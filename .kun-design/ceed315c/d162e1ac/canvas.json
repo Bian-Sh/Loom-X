@@ -1,0 +1,597 @@
+{
+  "version": 2,
+  "rootId": "__root__",
+  "objects": {
+    "__root__": {
+      "id": "__root__",
+      "type": "frame",
+      "name": "Root",
+      "parentId": null,
+      "frameId": null,
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [
+        "s_mt7yq5to_1",
+        "s_mt7yt2j1_2",
+        "s_mt7yt2kg_3",
+        "s_mt7yt2my_4",
+        "s_mt7yt2o1_5",
+        "s_mt7z1gwi_6",
+        "s_mt80c81v_7",
+        "s_mt80n74y_8",
+        "s_mt82dszr_c"
+      ]
+    },
+    "s_mt7yq5to_1": {
+      "id": "s_mt7yq5to_1",
+      "type": "frame",
+      "name": "Logo",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": -640,
+      "y": -4200,
+      "width": 1280,
+      "height": 597,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "ddfa596f",
+        "kind": "html",
+        "versionId": "ddfa596f-v1"
+      },
+      "htmlArtifactId": "ddfa596f",
+      "devicePreset": "desktop"
+    },
+    "s_mt7yt2j1_2": {
+      "id": "s_mt7yt2j1_2",
+      "type": "frame",
+      "name": "Overview",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 720,
+      "y": -4200,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "899ef30d",
+        "kind": "html",
+        "versionId": "899ef30d-v1"
+      },
+      "htmlArtifactId": "899ef30d",
+      "devicePreset": "desktop"
+    },
+    "s_mt7yt2kg_3": {
+      "id": "s_mt7yt2kg_3",
+      "type": "frame",
+      "name": "Models",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 2080,
+      "y": -4200,
+      "width": 1280,
+      "height": 962,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "7996c71a",
+        "kind": "html",
+        "versionId": "7996c71a-v1"
+      },
+      "htmlArtifactId": "7996c71a",
+      "devicePreset": "desktop"
+    },
+    "s_mt7yt2my_4": {
+      "id": "s_mt7yt2my_4",
+      "type": "frame",
+      "name": "Providers",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 3440,
+      "y": -4200,
+      "width": 1280,
+      "height": 1107,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "689f5fad",
+        "kind": "html",
+        "versionId": "689f5fad-v1"
+      },
+      "htmlArtifactId": "689f5fad",
+      "devicePreset": "desktop"
+    },
+    "s_mt7yt2o1_5": {
+      "id": "s_mt7yt2o1_5",
+      "type": "frame",
+      "name": "Activity",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 4800,
+      "y": -4200,
+      "width": 1280,
+      "height": 1064,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "de3c9aba",
+        "kind": "html",
+        "versionId": "de3c9aba-v1"
+      },
+      "htmlArtifactId": "de3c9aba",
+      "devicePreset": "desktop"
+    },
+    "s_mt7z1gwi_6": {
+      "id": "s_mt7z1gwi_6",
+      "type": "frame",
+      "name": "Overview",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 720,
+      "y": -4200,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "899ef30d",
+        "kind": "html",
+        "versionId": "899ef30d-v2"
+      },
+      "htmlArtifactId": "899ef30d",
+      "devicePreset": "desktop"
+    },
+    "s_mt80c81v_7": {
+      "id": "s_mt80c81v_7",
+      "type": "frame",
+      "name": "Activity",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 4800,
+      "y": -4200,
+      "width": 1280,
+      "height": 1064,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "de3c9aba",
+        "kind": "html",
+        "versionId": "de3c9aba-v2"
+      },
+      "htmlArtifactId": "de3c9aba",
+      "devicePreset": "desktop"
+    },
+    "s_mt80n74y_8": {
+      "id": "s_mt80n74y_8",
+      "type": "frame",
+      "name": "Logo",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": -630,
+      "y": -3581,
+      "width": 1280,
+      "height": 461,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "ddfa596f",
+        "kind": "html",
+        "versionId": "ddfa596f-v2"
+      },
+      "htmlArtifactId": "ddfa596f",
+      "devicePreset": "desktop"
+    },
+    "s_mt82dszr_c": {
+      "id": "s_mt82dszr_c",
+      "type": "frame",
+      "name": "Models",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 2080,
+      "y": -4200,
+      "width": 1280,
+      "height": 1005,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "7996c71a",
+        "kind": "html",
+        "versionId": "7996c71a-v2"
+      },
+      "htmlArtifactId": "7996c71a",
+      "devicePreset": "desktop"
+    }
+  },
+  "motion": {
+    "version": 1,
+    "timelines": {}
+  },
+  "graph": {
+    "version": 1,
+    "updatedAt": "2026-08-25T03:07:13.201Z",
+    "lastJournalEntryId": "journal_mt833kxd_4"
+  },
+  "operationJournal": [
+    {
+      "id": "journal_mt831qs3_2",
+      "label": "tool:tool_call_RjgTPt9paqosrqUnKuQd2TB2:0",
+      "createdAt": "2026-08-25T03:05:47.475Z",
+      "status": "applied",
+      "operations": [
+        {
+          "id": "renderer_replay:thr_3bd778c8eeae4889af037dd3d93182e2\u0000turn_fbd3e90f180b4c6f8364b120286941b0\u0000ceed315c\u0000d162e1ac\u0000tool:tool_call_RjgTPt9paqosrqUnKuQd2TB2:0",
+          "type": "delete_shape",
+          "label": "tool:tool_call_RjgTPt9paqosrqUnKuQd2TB2:0",
+          "source": "agent",
+          "createdAt": "2026-08-25T03:05:47.475Z",
+          "targetIds": [
+            "s_mt82dszr_c"
+          ],
+          "payload": {
+            "op": "delete",
+            "id": "s_mt82dszr_c"
+          }
+        }
+      ],
+      "affectedIds": [
+        "s_mt82dszr_c"
+      ],
+      "errors": []
+    },
+    {
+      "id": "journal_mt833kxd_4",
+      "label": "tool:tool_call_gNzaDUAa5mCkRfwrp8k8Xf5b:0",
+      "createdAt": "2026-08-25T03:07:13.201Z",
+      "status": "applied",
+      "operations": [
+        {
+          "id": "renderer_replay:thr_3bd778c8eeae4889af037dd3d93182e2\u0000turn_fbd3e90f180b4c6f8364b120286941b0\u0000ceed315c\u0000d162e1ac\u0000tool:tool_call_gNzaDUAa5mCkRfwrp8k8Xf5b:0",
+          "type": "generate_screen",
+          "label": "tool:tool_call_gNzaDUAa5mCkRfwrp8k8Xf5b:0",
+          "source": "agent",
+          "createdAt": "2026-08-25T03:07:13.201Z",
+          "targetIds": [],
+          "payload": {
+            "op": "add-screen",
+            "name": "Gateway",
+            "brief": "OllamaHub Control Center 网关页面。沿用现有深石墨背景、青绿色品牌色、蓝色信息色、浅灰高对比文本、8px 面板圆角和 240px desktop sidebar。左侧 sidebar 在所有页面统一，顺序为：概览、网关、Provider、活动、控制台；当前激活网关。页面目标是把 Ollama Endpoint 路由到 Provider 与 Model。主内容展示三个纵向堆叠的 Endpoint 配置区，直接标为 OpenAI、Ollama、Azure。每个 Endpoint 区域内部使用左右 split：左侧显示 endpoint 地址、监听状态、复制地址和路由说明；右侧显示该 Endpoint 当前绑定的模型列表，模型行展示 Provider、模型名、上下文大小、优先级、Enable/Disable 和拖拽排序。不要在本页展示 Selected Router 面板；路由深层编辑通过 Provider 页面下一级进入。页面首屏包含 H1 网关路由编排、保存网关配置主按钮、Endpoint 总数与启用路由上下文。包含空、禁用、保存成功、拖拽排序和 endpoint 未监听状态。响应式：1280x800 desktop 使用 240px sidebar 与三段纵向配置；tablet sidebar 收窄，mobile 改为顶部菜单，Endpoint 内部左右 split 改为上下堆叠，模型列表自然滚动。使用语义区块、清晰焦点态、40px 触控目标和 prefers-reduced-motion。导航链接到 Overview、Provider、Activity，并将 Console 作为 sidebar 目标。",
+            "x": 2055,
+            "y": -3036,
+            "width": 1280,
+            "height": 800,
+            "devicePreset": "desktop"
+          }
+        }
+      ],
+      "affectedIds": [
+        "s_mt833kxd_f"
+      ],
+      "errors": []
+    }
+  ],
+  "rendererReplayKeys": [
+    "thr_3bd778c8eeae4889af037dd3d93182e2\u0000turn_fbd3e90f180b4c6f8364b120286941b0\u0000ceed315c\u0000d162e1ac\u0000tool:tool_call_RjgTPt9paqosrqUnKuQd2TB2",
+    "thr_3bd778c8eeae4889af037dd3d93182e2\u0000turn_fbd3e90f180b4c6f8364b120286941b0\u0000ceed315c\u0000d162e1ac\u0000tool:tool_call_gNzaDUAa5mCkRfwrp8k8Xf5b"
+  ],
+  "rendererReplayWatermarkTurnId": "turn_bcc233f68428481ca9cf2afa971f12c6",
+  "codeBindings": [
+    {
+      "id": "binding_s_mt7yq5to_1_kun-design_ceed315c_ddfa596f_v1_html",
+      "designObjectId": "s_mt7yq5to_1",
+      "kind": "file",
+      "target": {
+        "sourceFile": ".kun-design/ceed315c/ddfa596f/v1.html"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T03:37:30.163Z",
+      "updatedAt": "2026-08-25T03:37:30.163Z",
+      "metadata": {
+        "tagName": "main",
+        "text": "LOCAL GATEWAY / CROSS-PLATFORM OllamaHub one local endpoint / many model protocols COMPACT LOCKUP OllamaHub MONOCHROME / ONE COLOR OllamaHub",
+        "rect": {
+          "left": 143,
+          "top": 0,
+          "width": 980,
+          "height": 752
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt7z1gwi_6_refreshBtn_kun-design_ceed315c_899ef30d_v2_html",
+      "designObjectId": "s_mt7z1gwi_6",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/ceed315c/899ef30d/v2.html",
+        "domId": "refreshBtn"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T01:19:47.403Z",
+      "updatedAt": "2026-08-25T03:41:25.180Z",
+      "metadata": {
+        "tagName": "button",
+        "text": "刷新状态",
+        "rect": {
+          "left": 1154,
+          "top": 12,
+          "width": 92,
+          "height": 44
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt7yt2kg_3_toast_kun-design_ceed315c_7996c71a_v1_html",
+      "designObjectId": "s_mt7yt2kg_3",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/ceed315c/7996c71a/v1.html",
+        "domId": "toast"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T01:36:12.801Z",
+      "updatedAt": "2026-08-25T03:41:22.057Z",
+      "metadata": {
+        "tagName": "div",
+        "rect": {
+          "left": 1209,
+          "top": 922,
+          "width": 32,
+          "height": 26
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt7yt2my_4_menuBtn_kun-design_ceed315c_689f5fad_v1_html",
+      "designObjectId": "s_mt7yt2my_4",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/ceed315c/689f5fad/v1.html",
+        "domId": "menuBtn"
+      },
+      "status": "stale",
+      "createdAt": "2026-08-25T01:40:39.065Z",
+      "updatedAt": "2026-08-25T01:40:52.654Z",
+      "metadata": {
+        "tagName": "button",
+        "text": "☰",
+        "rect": {
+          "left": 16,
+          "top": 55,
+          "width": 38,
+          "height": 40
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt7yt2my_4_toast_kun-design_ceed315c_689f5fad_v1_html",
+      "designObjectId": "s_mt7yt2my_4",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/ceed315c/689f5fad/v1.html",
+        "domId": "toast"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T01:40:52.654Z",
+      "updatedAt": "2026-08-25T03:41:16.561Z",
+      "metadata": {
+        "tagName": "div",
+        "rect": {
+          "left": 1224,
+          "top": 1067,
+          "width": 32,
+          "height": 26
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt7yt2o1_5_toast_kun-design_ceed315c_de3c9aba_v1_html",
+      "designObjectId": "s_mt7yt2o1_5",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/ceed315c/de3c9aba/v1.html",
+        "domId": "toast"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T01:45:22.425Z",
+      "updatedAt": "2026-08-25T03:41:18.981Z",
+      "metadata": {
+        "tagName": "div",
+        "rect": {
+          "left": 1209,
+          "top": 1024,
+          "width": 32,
+          "height": 26
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt80c81v_7_toast_kun-design_ceed315c_de3c9aba_v2_html",
+      "designObjectId": "s_mt80c81v_7",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/ceed315c/de3c9aba/v2.html",
+        "domId": "toast"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T01:49:59.456Z",
+      "updatedAt": "2026-08-25T03:41:18.860Z",
+      "metadata": {
+        "tagName": "div",
+        "rect": {
+          "left": 1224,
+          "top": 1024,
+          "width": 32,
+          "height": 26
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt80n74y_8_kun-design_ceed315c_ddfa596f_v2_html",
+      "designObjectId": "s_mt80n74y_8",
+      "kind": "file",
+      "target": {
+        "sourceFile": ".kun-design/ceed315c/ddfa596f/v2.html"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T03:37:30.110Z",
+      "updatedAt": "2026-08-25T03:37:30.110Z",
+      "metadata": {
+        "tagName": "main",
+        "text": "LOCAL GATEWAY / PROTOCOL BRIDGE OllamaHub one local endpoint / many model protocols COMPACT LOCKUP OllamaHub MONOCHROME / ONE COLOR OllamaHub",
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 1280,
+          "height": 597
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt82dszr_c_toast_kun-design_ceed315c_7996c71a_v2_html",
+      "designObjectId": "s_mt82dszr_c",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/ceed315c/7996c71a/v2.html",
+        "domId": "toast"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T02:47:12.322Z",
+      "updatedAt": "2026-08-25T03:41:22.141Z",
+      "metadata": {
+        "tagName": "div",
+        "rect": {
+          "left": 1224,
+          "top": 965,
+          "width": 32,
+          "height": 26
+        }
+      }
+    }
+  ]
+}
