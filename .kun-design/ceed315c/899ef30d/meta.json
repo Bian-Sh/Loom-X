@@ -22,13 +22,16 @@
   "designMdPath": ".kun-design/ceed315c/899ef30d/DESIGN.md",
   "previewStatus": "ready",
   "node": {
-    "x": 720,
-    "y": -4200,
+    "x": 750,
+    "y": -4140,
     "width": 1280,
     "height": 800,
     "sizeMode": "auto",
     "viewMode": "preview",
-    "boardHidden": false
+    "boardHidden": false,
+    "boardHiddenVersionIds": [
+      "899ef30d-v1"
+    ]
   },
   "direction": {
     "id": "5f8ece46",

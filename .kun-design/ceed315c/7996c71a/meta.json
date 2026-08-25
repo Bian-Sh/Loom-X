@@ -29,7 +29,10 @@
     "sizeMode": "auto",
     "viewMode": "preview",
     "boardHidden": false,
-    "boardHiddenVersionIds": []
+    "boardHiddenVersionIds": [
+      "7996c71a-v2",
+      "7996c71a-v1"
+    ]
   },
   "direction": {
     "id": "5f8ece46",
