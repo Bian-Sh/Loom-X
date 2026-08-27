@@ -1,6 +1,6 @@
 workflow: tweak
-language: en
-phase: open
+language: zh-CN
+phase: verify
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -14,7 +14,7 @@ base_ref: cfc2d43f4186bec2bab59b2d9aea5acd34460b73
 design_doc: null
 plan: null
 verify_result: pending
-verification_report: null
+verification_report: docs/superpowers/reports/2026-08-27-remove-topbar-status-verify.md
 branch_status: pending
 created_at: 2026-08-27
 verified_at: null
