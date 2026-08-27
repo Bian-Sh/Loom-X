@@ -1,0 +1,7 @@
+{
+  "openspec_proposal": "openspec/changes/remove-topbar-status/proposal.md",
+  "openspec_design": "openspec/changes/remove-topbar-status/design.md",
+  "openspec_tasks": "openspec/changes/remove-topbar-status/tasks.md",
+  "openspec_delta_spec": "openspec/changes/remove-topbar-status/specs/topbar-feedback/spec.md",
+  "build_tasks_complete": "openspec/changes/remove-topbar-status/tasks.md"
+}
