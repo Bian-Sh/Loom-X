@@ -30,7 +30,7 @@
       "path": ".design/pages/providers/index.html",
       "route": "/providers",
       "status": "active",
-      "responsibility": "管理上游 URL、协议、受保护 API key、请求头和连接测试。",
+      "responsibility": "以 SQLite 为配置真源，管理 Provider 身份、上游协议、受保护 API key、自定义请求头、连接测试、模型同步、排序与能力。",
       "source": { "artifactId": "689f5fad", "versionId": "689f5fad-v1" }
     },
     {
