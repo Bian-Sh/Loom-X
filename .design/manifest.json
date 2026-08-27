@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "project": "OllamaHub Control Center",
+  "entryPage": "overview",
+  "sourceArchive": ".kun-design/ceed315c",
+  "ownership": "codex",
+  "syncPolicy": "one-way-snapshot",
+  "pages": [
+    {
+      "key": "overview",
+      "title": "概览",
+      "path": ".design/pages/overview/index.html",
+      "route": "/overview",
+      "status": "active",
+      "responsibility": "确认本地服务健康、复制 endpoint、查看 Provider 状态和最近活动。",
+      "source": { "artifactId": "899ef30d", "versionId": "899ef30d-v2" }
+    },
+    {
+      "key": "gateway",
+      "title": "网关",
+      "path": ".design/pages/gateway/index.html",
+      "route": "/gateway",
+      "status": "active",
+      "responsibility": "维护 OpenAI、Ollama、Azure Endpoint 及其模型路由顺序。",
+      "source": { "artifactId": "a9213c1e", "versionId": "a9213c1e-v3" }
+    },
+    {
+      "key": "providers",
+      "title": "Provider",
+      "path": ".design/pages/providers/index.html",
+      "route": "/providers",
+      "status": "active",
+      "responsibility": "管理上游 URL、协议、受保护 API key、请求头和连接测试。",
+      "source": { "artifactId": "689f5fad", "versionId": "689f5fad-v1" }
+    },
+    {
+      "key": "activity",
+      "title": "活动",
+      "path": ".design/pages/activity/index.html",
+      "route": "/activity",
+      "status": "active",
+      "responsibility": "诊断请求、协议转换、延迟、状态码和脱敏日志上下文。",
+      "source": { "artifactId": "de3c9aba", "versionId": "de3c9aba-v2" }
+    },
+    {
+      "key": "console",
+      "title": "控制台",
+      "path": ".design/pages/console/index.html",
+      "route": "/console",
+      "status": "active",
+      "responsibility": "实时查看本地网关、代理和配置模块的脱敏运行日志。",
+      "source": { "artifactId": "a9213c1e", "versionId": "a9213c1e-v4" }
+    }
+  ]
+}
