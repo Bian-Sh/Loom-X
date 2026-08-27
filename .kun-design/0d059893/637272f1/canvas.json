@@ -1,0 +1,663 @@
+{
+  "version": 2,
+  "rootId": "__root__",
+  "objects": {
+    "__root__": {
+      "id": "__root__",
+      "type": "frame",
+      "name": "Root",
+      "parentId": null,
+      "frameId": null,
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [
+        "s_mt98xnrb_b",
+        "s_mt98xnrc_d",
+        "s_mt98xnrc_f",
+        "s_mt98xnrd_h",
+        "s_mt98xnrd_j",
+        "s_mt98xnrd_l",
+        "s_mt998kq4_t",
+        "s_mt998kq4_v",
+        "s_mt998kq4_x",
+        "s_mt998kq5_z",
+        "s_mt998kq5_11",
+        "s_mt998kq5_13"
+      ]
+    },
+    "s_mt98xnrb_b": {
+      "id": "s_mt98xnrb_b",
+      "type": "frame",
+      "name": "概览 Overview",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": -730,
+      "y": -590,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "14386075",
+        "kind": "html",
+        "versionId": "14386075-v1"
+      },
+      "htmlArtifactId": "14386075",
+      "devicePreset": "desktop"
+    },
+    "s_mt98xnrc_d": {
+      "id": "s_mt98xnrc_d",
+      "type": "frame",
+      "name": "网关 Gateway",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 660,
+      "y": -762.5,
+      "width": 1280,
+      "height": 1005,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "02a05d60",
+        "kind": "html",
+        "versionId": "02a05d60-v1"
+      },
+      "htmlArtifactId": "02a05d60",
+      "devicePreset": "desktop"
+    },
+    "s_mt98xnrc_f": {
+      "id": "s_mt98xnrc_f",
+      "type": "frame",
+      "name": "Provider 管理",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 2130,
+      "y": -590,
+      "width": 1280,
+      "height": 1095,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "7b51be19",
+        "kind": "html",
+        "versionId": "7b51be19-v1"
+      },
+      "htmlArtifactId": "7b51be19",
+      "devicePreset": "desktop"
+    },
+    "s_mt98xnrd_h": {
+      "id": "s_mt98xnrd_h",
+      "type": "frame",
+      "name": "请求活动 Activity",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": -640,
+      "y": 480,
+      "width": 1280,
+      "height": 1064,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "300c4cf3",
+        "kind": "html",
+        "versionId": "300c4cf3-v1"
+      },
+      "htmlArtifactId": "300c4cf3",
+      "devicePreset": "desktop"
+    },
+    "s_mt98xnrd_j": {
+      "id": "s_mt98xnrd_j",
+      "type": "frame",
+      "name": "控制台 Console",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 710,
+      "y": 610,
+      "width": 1280,
+      "height": 773,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "7ef92d4f",
+        "kind": "html",
+        "versionId": "7ef92d4f-v1"
+      },
+      "htmlArtifactId": "7ef92d4f",
+      "devicePreset": "desktop"
+    },
+    "s_mt98xnrd_l": {
+      "id": "s_mt98xnrd_l",
+      "type": "frame",
+      "name": "Logo 展示",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 2070,
+      "y": 839,
+      "width": 1280,
+      "height": 461,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "embeddedArtifact": {
+        "id": "e7083f1f",
+        "kind": "html",
+        "versionId": "e7083f1f-v1"
+      },
+      "htmlArtifactId": "e7083f1f",
+      "devicePreset": "desktop"
+    },
+    "s_mt998kq4_t": {
+      "id": "s_mt998kq4_t",
+      "type": "frame",
+      "name": "概览 Overview 2",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": -640,
+      "y": -400,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "htmlArtifactId": "86cc1f4a",
+      "embeddedArtifact": {
+        "id": "86cc1f4a",
+        "kind": "html",
+        "versionId": "86cc1f4a-v1"
+      },
+      "devicePreset": "desktop"
+    },
+    "s_mt998kq4_v": {
+      "id": "s_mt998kq4_v",
+      "type": "frame",
+      "name": "网关 Gateway 2",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 720,
+      "y": -400,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "htmlArtifactId": "9bab8341",
+      "embeddedArtifact": {
+        "id": "9bab8341",
+        "kind": "html",
+        "versionId": "9bab8341-v1"
+      },
+      "devicePreset": "desktop"
+    },
+    "s_mt998kq4_x": {
+      "id": "s_mt998kq4_x",
+      "type": "frame",
+      "name": "Provider 管理 2",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 2080,
+      "y": -400,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "htmlArtifactId": "add7153b",
+      "embeddedArtifact": {
+        "id": "add7153b",
+        "kind": "html",
+        "versionId": "add7153b-v1"
+      },
+      "devicePreset": "desktop"
+    },
+    "s_mt998kq5_z": {
+      "id": "s_mt998kq5_z",
+      "type": "frame",
+      "name": "请求活动 Activity 2",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": -640,
+      "y": 480,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "htmlArtifactId": "e528486a",
+      "embeddedArtifact": {
+        "id": "e528486a",
+        "kind": "html",
+        "versionId": "e528486a-v1"
+      },
+      "devicePreset": "desktop"
+    },
+    "s_mt998kq5_11": {
+      "id": "s_mt998kq5_11",
+      "type": "frame",
+      "name": "控制台 Console 2",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 720,
+      "y": 480,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "htmlArtifactId": "490bb806",
+      "embeddedArtifact": {
+        "id": "490bb806",
+        "kind": "html",
+        "versionId": "490bb806-v1"
+      },
+      "devicePreset": "desktop"
+    },
+    "s_mt998kq5_13": {
+      "id": "s_mt998kq5_13",
+      "type": "frame",
+      "name": "Logo 展示 2",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 2080,
+      "y": 480,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "htmlArtifactId": "6de0241f",
+      "embeddedArtifact": {
+        "id": "6de0241f",
+        "kind": "html",
+        "versionId": "6de0241f-v1"
+      },
+      "devicePreset": "desktop"
+    }
+  },
+  "motion": {
+    "version": 1,
+    "timelines": {}
+  },
+  "graph": {
+    "version": 1,
+    "updatedAt": "2026-08-25T22:38:20.809Z",
+    "lastJournalEntryId": "journal_mt98xnrd_a"
+  },
+  "operationJournal": [
+    {
+      "id": "journal_mt98xnrd_a",
+      "label": "tool:tool_call_JWZbXan3yZRp0X2LpE1KaGjX:0",
+      "createdAt": "2026-08-25T22:38:20.809Z",
+      "status": "applied",
+      "operations": [
+        {
+          "id": "renderer_replay:thr_05efdbd4fefc45a9b0d10a8cdad9b27e\u0000turn_a34ed5ab7bb24331998d225f7a450461\u00000d059893\u0000637272f1\u0000tool:tool_call_JWZbXan3yZRp0X2LpE1KaGjX:0",
+          "type": "generate_screen",
+          "label": "tool:tool_call_JWZbXan3yZRp0X2LpE1KaGjX:0",
+          "source": "agent",
+          "createdAt": "2026-08-25T22:38:20.809Z",
+          "targetIds": [],
+          "payload": {
+            "op": "add-screens",
+            "specs": [
+              {
+                "name": "概览 Overview",
+                "brief": "加载现有 HTML 设计，不重新构思或改版。源文件：.kun-design/ceed315c/899ef30d/v2.html。完整保留其 OllamaHub Control Center 概览页视觉样式、中文文案、响应式布局、状态演示、复制 endpoint 反馈、导航链接、可访问性和 prefers-reduced-motion 行为。以该文件当前内容作为页面实现来源。",
+                "x": -640,
+                "y": -400,
+                "width": 1280,
+                "height": 800,
+                "devicePreset": "desktop"
+              },
+              {
+                "name": "网关 Gateway",
+                "brief": "加载现有 HTML 设计，不重新构思或改版。源文件：.kun-design/ceed315c/7996c71a/v2.html。完整保留其 OllamaHub 网关路由编排页面、Endpoint 协议切换、路由列表、配置表单、保存与测试交互、导航链接、响应式布局、可访问性和 prefers-reduced-motion 行为。以该文件当前内容作为页面实现来源。",
+                "x": 720,
+                "y": -400,
+                "width": 1280,
+                "height": 800,
+                "devicePreset": "desktop"
+              },
+              {
+                "name": "Provider 管理",
+                "brief": "加载现有 HTML 设计，不重新构思或改版。源文件：.kun-design/ceed315c/689f5fad/v1.html。完整保留其上游 Provider 管理页面、Provider 注册表、配置编辑器、连接测试与保存交互、安全提示、导航链接、响应式布局、可访问性和 reduced-motion 行为。以该文件当前内容作为页面实现来源。",
+                "x": 2080,
+                "y": -400,
+                "width": 1280,
+                "height": 800,
+                "devicePreset": "desktop"
+              },
+              {
+                "name": "请求活动 Activity",
+                "brief": "加载现有 HTML 设计，不重新构思或改版。源文件：.kun-design/ceed315c/de3c9aba/v2.html。完整保留其请求活动页面、筛选与刷新交互、请求诊断信息、脱敏上下文、导航链接、响应式布局、可访问性和 reduced-motion 行为。以该文件当前内容作为页面实现来源。",
+                "x": -640,
+                "y": 480,
+                "width": 1280,
+                "height": 800,
+                "devicePreset": "desktop"
+              },
+              {
+                "name": "控制台 Console",
+                "brief": "加载现有 HTML 设计，不重新构思或改版。源文件：.kun-design/ceed315c/a9213c1e/v4.html。完整保留其控制台日志流页面、等级和模块筛选、搜索、暂停/恢复、清空视图、自动滚动、脱敏状态、导航链接、响应式布局、可访问性和 prefers-reduced-motion 行为。以该文件当前内容作为页面实现来源。",
+                "x": 720,
+                "y": 480,
+                "width": 1280,
+                "height": 800,
+                "devicePreset": "desktop"
+              },
+              {
+                "name": "Logo 展示",
+                "brief": "加载现有 HTML 设计，不重新构思或改版。源文件：.kun-design/ceed315c/ddfa596f/v2.html。完整保留其 OllamaHub Bridge Mark 品牌标志展示、主标志、紧凑横向组合和单色版本、响应式布局、SVG 可访问性与 reduced-motion 支持。以该文件当前内容作为页面实现来源。",
+                "x": 2080,
+                "y": 480,
+                "width": 1280,
+                "height": 800,
+                "devicePreset": "desktop"
+              }
+            ]
+          }
+        }
+      ],
+      "affectedIds": [
+        "s_mt98xnrb_b",
+        "s_mt98xnrc_d",
+        "s_mt98xnrc_f",
+        "s_mt98xnrd_h",
+        "s_mt98xnrd_j",
+        "s_mt98xnrd_l"
+      ],
+      "errors": []
+    }
+  ],
+  "rendererReplayKeys": [
+    "thr_05efdbd4fefc45a9b0d10a8cdad9b27e\u0000turn_a34ed5ab7bb24331998d225f7a450461\u00000d059893\u0000637272f1\u0000tool:tool_call_JWZbXan3yZRp0X2LpE1KaGjX"
+  ],
+  "rendererReplayWatermarkTurnId": "turn_565d1fb2c300416391b921edd2238561",
+  "codeBindings": [
+    {
+      "id": "binding_s_mt98xnrb_b_refreshBtn_kun-design_0d059893_14386075_v1_html",
+      "designObjectId": "s_mt98xnrb_b",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/0d059893/14386075/v1.html",
+        "domId": "refreshBtn"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T22:39:07.480Z",
+      "updatedAt": "2026-08-25T22:46:05.022Z",
+      "metadata": {
+        "tagName": "button",
+        "text": "刷新状态",
+        "rect": {
+          "left": 1154,
+          "top": 12,
+          "width": 92,
+          "height": 44
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt98xnrc_d_toast_kun-design_0d059893_02a05d60_v1_html",
+      "designObjectId": "s_mt98xnrc_d",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/0d059893/02a05d60/v1.html",
+        "domId": "toast"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T22:40:12.141Z",
+      "updatedAt": "2026-08-25T22:41:41.120Z",
+      "metadata": {
+        "tagName": "div",
+        "rect": {
+          "left": 1224,
+          "top": 965,
+          "width": 32,
+          "height": 26
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt98xnrc_f_toast_kun-design_0d059893_7b51be19_v1_html",
+      "designObjectId": "s_mt98xnrc_f",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/0d059893/7b51be19/v1.html",
+        "domId": "toast"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T22:41:05.460Z",
+      "updatedAt": "2026-08-25T22:47:17.357Z",
+      "metadata": {
+        "tagName": "div",
+        "rect": {
+          "left": 1224,
+          "top": 1055,
+          "width": 32,
+          "height": 26
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt98xnrd_h_toast_kun-design_0d059893_300c4cf3_v1_html",
+      "designObjectId": "s_mt98xnrd_h",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/0d059893/300c4cf3/v1.html",
+        "domId": "toast"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T22:42:00.613Z",
+      "updatedAt": "2026-08-25T22:46:52.292Z",
+      "metadata": {
+        "tagName": "div",
+        "rect": {
+          "left": 1224,
+          "top": 1024,
+          "width": 32,
+          "height": 26
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt98xnrd_j_console_kun-design_0d059893_7ef92d4f_v1_html",
+      "designObjectId": "s_mt98xnrd_j",
+      "kind": "dom-node",
+      "target": {
+        "sourceFile": ".kun-design/0d059893/7ef92d4f/v1.html",
+        "domId": "console"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T22:42:47.601Z",
+      "updatedAt": "2026-08-25T22:46:52.073Z",
+      "metadata": {
+        "tagName": "div",
+        "text": "10:42:18 INFO gateway OllamaHub listening on http://127.0.0.1:11434 10:42:21 OK config Loaded 3 providers and 6 exposed models from settings.json 10:43:04 INFO proxy req_7d91a2e4 · Claude Sonnet 4.5 · OpenAI → Anthropic · 842ms 10:43:17 WAR",
+        "rect": {
+          "left": 274,
+          "top": 248,
+          "width": 972,
+          "height": 460
+        }
+      }
+    },
+    {
+      "id": "binding_s_mt98xnrd_l_kun-design_0d059893_e7083f1f_v1_html",
+      "designObjectId": "s_mt98xnrd_l",
+      "kind": "file",
+      "target": {
+        "sourceFile": ".kun-design/0d059893/e7083f1f/v1.html"
+      },
+      "status": "active",
+      "createdAt": "2026-08-25T22:46:52.128Z",
+      "updatedAt": "2026-08-25T22:46:52.128Z",
+      "metadata": {
+        "tagName": "main",
+        "text": "LOCAL GATEWAY / PROTOCOL BRIDGE OllamaHub one local endpoint / many model protocols COMPACT LOCKUP OllamaHub MONOCHROME / ONE COLOR OllamaHub",
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "width": 1280,
+          "height": 597
+        }
+      }
+    }
+  ]
+}

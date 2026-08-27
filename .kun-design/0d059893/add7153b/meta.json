@@ -1,0 +1,27 @@
+{
+  "id": "add7153b",
+  "kind": "html",
+  "title": "Provider 管理 2",
+  "relativePath": ".kun-design/0d059893/add7153b/v1.html",
+  "createdAt": "2026-08-25T22:46:50.092Z",
+  "updatedAt": "2026-08-25T22:46:55.248Z",
+  "versions": [
+    {
+      "id": "add7153b-v1",
+      "relativePath": ".kun-design/0d059893/add7153b/v1.html",
+      "createdAt": "2026-08-25T22:46:50.092Z",
+      "summary": "加载现有 HTML 设计，不重新构思或改版。源文件：.kun-design/ceed315c/689f5fad/v1.html。完整保留其上游 Provider 管理页面、Provider 注册表、配置编辑器、连接测试与保存交互、安全提示、导航链接、响应式布局、可访问性和 reduced-motion 行为。以该文件当前内容作为页面实现来源。"
+    }
+  ],
+  "designMdPath": ".kun-design/0d059893/add7153b/DESIGN.md",
+  "previewStatus": "pending",
+  "node": {
+    "x": 2080,
+    "y": -400,
+    "width": 1280,
+    "height": 800,
+    "sizeMode": "auto",
+    "viewMode": "preview",
+    "boardHidden": false
+  }
+}

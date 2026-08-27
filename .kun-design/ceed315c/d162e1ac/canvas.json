@@ -25,7 +25,8 @@
         "s_mt80c81v_7",
         "s_mt80n74y_8",
         "s_mt872tve_k",
-        "s_mt88oy3f_l"
+        "s_mt88oy3f_l",
+        "s_mtaurntp_3"
       ]
     },
     "s_mt7yt2my_4": {
@@ -225,6 +226,39 @@
       },
       "htmlArtifactId": "a9213c1e",
       "devicePreset": "desktop"
+    },
+    "s_mtaurntp_3": {
+      "id": "s_mtaurntp_3",
+      "type": "frame",
+      "name": "Gateway 15",
+      "parentId": "__root__",
+      "frameId": null,
+      "x": 2055,
+      "y": -3036,
+      "width": 1280,
+      "height": 800,
+      "rotation": 0,
+      "opacity": 1,
+      "visible": true,
+      "locked": false,
+      "fills": [
+        {
+          "type": "solid",
+          "color": "#ffffff",
+          "opacity": 1
+        }
+      ],
+      "strokes": [],
+      "cornerRadius": 0,
+      "children": [],
+      "clipContent": true,
+      "htmlArtifactId": "aef4dcd9",
+      "embeddedArtifact": {
+        "id": "aef4dcd9",
+        "kind": "html",
+        "versionId": "aef4dcd9-v1"
+      },
+      "devicePreset": "desktop"
     }
   },
   "motion": {
@@ -294,7 +328,9 @@
       "errors": []
     },
     {
+      "id": "journal_mt8ckrlg_g",
       "label": "tool:tool_call_5YZLsS0Ys3Y72BXrJe7MLHUo:0",
+      "createdAt": "2026-08-25T07:32:31.540Z",
       "status": "applied",
       "operations": [
         {
@@ -345,9 +381,7 @@
         "s_mt85vqt5_i",
         "s_mt8cc3ud_o"
       ],
-      "errors": [],
-      "id": "journal_mt8ckrlg_g",
-      "createdAt": "2026-08-25T07:32:31.540Z"
+      "errors": []
     }
   ],
   "rendererReplayKeys": [
@@ -355,7 +389,7 @@
     "thr_3bd778c8eeae4889af037dd3d93182e2\u0000turn_fbd3e90f180b4c6f8364b120286941b0\u0000ceed315c\u0000d162e1ac\u0000tool:tool_call_gNzaDUAa5mCkRfwrp8k8Xf5b",
     "thr_3bd778c8eeae4889af037dd3d93182e2\u0000turn_e477cf8b0d34473f99347731bee68be9\u0000ceed315c\u0000d162e1ac\u0000tool:tool_call_5YZLsS0Ys3Y72BXrJe7MLHUo"
   ],
-  "rendererReplayWatermarkTurnId": "turn_e477cf8b0d34473f99347731bee68be9",
+  "rendererReplayWatermarkTurnId": "turn_a092f40370dc421d89d73d9a4ed27c0b",
   "codeBindings": [
     {
       "id": "binding_s_mt7yq5to_1_kun-design_ceed315c_ddfa596f_v1_html",
@@ -388,7 +422,7 @@
       },
       "status": "active",
       "createdAt": "2026-08-25T01:19:47.403Z",
-      "updatedAt": "2026-08-25T07:34:51.074Z",
+      "updatedAt": "2026-08-27T02:19:49.038Z",
       "metadata": {
         "tagName": "button",
         "text": "刷新状态",
@@ -453,7 +487,7 @@
       },
       "status": "active",
       "createdAt": "2026-08-25T01:40:52.654Z",
-      "updatedAt": "2026-08-25T07:34:47.678Z",
+      "updatedAt": "2026-08-27T02:19:47.489Z",
       "metadata": {
         "tagName": "div",
         "rect": {
@@ -495,7 +529,7 @@
       },
       "status": "active",
       "createdAt": "2026-08-25T01:49:59.456Z",
-      "updatedAt": "2026-08-25T07:34:34.275Z",
+      "updatedAt": "2026-08-27T02:19:46.500Z",
       "metadata": {
         "tagName": "div",
         "rect": {
@@ -514,8 +548,8 @@
         "sourceFile": ".kun-design/ceed315c/ddfa596f/v2.html"
       },
       "status": "active",
-      "createdAt": "2026-08-25T07:34:51.553Z",
-      "updatedAt": "2026-08-25T07:34:51.553Z",
+      "createdAt": "2026-08-27T02:19:50.243Z",
+      "updatedAt": "2026-08-27T02:19:50.243Z",
       "metadata": {
         "tagName": "main",
         "text": "LOCAL GATEWAY / PROTOCOL BRIDGE OllamaHub one local endpoint / many model protocols COMPACT LOCKUP OllamaHub MONOCHROME / ONE COLOR OllamaHub",
@@ -622,7 +656,7 @@
       },
       "status": "active",
       "createdAt": "2026-08-25T04:58:38.514Z",
-      "updatedAt": "2026-08-25T07:34:49.126Z",
+      "updatedAt": "2026-08-27T02:19:48.458Z",
       "metadata": {
         "tagName": "span",
         "text": "2 个 Endpoint 已启用",
@@ -666,7 +700,7 @@
       },
       "status": "active",
       "createdAt": "2026-08-25T05:45:29.679Z",
-      "updatedAt": "2026-08-25T07:34:39.935Z",
+      "updatedAt": "2026-08-27T01:41:28.493Z",
       "metadata": {
         "tagName": "div",
         "text": "10:42:18 INFO gateway OllamaHub listening on http://127.0.0.1:11434 10:42:21 OK config Loaded 3 providers and 6 exposed models from settings.json 10:43:04 INFO proxy req_7d91a2e4 · Claude Sonnet 4.5 · OpenAI → Anthropic · 842ms 10:43:17 WAR",

@@ -27,17 +27,11 @@
     "width": 1280,
     "height": 1064,
     "sizeMode": "auto",
-    "viewMode": "preview",
     "boardHidden": false,
     "boardHiddenVersionIds": [
       "de3c9aba-v1"
-    ]
-  },
-  "direction": {
-    "id": "5f8ece46",
-    "name": "开干啊，使用白板canvas画图",
-    "status": "active",
-    "createdAt": "2026-08-25T01:07:04.315Z"
+    ],
+    "viewMode": "preview"
   },
   "prototypeLinks": [
     {
@@ -45,5 +39,11 @@
       "targetArtifactId": "899ef30d",
       "href": "../899ef30d/v1.html"
     }
-  ]
+  ],
+  "direction": {
+    "id": "5f8ece46",
+    "name": "开干啊，使用白板canvas画图",
+    "status": "active",
+    "createdAt": "2026-08-25T01:07:04.315Z"
+  }
 }

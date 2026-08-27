@@ -1,0 +1,27 @@
+{
+  "id": "e7083f1f",
+  "kind": "html",
+  "title": "Logo 展示",
+  "relativePath": ".kun-design/0d059893/e7083f1f/v1.html",
+  "createdAt": "2026-08-25T22:38:20.809Z",
+  "updatedAt": "2026-08-25T22:43:10.488Z",
+  "versions": [
+    {
+      "id": "e7083f1f-v1",
+      "relativePath": ".kun-design/0d059893/e7083f1f/v1.html",
+      "createdAt": "2026-08-25T22:38:20.809Z",
+      "summary": "加载现有 HTML 设计，不重新构思或改版。源文件：.kun-design/ceed315c/ddfa596f/v2.html。完整保留其 OllamaHub Bridge Mark 品牌标志展示、主标志、紧凑横向组合和单色版本、响应式布局、SVG 可访问性与 reduced-motion 支持。以该文件当前内容作为页面实现来源。"
+    }
+  ],
+  "designMdPath": ".kun-design/0d059893/e7083f1f/DESIGN.md",
+  "previewStatus": "ready",
+  "node": {
+    "x": 2070,
+    "y": 839,
+    "width": 1280,
+    "height": 461,
+    "sizeMode": "auto",
+    "viewMode": "preview",
+    "boardHidden": false
+  }
+}
