@@ -8,13 +8,13 @@
 
 - Codex 只修改 `.design` 中的原型、规范和工具。
 - `.kun-design` 作为只读历史档案，不再回写或同步。
-- 五个业务页面使用稳定、可读的路径，不再依赖随机 artifact ID。
-- 页面可以直接从本地文件打开，并能在五个页面之间完整导航。
+- 六个业务页面使用稳定、可读的路径，不再依赖随机 artifact ID。
+- 页面可以直接从本地文件打开，并能在六个页面之间完整导航。
 - 原型结构适合 vibecoding：入口明确、上下文集中、变更容易验证。
 
 ## 2. 范围
 
-当前维护以下五个业务页面：
+当前维护以下六个业务页面：
 
 | 页面键 | 页面名称 | 旧版来源 | 新路径 |
 | --- | --- | --- | --- |
@@ -23,6 +23,7 @@
 | `providers` | Provider | `689f5fad/v1.html` | `.design/pages/providers/index.html` |
 | `activity` | 活动 | `de3c9aba/v2.html` | `.design/pages/activity/index.html` |
 | `console` | 控制台 | `a9213c1e/v4.html` | `.design/pages/console/index.html` |
+| `settings` | 设置 | Codex 新增 | `.design/pages/settings/index.html` |
 
 Logo、空白 Screen、生成中占位页、旧 Gateway 方案和白板操作日志不迁入主原型，只在来源映射中留档。
 
@@ -39,7 +40,8 @@ Logo、空白 Screen、生成中占位页、旧 Gateway 方案和白板操作日
 │  ├─ gateway/index.html
 │  ├─ providers/index.html
 │  ├─ activity/index.html
-│  └─ console/index.html
+│  ├─ console/index.html
+│  └─ settings/index.html
 ├─ shared/                   后续出现真实复用时再提取共享资源
 └─ scripts/
    └─ validate.ps1           只读校验入口
@@ -55,7 +57,7 @@ Logo、空白 Screen、生成中占位页、旧 Gateway 方案和白板操作日
 - `project`：项目名称。
 - `entryPage`：默认入口页面键。
 - `sourceArchive`：原 Kun Design 工作区路径。
-- `pages`：五个页面对象。
+- `pages`：六个页面对象。
 
 每个页面对象包含：
 
@@ -71,7 +73,7 @@ Logo、空白 Screen、生成中占位页、旧 Gateway 方案和白板操作日
 
 ## 5. 导航规则
 
-五个页面统一使用相对于当前 HTML 的链接：
+六个页面统一使用相对于当前 HTML 的链接：
 
 ```text
 ../overview/index.html
@@ -79,12 +81,13 @@ Logo、空白 Screen、生成中占位页、旧 Gateway 方案和白板操作日
 ../providers/index.html
 ../activity/index.html
 ../console/index.html
+../settings/index.html
 ```
 
 规则如下：
 
 - 产品 Logo 始终返回 Overview。
-- 主导航顺序固定为：概览、网关、Provider、活动、控制台。
+- 主导航顺序固定为：概览、网关、Provider、活动、控制台、设置。
 - 当前页面必须设置 `aria-current="page"`。
 - 页面中的上下文链接必须指向 `.design` 内的有效页面，不得继续引用 `.kun-design`。
 - 原型不得依赖本地服务即可完成基础浏览与交互。
@@ -119,7 +122,7 @@ Logo、空白 Screen、生成中占位页、旧 Gateway 方案和白板操作日
 `validate.ps1` 至少检查：
 
 - `manifest.json` 可以解析。
-- 清单中恰好存在五个 `active` 页面。
+- 清单中恰好存在六个 `active` 页面。
 - 每个页面文件存在。
 - 页面键、路径和来源 ID 唯一。
 - HTML 不包含 `.kun-design` 引用。
@@ -128,8 +131,8 @@ Logo、空白 Screen、生成中占位页、旧 Gateway 方案和白板操作日
 
 本次迁移完成的判断标准：
 
-- 五个页面均能直接打开。
-- 五页主导航互相可达。
+- 六个页面均能直接打开。
+- 六页主导航互相可达。
 - 当前页面高亮正确。
 - 原有主要交互仍可使用。
 - 校验脚本通过。

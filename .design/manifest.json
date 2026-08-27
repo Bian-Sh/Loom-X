@@ -50,6 +50,15 @@
       "status": "active",
       "responsibility": "实时查看本地网关、代理和配置模块的脱敏运行日志。",
       "source": { "artifactId": "a9213c1e", "versionId": "a9213c1e-v4" }
+    },
+    {
+      "key": "settings",
+      "title": "设置",
+      "path": ".design/pages/settings/index.html",
+      "route": "/settings",
+      "status": "active",
+      "responsibility": "管理界面语言、主题、代理、更新、数据与隐私及关于信息。",
+      "source": { "artifactId": "codex-settings", "versionId": "codex-settings-v1" }
     }
   ]
 }

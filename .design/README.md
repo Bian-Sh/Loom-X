@@ -11,6 +11,7 @@
 | Provider | [pages/providers/index.html](./pages/providers/index.html) |
 | 活动 | [pages/activity/index.html](./pages/activity/index.html) |
 | 控制台 | [pages/console/index.html](./pages/console/index.html) |
+| 设置 | [pages/settings/index.html](./pages/settings/index.html) |
 
 页面清单见 [manifest.json](./manifest.json)，完整维护规则见 [design.md](./design.md)，旧 Kun Design 来源见 [archive-map.md](./archive-map.md)。
 

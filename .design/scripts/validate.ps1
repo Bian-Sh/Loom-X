@@ -5,11 +5,11 @@ $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $manifestPath = Join-Path $root 'manifest.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding utf8 | ConvertFrom-Json
 
-if ($manifest.pages.Count -ne 5) { throw "manifest 必须包含 5 个页面，实际为 $($manifest.pages.Count) 个。" }
+if ($manifest.pages.Count -ne 6) { throw "manifest 必须包含 6 个页面，实际为 $($manifest.pages.Count) 个。" }
 $active = @($manifest.pages | Where-Object status -eq 'active')
-if ($active.Count -ne 5) { throw "active 页面必须为 5 个，实际为 $($active.Count) 个。" }
-if (($manifest.pages.key | Sort-Object -Unique).Count -ne 5) { throw '页面 key 必须唯一。' }
-if (($manifest.pages.path | Sort-Object -Unique).Count -ne 5) { throw '页面 path 必须唯一。' }
+if ($active.Count -ne 6) { throw "active 页面必须为 6 个，实际为 $($active.Count) 个。" }
+if (($manifest.pages.key | Sort-Object -Unique).Count -ne 6) { throw '页面 key 必须唯一。' }
+if (($manifest.pages.path | Sort-Object -Unique).Count -ne 6) { throw '页面 path 必须唯一。' }
 
 $allPages = @{}
 foreach ($page in $manifest.pages) {
