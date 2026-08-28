@@ -33,7 +33,7 @@ New-Item -ItemType Directory -Force -Path $publishDirectory | Out-Null
     "Visual Studio：$IdePath",
     "项目：$projectPath",
     "运行时：win-x64",
-    "自包含：false",
+    "自包含：true",
     "配置：$Configuration"
 ) | Set-Content -LiteralPath $logPath -Encoding utf8
 
@@ -42,13 +42,30 @@ $publishArguments = @(
     "publish", $projectPath,
     "--configuration", $Configuration,
     "--runtime", "win-x64",
-    "--self-contained", "false",
+    "--self-contained", "true",
+    "--property:PublishSingleFile=false",
     "--output", $publishDirectory,
     "--nologo"
 )
 & dotnet @publishArguments 2>&1 | Tee-Object -FilePath $logPath -Append
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish 失败，退出码：$LASTEXITCODE。详情请查看：$logPath"
+}
+
+$generatedCrashDumper = Join-Path $publishDirectory "createdump.exe"
+if (Test-Path -LiteralPath $generatedCrashDumper) {
+    Remove-Item -LiteralPath $generatedCrashDumper -Force
+}
+
+$gatewayAppHost = Join-Path $publishDirectory "OllamaHub.exe"
+if (Test-Path -LiteralPath $gatewayAppHost) {
+    Remove-Item -LiteralPath $gatewayAppHost -Force
+}
+
+$executables = @(Get-ChildItem -LiteralPath $publishDirectory -Filter *.exe -File)
+if ($executables.Count -ne 1 -or $executables[0].Name -ne "OllamaHub.Desktop.exe") {
+    $names = if ($executables.Count -eq 0) { "(none)" } else { ($executables | ForEach-Object Name) -join ", " }
+    throw "Publish output must contain only OllamaHub.Desktop.exe; actual: $names"
 }
 
 Write-Host "发布目录：$publishDirectory"

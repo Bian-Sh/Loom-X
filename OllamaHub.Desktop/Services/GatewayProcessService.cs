@@ -1,5 +1,6 @@
-using System.Diagnostics;
 using System.Net.Http;
+using Microsoft.AspNetCore.Builder;
+using OllamaHub;
 
 namespace OllamaHub.Desktop.Services;
 
@@ -16,7 +17,7 @@ public sealed class GatewayProcessService : IDisposable
 {
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(1) };
     private readonly SemaphoreSlim lifecycleLock = new(1, 1);
-    private Process? process;
+    private WebApplication? app;
 
     public GatewayState State { get; private set; } = GatewayState.Stopped;
     public string? Error { get; private set; }
@@ -29,23 +30,11 @@ public sealed class GatewayProcessService : IDisposable
         try
         {
             if (await CheckHealthCoreAsync(endpoint, cancellationToken)) return;
-            if (process is { HasExited: false }) return;
+            if (app is not null) return;
 
             SetState(GatewayState.Starting, null);
-            var gatewayDll = Path.Combine(AppContext.BaseDirectory, "OllamaHub.dll");
-            if (!File.Exists(gatewayDll)) throw new FileNotFoundException("未找到 OllamaHub 网关程序集，请先构建网关项目。", gatewayDll);
-
-            process = Process.Start(new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                Arguments = $"\"{gatewayDll}\"",
-                WorkingDirectory = AppContext.BaseDirectory,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            });
-            if (process is null) throw new InvalidOperationException("网关进程启动失败。");
-            process.EnableRaisingEvents = true;
-            process.Exited += ProcessExited;
+            app = await OllamaHubHost.CreateAsync(cancellationToken);
+            await app.StartAsync(cancellationToken);
 
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
             while (DateTime.UtcNow < deadline)
@@ -84,19 +73,16 @@ public sealed class GatewayProcessService : IDisposable
         await lifecycleLock.WaitAsync(cancellationToken);
         try
         {
-            if (process is null || process.HasExited)
+            if (app is null)
             {
-                process?.Dispose();
-                process = null;
                 SetState(GatewayState.Stopped, null);
                 return;
             }
 
             SetState(GatewayState.Stopping, null);
-            process.Kill(entireProcessTree: true);
-            await process.WaitForExitAsync(cancellationToken);
-            process.Dispose();
-            process = null;
+            await app.StopAsync(cancellationToken);
+            await app.DisposeAsync();
+            app = null;
             SetState(GatewayState.Stopped, null);
         }
         finally { lifecycleLock.Release(); }
@@ -117,18 +103,13 @@ public sealed class GatewayProcessService : IDisposable
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            if (process is null or { HasExited: true }) SetState(GatewayState.Stopped, null);
+            if (app is null) SetState(GatewayState.Stopped, null);
         }
         catch (HttpRequestException)
         {
-            if (process is null or { HasExited: true }) SetState(GatewayState.Stopped, null);
+            if (app is null) SetState(GatewayState.Stopped, null);
         }
         return false;
-    }
-
-    private void ProcessExited(object? sender, EventArgs args)
-    {
-        if (ReferenceEquals(sender, process)) SetState(GatewayState.Failed, "网关进程已退出。");
     }
 
     private void SetState(GatewayState state, string? error)
@@ -140,7 +121,11 @@ public sealed class GatewayProcessService : IDisposable
 
     public void Dispose()
     {
-        process?.Dispose();
+        if (app is not null)
+        {
+            app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            app = null;
+        }
         httpClient.Dispose();
         lifecycleLock.Dispose();
     }

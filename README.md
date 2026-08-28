@@ -91,7 +91,9 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 
 发布桌面端：
 
-`dotnet publish OllamaHub.Desktop -c Release -r win-x64 --self-contained false -o <output-directory>`
+`dotnet publish OllamaHub.Desktop -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o <output-directory>`
+
+发布目录只包含一个应用入口 `OllamaHub.Desktop.exe`，网关在桌面进程内运行，不会生成或启动独立的 `OllamaHub.exe`。
 
 ## Visual Studio Copilot Chat BYOM
 
