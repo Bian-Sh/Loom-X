@@ -15,34 +15,48 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private readonly GatewayProcessService gatewayService;
     private readonly ConfigSnapshotService configService = new();
     private object currentView = new PlaceholderViewModel("加载中", "正在加载桌面控制中心。");
+    private string pageTitle = "概览";
+    private string pageDescription = "确认本地服务健康，快速查看网关与模型配置。";
 
     public ObservableCollection<NavigationItemViewModel> NavigationItems { get; }
     public object CurrentView { get => currentView; private set => SetProperty(ref currentView, value); }
+    public string PageTitle { get => pageTitle; private set => SetProperty(ref pageTitle, value); }
+    public string PageDescription { get => pageDescription; private set => SetProperty(ref pageDescription, value); }
 
     public MainWindowViewModel(GatewayProcessService gatewayService)
     {
         this.gatewayService = gatewayService;
         NavigationItems = new([
-            new("概览", () => ShowOverview()),
-            new("网关", () => ShowPlaceholder("网关", "网关路由与监听地址将在下一阶段接入。")),
-            new("Provider", () => ShowProviders()),
-            new("活动", () => ShowPlaceholder("活动", "请求诊断与协议转换记录将在下一阶段接入。")),
-            new("控制台", () => ShowPlaceholder("控制台", "实时运行日志将在下一阶段接入。")),
-            new("设置", () => ShowPlaceholder("设置", "主题、代理和数据设置将在下一阶段接入。"))
+            new("概览", "◉", () => ShowOverview()),
+            new("网关", "▦", () => ShowPlaceholder("网关", "网关路由与监听地址将在下一阶段接入。")),
+            new("Provider", "⇄", () => ShowProviders()),
+            new("活动", "≋", () => ShowPlaceholder("活动", "请求诊断与协议转换记录将在下一阶段接入。")),
+            new("控制台", "⌘", () => ShowPlaceholder("控制台", "实时运行日志将在下一阶段接入。"), "运维"),
+            new("设置", "⚙", () => ShowPlaceholder("设置", "主题、代理和数据设置将在下一阶段接入。"))
         ]);
         ShowOverview();
     }
 
-    private void ShowOverview() => CurrentView = new OverviewViewModel(gatewayService, configService);
-    private void ShowProviders() => CurrentView = new ProvidersViewModel(configService);
-    private void ShowPlaceholder(string title, string description) => CurrentView = new PlaceholderViewModel(title, description);
+    private void SetActive(string title)
+    {
+        foreach (var item in NavigationItems) item.IsActive = item.Title == title;
+    }
+
+    private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = new OverviewViewModel(gatewayService, configService); }
+    private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService); }
+    private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
 }
 
-public sealed class NavigationItemViewModel
+public sealed class NavigationItemViewModel : NotifyViewModel
 {
     public string Title { get; }
+    public string Icon { get; }
+    public string? SectionLabel { get; }
+    public bool HasSectionLabel => !string.IsNullOrWhiteSpace(SectionLabel);
+    private bool isActive;
+    public bool IsActive { get => isActive; set => SetProperty(ref isActive, value); }
     public ICommand NavigateCommand { get; }
-    public NavigationItemViewModel(string title, Action action) { Title = title; NavigateCommand = new DelegateCommand(action); }
+    public NavigationItemViewModel(string title, string icon, Action action, string? sectionLabel = null) { Title = title; Icon = icon; SectionLabel = sectionLabel; NavigateCommand = new DelegateCommand(action); }
 }
 
 public sealed class OverviewViewModel : NotifyViewModel
@@ -144,8 +158,10 @@ public sealed class ProvidersViewModel : NotifyViewModel
             SetProperty(ref selectedProvider, value);
             AttachProvider(selectedProvider);
             SelectedModel = null;
+            OnPropertyChanged(nameof(HasSelectedProvider));
         }
     }
+    public bool HasSelectedProvider => SelectedProvider is not null;
 
     public ModelEditorViewModel? SelectedModel
     {

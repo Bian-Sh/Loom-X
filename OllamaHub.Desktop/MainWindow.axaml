@@ -1,14 +1,17 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="OllamaHub 控制中心" Background="#F7F8FA">
   <Window.Styles>
-    <Style Selector="Button.nav-button">
+    <Style Selector="ToggleButton.nav-button">
       <Setter Property="HorizontalContentAlignment" Value="Left"/>
       <Setter Property="HorizontalAlignment" Value="Stretch"/>
       <Setter Property="Padding" Value="12,10"/>
       <Setter Property="Margin" Value="0,2"/>
       <Setter Property="MinHeight" Value="40"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
     </Style>
+    <Style Selector="ToggleButton.nav-button:checked"><Setter Property="Background" Value="#DCE5EC"/><Setter Property="Foreground" Value="#101820"/></Style>
   </Window.Styles>
-  <Grid ColumnDefinitions="232,*">
+  <Grid ColumnDefinitions="208,*">
     <Border Grid.Column="0" Background="#EEF1F5" BorderBrush="#D7DCE3" BorderThickness="0,0,1,0" Padding="14,22">
       <Grid RowDefinitions="Auto,*,Auto">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="8,0,8,28">
@@ -24,7 +27,15 @@
           <ItemsControl ItemsSource="{Binding NavigationItems}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Button Content="{Binding Title}" Command="{Binding NavigateCommand}" Classes="nav-button"/>
+                <StackPanel Spacing="3">
+                  <TextBlock Text="{Binding SectionLabel}" FontSize="10" Opacity="0.55" Margin="10,10,0,2" IsVisible="{Binding HasSectionLabel}"/>
+                  <ToggleButton Command="{Binding NavigateCommand}" IsChecked="{Binding IsActive}" Classes="nav-button">
+                    <StackPanel Orientation="Horizontal" Spacing="11">
+                      <TextBlock Text="{Binding Icon}" Width="18" Foreground="#176B87" HorizontalAlignment="Center"/>
+                      <TextBlock Text="{Binding Title}"/>
+                    </StackPanel>
+                  </ToggleButton>
+                </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -32,28 +43,20 @@
         <Border Grid.Row="2" BorderBrush="#D7DCE3" BorderThickness="0,1,0,0" Padding="8,14,8,0">
           <StackPanel Spacing="3">
             <TextBlock Text="本地服务" FontSize="11" Opacity="0.58"/>
-            <TextBlock Text="事件驱动 · 自动保存" FontSize="11" Foreground="#23835A"/>
+            <TextBlock Text="服务版本" FontSize="11" Opacity="0.58"/>
+            <TextBlock Text="本地服务" FontSize="11" Foreground="#23835A"/>
           </StackPanel>
         </Border>
       </Grid>
     </Border>
-    <Grid Grid.Column="1" RowDefinitions="64,*">
-      <Border Grid.Row="0" Background="#F7F8FA" BorderBrush="#D7DCE3" BorderThickness="0,0,0,1" Padding="24,0">
-        <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-          <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <TextBlock Text="控制中心" Opacity="0.58" FontSize="13"/>
-            <TextBlock Text="/" Opacity="0.4" FontSize="13"/>
-            <TextBlock Text="Provider" FontWeight="SemiBold" FontSize="13"/>
-          </StackPanel>
-          <Border Grid.Column="1" Background="#EDF7F0" BorderBrush="#B7DFC6" BorderThickness="1" CornerRadius="5" Padding="8,4">
-            <StackPanel Orientation="Horizontal" Spacing="7">
-              <Ellipse Width="7" Height="7" Fill="#23835A" VerticalAlignment="Center"/>
-              <TextBlock Text="本地配置已连接" Foreground="#23835A" FontSize="11"/>
-            </StackPanel>
-          </Border>
-        </Grid>
+    <Grid Grid.Column="1" RowDefinitions="92,*">
+      <Border Grid.Row="0" Background="#F7F8FA" BorderBrush="#D7DCE3" BorderThickness="0,0,0,1" Padding="32,0">
+        <StackPanel VerticalAlignment="Center" Spacing="4">
+          <TextBlock Text="{Binding PageTitle}" FontSize="28" FontWeight="Bold"/>
+          <TextBlock Text="{Binding PageDescription}" FontSize="12" Opacity="0.62"/>
+        </StackPanel>
       </Border>
-      <Border Grid.Row="1" Padding="24,20" Background="#F7F8FA">
+      <Border Grid.Row="1" Padding="32,18" Background="#F7F8FA">
         <ContentControl Content="{Binding CurrentView}"/>
       </Border>
     </Grid>

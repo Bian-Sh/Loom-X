@@ -1,47 +1,35 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.Views.ProvidersView">
   <UserControl.Styles>
-    <Style Selector="TextBlock.muted"><Setter Property="Opacity" Value="0.62"/><Setter Property="FontSize" Value="11"/></Style>
-    <Style Selector="TextBlock.field-label"><Setter Property="Opacity" Value="0.68"/><Setter Property="FontSize" Value="11"/></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Opacity" Value="0.62"/><Setter Property="FontSize" Value="10"/></Style>
     <Style Selector="Border.panel"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/></Style>
     <Style Selector="Border.stat"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/><Setter Property="Padding" Value="14,12"/></Style>
     <Style Selector="Button.icon-button"><Setter Property="Width" Value="36"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/></Style>
     <Style Selector="Button.small-button"><Setter Property="Padding" Value="10,6"/><Setter Property="MinHeight" Value="32"/></Style>
   </UserControl.Styles>
   <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-    <StackPanel Spacing="14">
-      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,2">
-        <StackPanel Spacing="4">
-          <TextBlock Text="Provider" FontSize="30" FontWeight="Bold"/>
-          <TextBlock Text="管理上游连接、请求协议、密钥与可用模型。" Classes="muted" FontSize="13"/>
-        </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
-          <Button Content="刷新" Command="{Binding RefreshCommand}" Classes="small-button"/>
-          <Button Content="新增 Provider" Command="{Binding NewProviderCommand}" Classes="small-button"/>
-        </StackPanel>
-      </Grid>
-
+    <StackPanel Spacing="12">
       <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
         <Border Classes="stat">
           <StackPanel Spacing="3"><TextBlock Text="Provider" Classes="muted"/><TextBlock Text="{Binding Providers.Count}" FontSize="21" FontWeight="Bold"/><TextBlock Text="{Binding EnabledProviderCount, StringFormat='{}{0} 个已启用'}" Foreground="#23835A" FontSize="11"/></StackPanel>
         </Border>
         <Border Grid.Column="1" Classes="stat">
-          <StackPanel Spacing="3"><TextBlock Text="可用模型" Classes="muted"/><TextBlock Text="{Binding TotalModelCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="Provider 下的模型总数" Classes="muted"/></StackPanel>
+          <StackPanel Spacing="3"><TextBlock Text="可用模型" Classes="muted"/><TextBlock Text="{Binding TotalModelCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="远程模型已发现" Foreground="#23835A" FontSize="11"/></StackPanel>
         </Border>
         <Border Grid.Column="2" Classes="stat">
-          <StackPanel Spacing="3"><TextBlock Text="受保护密钥" Classes="muted"/><TextBlock Text="{Binding ProtectedKeyCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="本地数据库保存" Classes="muted"/></StackPanel>
+          <StackPanel Spacing="3"><TextBlock Text="受保护密钥" Classes="muted"/><TextBlock Text="{Binding ProtectedKeyCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="DPAPI CurrentUser" Foreground="#23835A" FontSize="11"/></StackPanel>
         </Border>
         <Border Grid.Column="3" Classes="stat">
-          <StackPanel Spacing="3"><TextBlock Text="连接健康" Classes="muted"/><StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="{Binding HealthyProviderCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="/" FontSize="17" VerticalAlignment="Center" Opacity="0.5"/><TextBlock Text="{Binding Providers.Count}" FontSize="17" VerticalAlignment="Center" Opacity="0.7"/></StackPanel><TextBlock Text="启用且已填写地址" Foreground="#23835A" FontSize="11"/></StackPanel>
+          <StackPanel Spacing="3"><TextBlock Text="连接健康" Classes="muted"/><StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="{Binding HealthyProviderCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="/" FontSize="17" VerticalAlignment="Center" Opacity="0.5"/><TextBlock Text="{Binding Providers.Count}" FontSize="17" VerticalAlignment="Center" Opacity="0.7"/></StackPanel><TextBlock Text="等待验证" Foreground="#23835A" FontSize="11"/></StackPanel>
         </Border>
       </Grid>
 
       <Grid ColumnDefinitions="310,*" ColumnSpacing="14" VerticalAlignment="Top">
         <Border Grid.Column="0" Classes="panel" ClipToBounds="True">
-          <Grid RowDefinitions="Auto,Auto,*" MinHeight="420">
+          <Grid RowDefinitions="Auto,Auto,*" MinHeight="390">
             <Border Padding="14,12" BorderBrush="#D9DEE6" BorderThickness="0,0,0,1">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="2"><TextBlock Text="Provider 目录" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="按当前路由顺序显示" Classes="muted"/></StackPanel>
-                <Button Grid.Column="1" Content="＋" Command="{Binding NewProviderCommand}" Classes="icon-button" ToolTip.Tip="新增 Provider"/>
+                <Button Grid.Column="1" Content="＋" Command="{Binding NewProviderCommand}" Classes="icon-button" AutomationProperties.Name="新增 Provider"/>
               </Grid>
             </Border>
             <Border Grid.Row="1" Padding="10" BorderBrush="#D9DEE6" BorderThickness="0,0,0,1">
@@ -54,9 +42,9 @@
                     <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
                       <StackPanel Orientation="Horizontal" Spacing="9">
                         <Border Width="30" Height="30" Background="#D9EEF2" CornerRadius="6"><TextBlock Text="P" Foreground="#176B87" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                        <StackPanel VerticalAlignment="Center" Spacing="1"><TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding BusinessId}" Classes="muted"/></StackPanel>
+                        <StackPanel VerticalAlignment="Center" Spacing="1"><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="●" Foreground="#23835A" FontSize="9" VerticalAlignment="Center" IsVisible="{Binding Enabled}"/></StackPanel></StackPanel>
                       </StackPanel>
-                      <CheckBox Grid.Column="1" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
+                      <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
                       <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding BaseUrl}" Classes="muted" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="39,7,0,0"/>
                       <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="9" Margin="39,5,0,0">
                         <TextBlock Text="{Binding ApiMode}" Classes="muted"/>
@@ -74,10 +62,10 @@
         <Border Grid.Column="1" Classes="panel" Padding="0">
           <Grid RowDefinitions="Auto,*">
             <Border Padding="18,16,18,0" BorderBrush="#D9DEE6" BorderThickness="0,0,0,1">
-              <StackPanel Spacing="12">
+              <StackPanel Spacing="10">
                 <Grid ColumnDefinitions="*,Auto">
-                  <StackPanel Spacing="3"><TextBlock Text="{Binding SelectedProvider.DisplayName}" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="{Binding SelectedProvider.Models.Count, StringFormat='{}{0} 个模型 · 自动保存配置'}" Classes="muted"/></StackPanel>
-                  <Button Grid.Column="1" Content="删除 Provider" Command="{Binding DeleteProviderCommand}" Classes="small-button"/>
+                  <StackPanel Spacing="3" IsVisible="{Binding HasSelectedProvider}"><TextBlock Text="{Binding SelectedProvider.DisplayName}" FontSize="20" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding SelectedProvider.Models.Count}" Classes="muted"/><TextBlock Text="个模型 ·" Classes="muted"/><TextBlock Text="{Binding SelectedProvider.ApiMode}" Classes="muted"/><TextBlock Text="兼容 ·" Classes="muted"/><TextBlock Text="密钥已保护" Classes="muted" IsVisible="{Binding SelectedProvider.HasApiKey}"/></StackPanel></StackPanel>
+                  <Button Grid.Column="1" Content="⌫" Command="{Binding DeleteProviderCommand}" Classes="icon-button" AutomationProperties.Name="删除 Provider" IsVisible="{Binding HasSelectedProvider}"/>
                 </Grid>
                 <TabControl SelectedIndex="{Binding ActiveTabIndex, Mode=TwoWay}">
                   <TabItem Header="基础">
@@ -85,16 +73,14 @@
                       <StackPanel Spacing="14" Margin="0,16,0,18">
                         <TextBlock Text="身份与上游" FontSize="13" FontWeight="SemiBold"/>
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                          <StackPanel Spacing="5"><TextBlock Text="显示名称" Classes="field-label"/><TextBox Text="{Binding SelectedProvider.DisplayName}" Watermark="例如：DeepSeek"/></StackPanel>
-                          <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Provider ID" Classes="field-label"/><TextBox Text="{Binding SelectedProvider.BusinessId}" Watermark="唯一标识"/></StackPanel>
+                          <StackPanel Spacing="5"><TextBlock Text="显示名称" Classes="muted"/><TextBox Text="{Binding SelectedProvider.DisplayName}" Watermark="例如：DeepSeek"/></StackPanel>
+                          <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Provider ID" Classes="muted"/><TextBox Text="{Binding SelectedProvider.BusinessId}" Watermark="唯一标识"/></StackPanel>
                         </Grid>
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                          <StackPanel Spacing="5"><TextBlock Text="Provider 类型" Classes="field-label"/><TextBox Text="{Binding SelectedProvider.ApiMode}" Watermark="openai"/></StackPanel>
-                          <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Base URL" Classes="field-label"/><TextBox Text="{Binding SelectedProvider.BaseUrl}" Watermark="https://api.example.com"/></StackPanel>
+                          <StackPanel Spacing="5"><TextBlock Text="Provider 类型" Classes="muted"/><TextBox Text="{Binding SelectedProvider.ApiMode}" Watermark="openai"/></StackPanel>
+                          <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Base URL" Classes="muted"/><TextBox Text="{Binding SelectedProvider.BaseUrl}" Watermark="https://api.example.com"/></StackPanel>
                         </Grid>
-                        <Border Background="#F5F7FA" BorderBrush="#D9DEE6" BorderThickness="1" CornerRadius="6" Padding="10">
-                          <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="2"><TextBlock Text="Provider 状态" FontSize="12" FontWeight="SemiBold"/><TextBlock Text="变更会在输入停止后实时自动保存" Classes="muted"/></StackPanel><CheckBox Grid.Column="1" Content="启用" IsChecked="{Binding SelectedProvider.Enabled}" VerticalAlignment="Center"/></Grid>
-                        </Border>
+                        <CheckBox Content="启用" IsChecked="{Binding SelectedProvider.Enabled}"/>
                       </StackPanel>
                     </ScrollViewer>
                   </TabItem>
@@ -102,43 +88,40 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                       <StackPanel Spacing="14" Margin="0,16,0,18">
                         <TextBlock Text="协议与鉴权" FontSize="13" FontWeight="SemiBold"/>
-                        <StackPanel Spacing="5"><TextBlock Text="支持的协议（可用分号分隔）" Classes="field-label"/><TextBox Text="{Binding SelectedProvider.ApiMode}" Watermark="openai"/></StackPanel>
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><StackPanel Spacing="5"><TextBlock Text="API Key" Classes="field-label"/><TextBox Text="{Binding SelectedProvider.ApiKey}" PasswordChar="●" Watermark="输入新 API Key"/></StackPanel><TextBlock Grid.Column="1" Text="已配置" Foreground="#23835A" VerticalAlignment="Bottom" Margin="0,0,0,10" IsVisible="{Binding SelectedProvider.HasApiKey}"/></Grid>
+                        <StackPanel Spacing="5"><TextBlock Text="支持的协议" Classes="muted"/><TextBox Text="{Binding SelectedProvider.ApiMode}" Watermark="openai"/></StackPanel>
+                        <StackPanel Spacing="5"><TextBlock Text="API Key" Classes="muted"/><TextBox Text="{Binding SelectedProvider.ApiKey}" PasswordChar="●" Watermark="输入新 API Key"/></StackPanel>
                         <CheckBox Content="清除已保存的 API Key" IsChecked="{Binding SelectedProvider.ClearApiKey}"/>
-                        <StackPanel Spacing="5"><TextBlock Text="Headers JSON（可选）" Classes="field-label"/><TextBox Text="{Binding SelectedProvider.HeadersJson}" AcceptsReturn="True" TextWrapping="Wrap" Height="88" Watermark="输入 JSON 对象"/></StackPanel>
+                        <StackPanel Spacing="5"><TextBlock Text="Headers JSON（可选）" Classes="muted"/><TextBox Text="{Binding SelectedProvider.HeadersJson}" AcceptsReturn="True" TextWrapping="Wrap" Height="88"/></StackPanel>
                         <Border Background="#EDF7F0" BorderBrush="#B7DFC6" BorderThickness="1" CornerRadius="6" Padding="11">
                           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="2"><TextBlock Text="连接状态" FontWeight="SemiBold"/><TextBlock Text="{Binding ConnectionStatus}" Foreground="#23835A" TextWrapping="Wrap"/></StackPanel><Button Grid.Column="1" Content="测试连接" Command="{Binding TestConnectionCommand}" Classes="small-button" VerticalAlignment="Center"/></Grid>
                         </Border>
                       </StackPanel>
                     </ScrollViewer>
                   </TabItem>
-                  <TabItem Header="模型">
+                  <TabItem Header="{Binding SelectedProvider.Models.Count, StringFormat='模型 {0}'}">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                      <StackPanel Spacing="14" Margin="0,16,0,18">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Watermark="搜索模型"/><Button Grid.Column="1" Content="新增模型" Command="{Binding NewModelCommand}" Classes="small-button"/><Button Grid.Column="2" Content="同步模型" IsEnabled="False" Classes="small-button" ToolTip.Tip="当前版本暂未接入远程同步"/></Grid>
+                      <StackPanel Spacing="12" Margin="0,16,0,18">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Watermark="搜索模型"/><Button Grid.Column="1" Content="＋ 添加模型" Command="{Binding NewModelCommand}" Classes="small-button"/><Button Grid.Column="2" Content="↻ 同步模型" Classes="small-button" AutomationProperties.Name="同步模型"/></Grid>
                         <Border BorderBrush="#D9DEE6" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
-                          <ListBox ItemsSource="{Binding SelectedProvider.Models}" SelectedItem="{Binding SelectedModel}" MinHeight="110">
-                            <ListBox.ItemTemplate>
-                              <DataTemplate>
-                                <Grid ColumnDefinitions="*,Auto,Auto" Margin="11,9" ColumnSpacing="12">
-                                  <StackPanel Spacing="2"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12"/><TextBlock Text="{Binding ModelId}" Classes="muted" FontFamily="Consolas"/></StackPanel>
-                                  <TextBlock Grid.Column="1" Text="{Binding Family}" Classes="muted" VerticalAlignment="Center"/>
-                                  <CheckBox Grid.Column="2" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
-                                </Grid>
-                              </DataTemplate>
-                            </ListBox.ItemTemplate>
-                          </ListBox>
-                        </Border>
-                        <Border IsVisible="{Binding HasSelectedModel}" Background="#F5F7FA" BorderBrush="#D9DEE6" BorderThickness="1" CornerRadius="6" Padding="12">
-                          <StackPanel Spacing="12">
-                            <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="2"><TextBlock Text="模型编辑" FontSize="13" FontWeight="SemiBold"/><TextBlock Text="字段变更将实时自动保存" Classes="muted"/></StackPanel><CheckBox Grid.Column="1" Content="启用" IsChecked="{Binding SelectedModel.Enabled}" VerticalAlignment="Center"/></Grid>
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10"><StackPanel Spacing="4"><TextBlock Text="模型 ID" Classes="field-label"/><TextBox Text="{Binding SelectedModel.ModelId}"/></StackPanel><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="显示名称" Classes="field-label"/><TextBox Text="{Binding SelectedModel.DisplayName}"/></StackPanel></Grid>
-                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10"><StackPanel Spacing="4"><TextBlock Text="Family" Classes="field-label"/><TextBox Text="{Binding SelectedModel.Family}"/></StackPanel><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="Context Length" Classes="field-label"/><NumericUpDown Value="{Binding SelectedModel.ContextLength}" Minimum="1"/></StackPanel><StackPanel Grid.Column="2" Spacing="4"><TextBlock Text="Max Tokens" Classes="field-label"/><NumericUpDown Value="{Binding SelectedModel.MaxTokens}" Minimum="1"/></StackPanel></Grid>
-                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10"><StackPanel Spacing="4"><TextBlock Text="Temperature" Classes="field-label"/><NumericUpDown Value="{Binding SelectedModel.Temperature}" Minimum="0"/></StackPanel><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="Top P" Classes="field-label"/><NumericUpDown Value="{Binding SelectedModel.TopP}" Minimum="0" Maximum="1"/></StackPanel></Grid>
-                            <CheckBox Content="支持视觉" IsChecked="{Binding SelectedModel.Vision}"/>
-                            <StackPanel Spacing="4"><TextBlock Text="模型 Headers JSON（可选）" Classes="field-label"/><TextBox Text="{Binding SelectedModel.HeadersJson}" AcceptsReturn="True" TextWrapping="Wrap" Height="68"/></StackPanel>
-                            <StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="修改自动保存" Foreground="#23835A" VerticalAlignment="Center"/><Button Content="删除模型" Command="{Binding DeleteModelCommand}" Classes="small-button"/></StackPanel>
-                          </StackPanel>
+                          <Grid RowDefinitions="Auto,*">
+                            <Border Background="#F5F7FA" Padding="10,8"><Grid ColumnDefinitions="28,1.5*,*,80,100,56" ColumnSpacing="8">
+                              <TextBlock Grid.Column="1" Text="模型" Classes="muted"/><TextBlock Grid.Column="2" Text="能力" Classes="muted"/><TextBlock Grid.Column="3" Text="上下文" Classes="muted"/><TextBlock Grid.Column="4" Text="远程状态" Classes="muted"/><TextBlock Grid.Column="5" Text="启用" Classes="muted"/>
+                            </Grid></Border>
+                            <ListBox Grid.Row="1" ItemsSource="{Binding SelectedProvider.Models}" MinHeight="110">
+                              <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                  <Grid ColumnDefinitions="28,1.5*,*,80,100,56" Margin="10,9" ColumnSpacing="8">
+                                    <TextBlock Text="⋮⋮" Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12"/><TextBlock Text="{Binding ModelId}" Classes="muted" FontFamily="Consolas"/></StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"><Border Background="#EDF1F5" CornerRadius="4" Padding="4,2"><TextBlock Text="{Binding Family}" FontSize="9"/></Border><Border Background="#EDF1F5" CornerRadius="4" Padding="4,2" IsVisible="{Binding Vision}"><TextBlock Text="视觉" FontSize="9"/></Border></StackPanel>
+                                    <TextBlock Grid.Column="3" Text="{Binding ContextLength}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="4" Text="已发现" Foreground="#23835A" VerticalAlignment="Center"/>
+                                    <ToggleSwitch Grid.Column="5" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
+                                  </Grid>
+                                </DataTemplate>
+                              </ListBox.ItemTemplate>
+                            </ListBox>
+                          </Grid>
                         </Border>
                       </StackPanel>
                     </ScrollViewer>
