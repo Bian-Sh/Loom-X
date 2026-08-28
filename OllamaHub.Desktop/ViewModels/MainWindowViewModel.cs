@@ -159,9 +159,11 @@ public sealed class ProvidersViewModel : NotifyViewModel
             AttachProvider(selectedProvider);
             SelectedModel = null;
             OnPropertyChanged(nameof(HasSelectedProvider));
+            OnPropertyChanged(nameof(HasNoSelectedProvider));
         }
     }
     public bool HasSelectedProvider => SelectedProvider is not null;
+    public bool HasNoSelectedProvider => SelectedProvider is null;
 
     public ModelEditorViewModel? SelectedModel
     {
@@ -195,7 +197,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
     public ProvidersViewModel(ConfigSnapshotService configService)
     {
         this.configService = configService;
-        RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(DeleteProviderAsync); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(DeleteModelAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); _ = RefreshAsync();
+        RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(DeleteModelAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); _ = RefreshAsync();
     }
 
     private async Task RefreshAsync()
@@ -213,10 +215,11 @@ public sealed class ProvidersViewModel : NotifyViewModel
         catch (Exception exception) { Status = $"保存失败：{exception.Message}"; }
     }
 
-    private async Task DeleteProviderAsync()
+    private async Task DeleteProviderAsync(ProviderEditorViewModel? provider = null)
     {
-        if (SelectedProvider is null) return;
-        try { if (SelectedProvider.Id != Guid.Empty) await configService.DeleteProviderAsync(SelectedProvider.Id); Providers.Remove(SelectedProvider); SelectedProvider = Providers.FirstOrDefault(); UpdateSummary(); Status = "Provider 已删除"; }
+        provider ??= SelectedProvider;
+        if (provider is null) return;
+        try { if (provider.Id != Guid.Empty) await configService.DeleteProviderAsync(provider.Id); Providers.Remove(provider); if (ReferenceEquals(SelectedProvider, provider)) SelectedProvider = Providers.FirstOrDefault(); UpdateSummary(); Status = "Provider 已删除"; }
         catch (Exception exception) { Status = $"删除失败：{exception.Message}"; }
     }
 
@@ -374,9 +377,10 @@ public sealed class DelegateCommand : ICommand
 
 public sealed class AsyncCommand : ICommand
 {
-    private readonly Func<Task> action;
+    private readonly Func<object?, Task> action;
     public event EventHandler? CanExecuteChanged { add { } remove { } }
-    public AsyncCommand(Func<Task> action) => this.action = action;
+    public AsyncCommand(Func<Task> action) => this.action = _ => action();
+    public AsyncCommand(Func<object?, Task> action) => this.action = action;
     public bool CanExecute(object? parameter) => true;
-    public async void Execute(object? parameter) => await action();
+    public async void Execute(object? parameter) => await action(parameter);
 }
