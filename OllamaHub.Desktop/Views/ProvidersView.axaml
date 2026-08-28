@@ -98,7 +98,7 @@
                       </StackPanel>
                     </ScrollViewer>
                   </TabItem>
-                  <TabItem Header="{Binding SelectedProvider.Models.Count, StringFormat='模型 {0}'}">
+                  <TabItem Header="模型">
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                       <StackPanel Spacing="12" Margin="0,16,0,18">
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Watermark="搜索模型"/><Button Grid.Column="1" Content="＋ 添加模型" Command="{Binding NewModelCommand}" Classes="small-button"/><Button Grid.Column="2" Content="↻ 同步模型" Classes="small-button" AutomationProperties.Name="同步模型"/></Grid>
