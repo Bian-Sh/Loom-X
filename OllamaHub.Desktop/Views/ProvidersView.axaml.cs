@@ -7,6 +7,18 @@ public partial class ProvidersView : UserControl
 {
     public ProvidersView() => InitializeComponent();
 
+    private void AddHeaderButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is ProvidersViewModel viewModel && viewModel.SelectedProvider is not null)
+            viewModel.SelectedProvider.AddHeader();
+    }
+
+    private void RemoveHeaderButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: HeaderEditorViewModel header } && DataContext is ProvidersViewModel viewModel && viewModel.SelectedProvider is not null)
+            viewModel.SelectedProvider.RemoveHeader(header);
+    }
+
     private async void DeleteProviderButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { DataContext: ProviderEditorViewModel provider } || DataContext is not ProvidersViewModel viewModel) return;

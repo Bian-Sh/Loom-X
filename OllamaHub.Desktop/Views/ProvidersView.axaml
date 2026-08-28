@@ -89,7 +89,23 @@
                         <StackPanel Spacing="5"><TextBlock Text="支持的协议" Classes="muted"/><TextBox Text="{Binding SelectedProvider.ApiMode}" Watermark="openai"/></StackPanel>
                         <StackPanel Spacing="5"><TextBlock Text="API Key" Classes="muted"/><TextBox Text="{Binding SelectedProvider.ApiKey}" PasswordChar="●" Watermark="输入新 API Key"/></StackPanel>
                         <CheckBox Content="清除已保存的 API Key" IsChecked="{Binding SelectedProvider.ClearApiKey}"/>
-                        <StackPanel Spacing="5"><TextBlock Text="Headers JSON（可选）" Classes="muted"/><TextBox Text="{Binding SelectedProvider.HeadersJson}" AcceptsReturn="True" TextWrapping="Wrap" Height="88"/></StackPanel>
+                        <StackPanel Spacing="7">
+                          <Grid ColumnDefinitions="*,Auto"><StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="自定义请求头" FontSize="13" FontWeight="SemiBold"/><Border Background="#EEF2F6" CornerRadius="8" Padding="6,2"><TextBlock Text="{Binding SelectedProvider.Headers.Count}" Classes="muted"/></Border></StackPanel><Button Grid.Column="1" Content="＋ 添加" Classes="small-button" Click="AddHeaderButton_OnClick"/></Grid>
+                          <ItemsControl ItemsSource="{Binding SelectedProvider.Headers}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                <Border BorderBrush="#D9DEE6" BorderThickness="1" CornerRadius="7" Margin="0,0,0,7" ClipToBounds="True">
+                                  <Grid ColumnDefinitions="*,2*,Auto">
+                                    <TextBox Text="{Binding Name}" Watermark="Header 名称" BorderThickness="0" Padding="12,9" FontFamily="Consolas"/>
+                                    <TextBox Grid.Column="1" Text="{Binding Value}" Watermark="Header 值" BorderBrush="#D9DEE6" BorderThickness="1,0,0,0" Padding="12,9" FontFamily="Consolas"/>
+                                    <Button Grid.Column="2" Content="×" Classes="icon-button" Width="34" Height="34" Margin="4" Click="RemoveHeaderButton_OnClick" ToolTip.Tip="删除请求头" AutomationProperties.Name="删除请求头"/>
+                                  </Grid>
+                                </Border>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <TextBlock Text="尚未添加自定义请求头" Classes="muted" IsVisible="{Binding SelectedProvider.HasNoHeaders}"/>
+                        </StackPanel>
                         <Border Background="#EDF7F0" BorderBrush="#B7DFC6" BorderThickness="1" CornerRadius="6" Padding="11">
                           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="2"><TextBlock Text="连接状态" FontWeight="SemiBold"/><TextBlock Text="{Binding ConnectionStatus}" Foreground="#23835A" TextWrapping="Wrap"/></StackPanel><Button Grid.Column="1" Content="测试连接" Command="{Binding TestConnectionCommand}" Classes="small-button" VerticalAlignment="Center"/></Grid>
                         </Border>

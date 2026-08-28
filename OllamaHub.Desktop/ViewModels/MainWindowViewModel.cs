@@ -147,12 +147,16 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private int activeTabIndex;
     private CancellationTokenSource? autoSaveCancellation;
     private CancellationTokenSource? connectionCancellation;
+    private bool suppressAutoSave;
+    private bool suppressSelectionInvariant;
     public ObservableCollection<ProviderEditorViewModel> Providers { get; } = [];
     public ProviderEditorViewModel? SelectedProvider
     {
         get => selectedProvider;
         set
         {
+            if (value is null && !suppressSelectionInvariant && Providers.Count > 0)
+                value = Providers[0];
             if (ReferenceEquals(selectedProvider, value)) return;
             DetachProvider(selectedProvider);
             SetProperty(ref selectedProvider, value);
@@ -163,7 +167,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
         }
     }
     public bool HasSelectedProvider => SelectedProvider is not null;
-    public bool HasNoSelectedProvider => SelectedProvider is null;
+    public bool HasNoSelectedProvider => Providers.Count == 0;
 
     public ModelEditorViewModel? SelectedModel
     {
@@ -202,8 +206,19 @@ public sealed class ProvidersViewModel : NotifyViewModel
 
     private async Task RefreshAsync()
     {
-        try { var selectedId = SelectedProvider?.Id; Providers.Clear(); foreach (var provider in await configService.ListProvidersAsync()) Providers.Add(ProviderEditorViewModel.FromResponse(provider)); SelectedProvider = Providers.FirstOrDefault(provider => provider.Id == selectedId) ?? Providers.FirstOrDefault(); UpdateSummary(); Status = $"已加载 {Providers.Count} 个 Provider"; }
-        catch (Exception exception) { Status = $"加载失败：{exception.Message}"; }
+        try
+        {
+            var selectedId = SelectedProvider?.Id;
+            suppressSelectionInvariant = true;
+            Providers.Clear();
+            foreach (var provider in await configService.ListProvidersAsync()) Providers.Add(ProviderEditorViewModel.FromResponse(provider));
+            suppressSelectionInvariant = false;
+            SelectedProvider = Providers.FirstOrDefault(provider => provider.Id == selectedId) ?? Providers.FirstOrDefault();
+            OnPropertyChanged(nameof(HasNoSelectedProvider));
+            UpdateSummary();
+            Status = $"已加载 {Providers.Count} 个 Provider";
+        }
+        catch (Exception exception) { suppressSelectionInvariant = false; Status = $"加载失败：{exception.Message}"; }
     }
 
     private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = "新 Provider", ApiMode = "openai", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); Status = "正在编辑新 Provider"; }
@@ -211,8 +226,18 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private async Task SaveProviderAsync()
     {
         if (SelectedProvider is null) return;
-        try { var input = SelectedProvider.ToInput(); var response = SelectedProvider.Id == Guid.Empty ? await configService.CreateProviderAsync(input) : await configService.UpdateProviderAsync(SelectedProvider.Id, input); var index = Providers.IndexOf(SelectedProvider); var updated = ProviderEditorViewModel.FromResponse(response); Providers[index] = updated; SelectedProvider = updated; UpdateSummary(); Status = "Provider 已保存"; }
-        catch (Exception exception) { Status = $"保存失败：{exception.Message}"; }
+        try
+        {
+            var provider = SelectedProvider;
+            var input = provider.ToInput();
+            var response = provider.Id == Guid.Empty ? await configService.CreateProviderAsync(input) : await configService.UpdateProviderAsync(provider.Id, input);
+            suppressAutoSave = true;
+            provider.ApplyResponse(response, preserveApiKey: true);
+            suppressAutoSave = false;
+            UpdateSummary();
+            Status = "Provider 已保存";
+        }
+        catch (Exception exception) { suppressAutoSave = false; Status = $"保存失败：{exception.Message}"; }
     }
 
     private async Task DeleteProviderAsync(ProviderEditorViewModel? provider = null)
@@ -282,7 +307,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private void ProviderChanged(object? sender, PropertyChangedEventArgs args)
     {
         UpdateSummary();
-        ScheduleAutoSave();
+        if (!suppressAutoSave) ScheduleAutoSave();
     }
     private void ModelsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
@@ -308,11 +333,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
         autoSaveCancellation?.Cancel();
         autoSaveCancellation = new CancellationTokenSource();
         var token = autoSaveCancellation.Token;
-        _ = Task.Run(async () =>
-        {
-            try { await Task.Delay(500, token); if (!token.IsCancellationRequested) await SaveProviderAsync(); }
-            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        }, token);
+        _ = SaveProviderAfterDelayAsync(token);
     }
 
     private void ScheduleModelAutoSave()
@@ -320,11 +341,19 @@ public sealed class ProvidersViewModel : NotifyViewModel
         autoSaveCancellation?.Cancel();
         autoSaveCancellation = new CancellationTokenSource();
         var token = autoSaveCancellation.Token;
-        _ = Task.Run(async () =>
-        {
-            try { await Task.Delay(500, token); if (!token.IsCancellationRequested) await SaveModelAsync(); }
-            catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        }, token);
+        _ = SaveModelAfterDelayAsync(token);
+    }
+
+    private async Task SaveProviderAfterDelayAsync(CancellationToken token)
+    {
+        try { await Task.Delay(500, token); if (!token.IsCancellationRequested) await SaveProviderAsync(); }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+    }
+
+    private async Task SaveModelAfterDelayAsync(CancellationToken token)
+    {
+        try { await Task.Delay(500, token); if (!token.IsCancellationRequested) await SaveModelAsync(); }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
     }
 }
 
@@ -332,11 +361,59 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
 {
     public Guid Id { get; set; }
     private string businessId = ""; private string displayName = ""; private string baseUrl = ""; private string apiMode = "openai"; private bool enabled; private string apiKey = ""; private bool clearApiKey; private string headersJson = "{}";
-    public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ApiMode { get => apiMode; set => SetProperty(ref apiMode, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool ClearApiKey { get => clearApiKey; set => SetProperty(ref clearApiKey, value); } public string HeadersJson { get => headersJson; set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; }
+    public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ApiMode { get => apiMode; set => SetProperty(ref apiMode, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool ClearApiKey { get => clearApiKey; set => SetProperty(ref clearApiKey, value); } public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; }
     public ObservableCollection<ModelEditorViewModel> Models { get; } = [];
-    public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel { Id = response.Id, BusinessId = response.BusinessId, DisplayName = response.DisplayName, BaseUrl = response.BaseUrl, ApiMode = response.ApiMode, Enabled = response.Enabled, HasApiKey = response.HasApiKey, HeadersJson = response.HeadersJson }; foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
-    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey, ClearApiKey, ParseDictionary(HeadersJson));
+    public ObservableCollection<HeaderEditorViewModel> Headers { get; } = [];
+    public bool HasNoHeaders => Headers.Count == 0;
+    public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel(); value.ApplyResponse(response, preserveApiKey: false); foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
+    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey, ClearApiKey, ToHeaderDictionary());
+    public void ApplyResponse(ProviderResponse response, bool preserveApiKey)
+    {
+        Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ApiMode = response.ApiMode; Enabled = response.Enabled; HasApiKey = response.HasApiKey;
+        if (!preserveApiKey) ApiKey = "";
+        if (!preserveApiKey) SetHeadersFromJson(response.HeadersJson);
+    }
+    public void AddHeader() => Headers.Add(new HeaderEditorViewModel());
+    public void RemoveHeader(HeaderEditorViewModel header) { if (Headers.Contains(header)) Headers.Remove(header); }
+    private void SetHeadersFromJson(string json)
+    {
+        Headers.CollectionChanged -= HeadersChanged;
+        foreach (var header in Headers) header.PropertyChanged -= HeaderChanged;
+        Headers.Clear();
+        foreach (var pair in ParseDictionary(json) ?? [])
+        {
+            var header = new HeaderEditorViewModel { Name = pair.Key, Value = pair.Value };
+            header.PropertyChanged += HeaderChanged;
+            Headers.Add(header);
+        }
+        Headers.CollectionChanged += HeadersChanged;
+        OnPropertyChanged(nameof(HasNoHeaders));
+        HeadersJson = JsonSerializer.Serialize(ToHeaderDictionary());
+    }
+    private void HeadersChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
+    {
+        if (args.NewItems is not null) foreach (HeaderEditorViewModel header in args.NewItems) header.PropertyChanged += HeaderChanged;
+        if (args.OldItems is not null) foreach (HeaderEditorViewModel header in args.OldItems) header.PropertyChanged -= HeaderChanged;
+        OnPropertyChanged(nameof(HasNoHeaders));
+        HeadersJson = JsonSerializer.Serialize(ToHeaderDictionary());
+    }
+    private void HeaderChanged(object? sender, PropertyChangedEventArgs args) => HeadersJson = JsonSerializer.Serialize(ToHeaderDictionary());
+    private Dictionary<string, string> ToHeaderDictionary()
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var header in Headers)
+            if (!string.IsNullOrWhiteSpace(header.Name)) result[header.Name.Trim()] = header.Value;
+        return result;
+    }
     internal static Dictionary<string, string>? ParseDictionary(string json) => string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+}
+
+public sealed class HeaderEditorViewModel : NotifyViewModel
+{
+    private string name = "";
+    private string value = "";
+    public string Name { get => name; set => SetProperty(ref name, value); }
+    public string Value { get => value; set => SetProperty(ref this.value, value); }
 }
 
 public sealed class ModelEditorViewModel : NotifyViewModel
