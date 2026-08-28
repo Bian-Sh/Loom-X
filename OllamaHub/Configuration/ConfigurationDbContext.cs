@@ -34,6 +34,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.Property(item => item.BusinessId).HasMaxLength(128).IsRequired();
             entity.Property(item => item.DisplayName).HasMaxLength(256).IsRequired();
             entity.Property(item => item.BaseUrl).HasMaxLength(2048).IsRequired();
+            entity.Property(item => item.ModelListUrl).HasMaxLength(2048);
             entity.HasMany(item => item.Models).WithOne(item => item.Provider).HasForeignKey(item => item.ProviderId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<ModelEntity>(entity =>
@@ -75,6 +76,7 @@ public sealed class ProviderEntity
     public string BusinessId { get; set; } = string.Empty;
     public string DisplayName { get; set; } = string.Empty;
     public string BaseUrl { get; set; } = string.Empty;
+    public string? ModelListUrl { get; set; }
     public string ApiMode { get; set; } = "openai";
     public bool Enabled { get; set; } = true;
     public bool UseProxy { get; set; }
@@ -149,6 +151,14 @@ public static class ConfigurationDatabase
         try
         {
             await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Providers ADD COLUMN UseProxy INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
+        }
+
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Providers ADD COLUMN ModelListUrl TEXT NULL", cancellationToken);
         }
         catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
         {

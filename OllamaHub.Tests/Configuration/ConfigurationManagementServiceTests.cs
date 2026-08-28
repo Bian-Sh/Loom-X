@@ -83,14 +83,16 @@ public sealed class ConfigurationManagementServiceTests
             Assert.True(updatedSettings.HasProxyPassword);
             Assert.True(configurationProvider.Current.Settings.DiagnosticsEnabled);
 
-            var provider = await service.CreateProviderAsync(new ProviderInput("proxy", "代理 Provider", "https://example.com", "anthropic", true, null, false, null, true));
+            var provider = await service.CreateProviderAsync(new ProviderInput("proxy", "代理 Provider", "https://example.com", "anthropic", true, null, false, null, true, "https://models.example.com/list"));
             Assert.True(provider.UseProxy);
             Assert.Equal("anthropic", provider.ApiMode);
+            Assert.Equal("https://models.example.com/list", provider.ModelListUrl);
 
             await using var verifyContext = new ConfigurationDbContext(options);
             var storedProvider = await verifyContext.Providers.SingleAsync(item => item.Id == provider.Id);
             var storedSettings = await verifyContext.AppSettings.SingleAsync();
             Assert.True(storedProvider.UseProxy);
+            Assert.Equal("https://models.example.com/list", storedProvider.ModelListUrl);
             Assert.Equal("dark", storedSettings.Theme);
             Assert.Equal("custom", storedSettings.ProxyMode);
         }
@@ -114,6 +116,27 @@ public sealed class ConfigurationManagementServiceTests
             var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
 
             await Assert.ThrowsAsync<ArgumentException>(() => service.CreateProviderAsync(new ProviderInput("unsupported", "不支持", "https://example.com", "antigravity", true, null, false, null)));
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task ModelListUrl_RejectsNonHttpAddress()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.CreateProviderAsync(new ProviderInput("invalid-url", "非法 URL", "https://example.com", "openai", true, null, false, null, false, "ftp://example.com/models")));
         }
         finally
         {

@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace OllamaHub.Configuration;
 
-public sealed record ProviderInput(string BusinessId, string DisplayName, string BaseUrl, string ApiMode, bool Enabled, string? ApiKey, bool ClearApiKey, Dictionary<string, string>? Headers, bool UseProxy = false);
+public sealed record ProviderInput(string BusinessId, string DisplayName, string BaseUrl, string ApiMode, bool Enabled, string? ApiKey, bool ClearApiKey, Dictionary<string, string>? Headers, bool UseProxy = false, string? ModelListUrl = null);
 public sealed record AppSettingsInput(string Language, string Theme, bool OpenControlCenterOnStartup, string ProxyMode, string ProxyHost, int ProxyPort, string? ProxyUsername, string? ProxyPassword, bool ClearProxyPassword, bool AutoCheckUpdates, string UpdateChannel, bool DiagnosticsEnabled, int LogRetentionDays);
 public sealed record AppSettingsResponse(int Id, string Language, string Theme, bool OpenControlCenterOnStartup, string ProxyMode, string ProxyHost, int ProxyPort, string? ProxyUsername, bool HasProxyPassword, bool AutoCheckUpdates, string UpdateChannel, bool DiagnosticsEnabled, int LogRetentionDays);
 public sealed record ModelInput(string ModelId, string DisplayName, string? ConfigId, string Family, string? BaseUrl, string? ApiMode, int ContextLength, int MaxTokens, bool Vision, double? Temperature, double? TopP, bool Enabled, string? ApiKey, bool ClearApiKey, Dictionary<string, string>? Headers, Dictionary<string, JsonElement>? Extra);
-public sealed record ProviderResponse(Guid Id, string BusinessId, string DisplayName, string BaseUrl, string ApiMode, bool Enabled, bool UseProxy, bool HasApiKey, int ModelCount, string HeadersJson, IReadOnlyList<ModelResponse> Models);
+public sealed record ProviderResponse(Guid Id, string BusinessId, string DisplayName, string BaseUrl, string ApiMode, bool Enabled, bool UseProxy, bool HasApiKey, int ModelCount, string HeadersJson, IReadOnlyList<ModelResponse> Models, string? ModelListUrl = null);
 public sealed record ModelResponse(Guid Id, string ProviderId, string ModelId, string DisplayName, string? ConfigId, string Family, string? BaseUrl, string? ApiMode, int ContextLength, int MaxTokens, bool Vision, double? Temperature, double? TopP, bool Enabled, bool HasApiKey, string HeadersJson, string ExtraJson);
 
 public sealed class ConfigurationManagementService(IDbContextFactory<ConfigurationDbContext> dbContextFactory, IDatabaseConfigurationProvider configurationProvider)
@@ -55,7 +55,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         ValidateProvider(input);
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         if (await db.Providers.AnyAsync(provider => provider.BusinessId == input.BusinessId.Trim(), cancellationToken)) throw new InvalidOperationException("Provider ID 已存在。");
-        var provider = new ProviderEntity { BusinessId = input.BusinessId.Trim(), DisplayName = input.DisplayName.Trim(), BaseUrl = NormalizeUrl(input.BaseUrl), ApiMode = NormalizeProviderMode(input.ApiMode), Enabled = input.Enabled, UseProxy = input.UseProxy, HeadersJson = Serialize(input.Headers) };
+        var provider = new ProviderEntity { BusinessId = input.BusinessId.Trim(), DisplayName = input.DisplayName.Trim(), BaseUrl = NormalizeUrl(input.BaseUrl), ModelListUrl = NormalizeOptionalUrl(input.ModelListUrl), ApiMode = NormalizeProviderMode(input.ApiMode), Enabled = input.Enabled, UseProxy = input.UseProxy, HeadersJson = Serialize(input.Headers) };
         provider.ProtectedApiKey = ProtectApiKey(input.ApiKey);
         db.Providers.Add(provider);
         await db.SaveChangesAsync(cancellationToken);
@@ -69,7 +69,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var provider = await db.Providers.Include(item => item.Models).SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("Provider 不存在。");
         if (await db.Providers.AnyAsync(item => item.Id != id && item.BusinessId == input.BusinessId.Trim(), cancellationToken)) throw new InvalidOperationException("Provider ID 已存在。");
-        provider.BusinessId = input.BusinessId.Trim(); provider.DisplayName = input.DisplayName.Trim(); provider.BaseUrl = NormalizeUrl(input.BaseUrl); provider.ApiMode = NormalizeProviderMode(input.ApiMode); provider.Enabled = input.Enabled; provider.UseProxy = input.UseProxy; provider.HeadersJson = Serialize(input.Headers);
+        provider.BusinessId = input.BusinessId.Trim(); provider.DisplayName = input.DisplayName.Trim(); provider.BaseUrl = NormalizeUrl(input.BaseUrl); provider.ModelListUrl = NormalizeOptionalUrl(input.ModelListUrl); provider.ApiMode = NormalizeProviderMode(input.ApiMode); provider.Enabled = input.Enabled; provider.UseProxy = input.UseProxy; provider.HeadersJson = Serialize(input.Headers);
         ApplyApiKey(provider, input.ApiKey, input.ClearApiKey);
         await db.SaveChangesAsync(cancellationToken);
         await configurationProvider.ReloadAsync(cancellationToken);
@@ -112,6 +112,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     {
         if (string.IsNullOrWhiteSpace(input.BusinessId) || string.IsNullOrWhiteSpace(input.DisplayName)) throw new ArgumentException("Provider ID 和名称不能为空。");
         _ = NormalizeUrl(input.BaseUrl); _ = NormalizeProviderMode(input.ApiMode);
+        if (input.ModelListUrl is not null) _ = NormalizeOptionalUrl(input.ModelListUrl);
     }
 
     private static void ValidateModel(ModelInput input)
@@ -167,7 +168,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     private static string? ProtectApiKey(string? value) => string.IsNullOrWhiteSpace(value) ? null : ProtectedApiKeyStore.Protect(value.Trim());
     private static void ApplyApiKey(ProviderEntity entity, string? value, bool clear) { if (clear) entity.ProtectedApiKey = null; else if (!string.IsNullOrWhiteSpace(value)) entity.ProtectedApiKey = ProtectApiKey(value); }
     private static void ApplyApiKey(ModelEntity entity, string? value, bool clear) { if (clear) entity.ProtectedApiKey = null; else if (!string.IsNullOrWhiteSpace(value)) entity.ProtectedApiKey = ProtectApiKey(value); }
-    private static ProviderResponse ToResponse(ProviderEntity provider) => new(provider.Id, provider.BusinessId, provider.DisplayName, provider.BaseUrl, provider.ApiMode, provider.Enabled, provider.UseProxy, !string.IsNullOrWhiteSpace(provider.ProtectedApiKey), provider.Models.Count, provider.HeadersJson, provider.Models.OrderBy(model => model.SortOrder).Select(model => ToResponse(provider, model)).ToArray());
+    private static ProviderResponse ToResponse(ProviderEntity provider) => new(provider.Id, provider.BusinessId, provider.DisplayName, provider.BaseUrl, provider.ApiMode, provider.Enabled, provider.UseProxy, !string.IsNullOrWhiteSpace(provider.ProtectedApiKey), provider.Models.Count, provider.HeadersJson, provider.Models.OrderBy(model => model.SortOrder).Select(model => ToResponse(provider, model)).ToArray(), provider.ModelListUrl);
     private static AppSettingsResponse ToResponse(AppSettingsEntity settings) => new(settings.Id, settings.Language, settings.Theme, settings.OpenControlCenterOnStartup, settings.ProxyMode, settings.ProxyHost, settings.ProxyPort, settings.ProxyUsername, !string.IsNullOrWhiteSpace(settings.ProtectedProxyPassword), settings.AutoCheckUpdates, settings.UpdateChannel, settings.DiagnosticsEnabled, settings.LogRetentionDays);
     private static ModelResponse ToResponse(ProviderEntity provider, ModelEntity model) => new(model.Id, provider.BusinessId, model.ModelId, model.DisplayName, model.ConfigId, model.Family, model.BaseUrl, model.ApiMode, model.ContextLength, model.MaxTokens, model.Vision, model.Temperature, model.TopP, model.Enabled, !string.IsNullOrWhiteSpace(model.ProtectedApiKey), model.HeadersJson, model.ExtraJson);
 }

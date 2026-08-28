@@ -19,6 +19,12 @@ public partial class ProvidersView : UserControl
             viewModel.SelectedProvider.RemoveHeader(header);
     }
 
+    private void ToggleApiKeyVisibilityButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is ProvidersViewModel viewModel)
+            viewModel.SelectedProvider?.ToggleApiKeyVisibility();
+    }
+
     private async void DeleteProviderButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { DataContext: ProviderEditorViewModel provider } || DataContext is not ProvidersViewModel viewModel) return;

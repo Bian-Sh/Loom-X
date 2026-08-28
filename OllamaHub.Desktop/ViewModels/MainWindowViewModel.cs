@@ -147,6 +147,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private int activeTabIndex;
     private CancellationTokenSource? autoSaveCancellation;
     private CancellationTokenSource? connectionCancellation;
+    private CancellationTokenSource? modelSyncCancellation;
     private bool suppressAutoSave;
     private bool suppressSelectionInvariant;
     public ObservableCollection<ProviderEditorViewModel> Providers { get; } = [];
@@ -198,11 +199,12 @@ public sealed class ProvidersViewModel : NotifyViewModel
     public ICommand SaveModelCommand { get; }
     public ICommand DeleteModelCommand { get; }
     public ICommand TestConnectionCommand { get; }
+    public ICommand SyncModelsCommand { get; }
 
     public ProvidersViewModel(ConfigSnapshotService configService)
     {
         this.configService = configService;
-        RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(DeleteModelAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); _ = RefreshAsync();
+        RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(DeleteModelAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
     }
 
     private async Task RefreshAsync()
@@ -289,6 +291,69 @@ public sealed class ProvidersViewModel : NotifyViewModel
         catch (Exception exception) { stopwatch.Stop(); ConnectionStatus = $"连接失败 · {exception.Message}"; }
     }
 
+    private async Task SyncModelsAsync()
+    {
+        var provider = SelectedProvider;
+        if (provider is null) return;
+        if (provider.Id == Guid.Empty) { Status = "请先保存 Provider，再同步模型"; return; }
+        if (!Uri.TryCreate(BuildModelListEndpoint(provider), UriKind.Absolute, out var endpoint) || endpoint.Scheme is not ("http" or "https")) { Status = "模型列表 URL 必须是 HTTP 或 HTTPS 绝对地址"; return; }
+
+        modelSyncCancellation?.Cancel();
+        modelSyncCancellation = new CancellationTokenSource();
+        var token = modelSyncCancellation.Token;
+        Status = "正在同步模型…";
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
+            if (!string.IsNullOrWhiteSpace(provider.ApiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.ApiKey);
+            foreach (var header in ProviderEditorViewModel.ParseDictionary(provider.HeadersJson) ?? []) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
+            if (!response.IsSuccessStatusCode) { Status = $"模型同步失败 · {(int)response.StatusCode} {response.ReasonPhrase}"; return; }
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync(token));
+            var names = ExtractModelNames(document.RootElement).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (names.Length == 0) { Status = "模型同步失败 · 响应中没有可用模型"; return; }
+            var existing = provider.Models.ToDictionary(model => model.ModelId, StringComparer.OrdinalIgnoreCase);
+            var added = 0;
+            foreach (var name in names)
+            {
+                if (existing.ContainsKey(name)) continue;
+                var created = await configService.CreateModelAsync(provider.Id, new ModelInput(name, name, null, "unknown", null, provider.ApiMode, 128000, 4096, false, null, null, true, null, false, null, null), token);
+                provider.Models.Add(ModelEditorViewModel.FromResponse(created));
+                added++;
+            }
+            Status = $"模型同步完成 · 发现 {names.Length} 个，新增 {added} 个";
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
+        catch (JsonException) { Status = "模型同步失败 · 响应格式无法解析"; }
+        catch (Exception exception) { Status = $"模型同步失败 · {exception.Message}"; }
+    }
+
+    private static string BuildModelListEndpoint(ProviderEditorViewModel provider)
+    {
+        if (!string.IsNullOrWhiteSpace(provider.ModelListUrl)) return provider.ModelListUrl.TrimEnd('/');
+        var baseUrl = provider.BaseUrl.TrimEnd('/');
+        return baseUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? $"{baseUrl}/models" : $"{baseUrl}/v1/models";
+    }
+
+    private static IEnumerable<string> ExtractModelNames(JsonElement root)
+    {
+        var items = root.ValueKind == JsonValueKind.Array
+            ? root
+            : root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var data)
+                ? data
+                : root.ValueKind == JsonValueKind.Object && root.TryGetProperty("models", out var models)
+                    ? models
+                    : default;
+        if (items.ValueKind != JsonValueKind.Array) yield break;
+        foreach (var item in items.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object) continue;
+            if (item.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(id.GetString())) yield return id.GetString()!;
+            else if (item.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(name.GetString())) yield return name.GetString()!;
+            else if (item.TryGetProperty("model", out var model) && model.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(model.GetString())) yield return model.GetString()!;
+        }
+    }
+
     private void AttachProvider(ProviderEditorViewModel? provider)
     {
         if (provider is null) return;
@@ -361,19 +426,20 @@ public sealed class ProvidersViewModel : NotifyViewModel
 public sealed class ProviderEditorViewModel : NotifyViewModel
 {
     public Guid Id { get; set; }
-    private string businessId = ""; private string displayName = ""; private string baseUrl = ""; private string apiMode = "openai"; private bool enabled; private bool useProxy; private string apiKey = ""; private bool clearApiKey; private string headersJson = "{}";
-    public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ApiMode { get => apiMode; set => SetProperty(ref apiMode, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool ClearApiKey { get => clearApiKey; set => SetProperty(ref clearApiKey, value); } public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; }
+    private string businessId = ""; private string displayName = ""; private string baseUrl = ""; private string modelListUrl = ""; private string apiMode = "openai"; private bool enabled; private bool useProxy; private string apiKey = ""; private bool clearApiKey; private bool isApiKeyVisible; private string headersJson = "{}";
+    public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ModelListUrl { get => modelListUrl; set => SetProperty(ref modelListUrl, value); } public string ApiMode { get => apiMode; set => SetProperty(ref apiMode, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool ClearApiKey { get => clearApiKey; set => SetProperty(ref clearApiKey, value); } public bool IsApiKeyVisible { get => isApiKeyVisible; private set { if (SetProperty(ref isApiKeyVisible, value)) OnPropertyChanged(nameof(ApiKeyPasswordChar)); } } public char ApiKeyPasswordChar => IsApiKeyVisible ? '\0' : '●'; public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; }
     public ObservableCollection<ModelEditorViewModel> Models { get; } = [];
     public ObservableCollection<HeaderEditorViewModel> Headers { get; } = [];
     public bool HasNoHeaders => Headers.Count == 0;
     public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel(); value.ApplyResponse(response, preserveApiKey: false); foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
-    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey, ClearApiKey, ToHeaderDictionary(), UseProxy);
+    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey, ClearApiKey, ToHeaderDictionary(), UseProxy, string.IsNullOrWhiteSpace(ModelListUrl) ? null : ModelListUrl);
     public void ApplyResponse(ProviderResponse response, bool preserveApiKey)
     {
-        Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ApiMode = response.ApiMode; Enabled = response.Enabled; UseProxy = response.UseProxy; HasApiKey = response.HasApiKey;
+        Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ModelListUrl = response.ModelListUrl ?? ""; ApiMode = response.ApiMode; Enabled = response.Enabled; UseProxy = response.UseProxy; HasApiKey = response.HasApiKey;
         if (!preserveApiKey) ApiKey = "";
         if (!preserveApiKey) SetHeadersFromJson(response.HeadersJson);
     }
+    public void ToggleApiKeyVisibility() => IsApiKeyVisible = !IsApiKeyVisible;
     public void AddHeader() => Headers.Add(new HeaderEditorViewModel());
     public void RemoveHeader(HeaderEditorViewModel header) { if (Headers.Contains(header)) Headers.Remove(header); }
     private void SetHeadersFromJson(string json)
