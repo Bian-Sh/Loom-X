@@ -318,6 +318,13 @@ public sealed class OllamaHubConfigLoader : IOllamaHubConfigProvider
         };
 
         var providers = config.Providers.ToDictionary(provider => provider.Id, StringComparer.OrdinalIgnoreCase);
+        var resolvedProviders = config.Providers.Select(provider => new ResolvedProviderConfig
+        {
+            Id = provider.Id,
+            BaseUrl = provider.BaseUrl ?? config.BaseUrl,
+            ApiModes = ResolveApiModes(provider.ApiMode, null),
+            HasApiKey = !string.IsNullOrWhiteSpace(provider.ApiKey) || !string.IsNullOrWhiteSpace(provider.ProtectedApiKey)
+        }).ToArray();
         var models = new List<ResolvedModelConfig>();
 
         foreach (var model in config.Models)
@@ -381,6 +388,7 @@ public sealed class OllamaHubConfigLoader : IOllamaHubConfigProvider
         {
             Server = server,
             Logging = config.Logging ?? new LoggingConfig(),
+            Providers = resolvedProviders,
             Models = models
         };
     }

@@ -149,11 +149,21 @@ public sealed class ResolvedServerConfig
     public IReadOnlyList<string> Urls { get; init; } = [];
 }
 
+public sealed class ResolvedProviderConfig
+{
+    public required string Id { get; init; }
+    public string? BaseUrl { get; init; }
+    public IReadOnlyList<string> ApiModes { get; init; } = [];
+    public bool HasApiKey { get; init; }
+}
+
 public sealed class ResolvedAppConfig
 {
     public ResolvedServerConfig Server { get; init; } = new();
 
     public LoggingConfig Logging { get; init; } = new();
+
+    public IReadOnlyList<ResolvedProviderConfig> Providers { get; init; } = [];
 
     public IReadOnlyList<ResolvedModelConfig> Models { get; init; } = [];
 }

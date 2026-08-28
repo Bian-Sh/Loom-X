@@ -1,0 +1,54 @@
+using Microsoft.EntityFrameworkCore;
+using OllamaHub.Configuration;
+
+namespace OllamaHub.Desktop.Services;
+
+public sealed class ConfigSnapshotService
+{
+    private readonly string databasePath = Path.Combine(AppContext.BaseDirectory, "OllamaHub.db");
+
+    public ResolvedAppConfig Load()
+    {
+        var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+        using var db = new ConfigurationDbContext(options);
+        ConfigurationDatabase.InitializeAsync(db).GetAwaiter().GetResult();
+        var provider = new DatabaseConfigurationProvider(db);
+        provider.ReloadAsync().GetAwaiter().GetResult();
+        return provider.Current;
+    }
+
+    public async Task<IReadOnlyList<ProviderResponse>> ListProvidersAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = CreateContext();
+        await ConfigurationDatabase.InitializeAsync(db, cancellationToken);
+        var provider = new DatabaseConfigurationProvider(db);
+        await provider.ReloadAsync(cancellationToken);
+        return await new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider).ListProvidersAsync(cancellationToken);
+    }
+
+    public Task<ProviderResponse> CreateProviderAsync(ProviderInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateProviderAsync(input, token), cancellationToken);
+    public Task<ProviderResponse> UpdateProviderAsync(Guid id, ProviderInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateProviderAsync(id, input, token), cancellationToken);
+    public Task DeleteProviderAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteProviderAsync(id, token); return true; }, cancellationToken);
+    public Task<ModelResponse> CreateModelAsync(Guid providerId, ModelInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateModelAsync(providerId, input, token), cancellationToken);
+    public Task<ModelResponse> UpdateModelAsync(Guid id, ModelInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateModelAsync(id, input, token), cancellationToken);
+    public Task DeleteModelAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteModelAsync(id, token); return true; }, cancellationToken);
+
+    private async Task<TResult> ExecuteManagementAsync<TResult>(Func<ConfigurationManagementService, CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
+    {
+        await using var db = CreateContext();
+        await ConfigurationDatabase.InitializeAsync(db, cancellationToken);
+        var provider = new DatabaseConfigurationProvider(db);
+        await provider.ReloadAsync(cancellationToken);
+        var service = new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider);
+        return await operation(service, cancellationToken);
+    }
+
+    private ConfigurationDbContext CreateContext() => new(CreateOptions());
+    private DbContextOptions<ConfigurationDbContext> CreateOptions() => new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+}
+
+file sealed class DesktopDbContextFactory(DbContextOptions<ConfigurationDbContext> options) : IDbContextFactory<ConfigurationDbContext>
+{
+    public ConfigurationDbContext CreateDbContext() => new(options);
+    public Task<ConfigurationDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) => Task.FromResult(new ConfigurationDbContext(options));
+}

@@ -1,0 +1,10 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="OllamaHub 控制中心" Background="#F7F8FA">
+  <Grid ColumnDefinitions="240,*">
+    <Border Grid.Column="0" Background="#EEF1F5" Padding="18,24"><StackPanel Spacing="10">
+      <StackPanel Margin="4,0,0,24" Spacing="3"><TextBlock Text="OllamaHub" FontSize="24" FontWeight="Bold"/><TextBlock Text="本地 AI 网关控制中心" Opacity="0.62"/></StackPanel>
+      <ItemsControl ItemsSource="{Binding NavigationItems}"><ItemsControl.ItemTemplate><DataTemplate><Button Content="{Binding Title}" Command="{Binding NavigateCommand}" HorizontalContentAlignment="Left" HorizontalAlignment="Stretch" Padding="14,11" Margin="0,2"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+      <Border Height="1" Background="#D7DCE3" Margin="0,18,0,10"/><TextBlock Text="跨平台桌面版" Opacity="0.55"/>
+    </StackPanel></Border>
+    <Border Grid.Column="1" Padding="34" Background="#F7F8FA"><ContentControl Content="{Binding CurrentView}"/></Border>
+  </Grid>
+</Window>

@@ -1,0 +1,54 @@
+param(
+    [string]$Configuration = "Release",
+    [string]$IdePath = "D:\Program Files\Microsoft Visual Studio\2026\Community\Common7\IDE\devenv.exe"
+)
+
+$ErrorActionPreference = "Stop"
+$repositoryRoot = Split-Path -Parent $PSScriptRoot
+$projectPath = Join-Path $repositoryRoot "OllamaHub.Desktop\OllamaHub.Desktop.csproj"
+$outputsRoot = Join-Path $repositoryRoot "outputs"
+
+if (-not (Test-Path -LiteralPath $projectPath)) {
+    throw "找不到桌面项目：$projectPath"
+}
+
+if (-not (Test-Path -LiteralPath $IdePath)) {
+    throw "找不到 Visual Studio IDE：$IdePath"
+}
+
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$publishRoot = Join-Path $outputsRoot $stamp
+$suffix = 1
+while (Test-Path -LiteralPath $publishRoot) {
+    $publishRoot = Join-Path $outputsRoot ("{0}-{1:D2}" -f $stamp, $suffix)
+    $suffix++
+}
+
+$publishDirectory = Join-Path $publishRoot "publish\win-x64"
+$logPath = Join-Path $publishRoot "publish.log"
+
+New-Item -ItemType Directory -Force -Path $publishDirectory | Out-Null
+@(
+    "发布时间：$(Get-Date -Format o)",
+    "Visual Studio：$IdePath",
+    "项目：$projectPath",
+    "运行时：win-x64",
+    "自包含：false",
+    "配置：$Configuration"
+) | Set-Content -LiteralPath $logPath -Encoding utf8
+
+Write-Host "发布 Windows 桌面应用到：$publishDirectory"
+$publishArguments = @(
+    "publish", $projectPath,
+    "--configuration", $Configuration,
+    "--runtime", "win-x64",
+    "--self-contained", "false",
+    "--output", $publishDirectory,
+    "--nologo"
+)
+& dotnet @publishArguments 2>&1 | Tee-Object -FilePath $logPath -Append
+if ($LASTEXITCODE -ne 0) {
+    throw "dotnet publish 失败，退出码：$LASTEXITCODE。详情请查看：$logPath"
+}
+
+Write-Host "发布目录：$publishDirectory"

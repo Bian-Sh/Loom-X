@@ -1,65 +1,52 @@
 ﻿using System.Net;
 using System.Text.Json.Nodes;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using OllamaHub.Configuration;
 using OllamaHub.Contracts;
 using OllamaHub.Interop;
-using OllamaHub.Logging;
 using OllamaHub.Services;
+using Serilog;
 
-var configPath = Path.Combine(AppContext.BaseDirectory, OllamaHubConfigLoader.DefaultConfigFileName);
-if (TryHandleCommand(args, configPath))
+var databasePath = Path.Combine(AppContext.BaseDirectory, "OllamaHub.db");
+if (TryHandleCommand(args, databasePath))
 {
     Environment.Exit(0);
     return;
 }
 
 var builder = WebApplication.CreateBuilder(args);
-var logPath = Path.Combine(AppContext.BaseDirectory, "OllamaHub.log");
-
-var appConfig = OllamaHubConfigLoader.LoadConfig(configPath, NullLogger.Instance);
-var minLogLevel = appConfig.Logging.GetLogLevel();
-var enableConsoleLogging = WindowsConsoleManager.ShouldEnableConsole(minLogLevel);
+var logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+var enableConsoleLogging = WindowsConsoleManager.ShouldEnableConsole(LogLevel.Information);
 
 if (enableConsoleLogging)
 {
     WindowsConsoleManager.EnsureConsole();
 }
 
-using var startupLoggerFactory = LoggerFactory.Create(logging =>
-{
-    logging.ClearProviders();
-    logging.AddProvider(new FileLoggerProvider(logPath, minLogLevel));
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .Enrich.FromLogContext()
+    .WriteTo.File(Path.Combine(logDirectory, "ollamahub-.log"), rollingInterval: RollingInterval.Day, fileSizeLimitBytes: 10 * 1024 * 1024, rollOnFileSizeLimit: true, retainedFileCountLimit: 30, shared: true)
+    .CreateLogger();
+builder.Host.UseSerilog();
 
-    if (enableConsoleLogging)
-    {
-        logging.AddSimpleConsole();
-    }
-});
-
-var startupLogger = startupLoggerFactory.CreateLogger("Startup");
-startupLogger.LogInformation("Loaded configuration from {ConfigPath}", configPath);
-
-builder.Logging.ClearProviders();
-builder.Logging.AddProvider(new FileLoggerProvider(logPath, minLogLevel));
-
-if (enableConsoleLogging)
-{
-    builder.Logging.AddSimpleConsole();
-}
-
-if (appConfig.Server.Urls.Count > 0)
-{
-    builder.WebHost.UseUrls(appConfig.Server.Urls.ToArray());
-}
+var dbOptions = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+await using var startupDb = new ConfigurationDbContext(dbOptions);
+await ConfigurationDatabase.InitializeAsync(startupDb);
+var startupConfiguration = new DatabaseConfigurationProvider(startupDb);
+await startupConfiguration.ReloadAsync();
+builder.WebHost.UseUrls(startupConfiguration.Current.Server.Urls.ToArray());
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.PropertyNamingPolicy = null;
 });
 
-builder.Services.AddSingleton<IOllamaHubConfigProvider, OllamaHubConfigLoader>();
+builder.Services.AddDbContextFactory<ConfigurationDbContext>(options => options.UseSqlite($"Data Source={databasePath}"));
+builder.Services.AddSingleton<IDatabaseConfigurationProvider>(startupConfiguration);
+builder.Services.AddSingleton<ConfigurationManagementService>();
+builder.Services.AddHostedService<ConfigurationRefreshService>();
 builder.Services.AddSingleton<IAnthropicRequestFactory, AnthropicRequestFactory>();
 builder.Services.AddSingleton<IAnthropicResponseMapper, AnthropicResponseMapper>();
 builder.Services.AddHttpClient<IAnthropicProxyClient, AnthropicProxyClient>();
@@ -71,13 +58,22 @@ app.MapGet("/", () => Results.Ok(new { name = "OllamaHub", status = "ok" }));
 app.MapGet("/api/version", () => Results.Ok(new { version = "0.12.6" }));
 app.MapGet("/api/ps", () => Results.Ok(new { models = Array.Empty<object>() }));
 
-app.MapGet("/api/tags", (IOllamaHubConfigProvider configProvider) =>
+app.MapGet("/api/tags", (IDatabaseConfigurationProvider configProvider) =>
     Results.Ok(new OllamaTagListResponse
     {
         Models = configProvider.GetModels().Select(ToDescriptor).ToArray()
     }));
 
-app.MapPost("/api/show", (IOllamaHubConfigProvider configProvider, OllamaShowRequest request) =>
+var adminApi = app.MapGroup("/api/admin");
+adminApi.MapGet("/providers", (ConfigurationManagementService service, CancellationToken cancellationToken) => service.ListProvidersAsync(cancellationToken));
+adminApi.MapPost("/providers", async (ConfigurationManagementService service, ProviderInput input, CancellationToken cancellationToken) => Results.Ok(await service.CreateProviderAsync(input, cancellationToken)));
+adminApi.MapPut("/providers/{id:guid}", async (Guid id, ConfigurationManagementService service, ProviderInput input, CancellationToken cancellationToken) => Results.Ok(await service.UpdateProviderAsync(id, input, cancellationToken)));
+adminApi.MapDelete("/providers/{id:guid}", async (Guid id, ConfigurationManagementService service, CancellationToken cancellationToken) => { await service.DeleteProviderAsync(id, cancellationToken); return Results.NoContent(); });
+adminApi.MapPost("/providers/{providerId:guid}/models", async (Guid providerId, ConfigurationManagementService service, ModelInput input, CancellationToken cancellationToken) => Results.Ok(await service.CreateModelAsync(providerId, input, cancellationToken)));
+adminApi.MapPut("/models/{id:guid}", async (Guid id, ConfigurationManagementService service, ModelInput input, CancellationToken cancellationToken) => Results.Ok(await service.UpdateModelAsync(id, input, cancellationToken)));
+adminApi.MapDelete("/models/{id:guid}", async (Guid id, ConfigurationManagementService service, CancellationToken cancellationToken) => { await service.DeleteModelAsync(id, cancellationToken); return Results.NoContent(); });
+
+app.MapPost("/api/show", (IDatabaseConfigurationProvider configProvider, OllamaShowRequest request) =>
 {
     var modelName = request.Model;
     if (string.IsNullOrWhiteSpace(modelName))
@@ -139,7 +135,7 @@ app.MapFallback((HttpContext httpContext, ILogger<Program> logger) =>
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
-    var configuredUrls = app.Services.GetRequiredService<IOllamaHubConfigProvider>().GetConfig().Server.Urls;
+    var configuredUrls = app.Services.GetRequiredService<IDatabaseConfigurationProvider>().Current.Server.Urls;
 
     if (configuredUrls.Count > 0)
     {
@@ -160,7 +156,7 @@ static OllamaModelDescriptor ToDescriptor(ResolvedModelConfig model) =>
         Model = model.ModelId,
         ModifiedAt = DateTimeOffset.UtcNow.ToString("O"),
         Size = 0,
-        Digest = OllamaHubConfigLoader.BuildDigest(model),
+        Digest = BuildDigest(model),
         Details = new OllamaModelDetails
         {
             Family = "",
@@ -169,6 +165,12 @@ static OllamaModelDescriptor ToDescriptor(ResolvedModelConfig model) =>
             QuantizationLevel = "proxy"
         }
     };
+
+static string BuildDigest(ResolvedModelConfig model)
+{
+    var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{model.ProviderId}:{model.ModelId}:{model.OllamaModelName}"));
+    return Convert.ToHexStringLower(bytes);
+}
 
 static IResult ToError(HttpStatusCode statusCode, string? error)
 {
@@ -237,7 +239,7 @@ static bool TryHandleCommand(string[] args, string configPath)
     return true;
 }
 
-static void SetProtectedApiKey(string configPath, string target, string apiKey)
+static void SetProtectedApiKey(string databasePath, string target, string apiKey)
 {
     if (!OperatingSystem.IsWindows())
     {
@@ -254,18 +256,27 @@ static void SetProtectedApiKey(string configPath, string target, string apiKey)
         throw new ArgumentException("API key is required.", nameof(apiKey));
     }
 
-    if (!File.Exists(configPath))
-    {
-        throw new FileNotFoundException("Config file not found.", configPath);
-    }
-
     var protectedApiKey = ProtectedApiKeyStore.Protect(apiKey);
-    OllamaHubConfigLoader.SetProtectedApiKey(configPath, target, protectedApiKey);
+    var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+    using var db = new ConfigurationDbContext(options);
+    ConfigurationDatabase.InitializeAsync(db).GetAwaiter().GetResult();
+    var provider = db.Providers.SingleOrDefault(item => item.BusinessId == target);
+    if (provider is not null)
+    {
+        provider.ProtectedApiKey = protectedApiKey;
+    }
+    else
+    {
+        var model = db.Models.SingleOrDefault(item => item.ModelId == target);
+        if (model is null) throw new InvalidOperationException($"未找到 Provider 或 Model：{target}");
+        model.ProtectedApiKey = protectedApiKey;
+    }
+    db.SaveChanges();
 }
 
 async Task<IResult> HandleChatCompletionsAsync(
     HttpContext httpContext,
-    IOllamaHubConfigProvider configProvider,
+    IDatabaseConfigurationProvider configProvider,
     IAnthropicRequestFactory requestFactory,
     IAnthropicProxyClient proxyClient,
     IAnthropicResponseMapper responseMapper,

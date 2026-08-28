@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="OllamaHub.Tests/OllamaHub.Tests.csproj" />
   <Project Path="OllamaHub/OllamaHub.csproj" />
+  <Project Path="OllamaHub.Desktop/OllamaHub.Desktop.csproj" />
 </Solution>

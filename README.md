@@ -1,13 +1,63 @@
-﻿# OllamaHub
+# OllamaHub
 
-OllamaHub 是一个本地 HTTP 代理服务，对外模拟部分 Ollama API，并可按模型声明的协议能力直通或转换转发到上游服务，方便在 Visual Studio Copilot Chat 的 BYOM 场景中把本地 Ollama 入口桥接到其他模型提供商。
+OllamaHub 是一个本地 HTTP 代理服务，对外提供 Ollama 与 OpenAI 兼容入口，并将请求转发到可配置的 Provider/Model。
 
-当前版本目标：
-- 对外兼容 Visual Studio Copilot Chat BYOM 常用的 Ollama 接口
-- 配置文件格式尽量兼容 [oai-compatible-copilot](https://github.com/JohnnyZ93/oai-compatible-copilot)
-- 当前已支持按 `apiMode` 选择 OpenAI / Anthropic / Ollama 兼容入口
+## 当前能力
 
-## 已支持接口
+- Provider 与 Model 通过 Avalonia 桌面控制中心增删改。
+- 配置唯一存储在应用目录的 `OllamaHub.db`，使用 Entity Framework Core + SQLite。
+- API Key 使用 Windows DPAPI 保护后写入数据库，界面和管理 API 不回显旧值。
+- 日志使用 Serilog，按日期和 10 MB 大小滚动，保留最近 30 个文件。
+- 支持 `openai`、`anthropic`、`ollama` 协议模式。
+- 支持 Provider/Model 级 Headers、模型能力、上下文长度、最大输出和采样参数。
+
+## 配置与数据
+
+运行时不读取、不导入、不生成 `settings.json`。应用首次运行会在可执行文件同级创建 `OllamaHub.db`，并建立默认网关监听地址 `http://127.0.0.1:11434`。
+
+数据库主要包含：
+
+- `GatewayConfigurations`：网关监听地址。
+- `Providers`：Provider 身份、Base URL、协议、启用状态、受保护 API Key 和 Headers。
+- `Models`：模型信息、Provider 关系、协议覆盖、能力、参数、排序和模型级密钥。
+
+Provider/Model 的保存会立即刷新运行时内存快照；监听地址的变更需要重启网关进程后生效。
+
+## 日志
+
+日志写入应用目录下的 `logs/`：
+
+- 文件名格式：`ollamahub-YYYYMMDD.log`。
+- 单文件超过 10 MB 时自动切分序号文件。
+- 最多保留 30 个日志文件，超期文件自动删除。
+- 日志不写入 SQLite，API Key 和授权头不得写入日志内容。
+
+## 启动
+
+开发运行网关：
+
+`dotnet run --project OllamaHub`
+
+开发运行桌面控制中心：
+
+`dotnet run --project OllamaHub.Desktop`
+
+启动桌面端后进入 **Provider** 页面：
+
+1. 新增 Provider，填写显示名称、业务 ID、Base URL 和协议。
+2. 输入 API Key 后保存；留空表示保留已有密钥。
+3. 保存 Provider 后新增模型，填写模型 ID、显示名称和 Family。
+4. 保存模型后，可从 `/api/tags` 查看对外暴露的模型。
+
+命令行也支持写入受保护 API Key：
+
+`dotnet run --project OllamaHub -- SetApiKey <providerOrModelId> <apiKey>`
+
+该命令直接更新 `OllamaHub.db`，不依赖 JSON 配置文件。
+
+## HTTP 接口
+
+兼容接口：
 
 - `GET /`
 - `GET /api/version`
@@ -17,312 +67,37 @@ OllamaHub 是一个本地 HTTP 代理服务，对外模拟部分 Ollama API，�
 - `POST /v1/chat/completions`
 - `POST /openai/v1/chat/completions`
 
-其中：
-- `/api/tags` 用于返回可用模型列表
-- `/api/show` 用于返回模型详情
-- `/v1/chat/completions` 提供 OpenAI Chat Completions 兼容入口
-- `/openai/v1/chat/completions` 提供 Azure OpenAI Chat Completions 兼容入口
+本机管理接口：
 
-## 配置文件
+- `GET /api/admin/providers`
+- `POST /api/admin/providers`
+- `PUT /api/admin/providers/{id}`
+- `DELETE /api/admin/providers/{id}`
+- `POST /api/admin/providers/{providerId}/models`
+- `PUT /api/admin/models/{id}`
+- `DELETE /api/admin/models/{id}`
 
-配置文件名固定为：
+管理 API 只返回密钥是否已配置，不返回密钥内容。
 
-- `settings.json`
+## 构建与测试
 
-配置文件位置：
+构建解决方案：
 
-- 与可执行文件同级目录
+`dotnet build OllamaHub.slnx`
 
-例如发布后为：
+运行测试：
 
-- `OllamaHub.exe`
-- `settings.json`
+`dotnet test OllamaHub.Tests/OllamaHub.Tests.csproj`
 
-## 配置格式
-配置结构尽量兼容 `oai-compatible-copilot` 的 `providers` / `models` 风格。一般格式如下：
+发布桌面端：
 
-```json
-{
-  "host": "127.0.0.1",
-  "port": 11434,
-  "logging": 
-  {
-    "level": "None"
-  },
-  "providers": [
-    {
-      "id": "智脑",
-      "baseUrl": "https://api.360.cn/",
-      "protectedApiKey": "dpapi:..."
-    }
-  ],
-  "models": [
-    {
-      "id": "anthropic/claude-sonnet-4-5",
-      "owned_by": "智脑",
-      "displayName": "Claude Sonnet 4.5",
-      "family": "claude",
-      "apiMode": "openai",
-      "context_length": 200000,
-      "max_tokens": 8192,
-      "vision": true,
-      "temperature": 0,
-      "top_p": 1,
-      "extra": {
-        "service_tier": "standard_only"
-      }
-    },
-    {
-      "id": "st/deepseek/deepseek-v4-pro",
-      "owned_by": "智脑",
-      "displayName": "deepseek/deepseek-v4-pro",
-      "family": "deepseek",
-      "apiMode": "openai",
-      "context_length": 1000000,
-      "max_tokens": 384000,
-      "temperature": 0,
-      "top_p": 1,
-      "extra": {
-        "thinking": { "type": "enabled" },
-        "reasoning_effort": "max"
-      }
-    },
-    {
-      "id": "z-ai/glm-5.1",
-      "owned_by": "智脑",
-      "displayName": "z-ai/glm-5.1",
-      "family": "glm",
-      "apiMode": "openai",
-      "context_length": 200000,
-      "max_tokens": 128000,
-      "temperature": 0,
-      "top_p": 1,
-      "extra": {
-        "thinking": { "type": "enabled" },
-        "reasoning_effort": "max"
-      }
-    }
-  ]
-}
-```
+`dotnet publish OllamaHub.Desktop -c Release -r win-x64 --self-contained false -o <output-directory>`
 
+## Visual Studio Copilot Chat BYOM
 
-当前实际使用到的字段：
+将 OllamaHub 作为本地 Ollama 服务使用：
 
-### 根字段
-
-- `host`: 可选，监听主机名或 IP，与 `port` 配合使用
-- `port`: 可选，监听端口，与 `host` 配合使用
-- `url`: 可选，单个监听地址，例如 `http://127.0.0.1:11434`
-- `baseUrl`: 可选，全局默认上游 base URL
-- `logging`: 可选，日志配置
-- `providers`: 可选，供应商列表
-- `models`: 必填，模型列表
-
-监听地址解析优先级：
-
-1. `url`
-2. `host + port`
-
-如果两者都不配置，则回退到 ASP.NET Core 默认监听方式。
-
-### logging 字段
-
-- `level`: 可选，日志输出等级，支持 `None`、`Error`、`Warning`、`Info`
-
-等级规则：
-
-- `None`: 不输出日志
-- `Error`: 只输出错误日志
-- `Warning`: 输出警告和错误日志
-- `Info`: 输出所有日志
-
-默认值：`None`
-
-### provider 字段
-
-- `id`: 供应商 ID
-- `baseUrl`: 供应商基础地址
-- `apiKey`: API Key，兼容旧格式明文配置
-- `protectedApiKey`: 使用 Windows DPAPI 按当前用户保护后的 API Key，推荐使用
-- `apiMode`: 可选，支持单个或多个协议模式，多个值用分号分隔，例如 `openai;anthropic`
-- `headers`: 可选，自定义请求头
-
-### model 字段
-
-- `id`: 模型 ID；在 Anthropic 转换路径下同时作为 Anthropic 模型名
-- `displayName`: 可选，显示名称
-- `configId`: 可选，用于同模型多配置；暴露给 Ollama 时会显示为 `id::configId`
-- `owned_by` / `provider` / `provide`: 提供商 ID，三者任选其一
-- `family`: 可选，默认 `claude`
-- `baseUrl`: 可选，覆盖 provider/baseUrl
-- `apiKey`: 可选，覆盖 provider/apiKey，兼容旧格式明文配置
-- `protectedApiKey`: 可选，覆盖 provider/protectedApiKey，使用 Windows DPAPI 按当前用户保护
-- `apiMode`: 可选，支持单个或多个协议模式，多个值用分号分隔，例如 `openai;anthropic`
-- `context_length`: 可选，默认 `128000`
-- `max_tokens`: 可选，默认 `4096`
-- `vision`: 可选，默认 `false`，表示模型是否支持视觉能力；若为 `true`，`/api/show` 返回的 `capabilities` 中会包含 `vision`
-- `temperature`: 可选
-- `top_p`: 可选
-- `headers`: 可选，模型级自定义请求头
-- `extra`: 可选，在走 Anthropic 转换路径时会合并到 Anthropic 请求体
-
-`apiMode` 选择规则：
-
-- 若当前入口协议被模型声明支持，则优先同协议直通上游
-- 若当前入口协议未被声明支持，但模型支持 `anthropic`，则回退到现有 Anthropic 转换链路
-- 目前已识别的协议值为：`openai`、`anthropic`、`ollama`
-
-## 示例配置
-
-见仓库中的 `settings.json`。
-
-核心示例：
-
-- provider 定义 `anthropic` 的 `baseUrl`、`apiKey`、`apiMode`
-- model 使用 `owned_by: "anthropic"`
-- `apiMode` 支持单值或分号分隔多值
-- `logging.level` 可控制日志输出等级，默认 `None`
-- 推荐使用 `protectedApiKey` 代替明文 `apiKey`
-
-## 启动方式
-
-### 开发运行
-
-在仓库根目录执行：
-
-`dotnet run --project OllamaHub`
-
-设置或更新某个 provider/model 的受保护 API Key：
-
-`dotnet run --project OllamaHub --SetApiKey 智脑 你的APIKey`
-
-也可以直接运行发布后的程序：
-
-`OllamaHub SetApiKey 智脑 你的APIKey`
-
-命令会优先匹配 provider id，找不到时再匹配 model id；写入时只新增或更新 `protectedApiKey`，不会清空已有的明文 `apiKey`。该值使用 Windows DPAPI 的 CurrentUser 范围加密，只有当前 Windows 用户可解密。
-
-监听地址现在建议直接在 `settings.json` 中配置。
-
-示例 1：使用 `host` + `port`
-
-`"host": "127.0.0.1", "port": 11434`
-
-示例 2：使用单个 `url`
-
-`"url": "http://127.0.0.1:11434"`
-
-当前优先推荐为 VS Copilot BYOM 配置：
-
-`"url": "http://127.0.0.1:11434"`
-
-如果你仍然需要，也可以继续使用 ASP.NET Core 自带环境变量覆盖，例如：
-
-`set ASPNETCORE_URLS=http://127.0.0.1:11434`
-
-然后再启动程序。
-
-### 发布运行
-
-示例：
-
-`dotnet publish OllamaHub -c Release -o publish`
-
-把 `settings.json` 放到 `publish` 目录，与生成的可执行文件同级。
-
-## 在 Visual Studio Copilot Chat BYOM 中使用
-
-思路是把 OllamaHub 当作本地 Ollama 服务。
-
-建议步骤：
-
-1. 启动 OllamaHub，并监听一个本地 HTTP 地址，例如 `http://127.0.0.1:11434`
-2. 在 Visual Studio 的 Copilot Chat BYOM 中选择使用 Ollama / 本地 Ollama
-3. 把地址指向 OllamaHub 的监听地址
-4. Copilot 请求到达 OllamaHub 后，由它转发到配置中的 Anthropic 模型
-
-## 请求映射说明
-
-### OpenAI Chat Completions -> 上游
-
-- 若模型支持 `openai`，则 `/v1/chat/completions` 会直接透传到上游 `/v1/chat/completions`
-- 若模型不支持 `openai` 但支持 `anthropic`，则会按以下规则转换为 Anthropic
-
-- `messages[].role = system` 会被合并为 Anthropic `system`
-- `messages[].content` 文本会映射为 Anthropic `text`
-- `messages[].content` 数组支持基础多模态转换：`text` 与 `image_url`
-- `assistant.tool_calls` 会映射为 Anthropic `tool_use`
-- `tool` 消息会映射为 Anthropic `tool_result`
-- `tools` 会映射为 Anthropic `tools`
-- `tool_choice` 会转换为 Anthropic `tool_choice`
-- `temperature`、`top_p`、`max_tokens` 会映射到对应 Anthropic 字段
-- 其他未显式处理的字段会按允许列表通过 `extra` 透传
-
-### Ollama -> 上游
-
-- 若模型支持 `ollama`，则 `/api/chat` 会直接透传到上游 `/api/chat`
-- 若模型不支持 `ollama` 但支持 `anthropic`，则会按以下规则转换为 Anthropic
-
-- `system` 消息会被合并为 Anthropic 的 `system`
-- `user` / `assistant` 文本消息会映射到 Anthropic `messages`
-- `assistant.tool_calls` 会映射为 Anthropic `tool_use`
-- `tool` 角色消息会映射为 Anthropic `tool_result`
-- `options.temperature` -> `temperature`
-- `options.top_p` -> `top_p`
-- `options.num_predict` -> `max_tokens`
-- `extra` 会直接合并到请求体
-
-### Anthropic -> Ollama
-
-- 非流式：把返回文本块合并为一个 Ollama chat 响应
-- 流式：把 Anthropic SSE 事件转换为 Ollama 风格 NDJSON 分块输出
-
-### Anthropic -> OpenAI Chat Completions
-
-- 非流式：返回 OpenAI `chat.completion` JSON
-- 流式：返回 OpenAI 风格 `text/event-stream`
-- 工具调用会尽量映射为 `tool_calls`
-- 若 Anthropic 返回 token 统计，会尽量映射到 OpenAI `usage`
-- 流式工具调用会拆分为起始 metadata 块和 arguments 增量块，更贴近 OpenAI delta 语义
-- 流结束前会额外输出一个包含 `usage` 的最终 chunk（若上游提供了 token 统计）
-
-## 当前限制
-
-当前版本只覆盖首批可用场景，存在以下限制：
-
-- 仅对 `openai`、`anthropic`、`ollama` 三种协议值做内建处理
-- 当前支持文本消息和基础工具调用透传
-- 当前支持 `/v1/chat/completions` 的基础 OpenAI 兼容转发
-- 尚未实现图像/多模态消息透传
-- 仅实现了 Copilot Chat BYOM 所需的基础 Ollama 兼容面
-- 模型元数据中的大小、量化等字段为代理占位值，不代表真实模型信息
-
-## 测试
-
-运行全部测试：
-
-`dotnet test`
-
-当前已覆盖：
-
-- 配置加载与模型解析
-- settings 中监听地址解析
-- Ollama 请求到 Anthropic 请求的转换
-- Ollama 工具调用到 Anthropic tool_use/tool_result 的转换
-- Anthropic SSE 到 Ollama NDJSON 的映射
-- OpenAI Chat Completions 到 Anthropic 的转换
-- 分号分隔多 `apiMode` 的配置解析
-- Anthropic 到 OpenAI Chat Completions 的非流式/流式映射
-- Anthropic usage 到 OpenAI usage 的映射
-- Anthropic 流式 tool_use 到 OpenAI tool_calls delta 的细粒度映射
-- OpenAI 多模态 content 数组到 Anthropic text/image 的转换
-- OpenAI 流式最终 usage chunk 输出
-
-## 后续扩展方向
-
-- OpenAI 兼容接口转发
-- Gemini 转发
-- 工具调用透传
-- 多模态内容转发
-- 更完整的 Ollama API 兼容
+1. 启动网关并确认监听 `http://127.0.0.1:11434`。
+2. 在桌面控制中心配置 Provider 和 Model。
+3. 在 Visual Studio Copilot Chat BYOM 中选择本地 Ollama。
+4. 将地址指向 OllamaHub 的监听地址。

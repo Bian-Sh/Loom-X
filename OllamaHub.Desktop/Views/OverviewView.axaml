@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.Views.OverviewView">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Spacing="24">
+      <StackPanel Spacing="6"><TextBlock Text="概览" FontSize="32" FontWeight="Bold"/><TextBlock Text="确认本地服务健康，快速查看网关与模型配置。" Opacity="0.68" FontSize="15"/></StackPanel>
+      <Border Background="White" CornerRadius="12" Padding="22" BorderBrush="#E2E6EC" BorderThickness="1">
+        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="12">
+          <TextBlock Text="本地网关" FontSize="19" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="{Binding GatewayStatus}" FontWeight="SemiBold"/>
+          <TextBlock Grid.Row="1" Text="监听地址" Opacity="0.6"/><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Endpoint}"/>
+          <TextBlock Grid.Row="2" Text="接口状态" Opacity="0.6"/><TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Version}"/>
+          <TextBlock Grid.Row="3" Text="最后检查" Opacity="0.6"/><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding LastChecked}"/>
+          <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="10" Margin="0,12,0,0"><Button Content="启动网关" Command="{Binding StartCommand}"/><Button Content="停止网关" Command="{Binding StopCommand}"/><Button Content="刷新" Command="{Binding RefreshCommand}"/></StackPanel>
+        </Grid>
+      </Border>
+      <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+        <Border Background="White" CornerRadius="12" Padding="22" BorderBrush="#E2E6EC" BorderThickness="1"><StackPanel Spacing="6"><TextBlock Text="Provider" Opacity="0.65"/><TextBlock Text="{Binding ProviderCount}" FontSize="30" FontWeight="Bold"/><TextBlock Text="已配置 Provider" Opacity="0.55"/></StackPanel></Border>
+        <Border Grid.Column="1" Background="White" CornerRadius="12" Padding="22" BorderBrush="#E2E6EC" BorderThickness="1"><StackPanel Spacing="6"><TextBlock Text="模型" Opacity="0.65"/><TextBlock Text="{Binding ModelCount}" FontSize="30" FontWeight="Bold"/><TextBlock Text="可用模型" Opacity="0.55"/></StackPanel></Border>
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
