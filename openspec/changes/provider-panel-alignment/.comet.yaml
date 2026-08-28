@@ -1,6 +1,6 @@
 workflow: tweak
 language: zh-CN
-phase: build
+phase: verify
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -14,10 +14,10 @@ base_ref: 97db3b1
 design_doc: docs/superpowers/specs/2026-08-29-provider-panel-alignment-design.md
 plan: null
 verify_result: pending
-verification_report: null
+verification_report: docs/superpowers/reports/2026-08-29-provider-panel-alignment-verify.md
 branch_status: pending
 created_at: 2026-08-29
-verified_at: null
+verified_at: 2026-08-29
 archived: false
 direct_override: null
 classic_profile: tweak
