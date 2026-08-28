@@ -123,6 +123,14 @@
                             </ListBox>
                           </Grid>
                         </Border>
+                        <Border IsVisible="{Binding HasSelectedModel}" Background="#F5F7FA" BorderBrush="#D9DEE6" BorderThickness="1" CornerRadius="6" Padding="12">
+                          <StackPanel Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto"><TextBlock Text="模型配置" FontSize="13" FontWeight="SemiBold"/><Button Grid.Column="1" Content="⌫" Command="{Binding DeleteModelCommand}" Classes="icon-button" AutomationProperties.Name="删除模型"/></Grid>
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10"><StackPanel Spacing="4"><TextBlock Text="模型 ID" Classes="muted"/><TextBox Text="{Binding SelectedModel.ModelId}"/></StackPanel><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="显示名称" Classes="muted"/><TextBox Text="{Binding SelectedModel.DisplayName}"/></StackPanel></Grid>
+                            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10"><StackPanel Spacing="4"><TextBlock Text="Family" Classes="muted"/><TextBox Text="{Binding SelectedModel.Family}"/></StackPanel><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="上下文" Classes="muted"/><NumericUpDown Value="{Binding SelectedModel.ContextLength}" Minimum="1"/></StackPanel><StackPanel Grid.Column="2" Spacing="4"><TextBlock Text="Max Tokens" Classes="muted"/><NumericUpDown Value="{Binding SelectedModel.MaxTokens}" Minimum="1"/></StackPanel></Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="12"><CheckBox Content="启用" IsChecked="{Binding SelectedModel.Enabled}"/><CheckBox Content="支持视觉" IsChecked="{Binding SelectedModel.Vision}"/><TextBlock Text="修改自动保存" Foreground="#23835A" VerticalAlignment="Center"/></StackPanel>
+                          </StackPanel>
+                        </Border>
                       </StackPanel>
                     </ScrollViewer>
                   </TabItem>
