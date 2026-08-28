@@ -144,6 +144,30 @@ public sealed class ConfigurationManagementServiceTests
         }
     }
 
+    [Fact]
+    public async Task EmptyProviderApiKey_ClearsStoredKey()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+            var provider = await service.CreateProviderAsync(new ProviderInput("empty-key", "空密钥", "https://example.com", "openai", true, "secret", false, null));
+            Assert.True(provider.HasApiKey);
+
+            var updated = await service.UpdateProviderAsync(provider.Id, new ProviderInput("empty-key", "空密钥", "https://example.com", "openai", true, string.Empty, false, null));
+            Assert.False(updated.HasApiKey);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
     private sealed class TestDbContextFactory(DbContextOptions<ConfigurationDbContext> options) : IDbContextFactory<ConfigurationDbContext>
     {
         public ConfigurationDbContext CreateDbContext() => new(options);
