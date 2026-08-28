@@ -124,6 +124,8 @@ public sealed class ResolvedModelConfig
 
     public required string AnthropicModel { get; init; }
 
+    public bool UseProxy { get; init; }
+
     public string Family { get; init; } = "claude";
 
     public int ContextLength { get; init; } = 128000;
@@ -155,6 +157,23 @@ public sealed class ResolvedProviderConfig
     public string? BaseUrl { get; init; }
     public IReadOnlyList<string> ApiModes { get; init; } = [];
     public bool HasApiKey { get; init; }
+    public bool UseProxy { get; init; }
+}
+
+public sealed class ResolvedAppSettings
+{
+    public string Language { get; init; } = "zh-CN";
+    public string Theme { get; init; } = "system";
+    public bool OpenControlCenterOnStartup { get; init; } = true;
+    public string ProxyMode { get; init; } = "direct";
+    public string ProxyHost { get; init; } = "http://127.0.0.1";
+    public int ProxyPort { get; init; } = 7890;
+    public string? ProxyUsername { get; init; }
+    public bool HasProxyPassword { get; init; }
+    public bool AutoCheckUpdates { get; init; } = true;
+    public string UpdateChannel { get; init; } = "stable";
+    public bool DiagnosticsEnabled { get; init; }
+    public int LogRetentionDays { get; init; } = 30;
 }
 
 public sealed class ResolvedAppConfig
@@ -162,6 +181,8 @@ public sealed class ResolvedAppConfig
     public ResolvedServerConfig Server { get; init; } = new();
 
     public LoggingConfig Logging { get; init; } = new();
+
+    public ResolvedAppSettings Settings { get; init; } = new();
 
     public IReadOnlyList<ResolvedProviderConfig> Providers { get; init; } = [];
 

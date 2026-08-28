@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 
 namespace OllamaHub.Configuration;
 
 public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbContext> options) : DbContext(options)
 {
     public DbSet<GatewayConfigurationEntity> GatewayConfigurations => Set<GatewayConfigurationEntity>();
+    public DbSet<AppSettingsEntity> AppSettings => Set<AppSettingsEntity>();
     public DbSet<ProviderEntity> Providers => Set<ProviderEntity>();
     public DbSet<ModelEntity> Models => Set<ModelEntity>();
 
@@ -14,6 +16,16 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
         {
             entity.HasKey(item => item.Id);
             entity.Property(item => item.ListenUrl).HasMaxLength(2048).IsRequired();
+        });
+        modelBuilder.Entity<AppSettingsEntity>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.Language).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.Theme).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.ProxyMode).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.ProxyHost).HasMaxLength(2048).IsRequired();
+            entity.Property(item => item.ProxyUsername).HasMaxLength(256);
+            entity.Property(item => item.UpdateChannel).HasMaxLength(32).IsRequired();
         });
         modelBuilder.Entity<ProviderEntity>(entity =>
         {
@@ -40,6 +52,23 @@ public sealed class GatewayConfigurationEntity
     public string ListenUrl { get; set; } = "http://127.0.0.1:11434";
 }
 
+public sealed class AppSettingsEntity
+{
+    public int Id { get; set; } = 1;
+    public string Language { get; set; } = "zh-CN";
+    public string Theme { get; set; } = "system";
+    public bool OpenControlCenterOnStartup { get; set; } = true;
+    public string ProxyMode { get; set; } = "direct";
+    public string ProxyHost { get; set; } = "http://127.0.0.1";
+    public int ProxyPort { get; set; } = 7890;
+    public string? ProxyUsername { get; set; }
+    public string? ProtectedProxyPassword { get; set; }
+    public bool AutoCheckUpdates { get; set; } = true;
+    public string UpdateChannel { get; set; } = "stable";
+    public bool DiagnosticsEnabled { get; set; }
+    public int LogRetentionDays { get; set; } = 30;
+}
+
 public sealed class ProviderEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
@@ -48,6 +77,7 @@ public sealed class ProviderEntity
     public string BaseUrl { get; set; } = string.Empty;
     public string ApiMode { get; set; } = "openai";
     public bool Enabled { get; set; } = true;
+    public bool UseProxy { get; set; }
     public string? ProtectedApiKey { get; set; }
     public string HeadersJson { get; set; } = "{}";
     public int SortOrder { get; set; }
@@ -82,10 +112,46 @@ public static class ConfigurationDatabase
     public static async Task InitializeAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken = default)
     {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        await EnsureSchemaAsync(dbContext, cancellationToken);
         if (!await dbContext.GatewayConfigurations.AnyAsync(cancellationToken))
         {
             dbContext.GatewayConfigurations.Add(new GatewayConfigurationEntity());
             await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        if (!await dbContext.AppSettings.AnyAsync(cancellationToken))
+        {
+            dbContext.AppSettings.Add(new AppSettingsEntity());
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    private static async Task EnsureSchemaAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        await dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS AppSettings (
+                Id INTEGER NOT NULL CONSTRAINT PK_AppSettings PRIMARY KEY,
+                Language TEXT NOT NULL,
+                Theme TEXT NOT NULL,
+                OpenControlCenterOnStartup INTEGER NOT NULL,
+                ProxyMode TEXT NOT NULL,
+                ProxyHost TEXT NOT NULL,
+                ProxyPort INTEGER NOT NULL,
+                ProxyUsername TEXT NULL,
+                ProtectedProxyPassword TEXT NULL,
+                AutoCheckUpdates INTEGER NOT NULL,
+                UpdateChannel TEXT NOT NULL,
+                DiagnosticsEnabled INTEGER NOT NULL,
+                LogRetentionDays INTEGER NOT NULL
+            )
+            """, cancellationToken);
+
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Providers ADD COLUMN UseProxy INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
         }
     }
 }

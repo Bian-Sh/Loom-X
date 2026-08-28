@@ -56,6 +56,8 @@ public static class OllamaHubHost
             Results.Ok(new OllamaTagListResponse { Models = configProvider.GetModels().Select(ToDescriptor).ToArray() }));
 
         var adminApi = app.MapGroup("/api/admin");
+        adminApi.MapGet("/settings", (ConfigurationManagementService service, CancellationToken cancellationToken) => service.GetSettingsAsync(cancellationToken));
+        adminApi.MapPut("/settings", async (ConfigurationManagementService service, AppSettingsInput input, CancellationToken cancellationToken) => Results.Ok(await service.UpdateSettingsAsync(input, cancellationToken)));
         adminApi.MapGet("/providers", (ConfigurationManagementService service, CancellationToken cancellationToken) => service.ListProvidersAsync(cancellationToken));
         adminApi.MapPost("/providers", async (ConfigurationManagementService service, ProviderInput input, CancellationToken cancellationToken) => Results.Ok(await service.CreateProviderAsync(input, cancellationToken)));
         adminApi.MapPut("/providers/{id:guid}", async (Guid id, ConfigurationManagementService service, ProviderInput input, CancellationToken cancellationToken) => Results.Ok(await service.UpdateProviderAsync(id, input, cancellationToken)));

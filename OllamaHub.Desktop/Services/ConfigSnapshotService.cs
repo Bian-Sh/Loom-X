@@ -26,6 +26,17 @@ public sealed class ConfigSnapshotService
         return await new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider).ListProvidersAsync(cancellationToken);
     }
 
+    public async Task<AppSettingsResponse> GetSettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = CreateContext();
+        await ConfigurationDatabase.InitializeAsync(db, cancellationToken);
+        var provider = new DatabaseConfigurationProvider(db);
+        await provider.ReloadAsync(cancellationToken);
+        return await new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider).GetSettingsAsync(cancellationToken);
+    }
+
+    public Task<AppSettingsResponse> UpdateSettingsAsync(AppSettingsInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateSettingsAsync(input, token), cancellationToken);
+
     public Task<ProviderResponse> CreateProviderAsync(ProviderInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateProviderAsync(input, token), cancellationToken);
     public Task<ProviderResponse> UpdateProviderAsync(Guid id, ProviderInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateProviderAsync(id, input, token), cancellationToken);
     public Task DeleteProviderAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteProviderAsync(id, token); return true; }, cancellationToken);

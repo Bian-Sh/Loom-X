@@ -150,6 +150,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private bool suppressAutoSave;
     private bool suppressSelectionInvariant;
     public ObservableCollection<ProviderEditorViewModel> Providers { get; } = [];
+    public IReadOnlyList<string> ProviderTypeOptions { get; } = ["openai", "anthropic", "ollama"];
     public ProviderEditorViewModel? SelectedProvider
     {
         get => selectedProvider;
@@ -360,16 +361,16 @@ public sealed class ProvidersViewModel : NotifyViewModel
 public sealed class ProviderEditorViewModel : NotifyViewModel
 {
     public Guid Id { get; set; }
-    private string businessId = ""; private string displayName = ""; private string baseUrl = ""; private string apiMode = "openai"; private bool enabled; private string apiKey = ""; private bool clearApiKey; private string headersJson = "{}";
-    public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ApiMode { get => apiMode; set => SetProperty(ref apiMode, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool ClearApiKey { get => clearApiKey; set => SetProperty(ref clearApiKey, value); } public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; }
+    private string businessId = ""; private string displayName = ""; private string baseUrl = ""; private string apiMode = "openai"; private bool enabled; private bool useProxy; private string apiKey = ""; private bool clearApiKey; private string headersJson = "{}";
+    public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ApiMode { get => apiMode; set => SetProperty(ref apiMode, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool ClearApiKey { get => clearApiKey; set => SetProperty(ref clearApiKey, value); } public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; }
     public ObservableCollection<ModelEditorViewModel> Models { get; } = [];
     public ObservableCollection<HeaderEditorViewModel> Headers { get; } = [];
     public bool HasNoHeaders => Headers.Count == 0;
     public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel(); value.ApplyResponse(response, preserveApiKey: false); foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
-    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey, ClearApiKey, ToHeaderDictionary());
+    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey, ClearApiKey, ToHeaderDictionary(), UseProxy);
     public void ApplyResponse(ProviderResponse response, bool preserveApiKey)
     {
-        Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ApiMode = response.ApiMode; Enabled = response.Enabled; HasApiKey = response.HasApiKey;
+        Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ApiMode = response.ApiMode; Enabled = response.Enabled; UseProxy = response.UseProxy; HasApiKey = response.HasApiKey;
         if (!preserveApiKey) ApiKey = "";
         if (!preserveApiKey) SetHeadersFromJson(response.HeadersJson);
     }

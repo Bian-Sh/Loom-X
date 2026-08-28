@@ -38,13 +38,15 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
         try
         {
             var gateway = await dbContext.GatewayConfigurations.AsNoTracking().SingleAsync(cancellationToken);
+            var settings = await dbContext.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
             var providers = await dbContext.Providers.AsNoTracking().Include(provider => provider.Models).ToListAsync(cancellationToken);
             var resolvedProviders = providers.OrderBy(provider => provider.SortOrder).Select(provider => new ResolvedProviderConfig
             {
                 Id = provider.BusinessId,
                 BaseUrl = provider.BaseUrl,
                 ApiModes = SplitApiModes(provider.ApiMode),
-                HasApiKey = !string.IsNullOrWhiteSpace(provider.ProtectedApiKey)
+                HasApiKey = !string.IsNullOrWhiteSpace(provider.ProtectedApiKey),
+                UseProxy = provider.UseProxy
             }).ToArray();
             var models = providers.Where(provider => provider.Enabled)
                 .SelectMany(provider => provider.Models.Where(model => model.Enabled).OrderBy(model => model.SortOrder).Select(model => ResolveModel(provider, model)))
@@ -52,6 +54,21 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
             Volatile.Write(ref current, new ResolvedAppConfig
             {
                 Server = new ResolvedServerConfig { Urls = [gateway.ListenUrl] },
+                Settings = new ResolvedAppSettings
+                {
+                    Language = settings.Language,
+                    Theme = settings.Theme,
+                    OpenControlCenterOnStartup = settings.OpenControlCenterOnStartup,
+                    ProxyMode = settings.ProxyMode,
+                    ProxyHost = settings.ProxyHost,
+                    ProxyPort = settings.ProxyPort,
+                    ProxyUsername = settings.ProxyUsername,
+                    HasProxyPassword = !string.IsNullOrWhiteSpace(settings.ProtectedProxyPassword),
+                    AutoCheckUpdates = settings.AutoCheckUpdates,
+                    UpdateChannel = settings.UpdateChannel,
+                    DiagnosticsEnabled = settings.DiagnosticsEnabled,
+                    LogRetentionDays = settings.LogRetentionDays
+                },
                 Providers = resolvedProviders,
                 Models = models
             });
@@ -73,6 +90,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
         {
             ModelId = model.ModelId,
             AnthropicModel = model.ModelId,
+            UseProxy = provider.UseProxy,
             ProviderId = provider.BusinessId,
             ApiModes = SplitApiModes(apiMode),
             BaseUrl = (string.IsNullOrWhiteSpace(model.BaseUrl) ? provider.BaseUrl : model.BaseUrl).TrimEnd('/'),
