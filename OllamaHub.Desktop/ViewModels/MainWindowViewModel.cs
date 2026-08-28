@@ -126,6 +126,11 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private ModelEditorViewModel? selectedModel;
     private string status = "";
     private string connectionStatus = "尚未测试连接";
+    private int totalModelCount;
+    private int protectedKeyCount;
+    private int healthyProviderCount;
+    private int enabledProviderCount;
+    private int activeTabIndex;
     private CancellationTokenSource? autoSaveCancellation;
     private CancellationTokenSource? connectionCancellation;
     public ObservableCollection<ProviderEditorViewModel> Providers { get; } = [];
@@ -151,10 +156,17 @@ public sealed class ProvidersViewModel : NotifyViewModel
             DetachModel(selectedModel);
             SetProperty(ref selectedModel, value);
             AttachModel(selectedModel);
+            OnPropertyChanged(nameof(HasSelectedModel));
         }
     }
+    public bool HasSelectedModel => SelectedModel is not null;
     public string Status { get => status; private set => SetProperty(ref status, value); }
     public string ConnectionStatus { get => connectionStatus; private set => SetProperty(ref connectionStatus, value); }
+    public int TotalModelCount { get => totalModelCount; private set => SetProperty(ref totalModelCount, value); }
+    public int ProtectedKeyCount { get => protectedKeyCount; private set => SetProperty(ref protectedKeyCount, value); }
+    public int HealthyProviderCount { get => healthyProviderCount; private set => SetProperty(ref healthyProviderCount, value); }
+    public int EnabledProviderCount { get => enabledProviderCount; private set => SetProperty(ref enabledProviderCount, value); }
+    public int ActiveTabIndex { get => activeTabIndex; set => SetProperty(ref activeTabIndex, value); }
     public ICommand RefreshCommand { get; }
     public ICommand NewProviderCommand { get; }
     public ICommand SaveProviderCommand { get; }
@@ -172,23 +184,23 @@ public sealed class ProvidersViewModel : NotifyViewModel
 
     private async Task RefreshAsync()
     {
-        try { var selectedId = SelectedProvider?.Id; Providers.Clear(); foreach (var provider in await configService.ListProvidersAsync()) Providers.Add(ProviderEditorViewModel.FromResponse(provider)); SelectedProvider = Providers.FirstOrDefault(provider => provider.Id == selectedId) ?? Providers.FirstOrDefault(); Status = $"已加载 {Providers.Count} 个 Provider"; }
+        try { var selectedId = SelectedProvider?.Id; Providers.Clear(); foreach (var provider in await configService.ListProvidersAsync()) Providers.Add(ProviderEditorViewModel.FromResponse(provider)); SelectedProvider = Providers.FirstOrDefault(provider => provider.Id == selectedId) ?? Providers.FirstOrDefault(); UpdateSummary(); Status = $"已加载 {Providers.Count} 个 Provider"; }
         catch (Exception exception) { Status = $"加载失败：{exception.Message}"; }
     }
 
-    private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = "新 Provider", ApiMode = "openai", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; Status = "正在编辑新 Provider"; }
+    private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = "新 Provider", ApiMode = "openai", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); Status = "正在编辑新 Provider"; }
 
     private async Task SaveProviderAsync()
     {
         if (SelectedProvider is null) return;
-        try { var input = SelectedProvider.ToInput(); var response = SelectedProvider.Id == Guid.Empty ? await configService.CreateProviderAsync(input) : await configService.UpdateProviderAsync(SelectedProvider.Id, input); var index = Providers.IndexOf(SelectedProvider); var updated = ProviderEditorViewModel.FromResponse(response); Providers[index] = updated; SelectedProvider = updated; Status = "Provider 已保存"; }
+        try { var input = SelectedProvider.ToInput(); var response = SelectedProvider.Id == Guid.Empty ? await configService.CreateProviderAsync(input) : await configService.UpdateProviderAsync(SelectedProvider.Id, input); var index = Providers.IndexOf(SelectedProvider); var updated = ProviderEditorViewModel.FromResponse(response); Providers[index] = updated; SelectedProvider = updated; UpdateSummary(); Status = "Provider 已保存"; }
         catch (Exception exception) { Status = $"保存失败：{exception.Message}"; }
     }
 
     private async Task DeleteProviderAsync()
     {
         if (SelectedProvider is null) return;
-        try { if (SelectedProvider.Id != Guid.Empty) await configService.DeleteProviderAsync(SelectedProvider.Id); Providers.Remove(SelectedProvider); SelectedProvider = Providers.FirstOrDefault(); Status = "Provider 已删除"; }
+        try { if (SelectedProvider.Id != Guid.Empty) await configService.DeleteProviderAsync(SelectedProvider.Id); Providers.Remove(SelectedProvider); SelectedProvider = Providers.FirstOrDefault(); UpdateSummary(); Status = "Provider 已删除"; }
         catch (Exception exception) { Status = $"删除失败：{exception.Message}"; }
     }
 
@@ -248,16 +260,29 @@ public sealed class ProvidersViewModel : NotifyViewModel
         foreach (var model in provider.Models) DetachModel(model);
     }
 
-    private void ProviderChanged(object? sender, PropertyChangedEventArgs args) => ScheduleAutoSave();
+    private void ProviderChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        UpdateSummary();
+        ScheduleAutoSave();
+    }
     private void ModelsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
         if (args.NewItems is not null) foreach (ModelEditorViewModel model in args.NewItems) model.PropertyChanged += ModelChanged;
         if (args.OldItems is not null) foreach (ModelEditorViewModel model in args.OldItems) model.PropertyChanged -= ModelChanged;
+        UpdateSummary();
     }
 
     private void AttachModel(ModelEditorViewModel? model) { if (model is not null) model.PropertyChanged += ModelChanged; }
     private void DetachModel(ModelEditorViewModel? model) { if (model is not null) model.PropertyChanged -= ModelChanged; }
     private void ModelChanged(object? sender, PropertyChangedEventArgs args) => ScheduleModelAutoSave();
+
+    private void UpdateSummary()
+    {
+        TotalModelCount = Providers.Sum(provider => provider.Models.Count);
+        ProtectedKeyCount = Providers.Count(provider => provider.HasApiKey);
+        EnabledProviderCount = Providers.Count(provider => provider.Enabled);
+        HealthyProviderCount = Providers.Count(provider => provider.Enabled && !string.IsNullOrWhiteSpace(provider.BaseUrl));
+    }
 
     private void ScheduleAutoSave()
     {
@@ -314,6 +339,7 @@ public sealed class PlaceholderViewModel
 public abstract class NotifyViewModel : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;
+    protected void OnPropertyChanged([CallerMemberName] string? propertyName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     protected bool SetProperty<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
