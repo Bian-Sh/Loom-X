@@ -8,8 +8,8 @@ public static class Program
 {
     public static async Task Main(string[] args)
     {
-        var databasePath = Path.Combine(AppContext.BaseDirectory, "OllamaHub.db");
-        if (TryHandleCommand(args, databasePath))
+        AppDataPaths.EnsureCreated();
+        if (TryHandleCommand(args, AppDataPaths.DatabasePath))
         {
             return;
         }

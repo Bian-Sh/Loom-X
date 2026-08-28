@@ -5,7 +5,9 @@ namespace OllamaHub.Desktop.Services;
 
 public sealed class ConfigSnapshotService
 {
-    private readonly string databasePath = Path.Combine(AppContext.BaseDirectory, "OllamaHub.db");
+    private readonly string databasePath = AppDataPaths.DatabasePath;
+
+    public ConfigSnapshotService() => AppDataPaths.EnsureCreated();
 
     public ResolvedAppConfig Load()
     {

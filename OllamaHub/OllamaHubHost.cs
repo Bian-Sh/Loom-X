@@ -13,9 +13,10 @@ public static class OllamaHubHost
 {
     public static async Task<WebApplication> CreateAsync(CancellationToken cancellationToken = default)
     {
-        var databasePath = Path.Combine(AppContext.BaseDirectory, "OllamaHub.db");
+        AppDataPaths.EnsureCreated();
+        var databasePath = AppDataPaths.DatabasePath;
         var builder = WebApplication.CreateBuilder(Array.Empty<string>());
-        var logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+        var logDirectory = AppDataPaths.LogDirectory;
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()

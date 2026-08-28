@@ -5,7 +5,7 @@ OllamaHub 是一个本地 HTTP 代理服务，对外提供 Ollama 与 OpenAI 兼
 ## 当前能力
 
 - Provider 与 Model 通过 Avalonia 桌面控制中心增删改。
-- 配置唯一存储在应用目录的 `OllamaHub.db`，使用 Entity Framework Core + SQLite。
+- 配置唯一存储在 `%LOCALAPPDATA%\OllamaHub\OllamaHub.db`，使用 Entity Framework Core + SQLite。
 - API Key 使用 Windows DPAPI 保护后写入数据库，界面和管理 API 不回显旧值。
 - 日志使用 Serilog，按日期和 10 MB 大小滚动，保留最近 30 个文件。
 - 支持 `openai`、`anthropic`、`ollama` 协议模式。
@@ -13,7 +13,7 @@ OllamaHub 是一个本地 HTTP 代理服务，对外提供 Ollama 与 OpenAI 兼
 
 ## 配置与数据
 
-运行时不读取、不导入、不生成 `settings.json`。应用首次运行会在可执行文件同级创建 `OllamaHub.db`，并建立默认网关监听地址 `http://127.0.0.1:11434`。
+运行时不读取、不导入、不生成 `settings.json`。应用首次运行会在 `%LOCALAPPDATA%\OllamaHub\` 创建 `OllamaHub.db`，并建立默认网关监听地址 `http://127.0.0.1:11434`。应用程序目录中的旧数据库不会被读取或迁移。
 
 数据库主要包含：
 
@@ -25,7 +25,7 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 
 ## 日志
 
-日志写入应用目录下的 `logs/`：
+日志写入 `%LOCALAPPDATA%\OllamaHub\logs\`：
 
 - 文件名格式：`ollamahub-YYYYMMDD.log`。
 - 单文件超过 10 MB 时自动切分序号文件。
@@ -53,7 +53,7 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 
 `dotnet run --project OllamaHub -- SetApiKey <providerOrModelId> <apiKey>`
 
-该命令直接更新 `OllamaHub.db`，不依赖 JSON 配置文件。
+该命令直接更新 `%LOCALAPPDATA%\OllamaHub\OllamaHub.db`，不依赖 JSON 配置文件。
 
 ## HTTP 接口
 
