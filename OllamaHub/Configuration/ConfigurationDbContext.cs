@@ -86,7 +86,6 @@ public sealed class AppSettingsEntity
     public int Id { get; set; } = 1;
     public string Language { get; set; } = "zh-CN";
     public string Theme { get; set; } = "system";
-    public bool OpenControlCenterOnStartup { get; set; } = true;
     public string ProxyMode { get; set; } = "direct";
     public string ProxyHost { get; set; } = "http://127.0.0.1";
     public int ProxyPort { get; set; } = 7890;
@@ -198,7 +197,6 @@ public static class ConfigurationDatabase
                 Id INTEGER NOT NULL CONSTRAINT PK_AppSettings PRIMARY KEY,
                 Language TEXT NOT NULL,
                 Theme TEXT NOT NULL,
-                OpenControlCenterOnStartup INTEGER NOT NULL,
                 ProxyMode TEXT NOT NULL,
                 ProxyHost TEXT NOT NULL,
                 ProxyPort INTEGER NOT NULL,
@@ -210,6 +208,14 @@ public static class ConfigurationDatabase
                 LogRetentionDays INTEGER NOT NULL
             )
             """, cancellationToken);
+
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE AppSettings DROP COLUMN OpenControlCenterOnStartup", cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase))
+        {
+        }
 
         try
         {

@@ -63,7 +63,6 @@ public sealed class ResolvedAppSettings
 {
     public string Language { get; init; } = "zh-CN";
     public string Theme { get; init; } = "system";
-    public bool OpenControlCenterOnStartup { get; init; } = true;
     public string ProxyMode { get; init; } = "direct";
     public string ProxyHost { get; init; } = "http://127.0.0.1";
     public int ProxyPort { get; init; } = 7890;

@@ -30,7 +30,6 @@ public sealed class SettingsViewModel : NotifyViewModel
     private string proxyUsername = "";
     private string proxyPassword = "";
     private bool clearProxyPassword;
-    private bool openControlCenterOnStartup = true;
     private bool autoCheckUpdates = true;
     private bool diagnosticsEnabled;
     private SettingOption selectedLogRetention = LogRetentionOptions[1];
@@ -66,7 +65,6 @@ public sealed class SettingsViewModel : NotifyViewModel
     public string ProxyPassword { get => proxyPassword; set { if (SetProperty(ref proxyPassword, value)) QueueAutoSave(); } }
     public bool ClearProxyPassword { get => clearProxyPassword; set { if (SetProperty(ref clearProxyPassword, value)) QueueAutoSave(); } }
     public bool HasProxyPassword { get => hasProxyPassword; private set => SetProperty(ref hasProxyPassword, value); }
-    public bool OpenControlCenterOnStartup { get => openControlCenterOnStartup; set { if (SetProperty(ref openControlCenterOnStartup, value)) QueueAutoSave(); } }
     public bool AutoCheckUpdates { get => autoCheckUpdates; set { if (SetProperty(ref autoCheckUpdates, value)) QueueAutoSave(); } }
     public bool DiagnosticsEnabled { get => diagnosticsEnabled; set { if (SetProperty(ref diagnosticsEnabled, value)) QueueAutoSave(); } }
     public SettingOption SelectedLogRetention { get => selectedLogRetention; set { if (SetProperty(ref selectedLogRetention, value)) OnPropertyChanged(nameof(LogRetentionDays)); } }
@@ -118,7 +116,6 @@ public sealed class SettingsViewModel : NotifyViewModel
             SelectedTheme = FindOption(ThemeOptions, settings.Theme, ThemeOptions[0]);
             SelectedProxyMode = FindOption(ProxyModeOptions, settings.ProxyMode, ProxyModeOptions[0]);
             SelectedUpdateChannel = FindOption(UpdateChannelOptions, settings.UpdateChannel, UpdateChannelOptions[0]);
-            OpenControlCenterOnStartup = settings.OpenControlCenterOnStartup;
             AutoCheckUpdates = settings.AutoCheckUpdates;
             DiagnosticsEnabled = settings.DiagnosticsEnabled;
             ProxyHost = settings.ProxyHost;
@@ -149,7 +146,6 @@ public sealed class SettingsViewModel : NotifyViewModel
             var input = new AppSettingsInput(
                 SelectedLanguage.Value,
                 SelectedTheme.Value,
-                OpenControlCenterOnStartup,
                 SelectedProxyMode.Value,
                 ProxyHost,
                 ProxyPort,

@@ -35,7 +35,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
             new("网关", "▦", () => ShowGateway()),
             new("Provider", "⇄", () => ShowProviders()),
             new("活动", "≋", () => ShowActivity()),
-            new("控制台", "⌘", () => ShowConsole(), "运维"),
+            new("控制台", "⌘", () => ShowConsole()),
             new("设置", "⚙", () => ShowSettings())
         ]);
         ShowOverview();
@@ -59,12 +59,10 @@ public sealed class NavigationItemViewModel : NotifyViewModel
 {
     public string Title { get; }
     public string Icon { get; }
-    public string? SectionLabel { get; }
-    public bool HasSectionLabel => !string.IsNullOrWhiteSpace(SectionLabel);
     private bool isActive;
     public bool IsActive { get => isActive; set => SetProperty(ref isActive, value); }
     public ICommand NavigateCommand { get; }
-    public NavigationItemViewModel(string title, string icon, Action action, string? sectionLabel = null) { Title = title; Icon = icon; SectionLabel = sectionLabel; NavigateCommand = new DelegateCommand(action); }
+    public NavigationItemViewModel(string title, string icon, Action action) { Title = title; Icon = icon; NavigateCommand = new DelegateCommand(action); }
 }
 
 public sealed class OverviewViewModel : NotifyViewModel, IDisposable

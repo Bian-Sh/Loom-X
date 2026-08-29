@@ -15,7 +15,6 @@
               <StackPanel Spacing="14">
                 <StackPanel Spacing="4"><TextBlock Text="界面语言" FontWeight="SemiBold"/><TextBlock Text="切换控制中心的显示语言。" Classes="hint"/><ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"/></StackPanel>
                 <StackPanel Spacing="4"><TextBlock Text="主题" FontWeight="SemiBold"/><TextBlock Text="选择适合当前工作环境的配色。" Classes="hint"/><ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"/></StackPanel>
-                <CheckBox Content="启动时打开控制中心" IsChecked="{Binding OpenControlCenterOnStartup}"/><TextBlock Text="应用启动后自动打开本地控制台页面。" Classes="hint" Margin="24,-10,0,0"/>
               </StackPanel>
             </Border>
           </StackPanel>

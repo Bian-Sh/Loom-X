@@ -61,7 +61,6 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                 {
                     Language = settings.Language,
                     Theme = settings.Theme,
-                    OpenControlCenterOnStartup = settings.OpenControlCenterOnStartup,
                     ProxyMode = settings.ProxyMode,
                     ProxyHost = settings.ProxyHost,
                     ProxyPort = settings.ProxyPort,

@@ -29,7 +29,6 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <StackPanel Spacing="3">
-                  <TextBlock Text="{Binding SectionLabel}" FontSize="10" Opacity="0.55" Margin="10,10,0,2" IsVisible="{Binding HasSectionLabel}"/>
                   <ToggleButton Command="{Binding NavigateCommand}" IsChecked="{Binding IsActive, Mode=OneWay}" Classes="nav-button">
                     <StackPanel Orientation="Horizontal" Spacing="11">
                       <TextBlock Text="{Binding Icon}" Width="18" Foreground="#176B87" HorizontalAlignment="Center"/>
