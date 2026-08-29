@@ -45,9 +45,23 @@ public sealed class ConfigSnapshotService
     public Task<ModelResponse> CreateModelAsync(Guid providerId, ModelInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateModelAsync(providerId, input, token), cancellationToken);
     public Task<ModelResponse> UpdateModelAsync(Guid id, ModelInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateModelAsync(id, input, token), cancellationToken);
     public Task DeleteModelAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteModelAsync(id, token); return true; }, cancellationToken);
+    public async Task<IReadOnlyList<GatewayModelSourceResponse>> ListEnabledGatewayModelsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = CreateContext();
+        return await db.Models.AsNoTracking()
+            .Where(model => model.Enabled && model.Provider.Enabled)
+            .OrderBy(model => model.Provider.SortOrder)
+            .ThenBy(model => model.SortOrder)
+            .ThenBy(model => model.ModelId)
+            .Select(model => new GatewayModelSourceResponse(model.Id, model.DisplayName, model.Provider.DisplayName))
+            .ToArrayAsync(cancellationToken);
+    }
     public Task<IReadOnlyList<GatewayEndpointResponse>> ListGatewayEndpointsAsync(CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.ListGatewayEndpointsAsync(token), cancellationToken);
     public Task<GatewayEndpointResponse> SetGatewayEndpointEnabledAsync(string key, bool enabled, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.SetGatewayEndpointEnabledAsync(key, enabled, token), cancellationToken);
-    public Task<GatewayRouteResponse> CreateGatewayRouteAsync(string endpointKey, GatewayRouteInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateGatewayRouteAsync(endpointKey, input, token), cancellationToken);
+    public Task<GatewayComboResponse> CreateGatewayComboAsync(string endpointKey, GatewayComboInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateGatewayComboAsync(endpointKey, input, token), cancellationToken);
+    public Task<GatewayComboResponse> UpdateGatewayComboAsync(Guid id, GatewayComboInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateGatewayComboAsync(id, input, token), cancellationToken);
+    public Task DeleteGatewayComboAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteGatewayComboAsync(id, token); return true; }, cancellationToken);
+    public Task<GatewayRouteResponse> CreateGatewayRouteAsync(Guid comboId, GatewayRouteInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateGatewayRouteAsync(comboId, input, token), cancellationToken);
     public Task<GatewayRouteResponse> UpdateGatewayRouteAsync(Guid id, GatewayRouteInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateGatewayRouteAsync(id, input, token), cancellationToken);
     public Task DeleteGatewayRouteAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteGatewayRouteAsync(id, token); return true; }, cancellationToken);
 

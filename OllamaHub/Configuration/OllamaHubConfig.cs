@@ -93,12 +93,19 @@ public sealed class ResolvedGatewayEndpointConfig
     public required string Key { get; init; }
     public required string PublicPath { get; init; }
     public bool Enabled { get; init; }
+    public IReadOnlyList<ResolvedGatewayComboConfig> Combos { get; init; } = [];
+}
+
+public sealed class ResolvedGatewayComboConfig
+{
+    public required string Name { get; init; }
+    public bool Enabled { get; init; }
+    public int SortOrder { get; init; }
     public IReadOnlyList<ResolvedGatewayRouteConfig> Routes { get; init; } = [];
 }
 
 public sealed class ResolvedGatewayRouteConfig
 {
-    public required string Alias { get; init; }
     public required ResolvedModelConfig Model { get; init; }
     public bool Enabled { get; init; }
     public int SortOrder { get; init; }

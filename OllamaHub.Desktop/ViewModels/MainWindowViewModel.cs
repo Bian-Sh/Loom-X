@@ -167,7 +167,9 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         foreach (var endpoint in config.GatewayEndpoints.OrderBy(item => item.Key))
         {
             var endpointVm = new OverviewEndpointViewModel(endpoint.Key, EndpointLabel(endpoint.Key), endpoint.PublicPath, endpoint.Enabled);
-            foreach (var route in endpoint.Routes.Where(item => item.Enabled)) endpointVm.Routes.Add(new OverviewRouteViewModel(route.Alias, route.Model.DisplayName, route.Model.ModelId, route.Model.ProviderId));
+            foreach (var combo in endpoint.Combos.Where(item => item.Enabled))
+                foreach (var route in combo.Routes.Where(item => item.Enabled))
+                    endpointVm.Routes.Add(new OverviewRouteViewModel(combo.Name, route.Model.DisplayName, route.Model.ModelId, route.Model.ProviderId));
             Endpoints.Add(endpointVm);
         }
         TopologyChanged?.Invoke(this, EventArgs.Empty);

@@ -10,9 +10,12 @@ public sealed record AppSettingsResponse(int Id, string Language, string Theme, 
 public sealed record ModelInput(string ModelId, string DisplayName, string? ConfigId, string Family, string? BaseUrl, string? ApiMode, int ContextLength, int MaxTokens, bool Vision, double? Temperature, double? TopP, bool Enabled, string? ApiKey, bool ClearApiKey, Dictionary<string, string>? Headers, Dictionary<string, JsonElement>? Extra);
 public sealed record ProviderResponse(Guid Id, string BusinessId, string DisplayName, string BaseUrl, string ApiMode, bool Enabled, bool UseProxy, bool HasApiKey, int ModelCount, string HeadersJson, IReadOnlyList<ModelResponse> Models, string? ModelListUrl = null, string EndpointFormat = "responses", string? ApiKey = null);
 public sealed record ModelResponse(Guid Id, string ProviderId, string ModelId, string DisplayName, string? ConfigId, string Family, string? BaseUrl, string? ApiMode, int ContextLength, int MaxTokens, bool Vision, double? Temperature, double? TopP, bool Enabled, bool HasApiKey, string HeadersJson, string ExtraJson);
-public sealed record GatewayRouteInput(Guid ModelId, string? Alias, bool Enabled, int SortOrder);
-public sealed record GatewayRouteResponse(Guid Id, string EndpointKey, Guid ModelId, string ModelName, string ProviderName, string? Alias, bool Enabled, int SortOrder);
-public sealed record GatewayEndpointResponse(string Key, string DisplayName, string PublicPath, bool Enabled, IReadOnlyList<GatewayRouteResponse> Routes);
+public sealed record GatewayModelSourceResponse(Guid Id, string ModelName, string ProviderName);
+public sealed record GatewayComboInput(string Name, bool Enabled, int SortOrder);
+public sealed record GatewayComboResponse(Guid Id, string EndpointKey, string Name, bool Enabled, int SortOrder, IReadOnlyList<GatewayRouteResponse> Routes);
+public sealed record GatewayRouteInput(Guid ModelId, bool Enabled, int SortOrder);
+public sealed record GatewayRouteResponse(Guid Id, Guid ComboId, Guid ModelId, string ModelName, string ProviderName, bool Enabled, int SortOrder);
+public sealed record GatewayEndpointResponse(string Key, string DisplayName, string PublicPath, bool Enabled, IReadOnlyList<GatewayComboResponse> Combos);
 public sealed record GatewayEndpointToggleInput(bool Enabled);
 
 public sealed class ConfigurationManagementService(IDbContextFactory<ConfigurationDbContext> dbContextFactory, IDatabaseConfigurationProvider configurationProvider)
@@ -22,6 +25,18 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var providers = await db.Providers.AsNoTracking().Include(provider => provider.Models).OrderBy(provider => provider.SortOrder).ToListAsync(cancellationToken);
         return providers.Select(ToResponse).ToArray();
+    }
+
+    public async Task<IReadOnlyList<GatewayModelSourceResponse>> ListEnabledGatewayModelsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Models.AsNoTracking()
+            .Where(model => model.Enabled && model.Provider.Enabled)
+            .OrderBy(model => model.Provider.SortOrder)
+            .ThenBy(model => model.SortOrder)
+            .ThenBy(model => model.ModelId)
+            .Select(model => new GatewayModelSourceResponse(model.Id, model.DisplayName, model.Provider.DisplayName))
+            .ToArrayAsync(cancellationToken);
     }
 
     public async Task<AppSettingsResponse> GetSettingsAsync(CancellationToken cancellationToken = default)
@@ -111,31 +126,58 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var model = await db.Models.SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("Model 不存在。");
-        if (await db.GatewayRoutes.AnyAsync(item => item.ModelId == id, cancellationToken)) throw new InvalidOperationException("模型仍被网关路由引用，请先从各 Endpoint 删除路由。");
+        if (await db.GatewayRoutes.AnyAsync(item => item.ModelId == id, cancellationToken)) throw new InvalidOperationException("模型仍被网关路由引用，请先从 Combo 中移除模型。");
         db.Models.Remove(model); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<GatewayEndpointResponse>> ListGatewayEndpointsAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var endpoints = await db.GatewayEndpoints.AsNoTracking().Include(item => item.Routes).ThenInclude(item => item.Model).ThenInclude(item => item.Provider).OrderBy(item => item.Key).ToListAsync(cancellationToken);
+        var endpoints = await db.GatewayEndpoints.AsNoTracking().Include(item => item.Combos).ThenInclude(item => item.Routes).ThenInclude(item => item.Model).ThenInclude(item => item.Provider).OrderBy(item => item.Key).ToListAsync(cancellationToken);
         return endpoints.Select(ToGatewayResponse).ToArray();
     }
 
     public async Task<GatewayEndpointResponse> SetGatewayEndpointEnabledAsync(string key, bool enabled, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var endpoint = await db.GatewayEndpoints.Include(item => item.Routes).ThenInclude(item => item.Model).ThenInclude(item => item.Provider).SingleOrDefaultAsync(item => item.Key == key, cancellationToken) ?? throw new KeyNotFoundException("Endpoint 不存在。");
+        var endpoint = await db.GatewayEndpoints.Include(item => item.Combos).ThenInclude(item => item.Routes).ThenInclude(item => item.Model).ThenInclude(item => item.Provider).SingleOrDefaultAsync(item => item.Key == key, cancellationToken) ?? throw new KeyNotFoundException("Endpoint 不存在。");
         endpoint.Enabled = enabled; await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToGatewayResponse(endpoint);
     }
 
-    public async Task<GatewayRouteResponse> CreateGatewayRouteAsync(string endpointKey, GatewayRouteInput input, CancellationToken cancellationToken = default)
+    public async Task<GatewayComboResponse> CreateGatewayComboAsync(string endpointKey, GatewayComboInput input, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var endpoint = await db.GatewayEndpoints.SingleOrDefaultAsync(item => item.Key == endpointKey, cancellationToken) ?? throw new KeyNotFoundException("Endpoint 不存在。");
+        _ = await db.GatewayEndpoints.SingleOrDefaultAsync(item => item.Key == endpointKey, cancellationToken) ?? throw new KeyNotFoundException("Endpoint 不存在。");
+        var name = NormalizeComboName(input.Name);
+        if (await db.GatewayCombos.AnyAsync(item => item.EndpointKey == endpointKey && item.Name.ToLower() == name.ToLower(), cancellationToken)) throw new InvalidOperationException("Combo 模型名已存在。");
+        var combo = new GatewayComboEntity { EndpointKey = endpointKey, Name = name, Enabled = input.Enabled, SortOrder = input.SortOrder };
+        db.GatewayCombos.Add(combo); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToGatewayComboResponse(combo);
+    }
+
+    public async Task<GatewayComboResponse> UpdateGatewayComboAsync(Guid id, GatewayComboInput input, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var combo = await db.GatewayCombos.Include(item => item.Routes).ThenInclude(item => item.Model).ThenInclude(item => item.Provider).SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("Combo 模型不存在。");
+        var name = NormalizeComboName(input.Name);
+        if (await db.GatewayCombos.AnyAsync(item => item.Id != id && item.EndpointKey == combo.EndpointKey && item.Name.ToLower() == name.ToLower(), cancellationToken)) throw new InvalidOperationException("Combo 模型名已存在。");
+        combo.Name = name; combo.Enabled = input.Enabled; combo.SortOrder = input.SortOrder;
+        await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToGatewayComboResponse(combo);
+    }
+
+    public async Task DeleteGatewayComboAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var combo = await db.GatewayCombos.SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("Combo 模型不存在。");
+        db.GatewayCombos.Remove(combo); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
+    }
+
+    public async Task<GatewayRouteResponse> CreateGatewayRouteAsync(Guid comboId, GatewayRouteInput input, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var combo = await db.GatewayCombos.SingleOrDefaultAsync(item => item.Id == comboId, cancellationToken) ?? throw new KeyNotFoundException("Combo 模型不存在。");
         var model = await db.Models.Include(item => item.Provider).SingleOrDefaultAsync(item => item.Id == input.ModelId, cancellationToken) ?? throw new KeyNotFoundException("模型不存在。");
-        if (await db.GatewayRoutes.AnyAsync(item => item.EndpointKey == endpointKey && item.ModelId == input.ModelId, cancellationToken)) throw new InvalidOperationException("模型已在当前 Endpoint 中。");
-        var route = new GatewayRouteEntity { EndpointKey = endpointKey, ModelId = input.ModelId, Alias = string.IsNullOrWhiteSpace(input.Alias) ? null : input.Alias.Trim(), Enabled = input.Enabled, SortOrder = input.SortOrder };
+        if (await db.GatewayRoutes.AnyAsync(item => item.ComboId == comboId && item.ModelId == input.ModelId, cancellationToken)) throw new InvalidOperationException("模型已在当前 Combo 中。");
+        var route = new GatewayRouteEntity { EndpointKey = combo.EndpointKey, ComboId = comboId, ModelId = input.ModelId, Enabled = input.Enabled, SortOrder = input.SortOrder };
         db.GatewayRoutes.Add(route); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); route.Model = model; return ToGatewayRouteResponse(route);
     }
 
@@ -143,7 +185,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var route = await db.GatewayRoutes.Include(item => item.Model).ThenInclude(item => item.Provider).SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("路由不存在。");
-        route.Alias = string.IsNullOrWhiteSpace(input.Alias) ? null : input.Alias.Trim(); route.Enabled = input.Enabled; route.SortOrder = input.SortOrder; await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToGatewayRouteResponse(route);
+        route.Enabled = input.Enabled; route.SortOrder = input.SortOrder; await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToGatewayRouteResponse(route);
     }
 
     public async Task DeleteGatewayRouteAsync(Guid id, CancellationToken cancellationToken = default)
@@ -151,8 +193,16 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken); var route = await db.GatewayRoutes.SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("路由不存在。"); db.GatewayRoutes.Remove(route); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
     }
 
-    private static GatewayEndpointResponse ToGatewayResponse(GatewayEndpointEntity endpoint) => new(endpoint.Key, endpoint.DisplayName, endpoint.PublicPath, endpoint.Enabled, endpoint.Routes.OrderBy(item => item.SortOrder).Select(ToGatewayRouteResponse).ToArray());
-    private static GatewayRouteResponse ToGatewayRouteResponse(GatewayRouteEntity route) => new(route.Id, route.EndpointKey, route.ModelId, route.Model.DisplayName, route.Model.Provider.DisplayName, route.Alias, route.Enabled, route.SortOrder);
+    private static GatewayEndpointResponse ToGatewayResponse(GatewayEndpointEntity endpoint) => new(endpoint.Key, endpoint.DisplayName, endpoint.PublicPath, endpoint.Enabled, endpoint.Combos.OrderBy(item => item.SortOrder).Select(ToGatewayComboResponse).ToArray());
+    private static GatewayComboResponse ToGatewayComboResponse(GatewayComboEntity combo) => new(combo.Id, combo.EndpointKey, combo.Name, combo.Enabled, combo.SortOrder, combo.Routes.OrderBy(item => item.SortOrder).Select(ToGatewayRouteResponse).ToArray());
+    private static GatewayRouteResponse ToGatewayRouteResponse(GatewayRouteEntity route) => new(route.Id, route.ComboId ?? Guid.Empty, route.ModelId, route.Model.DisplayName, route.Model.Provider.DisplayName, route.Enabled, route.SortOrder);
+    private static string NormalizeComboName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) throw new ArgumentException("Combo 模型名不能为空。");
+        var normalized = value.Trim();
+        if (normalized.Length > 256) throw new ArgumentException("Combo 模型名不能超过 256 个字符。");
+        return normalized;
+    }
 
     private static void ValidateProvider(ProviderInput input)
     {

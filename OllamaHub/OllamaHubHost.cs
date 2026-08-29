@@ -68,7 +68,7 @@ public static class OllamaHubHost
         app.MapGet("/api/version", () => Results.Ok(new { version = "0.12.6" }));
         app.MapGet("/api/ps", () => Results.Ok(new { models = Array.Empty<object>() }));
         app.MapGet("/api/tags", (IDatabaseConfigurationProvider configProvider) =>
-            Results.Ok(new OllamaTagListResponse { Models = configProvider.GetModels().Select(ToDescriptor).ToArray() }));
+            Results.Ok(new OllamaTagListResponse { Models = ListEnabledCombos(configProvider, "ollama").Select(ToDescriptor).ToArray() }));
 
         var adminApi = app.MapGroup("/api/admin");
         adminApi.MapGet("/settings", (ConfigurationManagementService service, CancellationToken cancellationToken) => service.GetSettingsAsync(cancellationToken));
@@ -82,7 +82,10 @@ public static class OllamaHubHost
         adminApi.MapDelete("/models/{id:guid}", async (Guid id, ConfigurationManagementService service, CancellationToken cancellationToken) => { await service.DeleteModelAsync(id, cancellationToken); return Results.NoContent(); });
         adminApi.MapGet("/gateway", (ConfigurationManagementService service, CancellationToken cancellationToken) => service.ListGatewayEndpointsAsync(cancellationToken));
         adminApi.MapPut("/gateway/{key}/enabled", async (string key, GatewayEndpointToggleInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.SetGatewayEndpointEnabledAsync(key, input.Enabled, cancellationToken)));
-        adminApi.MapPost("/gateway/{key}/routes", async (string key, GatewayRouteInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.CreateGatewayRouteAsync(key, input, cancellationToken)));
+        adminApi.MapPost("/gateway/{key}/combos", async (string key, GatewayComboInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.CreateGatewayComboAsync(key, input, cancellationToken)));
+        adminApi.MapPut("/gateway/combos/{id:guid}", async (Guid id, GatewayComboInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.UpdateGatewayComboAsync(id, input, cancellationToken)));
+        adminApi.MapDelete("/gateway/combos/{id:guid}", async (Guid id, ConfigurationManagementService service, CancellationToken cancellationToken) => { await service.DeleteGatewayComboAsync(id, cancellationToken); return Results.NoContent(); });
+        adminApi.MapPost("/gateway/combos/{id:guid}/routes", async (Guid id, GatewayRouteInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.CreateGatewayRouteAsync(id, input, cancellationToken)));
         adminApi.MapPut("/gateway/routes/{id:guid}", async (Guid id, GatewayRouteInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.UpdateGatewayRouteAsync(id, input, cancellationToken)));
         adminApi.MapDelete("/gateway/routes/{id:guid}", async (Guid id, ConfigurationManagementService service, CancellationToken cancellationToken) => { await service.DeleteGatewayRouteAsync(id, cancellationToken); return Results.NoContent(); });
 
@@ -90,19 +93,18 @@ public static class OllamaHubHost
         {
             var modelName = request.Model;
             if (string.IsNullOrWhiteSpace(modelName)) return Results.BadRequest(new OllamaErrorResponse { Error = "Model name is required." });
-            var model = configProvider.FindModel(modelName);
-            if (model is null) return Results.NotFound(new OllamaErrorResponse { Error = $"Model '{modelName}' is not configured." });
+            var combo = FindEnabledCombo(configProvider, "ollama", modelName);
+            var model = combo?.Routes.FirstOrDefault(item => item.Enabled)?.Model;
+            if (model is null) return Results.NotFound(new OllamaErrorResponse { Error = $"Combo model '{modelName}' is not configured for this Endpoint." });
             var capabilities = model.Vision ? new[] { "completion", "tools", "vision" } : new[] { "completion", "tools" };
             return Results.Ok(new OllamaShowResponse
             {
-                Modelfile = $"FROM {model.AnthropicModel}",
+                Modelfile = $"FROM {combo!.Name}",
                 Parameters = $"family={model.Family}\ncontext_length={model.ContextLength}\nmax_tokens={model.MaxTokens}",
-                Details = ToDescriptor(model).Details,
+                Details = ToDescriptor(combo!).Details,
                 Capabilities = capabilities,
                 ModelInfo = new Dictionary<string, object>
                 {
-                    ["provider"] = model.ProviderId,
-                    ["anthropic_model"] = model.AnthropicModel,
                     ["context_length"] = model.ContextLength,
                     ["max_tokens"] = model.MaxTokens,
                     ["capabilities"] = capabilities,
@@ -134,19 +136,19 @@ public static class OllamaHubHost
         });
     }
 
-    private static OllamaModelDescriptor ToDescriptor(ResolvedModelConfig model) => new()
+    private static OllamaModelDescriptor ToDescriptor(ResolvedGatewayComboConfig combo) => new()
     {
-        Name = model.OllamaModelName,
-        Model = model.ModelId,
+        Name = combo.Name,
+        Model = combo.Name,
         ModifiedAt = DateTimeOffset.UtcNow.ToString("O"),
         Size = 0,
-        Digest = BuildDigest(model),
+        Digest = BuildDigest(combo.Name),
         Details = new OllamaModelDetails { Family = "", Families = [""], ParameterSize = "", QuantizationLevel = "proxy" }
     };
 
-    private static string BuildDigest(ResolvedModelConfig model)
+    private static string BuildDigest(string comboName)
     {
-        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes($"{model.ProviderId}:{model.ModelId}:{model.OllamaModelName}"));
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(comboName));
         return Convert.ToHexStringLower(bytes);
     }
 
@@ -182,65 +184,85 @@ public static class OllamaHubHost
     {
         var logger = loggerFactory.CreateLogger("ChatCompletions");
         if (requestJson is not JsonObject requestObject) return Results.BadRequest(new OllamaErrorResponse { Error = "Request body must be a JSON object." });
-        if (!TryGetString(requestObject, "model", out var modelName)) return Results.BadRequest(new OllamaErrorResponse { Error = "Model name is required." });
-
-        var model = configProvider.FindModel(modelName);
+        var requestedModel = TryGetString(requestObject, "model", out var modelName) ? modelName : null;
+        var combo = requestedModel is null
+            ? ListEnabledCombos(configProvider, "openai").FirstOrDefault()
+            : FindEnabledCombo(configProvider, "openai", requestedModel);
+        var routes = combo?.Routes.Where(item => item.Enabled).OrderBy(item => item.SortOrder).ToArray() ?? [];
         if (httpContext.Items[ActivityContextKeys.Request] is ActivityRequestContext activityContext)
         {
-            activityContext.ProviderId = model?.ProviderId;
-            activityContext.ModelId = model?.ModelId ?? modelName;
-            activityContext.ModelAlias = modelName;
-            activityContext.Route = model?.SupportsApiMode("openai") == true ? "OpenAI 直通" : "OpenAI → Anthropic";
+            activityContext.ModelAlias = combo?.Name ?? requestedModel;
+            activityContext.Route = "OpenAI Combo";
             activityContext.IsStreaming = requestObject["stream"] is JsonValue streamValue
                 && streamValue.TryGetValue<bool>(out var isStreaming)
                 && isStreaming;
         }
-        if (model is null)
+        if (routes.Length == 0)
         {
-            logger.LogWarning("OpenAI chat completion model not configured. Requested model: {RequestedModel}. Available models: {AvailableModels}", modelName, string.Join(", ", configProvider.GetModels().Select(m => m.OllamaModelName)));
-            return Results.NotFound(new OllamaErrorResponse { Error = $"Model '{modelName}' is not configured." });
+            logger.LogWarning("OpenAI chat completion Combo model not configured. Requested model: {RequestedModel}", requestedModel ?? "默认");
+            return Results.NotFound(new OllamaErrorResponse { Error = requestedModel is null ? "No enabled model route is configured." : $"Combo model '{requestedModel}' is not configured for this Endpoint." });
         }
 
-        if (model.SupportsApiMode("openai"))
+        foreach (var route in routes)
         {
-            requestObject["model"] = model.ModelId;
-            if (model.Extra != null) foreach (var kvp in model.Extra) requestObject[kvp.Key] = kvp.Value?.DeepClone();
-            if (model.Temperature.HasValue && !requestObject.ContainsKey("temperature")) requestObject["temperature"] = model.Temperature.Value;
-            if (model.TopP.HasValue && !requestObject.ContainsKey("top_p")) requestObject["top_p"] = model.TopP.Value;
-            await passthroughClient.ProxyAsync(httpContext, model, "openai", "/v1/chat/completions", requestObject, cancellationToken);
+            var model = route.Model;
+            if (httpContext.Items[ActivityContextKeys.Request] is ActivityRequestContext routeContext)
+            {
+                routeContext.AttemptIndex++;
+                routeContext.ProviderId = model.ProviderId;
+                routeContext.ModelId = model.ModelId;
+                routeContext.ModelAlias = combo!.Name;
+                routeContext.Route = model.SupportsApiMode("openai") ? "OpenAI Combo" : "OpenAI Combo → Anthropic";
+            }
+
+            var attemptRequest = requestObject.DeepClone() as JsonObject ?? new JsonObject();
+            if (model.SupportsApiMode("openai"))
+            {
+                attemptRequest["model"] = model.ModelId;
+                foreach (var kvp in model.Extra) attemptRequest[kvp.Key] = kvp.Value?.DeepClone();
+                if (model.Temperature.HasValue && !attemptRequest.ContainsKey("temperature")) attemptRequest["temperature"] = model.Temperature.Value;
+                if (model.TopP.HasValue && !attemptRequest.ContainsKey("top_p")) attemptRequest["top_p"] = model.TopP.Value;
+                if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, model, "openai", "/v1/chat/completions", attemptRequest, cancellationToken)) return Results.Empty;
+                continue;
+            }
+
+            var anthropicRequest = requestFactory.Create(model, attemptRequest);
+            var telemetryContext = httpContext.Items[ActivityContextKeys.Request] as ActivityRequestContext;
+            var attemptStartedAt = Stopwatch.GetTimestamp();
+            if (telemetryContext is not null) telemetryHub.EdgeAttemptStarted(telemetryContext, model.ProviderId, model.ModelId, telemetryContext.AttemptIndex);
+            if (!anthropicRequest.Stream)
+            {
+                var (statusCode, response, error) = await proxyClient.SendAsync(model, anthropicRequest, cancellationToken);
+                var elapsedMs = (long)Stopwatch.GetElapsedTime(attemptStartedAt).TotalMilliseconds;
+                if (response is not null)
+                {
+                    if (telemetryContext is not null) telemetryHub.EdgeAttemptCompleted(telemetryContext, model.ProviderId, model.ModelId, (int)statusCode, elapsedMs);
+                    return Results.Ok(responseMapper.MapOpenAiResponse(model, response));
+                }
+                var retryable = (int)statusCode is 408 or 429 or >= 500;
+                if (telemetryContext is not null) telemetryHub.EdgeAttemptFailed(telemetryContext, model.ProviderId, model.ModelId, (int)statusCode, elapsedMs, retryable);
+                if (retryable) continue;
+                return ToError(statusCode, error);
+            }
+
+            var streamResult = await proxyClient.SendStreamAsync(model, anthropicRequest, cancellationToken);
+            var streamElapsedMs = (long)Stopwatch.GetElapsedTime(attemptStartedAt).TotalMilliseconds;
+            if (streamResult.Stream is null)
+            {
+                var retryable = (int)streamResult.StatusCode is 408 or 429 or >= 500;
+                if (telemetryContext is not null) telemetryHub.EdgeAttemptFailed(telemetryContext, model.ProviderId, model.ModelId, (int)streamResult.StatusCode, streamElapsedMs, retryable);
+                if (retryable) continue;
+                return ToError(streamResult.StatusCode, streamResult.Error);
+            }
+            if (telemetryContext is not null) telemetryHub.EdgeAttemptCompleted(telemetryContext, model.ProviderId, model.ModelId, (int)streamResult.StatusCode, streamElapsedMs);
+            httpContext.Response.StatusCode = StatusCodes.Status200OK;
+            httpContext.Response.ContentType = "text/event-stream";
+            httpContext.Response.Headers.CacheControl = "no-cache";
+            await using var anthropicStream = streamResult.Stream;
+            await responseMapper.WriteOpenAiStreamAsync(model, anthropicStream, httpContext.Response.Body, cancellationToken);
             return Results.Empty;
         }
-
-        var anthropicRequest = requestFactory.Create(model, requestObject);
-        var telemetryContext = httpContext.Items[ActivityContextKeys.Request] as ActivityRequestContext;
-        var attemptStartedAt = Stopwatch.GetTimestamp();
-        if (telemetryContext is not null) telemetryHub.EdgeAttemptStarted(telemetryContext, model.ProviderId, model.ModelId, telemetryContext.AttemptIndex);
-        if (!anthropicRequest.Stream)
-        {
-            var (statusCode, response, error) = await proxyClient.SendAsync(model, anthropicRequest, cancellationToken);
-            if (telemetryContext is not null)
-            {
-                var elapsedMs = (long)Stopwatch.GetElapsedTime(attemptStartedAt).TotalMilliseconds;
-                if (response is null) telemetryHub.EdgeAttemptFailed(telemetryContext, model.ProviderId, model.ModelId, (int)statusCode, elapsedMs, false);
-                else telemetryHub.EdgeAttemptCompleted(telemetryContext, model.ProviderId, model.ModelId, (int)statusCode, elapsedMs);
-            }
-            return response is null ? ToError(statusCode, error) : Results.Ok(responseMapper.MapOpenAiResponse(model, response));
-        }
-
-        var streamResult = await proxyClient.SendStreamAsync(model, anthropicRequest, cancellationToken);
-        if (telemetryContext is not null)
-        {
-            var elapsedMs = (long)Stopwatch.GetElapsedTime(attemptStartedAt).TotalMilliseconds;
-            if (streamResult.Stream is null) telemetryHub.EdgeAttemptFailed(telemetryContext, model.ProviderId, model.ModelId, (int)streamResult.StatusCode, elapsedMs, false);
-            else telemetryHub.EdgeAttemptCompleted(telemetryContext, model.ProviderId, model.ModelId, (int)streamResult.StatusCode, elapsedMs);
-        }
-        if (streamResult.Stream is null) return ToError(streamResult.StatusCode, streamResult.Error);
-        httpContext.Response.StatusCode = StatusCodes.Status200OK;
-        httpContext.Response.ContentType = "text/event-stream";
-        httpContext.Response.Headers.CacheControl = "no-cache";
-        await using var anthropicStream = streamResult.Stream;
-        await responseMapper.WriteOpenAiStreamAsync(model, anthropicStream, httpContext.Response.Body, cancellationToken);
-        return Results.Empty;
+        return Results.StatusCode(StatusCodes.Status502BadGateway);
     }
 
     private static async Task<IResult> HandleResponsesAsync(
@@ -256,11 +278,14 @@ public static class OllamaHubHost
         if (endpoint is null) return Results.NotFound(new OllamaErrorResponse { Error = "Endpoint is disabled or not configured." });
         if (requestJson is not JsonObject requestObject) return Results.BadRequest(new OllamaErrorResponse { Error = "Request body must be a JSON object." });
         var requestedModel = TryGetString(requestObject, "model", out var modelName) ? modelName : null;
-        var routes = endpoint.Routes.Where(item => item.Enabled && (requestedModel is null || string.Equals(item.Alias, requestedModel, StringComparison.OrdinalIgnoreCase) || string.Equals(item.Model.OllamaModelName, requestedModel, StringComparison.OrdinalIgnoreCase) || string.Equals(item.Model.DisplayName, requestedModel, StringComparison.OrdinalIgnoreCase))).OrderBy(item => item.SortOrder).ToArray();
+        var combo = requestedModel is null
+            ? endpoint.Combos.Where(item => item.Enabled).OrderBy(item => item.SortOrder).FirstOrDefault()
+            : endpoint.Combos.FirstOrDefault(item => item.Enabled && string.Equals(item.Name, requestedModel, StringComparison.OrdinalIgnoreCase));
+        var routes = combo?.Routes.Where(item => item.Enabled).OrderBy(item => item.SortOrder).ToArray() ?? [];
         if (routes.Length == 0) return Results.NotFound(new OllamaErrorResponse { Error = requestedModel is null ? "No enabled model route is configured." : $"Model '{requestedModel}' is not configured for this Endpoint." });
         if (httpContext.Items[ActivityContextKeys.Request] is ActivityRequestContext activityContext)
         {
-            activityContext.ModelAlias = requestedModel;
+            activityContext.ModelAlias = combo?.Name;
             activityContext.Protocol = EndpointLabel(endpointKey);
         }
         for (var routeIndex = 0; routeIndex < routes.Length; routeIndex++)
@@ -271,7 +296,7 @@ public static class OllamaHubHost
             {
                 routeContext.ProviderId = route.Model.ProviderId;
                 routeContext.ModelId = route.Model.ModelId;
-                routeContext.ModelAlias = route.Alias;
+                routeContext.ModelAlias = combo!.Name;
                 routeContext.Route = $"{EndpointLabel(endpointKey)} → {route.Model.ProviderId}";
             }
             requestObject["model"] = route.Model.ModelId;
@@ -292,8 +317,15 @@ public static class OllamaHubHost
 
     private static object ListGatewayModels(IDatabaseConfigurationProvider provider, string endpointKey)
     {
-        var endpoint = provider.Current.GatewayEndpoints.FirstOrDefault(item => item.Key == endpointKey && item.Enabled);
-        var data = endpoint?.Routes.Where(item => item.Enabled).OrderBy(item => item.SortOrder).Select(item => new { id = item.Alias, @object = "model", owned_by = item.Model.ProviderId }).ToArray() ?? [];
+        var data = ListEnabledCombos(provider, endpointKey).Select(item => new { id = item.Name, @object = "model", owned_by = "ollamahub" }).ToArray();
         return new { @object = "list", data };
     }
+
+    private static IReadOnlyList<ResolvedGatewayComboConfig> ListEnabledCombos(IDatabaseConfigurationProvider provider, string endpointKey) =>
+        provider.Current.GatewayEndpoints.FirstOrDefault(item => item.Key == endpointKey && item.Enabled)?.Combos
+            .Where(item => item.Enabled && item.Routes.Any(route => route.Enabled))
+            .OrderBy(item => item.SortOrder).ToArray() ?? [];
+
+    private static ResolvedGatewayComboConfig? FindEnabledCombo(IDatabaseConfigurationProvider provider, string endpointKey, string name) =>
+        ListEnabledCombos(provider, endpointKey).FirstOrDefault(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
 }

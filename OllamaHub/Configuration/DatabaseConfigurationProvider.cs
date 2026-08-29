@@ -40,7 +40,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
             var gateway = await dbContext.GatewayConfigurations.AsNoTracking().SingleAsync(cancellationToken);
             var settings = await dbContext.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
             var providers = await dbContext.Providers.AsNoTracking().Include(provider => provider.Models).ToListAsync(cancellationToken);
-            var endpoints = await dbContext.GatewayEndpoints.AsNoTracking().Include(endpoint => endpoint.Routes).ThenInclude(route => route.Model).ThenInclude(model => model.Provider).ToListAsync(cancellationToken);
+            var endpoints = await dbContext.GatewayEndpoints.AsNoTracking().Include(endpoint => endpoint.Combos).ThenInclude(combo => combo.Routes).ThenInclude(route => route.Model).ThenInclude(model => model.Provider).ToListAsync(cancellationToken);
             var resolvedProviders = providers.OrderBy(provider => provider.SortOrder).Select(provider => new ResolvedProviderConfig
             {
                 Id = provider.BusinessId,
@@ -79,12 +79,17 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     Key = endpoint.Key,
                     PublicPath = endpoint.PublicPath,
                     Enabled = endpoint.Enabled,
-                    Routes = endpoint.Routes.OrderBy(route => route.SortOrder).Where(route => modelLookup.ContainsKey(route.ModelId)).Select(route => new ResolvedGatewayRouteConfig
+                    Combos = endpoint.Combos.OrderBy(combo => combo.SortOrder).Select(combo => new ResolvedGatewayComboConfig
                     {
-                        Alias = string.IsNullOrWhiteSpace(route.Alias) ? modelLookup[route.ModelId].OllamaModelName : route.Alias!,
-                        Model = modelLookup[route.ModelId],
-                        Enabled = route.Enabled,
-                        SortOrder = route.SortOrder
+                        Name = combo.Name,
+                        Enabled = combo.Enabled,
+                        SortOrder = combo.SortOrder,
+                        Routes = combo.Routes.OrderBy(route => route.SortOrder).Where(route => modelLookup.ContainsKey(route.ModelId)).Select(route => new ResolvedGatewayRouteConfig
+                        {
+                            Model = modelLookup[route.ModelId],
+                            Enabled = route.Enabled,
+                            SortOrder = route.SortOrder
+                        }).ToArray()
                     }).ToArray()
                 }).ToArray()
             });

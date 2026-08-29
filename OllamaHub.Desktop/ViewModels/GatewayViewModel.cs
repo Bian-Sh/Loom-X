@@ -10,6 +10,7 @@ public sealed class GatewayViewModel : NotifyViewModel
     private readonly ConfigSnapshotService configService;
     private readonly ToastService toastService;
     private GatewayEndpointEditorViewModel? selectedEndpoint;
+    private GatewayComboEditorViewModel? selectedCombo;
     private string status = "";
     private string selectedSortMode = "Provider";
     public ObservableCollection<GatewayEndpointEditorViewModel> Endpoints { get; } = [];
@@ -17,42 +18,38 @@ public sealed class GatewayViewModel : NotifyViewModel
     public ObservableCollection<GatewayModelGroup> ModelGroups { get; } = [];
     public IReadOnlyList<string> SortModeOptions { get; } = ["Provider", "模型名称"];
     public string SelectedSortMode { get => selectedSortMode; set { if (SetProperty(ref selectedSortMode, value)) FilterModels(""); } }
-    public GatewayEndpointEditorViewModel? SelectedEndpoint { get => selectedEndpoint; set { if (SetProperty(ref selectedEndpoint, value)) { OnPropertyChanged(nameof(HasSelectedEndpoint)); FilterModels(""); } } }
+    public GatewayEndpointEditorViewModel? SelectedEndpoint { get => selectedEndpoint; set { if (SetProperty(ref selectedEndpoint, value)) { SelectedCombo = null; OnPropertyChanged(nameof(HasSelectedEndpoint)); FilterModels(""); } } }
+    public GatewayComboEditorViewModel? SelectedCombo { get => selectedCombo; private set { if (SetProperty(ref selectedCombo, value)) FilterModels(""); } }
     public bool HasSelectedEndpoint => SelectedEndpoint is not null;
     public string Status { get => status; private set => SetProperty(ref status, value); }
-    public ICommand AddRouteCommand { get; }
+    public ICommand AddComboCommand { get; }
     public ICommand ToggleEndpointCommand { get; }
+    public ICommand ToggleComboCommand { get; }
+    public ICommand RemoveComboCommand { get; }
     public ICommand ToggleRouteCommand { get; }
     public ICommand RemoveRouteCommand { get; }
-    public ICommand MoveUpCommand { get; }
-    public ICommand MoveDownCommand { get; }
 
     public GatewayViewModel(ConfigSnapshotService configService, ToastService? toastService = null)
     {
         this.configService = configService;
         this.toastService = toastService ?? new ToastService();
-        AddRouteCommand = new AsyncCommand(parameter => AddRouteAsync(parameter as GatewayModelOption));
+        AddComboCommand = new AsyncCommand(_ => AddComboAsync());
         ToggleEndpointCommand = new AsyncCommand(parameter => ToggleEndpointAsync(parameter as GatewayEndpointEditorViewModel));
+        ToggleComboCommand = new AsyncCommand(parameter => ToggleComboAsync(parameter as GatewayComboEditorViewModel));
+        RemoveComboCommand = new AsyncCommand(parameter => RemoveComboAsync(parameter as GatewayComboEditorViewModel));
         ToggleRouteCommand = new AsyncCommand(parameter => ToggleRouteAsync(parameter as GatewayRouteEditorViewModel));
         RemoveRouteCommand = new AsyncCommand(parameter => RemoveRouteAsync(parameter as GatewayRouteEditorViewModel));
-        MoveUpCommand = new AsyncCommand(parameter => MoveRouteAsync(parameter as GatewayRouteEditorViewModel, -1));
-        MoveDownCommand = new AsyncCommand(parameter => MoveRouteAsync(parameter as GatewayRouteEditorViewModel, 1));
         _ = RefreshAsync();
     }
 
     public void NotifyCopied() => toastService.Show("地址已复制", ToastLevel.Success);
-
     private async Task RefreshAsync()
     {
         try
         {
             var selectedKey = SelectedEndpoint?.Key;
             var providers = await configService.ListProvidersAsync();
-            AvailableModels.Clear();
-            foreach (var provider in providers.Where(item => item.Enabled))
-                foreach (var model in provider.Models.Where(item => item.Enabled))
-                    AvailableModels.Add(new GatewayModelOption(model.Id, model.DisplayName, provider.DisplayName));
-            RebuildModelGroups();
+            await ReloadAvailableModelsAsync();
             var endpoints = await configService.ListGatewayEndpointsAsync();
             var baseUrl = configService.Load().Server.Urls.FirstOrDefault() ?? "http://127.0.0.1:11434";
             Endpoints.Clear();
@@ -64,135 +61,142 @@ public sealed class GatewayViewModel : NotifyViewModel
         catch (Exception exception) { Status = $"网关加载失败：{exception.Message}"; }
     }
 
-    public async Task AddRouteAsync(GatewayModelOption? option)
+    private async Task AddComboAsync()
     {
-        if (SelectedEndpoint is null || option is null) return;
+        if (SelectedEndpoint is null) return;
         try
         {
-            var response = await configService.CreateGatewayRouteAsync(SelectedEndpoint.Key, new GatewayRouteInput(option.Id, null, true, SelectedEndpoint.Routes.Count));
-            SelectedEndpoint.Routes.Add(GatewayRouteEditorViewModel.FromResponse(response));
-            Status = "模型路由已添加";
+            var name = "新 Combo"; var index = 2;
+            while (SelectedEndpoint.Combos.Any(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))) name = $"新 Combo {index++}";
+            var response = await configService.CreateGatewayComboAsync(SelectedEndpoint.Key, new GatewayComboInput(name, true, SelectedEndpoint.Combos.Count));
+            var combo = GatewayComboEditorViewModel.FromResponse(response); combo.IsExpanded = true;
+            SelectedEndpoint.Combos.Add(combo); SelectedCombo = combo; Status = "Combo 模型已添加";
         }
-        catch (Exception exception) { Status = $"添加路由失败：{exception.Message}"; }
+        catch (Exception exception) { Status = $"添加 Combo 模型失败：{exception.Message}"; }
     }
 
+    public async Task SaveComboChangesAsync(GatewayComboEditorViewModel? combo)
+    {
+        if (combo is null) return;
+        try { combo.ApplyResponse(await configService.UpdateGatewayComboAsync(combo.Id, new GatewayComboInput(combo.Name, combo.Enabled, combo.SortOrder))); Status = "Combo 模型已保存"; }
+        catch (Exception exception) { Status = $"保存 Combo 模型失败：{exception.Message}"; }
+    }
+    public void SelectCombo(GatewayComboEditorViewModel? combo) => SelectedCombo = combo;
+    public GatewayRouteEditorViewModel? FindSelectedRoute(Guid id) => SelectedCombo?.Routes.FirstOrDefault(item => item.Id == id);
+    public async Task<bool> PrepareModelPickerAsync(GatewayComboEditorViewModel? combo)
+    {
+        if (combo is null) return false;
+        SelectedCombo = combo;
+        try
+        {
+            await ReloadAvailableModelsAsync();
+            FilterModels("");
+            Status = AvailableModels.Count == 0 ? "没有可加入的已启用模型，请先在 Provider 中启用模型" : $"已加载 {AvailableModels.Count} 个可加入模型";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            AvailableModels.Clear();
+            ModelGroups.Clear();
+            Status = $"加载可加入模型失败：{exception.Message}";
+            return false;
+        }
+    }
+
+    private async Task ReloadAvailableModelsAsync()
+    {
+        var models = await configService.ListEnabledGatewayModelsAsync();
+        AvailableModels.Clear();
+        foreach (var model in models) AvailableModels.Add(new GatewayModelOption(model.Id, model.ModelName, model.ProviderName));
+    }
+    public async Task AddRouteAsync(GatewayModelOption? option)
+    {
+        if (SelectedCombo is null || option is null) return;
+        try { SelectedCombo.Routes.Add(GatewayRouteEditorViewModel.FromResponse(await configService.CreateGatewayRouteAsync(SelectedCombo.Id, new GatewayRouteInput(option.Id, true, SelectedCombo.Routes.Count)))); Status = "模型已加入 Combo"; }
+        catch (Exception exception) { Status = $"加入 Combo 失败：{exception.Message}"; }
+    }
     public async Task ToggleModelRouteAsync(GatewayModelOption? option)
     {
-        if (SelectedEndpoint is null || option is null) return;
-        var existing = SelectedEndpoint.Routes.FirstOrDefault(item => item.ModelId == option.Id);
-        if (existing is null) await AddRouteAsync(option);
-        else await RemoveRouteAsync(existing);
-        option.IsSelected = SelectedEndpoint.Routes.Any(item => item.ModelId == option.Id);
+        if (SelectedCombo is null || option is null) return;
+        var existing = SelectedCombo.Routes.FirstOrDefault(item => item.ModelId == option.Id);
+        if (existing is null) await AddRouteAsync(option); else await RemoveRouteAsync(existing);
+        option.IsSelected = SelectedCombo.Routes.Any(item => item.ModelId == option.Id);
     }
-
     private async Task ToggleEndpointAsync(GatewayEndpointEditorViewModel? endpoint)
     {
         if (endpoint is null) return;
-        try { var response = await configService.SetGatewayEndpointEnabledAsync(endpoint.Key, !endpoint.Enabled); endpoint.Enabled = response.Enabled; Status = $"{endpoint.DisplayName} 已{(endpoint.Enabled ? "启用" : "停用")}"; }
+        try { endpoint.Enabled = (await configService.SetGatewayEndpointEnabledAsync(endpoint.Key, !endpoint.Enabled)).Enabled; Status = $"{endpoint.DisplayName} 已{(endpoint.Enabled ? "启用" : "停用")}"; }
         catch (Exception exception) { Status = $"Endpoint 更新失败：{exception.Message}"; }
     }
-
-    private async Task ToggleRouteAsync(GatewayRouteEditorViewModel? route)
+    private async Task ToggleComboAsync(GatewayComboEditorViewModel? combo) { if (combo is null) return; combo.Enabled = !combo.Enabled; await SaveComboChangesAsync(combo); }
+    private async Task RemoveComboAsync(GatewayComboEditorViewModel? combo)
     {
-        if (route is null || SelectedEndpoint is null) return;
-        try { route.Enabled = !route.Enabled; await SaveRouteAsync(route); Status = "路由状态已保存"; }
-        catch (Exception exception) { Status = $"路由更新失败：{exception.Message}"; }
+        if (combo is null || SelectedEndpoint is null) return;
+        try { await configService.DeleteGatewayComboAsync(combo.Id); SelectedEndpoint.Combos.Remove(combo); if (SelectedCombo == combo) SelectedCombo = null; Status = "Combo 模型已移除"; }
+        catch (Exception exception) { Status = $"移除 Combo 模型失败：{exception.Message}"; }
     }
-
+    private async Task ToggleRouteAsync(GatewayRouteEditorViewModel? route) { if (route is null) return; route.Enabled = !route.Enabled; await SaveRouteAsync(route); Status = "成员状态已保存"; }
     private async Task RemoveRouteAsync(GatewayRouteEditorViewModel? route)
     {
-        if (route is null || SelectedEndpoint is null) return;
-        try { await configService.DeleteGatewayRouteAsync(route.Id); SelectedEndpoint.Routes.Remove(route); Renumber(); Status = "模型路由已删除"; }
-        catch (Exception exception) { Status = $"删除路由失败：{exception.Message}"; }
+        if (route is null || SelectedCombo is null) return;
+        try { await configService.DeleteGatewayRouteAsync(route.Id); SelectedCombo.Routes.Remove(route); Renumber(SelectedCombo); Status = "模型已从 Combo 移除"; }
+        catch (Exception exception) { Status = $"移除成员失败：{exception.Message}"; }
     }
-
-    private async Task MoveRouteAsync(GatewayRouteEditorViewModel? route, int delta)
+    public async Task MoveRouteAsync(GatewayRouteEditorViewModel? route, GatewayRouteEditorViewModel? target)
     {
-        if (route is null || SelectedEndpoint is null) return;
-        var index = SelectedEndpoint.Routes.IndexOf(route); var target = index + delta;
-        if (index < 0 || target < 0 || target >= SelectedEndpoint.Routes.Count) return;
-        SelectedEndpoint.Routes.Move(index, target); Renumber();
-        try { foreach (var item in SelectedEndpoint.Routes) await SaveRouteAsync(item); Status = "路由优先级已保存"; }
-        catch (Exception exception) { Status = $"排序保存失败：{exception.Message}"; }
+        if (route is null || target is null || route == target || SelectedCombo is null) return;
+        var from = SelectedCombo.Routes.IndexOf(route); var to = SelectedCombo.Routes.IndexOf(target); if (from < 0 || to < 0) return;
+        SelectedCombo.Routes.Move(from, to); Renumber(SelectedCombo);
+        try { foreach (var item in SelectedCombo.Routes) await SaveRouteAsync(item); Status = "故障转移顺序已保存"; }
+        catch (Exception exception) { Status = $"保存排序失败：{exception.Message}"; }
     }
-
-    private async Task SaveRouteAsync(GatewayRouteEditorViewModel route) => await configService.UpdateGatewayRouteAsync(route.Id, new GatewayRouteInput(route.ModelId, route.Alias, route.Enabled, route.SortOrder));
-    public async Task SaveRouteChangesAsync(GatewayRouteEditorViewModel route)
-    {
-        try { await SaveRouteAsync(route); Status = "路由已保存"; }
-        catch (Exception exception) { Status = $"路由更新失败：{exception.Message}"; }
-    }
-    private void Renumber() { for (var i = 0; i < (SelectedEndpoint?.Routes.Count ?? 0); i++) SelectedEndpoint!.Routes[i].SortOrder = i; }
-
-    private void RebuildModelGroups()
-    {
-        ModelGroups.Clear();
-        foreach (var group in AvailableModels.GroupBy(item => item.ProviderName))
-            ModelGroups.Add(new GatewayModelGroup(group.Key, group.ToArray()));
-    }
-
+    private Task SaveRouteAsync(GatewayRouteEditorViewModel route) => configService.UpdateGatewayRouteAsync(route.Id, new GatewayRouteInput(route.ModelId, route.Enabled, route.SortOrder));
+    private static void Renumber(GatewayComboEditorViewModel combo) { for (var i = 0; i < combo.Routes.Count; i++) combo.Routes[i].SortOrder = i; }
     public void FilterModels(string? search)
     {
-        var term = search?.Trim() ?? "";
-        var routeIds = SelectedEndpoint?.Routes.Select(item => item.ModelId).ToHashSet() ?? [];
+        var term = search?.Trim() ?? ""; var routeIds = SelectedCombo?.Routes.Select(item => item.ModelId).ToHashSet() ?? [];
         foreach (var item in AvailableModels) item.IsSelected = routeIds.Contains(item.Id);
         ModelGroups.Clear();
         var filtered = AvailableModels.Where(item => string.IsNullOrWhiteSpace(term) || item.ModelName.Contains(term, StringComparison.OrdinalIgnoreCase) || item.ProviderName.Contains(term, StringComparison.OrdinalIgnoreCase));
-        var groups = filtered.GroupBy(item => item.ProviderName);
-        foreach (var group in (SelectedSortMode == "模型名称" ? groups.OrderBy(item => item.Min(model => model.ModelName), StringComparer.OrdinalIgnoreCase) : groups.OrderBy(item => item.Key, StringComparer.OrdinalIgnoreCase)))
-            ModelGroups.Add(new GatewayModelGroup(group.Key, SelectedSortMode == "模型名称" ? group.OrderBy(item => item.ModelName, StringComparer.OrdinalIgnoreCase).ToArray() : group.OrderBy(item => item.ModelName, StringComparer.OrdinalIgnoreCase).ToArray()));
+        foreach (var group in filtered.GroupBy(item => item.ProviderName).OrderBy(item => SelectedSortMode == "模型名称" ? item.Min(model => model.ModelName) : item.Key, StringComparer.OrdinalIgnoreCase)) ModelGroups.Add(new GatewayModelGroup(group.Key, group.OrderBy(item => item.ModelName, StringComparer.OrdinalIgnoreCase).ToArray()));
     }
 }
 
 public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
 {
     private bool enabled;
-    public string Key { get; init; } = "";
-    public string DisplayName { get; init; } = "";
-    public string PublicPath { get; init; } = "";
-    public string PublicUrl { get; init; } = "";
-    public ObservableCollection<GatewayRouteEditorViewModel> Routes { get; } = [];
+    public string Key { get; init; } = ""; public string DisplayName { get; init; } = ""; public string PublicPath { get; init; } = ""; public string PublicUrl { get; init; } = "";
+    public ObservableCollection<GatewayComboEditorViewModel> Combos { get; } = [];
     public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); }
     public static GatewayEndpointEditorViewModel FromResponse(GatewayEndpointResponse response, string baseUrl)
     {
         var value = new GatewayEndpointEditorViewModel { Key = response.Key, DisplayName = response.DisplayName, PublicPath = response.PublicPath, PublicUrl = $"{baseUrl.TrimEnd('/')}{response.PublicPath}", Enabled = response.Enabled };
-        foreach (var route in response.Routes) value.Routes.Add(GatewayRouteEditorViewModel.FromResponse(route));
-        return value;
+        foreach (var combo in response.Combos) value.Combos.Add(GatewayComboEditorViewModel.FromResponse(combo)); return value;
     }
 }
-
+public sealed class GatewayComboEditorViewModel : NotifyViewModel
+{
+    private string name = ""; private bool enabled; private bool isExpanded = true; private int sortOrder;
+    public Guid Id { get; init; } public string Name { get => name; set => SetProperty(ref name, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool IsExpanded { get => isExpanded; set => SetProperty(ref isExpanded, value); } public int SortOrder { get => sortOrder; set => SetProperty(ref sortOrder, value); }
+    public ObservableCollection<GatewayRouteEditorViewModel> Routes { get; } = [];
+    public static GatewayComboEditorViewModel FromResponse(GatewayComboResponse response) { var value = new GatewayComboEditorViewModel { Id = response.Id, Name = response.Name, Enabled = response.Enabled, SortOrder = response.SortOrder }; foreach (var route in response.Routes) value.Routes.Add(GatewayRouteEditorViewModel.FromResponse(route)); return value; }
+    public void ApplyResponse(GatewayComboResponse response) { Name = response.Name; Enabled = response.Enabled; SortOrder = response.SortOrder; }
+}
 public sealed class GatewayRouteEditorViewModel : NotifyViewModel
 {
-    private bool enabled;
-    private int sortOrder;
-    public Guid Id { get; init; }
-    public Guid ModelId { get; init; }
-    public string ModelName { get; init; } = "";
-    public string ProviderName { get; init; } = "";
-    public string? Alias { get; set; }
-    public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); }
-    public int SortOrder { get => sortOrder; set => SetProperty(ref sortOrder, value); }
-    public static GatewayRouteEditorViewModel FromResponse(GatewayRouteResponse response) => new() { Id = response.Id, ModelId = response.ModelId, ModelName = response.ModelName, ProviderName = response.ProviderName, Alias = response.Alias, Enabled = response.Enabled, SortOrder = response.SortOrder };
+    private bool enabled; private int sortOrder;
+    public Guid Id { get; init; } public Guid ModelId { get; init; } public string ModelName { get; init; } = ""; public string ProviderName { get; init; } = ""; public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public int SortOrder { get => sortOrder; set => SetProperty(ref sortOrder, value); }
+    public static GatewayRouteEditorViewModel FromResponse(GatewayRouteResponse response) => new() { Id = response.Id, ModelId = response.ModelId, ModelName = response.ModelName, ProviderName = response.ProviderName, Enabled = response.Enabled, SortOrder = response.SortOrder };
 }
-
 public sealed class GatewayModelOption : NotifyViewModel
 {
     private bool isSelected;
-    public Guid Id { get; }
-    public string ModelName { get; }
-    public string ProviderName { get; }
-    public bool IsSelected { get => isSelected; set => SetProperty(ref isSelected, value); }
+    public Guid Id { get; } public string ModelName { get; } public string ProviderName { get; } public bool IsSelected { get => isSelected; set => SetProperty(ref isSelected, value); }
     public GatewayModelOption(Guid id, string modelName, string providerName) => (Id, ModelName, ProviderName) = (id, modelName, providerName);
-    public override string ToString() => $"{ProviderName} / {ModelName}";
 }
-
 public sealed class GatewayModelGroup : NotifyViewModel
 {
     private bool isExpanded = true;
-    public string ProviderName { get; }
-    public IReadOnlyList<GatewayModelOption> Models { get; }
-    public int ModelCount => Models.Count;
-    public bool IsExpanded { get => isExpanded; set { if (isExpanded == value) return; isExpanded = value; OnPropertyChanged(); OnPropertyChanged(nameof(ExpandGlyph)); } }
-    public string ExpandGlyph => IsExpanded ? "⌃" : "⌄";
+    public string ProviderName { get; } public IReadOnlyList<GatewayModelOption> Models { get; } public int ModelCount => Models.Count; public bool IsExpanded { get => isExpanded; set => SetProperty(ref isExpanded, value); }
     public GatewayModelGroup(string providerName, IReadOnlyList<GatewayModelOption> models) => (ProviderName, Models) = (providerName, models);
 }

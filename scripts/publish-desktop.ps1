@@ -24,7 +24,7 @@ while (Test-Path -LiteralPath $publishRoot) {
     $suffix++
 }
 
-$publishDirectory = Join-Path $publishRoot "publish\win-x64"
+$publishDirectory = $publishRoot
 $logPath = Join-Path $publishRoot "publish.log"
 
 New-Item -ItemType Directory -Force -Path $publishDirectory | Out-Null

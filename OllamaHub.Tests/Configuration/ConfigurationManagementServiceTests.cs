@@ -195,7 +195,7 @@ public sealed class ConfigurationManagementServiceTests
     }
 
     [Fact]
-    public async Task GatewayRoutes_AreIndependentPerEndpoint()
+    public async Task GatewayCombos_AreIndependentPerEndpoint()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
         try
@@ -209,12 +209,140 @@ public sealed class ConfigurationManagementServiceTests
             var provider = await service.CreateProviderAsync(new ProviderInput("gateway", "网关 Provider", "https://example.com", "openai", true, null, false, null));
             var model = await service.CreateModelAsync(provider.Id, new ModelInput("model", "模型", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
 
-            await service.CreateGatewayRouteAsync("openai", new GatewayRouteInput(model.Id, "公共模型", true, 2));
-            await service.CreateGatewayRouteAsync("ollama", new GatewayRouteInput(model.Id, null, false, 0));
+            var openAiCombo = await service.CreateGatewayComboAsync("openai", new GatewayComboInput("公共模型", true, 2));
+            var ollamaCombo = await service.CreateGatewayComboAsync("ollama", new GatewayComboInput("本地模型", false, 0));
+            await service.CreateGatewayRouteAsync(openAiCombo.Id, new GatewayRouteInput(model.Id, true, 0));
+            await service.CreateGatewayRouteAsync(ollamaCombo.Id, new GatewayRouteInput(model.Id, false, 0));
             var endpoints = await service.ListGatewayEndpointsAsync();
-            Assert.Contains(endpoints.Single(item => item.Key == "openai").Routes, route => route.Alias == "公共模型" && route.Enabled && route.SortOrder == 2);
-            Assert.Contains(endpoints.Single(item => item.Key == "ollama").Routes, route => !route.Enabled);
-            Assert.Equal(2, configurationProvider.Current.GatewayEndpoints.Count(item => item.Routes.Count > 0));
+            Assert.Contains(endpoints.Single(item => item.Key == "openai").Combos, combo => combo.Name == "公共模型" && combo.Enabled && combo.SortOrder == 2);
+            Assert.Contains(endpoints.Single(item => item.Key == "ollama").Combos, combo => !combo.Enabled);
+            Assert.Equal(2, configurationProvider.Current.GatewayEndpoints.Count(item => item.Combos.Count > 0));
+        }
+        finally { DeleteDatabaseFiles(databasePath); }
+    }
+
+    [Fact]
+    public async Task GatewayCombos_ExposeNamedGroupsAndMembers()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+            var provider = await service.CreateProviderAsync(new ProviderInput("combo", "Combo Provider", "https://example.com", "openai", true, null, false, null));
+            var model = await service.CreateModelAsync(provider.Id, new ModelInput("model", "模型", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+
+            var combo = await service.CreateGatewayComboAsync("openai", new GatewayComboInput("coding", true, 0));
+            await service.CreateGatewayRouteAsync(combo.Id, new GatewayRouteInput(model.Id, true, 0));
+
+            var endpoints = await service.ListGatewayEndpointsAsync();
+            var listedCombo = endpoints.Single(item => item.Key == "openai").Combos.Single();
+            Assert.Equal("coding", listedCombo.Name);
+            Assert.Single(listedCombo.Routes);
+            Assert.Equal(model.Id, listedCombo.Routes[0].ModelId);
+        }
+        finally { DeleteDatabaseFiles(databasePath); }
+    }
+
+    [Fact]
+    public async Task GatewayModelSource_ReadsEnabledProviderModelsFromOrmRelationship()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+            var provider = await service.CreateProviderAsync(new ProviderInput("provider", "Provider", "https://example.com", "openai", true, null, false, null));
+
+            for (var index = 1; index <= 4; index++)
+            {
+                await service.CreateModelAsync(provider.Id, new ModelInput($"model-{index}", $"模型 {index}", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+            }
+
+            var models = await service.ListEnabledGatewayModelsAsync();
+
+            Assert.Equal(4, models.Count);
+            Assert.All(models, model => Assert.Equal("Provider", model.ProviderName));
+            Assert.Equal(["模型 1", "模型 2", "模型 3", "模型 4"], models.Select(model => model.ModelName));
+        }
+        finally { DeleteDatabaseFiles(databasePath); }
+    }
+
+    [Fact]
+    public async Task GatewayComboNames_AreCaseInsensitivePerEndpoint()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+
+            await service.CreateGatewayComboAsync("openai", new GatewayComboInput("Coding", true, 0));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateGatewayComboAsync("openai", new GatewayComboInput("coding", true, 1)));
+        }
+        finally { DeleteDatabaseFiles(databasePath); }
+    }
+
+    [Fact]
+    public async Task LegacyGatewayRoutes_AreNotExposedUntilAddedToCombo()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            var provider = new ProviderEntity { BusinessId = "legacy", DisplayName = "旧 Provider", BaseUrl = "https://example.com" };
+            var model = new ModelEntity { Provider = provider, ModelId = "legacy-model", DisplayName = "旧模型" };
+            context.Providers.Add(provider);
+            context.Models.Add(model);
+            context.GatewayRoutes.Add(new GatewayRouteEntity { EndpointKey = "ollama", Model = model, ModelId = model.Id });
+            await context.SaveChangesAsync();
+
+            await configurationProvider.ReloadAsync();
+
+            Assert.Empty(configurationProvider.Current.GatewayEndpoints.Single(item => item.Key == "ollama").Combos);
+        }
+        finally { DeleteDatabaseFiles(databasePath); }
+    }
+
+    [Fact]
+    public async Task DeleteModel_WithLegacyGatewayRoute_IsRejected()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+            var provider = await service.CreateProviderAsync(new ProviderInput("legacy-delete", "旧 Provider", "https://example.com", "openai", true, null, false, null));
+            var model = await service.CreateModelAsync(provider.Id, new ModelInput("legacy-model", "旧模型", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+
+            await using (var routeContext = new ConfigurationDbContext(options))
+            {
+                routeContext.GatewayRoutes.Add(new GatewayRouteEntity { EndpointKey = "openai", ModelId = model.Id });
+                await routeContext.SaveChangesAsync();
+            }
+
+            var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteModelAsync(model.Id));
+            Assert.Contains("网关路由", exception.Message);
         }
         finally { DeleteDatabaseFiles(databasePath); }
     }
