@@ -18,6 +18,7 @@ public sealed record SettingOption(string Value, string DisplayName)
 public sealed class SettingsViewModel : NotifyViewModel
 {
     private readonly ConfigSnapshotService configService;
+    private readonly ToastService toastService;
     private readonly ILogger<SettingsViewModel> logger;
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private SettingOption selectedLanguage = LanguageOptions[0];
@@ -90,10 +91,11 @@ public sealed class SettingsViewModel : NotifyViewModel
     public ICommand ClearLogsCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
 
-    public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null)
+    public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null)
     {
         this.configService = configService;
         this.logger = logger ?? NullLogger<SettingsViewModel>.Instance;
+        this.toastService = toastService ?? new ToastService();
         LoadCommand = new AsyncCommand(LoadAsync);
         TestProxyCommand = new AsyncCommand(TestProxyAsync);
         CheckUpdateCommand = new AsyncCommand(CheckUpdateAsync);
@@ -197,11 +199,12 @@ public sealed class SettingsViewModel : NotifyViewModel
     private async Task TestProxyAsync()
     {
         if (IsBusy) return;
-        if (SelectedProxyMode.Value == "direct") { Status = "直连模式配置有效。"; logger.LogInformation("代理测试完成 {ProxyMode}", SelectedProxyMode.Value); return; }
-        if (SelectedProxyMode.Value == "system") { Status = "系统代理模式已选择，将跟随 Windows 设置。"; logger.LogInformation("代理测试完成 {ProxyMode}", SelectedProxyMode.Value); return; }
+        if (SelectedProxyMode.Value == "direct") { Status = "直连模式配置有效。"; toastService.Show("直连模式配置有效", ToastLevel.Success); logger.LogInformation("代理测试完成 {ProxyMode}", SelectedProxyMode.Value); return; }
+        if (SelectedProxyMode.Value == "system") { Status = "系统代理模式已选择，将跟随 Windows 设置。"; toastService.Show("系统代理模式配置有效", ToastLevel.Success); logger.LogInformation("代理测试完成 {ProxyMode}", SelectedProxyMode.Value); return; }
         if (!Uri.TryCreate(ProxyHost?.Trim(), UriKind.Absolute, out var proxyUri) || proxyUri.Scheme is not ("http" or "https") || ProxyPort is < 1 or > 65535)
         {
             Status = "代理测试失败：请填写有效的 HTTP/HTTPS 地址和端口。";
+            toastService.Show("代理测试配置无效", ToastLevel.Warning);
             logger.LogWarning("代理测试配置无效 {ProxyMode}", SelectedProxyMode.Value);
             return;
         }
@@ -215,9 +218,10 @@ public sealed class SettingsViewModel : NotifyViewModel
             using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
             using var response = await client.GetAsync("https://www.example.com", HttpCompletionOption.ResponseHeadersRead);
             Status = response.IsSuccessStatusCode ? $"代理连接正常 · {(int)response.StatusCode}" : $"代理已响应 · {(int)response.StatusCode}";
+            toastService.Show(response.IsSuccessStatusCode ? "代理连接测试成功" : "代理已响应，请检查配置", response.IsSuccessStatusCode ? ToastLevel.Success : ToastLevel.Warning);
             logger.LogInformation("代理测试完成 {ProxyMode} {StatusCode}", SelectedProxyMode.Value, (int)response.StatusCode);
         }
-        catch (Exception exception) { Status = $"代理测试失败：{exception.Message}"; logger.LogWarning(exception, "代理测试失败 {ProxyMode}", SelectedProxyMode.Value); }
+        catch (Exception exception) { Status = $"代理测试失败：{exception.Message}"; toastService.Show("代理连接测试失败", ToastLevel.Error); logger.LogWarning(exception, "代理测试失败 {ProxyMode}", SelectedProxyMode.Value); }
         finally { IsBusy = false; }
     }
 

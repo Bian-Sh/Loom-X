@@ -8,6 +8,7 @@ namespace OllamaHub.Desktop.ViewModels;
 public sealed class GatewayViewModel : NotifyViewModel
 {
     private readonly ConfigSnapshotService configService;
+    private readonly ToastService toastService;
     private GatewayEndpointEditorViewModel? selectedEndpoint;
     private string status = "";
     private string selectedSortMode = "Provider";
@@ -26,9 +27,10 @@ public sealed class GatewayViewModel : NotifyViewModel
     public ICommand MoveUpCommand { get; }
     public ICommand MoveDownCommand { get; }
 
-    public GatewayViewModel(ConfigSnapshotService configService)
+    public GatewayViewModel(ConfigSnapshotService configService, ToastService? toastService = null)
     {
         this.configService = configService;
+        this.toastService = toastService ?? new ToastService();
         AddRouteCommand = new AsyncCommand(parameter => AddRouteAsync(parameter as GatewayModelOption));
         ToggleEndpointCommand = new AsyncCommand(parameter => ToggleEndpointAsync(parameter as GatewayEndpointEditorViewModel));
         ToggleRouteCommand = new AsyncCommand(parameter => ToggleRouteAsync(parameter as GatewayRouteEditorViewModel));
@@ -37,6 +39,8 @@ public sealed class GatewayViewModel : NotifyViewModel
         MoveDownCommand = new AsyncCommand(parameter => MoveRouteAsync(parameter as GatewayRouteEditorViewModel, 1));
         _ = RefreshAsync();
     }
+
+    public void NotifyCopied() => toastService.Show("地址已复制", ToastLevel.Success);
 
     private async Task RefreshAsync()
     {

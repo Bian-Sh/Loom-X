@@ -38,11 +38,13 @@ public partial class GatewayView : UserControl
         }
     }
 
-    private async void CopyEndpointButton_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void CopyEndpointUrl_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (DataContext is not GatewayViewModel viewModel || viewModel.SelectedEndpoint is null) return;
+        if (sender is not Button { DataContext: GatewayEndpointEditorViewModel endpoint }) return;
         var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
-        if (clipboard is not null) await clipboard.SetTextAsync(viewModel.SelectedEndpoint.PublicUrl);
+        if (clipboard is null) return;
+        await clipboard.SetTextAsync(endpoint.PublicUrl);
+        if (DataContext is GatewayViewModel viewModel) viewModel.NotifyCopied();
     }
 
     private async void RouteAlias_OnLostFocus(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

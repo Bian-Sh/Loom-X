@@ -14,6 +14,7 @@ namespace OllamaHub.Desktop.ViewModels;
 public sealed class MainWindowViewModel : NotifyViewModel
 {
     private readonly GatewayProcessService gatewayService;
+    private readonly ToastService toastService;
     private readonly ConfigSnapshotService configService = new();
     private object currentView = new PlaceholderViewModel("加载中", "正在加载桌面控制中心。");
     private string pageTitle = "概览";
@@ -24,9 +25,10 @@ public sealed class MainWindowViewModel : NotifyViewModel
     public string PageTitle { get => pageTitle; private set => SetProperty(ref pageTitle, value); }
     public string PageDescription { get => pageDescription; private set => SetProperty(ref pageDescription, value); }
 
-    public MainWindowViewModel(GatewayProcessService gatewayService)
+    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null)
     {
         this.gatewayService = gatewayService;
+        this.toastService = toastService ?? new ToastService();
         NavigationItems = new([
             new("概览", "◉", () => ShowOverview()),
             new("网关", "▦", () => ShowGateway()),
@@ -44,11 +46,11 @@ public sealed class MainWindowViewModel : NotifyViewModel
     }
 
     private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = new OverviewViewModel(gatewayService, configService); }
-    private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService); }
-    private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = new GatewayViewModel(configService); }
+    private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService, toastService); }
+    private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = new GatewayViewModel(configService, toastService); }
     private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = new ConsoleViewModel(); }
     private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = new ActivityViewModel(gatewayService); }
-    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = new SettingsViewModel(configService); }
+    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = new SettingsViewModel(configService, toastService: toastService); }
     private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
 }
 
@@ -140,6 +142,7 @@ public sealed class OverviewViewModel : NotifyViewModel
 public sealed class ProvidersViewModel : NotifyViewModel
 {
     private readonly ConfigSnapshotService configService;
+    private readonly ToastService toastService;
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private ProviderEditorViewModel? selectedProvider;
     private ModelEditorViewModel? selectedModel;
@@ -206,9 +209,10 @@ public sealed class ProvidersViewModel : NotifyViewModel
     public ICommand TestConnectionCommand { get; }
     public ICommand SyncModelsCommand { get; }
 
-    public ProvidersViewModel(ConfigSnapshotService configService)
+    public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null)
     {
         this.configService = configService;
+        this.toastService = toastService ?? new ToastService();
         RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(DeleteModelAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
     }
 
@@ -275,7 +279,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private async Task TestConnectionAsync()
     {
         var provider = SelectedProvider;
-        if (provider is null || string.IsNullOrWhiteSpace(provider.BaseUrl)) { ConnectionStatus = "请先填写 Base URL"; return; }
+        if (provider is null || string.IsNullOrWhiteSpace(provider.BaseUrl)) { ConnectionStatus = "请先填写 Base URL"; toastService.Show("请先填写 Provider Base URL", ToastLevel.Warning); return; }
         connectionCancellation?.Cancel();
         connectionCancellation = new CancellationTokenSource();
         var token = connectionCancellation.Token;
@@ -291,9 +295,10 @@ public sealed class ProvidersViewModel : NotifyViewModel
             using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             stopwatch.Stop();
             ConnectionStatus = response.IsSuccessStatusCode ? $"连接正常 · {(int)response.StatusCode} · {stopwatch.ElapsedMilliseconds} ms" : $"连接失败 · {(int)response.StatusCode} {response.ReasonPhrase}";
+            toastService.Show(response.IsSuccessStatusCode ? "Provider 连通性测试成功" : "Provider 连通性测试失败", response.IsSuccessStatusCode ? ToastLevel.Success : ToastLevel.Error);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        catch (Exception exception) { stopwatch.Stop(); ConnectionStatus = $"连接失败 · {exception.Message}"; }
+        catch (Exception exception) { stopwatch.Stop(); ConnectionStatus = $"连接失败 · {exception.Message}"; toastService.Show("Provider 连通性测试失败", ToastLevel.Error); }
     }
 
     private async Task SyncModelsAsync()
@@ -446,7 +451,7 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, apiKeyEdited ? ApiKey : null, false, ToHeaderDictionary(), UseProxy, string.IsNullOrWhiteSpace(ModelListUrl) ? null : ModelListUrl, EndpointFormat);
     public void ApplyResponse(ProviderResponse response)
     {
-        Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ModelListUrl = response.ModelListUrl ?? ""; ApiMode = response.ApiMode; EndpointFormat = response.EndpointFormat; UseProxy = response.UseProxy; HasApiKey = response.HasApiKey; OnPropertyChanged(nameof(ApiKeyWatermark));
+        Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ModelListUrl = response.ModelListUrl ?? ""; ApiMode = response.ApiMode; EndpointFormat = response.EndpointFormat; Enabled = response.Enabled; UseProxy = response.UseProxy; HasApiKey = response.HasApiKey; OnPropertyChanged(nameof(ApiKeyWatermark));
         if (response.ApiKey is not null || !response.HasApiKey)
             SetApiKeyFromResponse(response.ApiKey ?? "");
         else

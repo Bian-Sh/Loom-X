@@ -11,8 +11,9 @@
     </Style>
     <Style Selector="ToggleButton.nav-button:checked"><Setter Property="Background" Value="#DCE5EC"/><Setter Property="Foreground" Value="#101820"/></Style>
   </Window.Styles>
-  <Grid ColumnDefinitions="208,*">
-    <Border Grid.Column="0" Background="#EEF1F5" BorderBrush="#D7DCE3" BorderThickness="0,0,1,0" Padding="14,22">
+  <Grid>
+    <Grid ColumnDefinitions="208,*">
+      <Border Grid.Column="0" Background="#EEF1F5" BorderBrush="#D7DCE3" BorderThickness="0,0,1,0" Padding="14,22">
       <Grid RowDefinitions="Auto,*,Auto">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="8,0,8,28">
           <Border Width="34" Height="34" BorderBrush="#176B87" BorderThickness="2" CornerRadius="8">
@@ -48,17 +49,21 @@
           </StackPanel>
         </Border>
       </Grid>
-    </Border>
-    <Grid Grid.Column="1" RowDefinitions="92,*">
-      <Border Grid.Row="0" Background="#F7F8FA" BorderBrush="#D7DCE3" BorderThickness="0,0,0,1" Padding="32,0">
-        <StackPanel VerticalAlignment="Center" Spacing="4">
-          <TextBlock Text="{Binding PageTitle}" FontSize="28" FontWeight="Bold"/>
-          <TextBlock Text="{Binding PageDescription}" FontSize="12" Opacity="0.62"/>
-        </StackPanel>
       </Border>
-      <Border Grid.Row="1" Padding="32,18" Background="#F7F8FA">
-        <ContentControl Content="{Binding CurrentView}"/>
-      </Border>
+      <Grid Grid.Column="1" RowDefinitions="92,*">
+        <Border Grid.Row="0" Background="#F7F8FA" BorderBrush="#D7DCE3" BorderThickness="0,0,0,1" Padding="32,0">
+          <StackPanel VerticalAlignment="Center" Spacing="4">
+            <TextBlock Text="{Binding PageTitle}" FontSize="28" FontWeight="Bold"/>
+            <TextBlock Text="{Binding PageDescription}" FontSize="12" Opacity="0.62"/>
+          </StackPanel>
+        </Border>
+        <Border Grid.Row="1" Padding="32,18" Background="#F7F8FA">
+          <ContentControl Content="{Binding CurrentView}"/>
+        </Border>
+      </Grid>
     </Grid>
+    <Border x:Name="toastBorder" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Background="#17212B" CornerRadius="6" Padding="14,10" MaxWidth="420">
+      <TextBlock x:Name="toastText" Foreground="White" TextWrapping="Wrap"/>
+    </Border>
   </Grid>
 </Window>
