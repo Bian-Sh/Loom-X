@@ -1,0 +1,64 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.Views.ActivityView">
+  <UserControl.Styles>
+    <Style Selector="Border.panel"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/></Style>
+    <Style Selector="Button.outline"><Setter Property="MinHeight" Value="34"/><Setter Property="Padding" Value="10,6"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="Foreground" Value="#101820"/></Style>
+    <Style Selector="Button.row"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="0"/></Style>
+    <Style Selector="Button.row:pointerover"><Setter Property="Background" Value="#F2F7F8"/></Style>
+    <Style Selector="ComboBox.filter"><Setter Property="MinWidth" Value="128"/><Setter Property="MinHeight" Value="36"/><Setter Property="Background" Value="White"/></Style>
+    <Style Selector="TextBox.filter"><Setter Property="MinHeight" Value="36"/><Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#101820"/></Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="Auto,*" RowSpacing="14">
+    <Grid Grid.Row="0" ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+      <Border Classes="panel" Padding="14"><StackPanel Spacing="4"><TextBlock Text="请求数" Opacity="0.62" FontSize="11"/><TextBlock Text="{Binding TotalCount}" FontSize="22" FontWeight="Bold"/><TextBlock Text="当前筛选结果" Opacity="0.52" FontSize="10"/></StackPanel></Border>
+      <Border Grid.Column="1" Classes="panel" Padding="14"><StackPanel Spacing="4"><TextBlock Text="协议转换" Opacity="0.62" FontSize="11"/><TextBlock Text="{Binding ConversionCount}" FontSize="22" FontWeight="Bold"/><TextBlock Text="OpenAI → Anthropic" Opacity="0.52" FontSize="10"/></StackPanel></Border>
+      <Border Grid.Column="2" Classes="panel" Padding="14"><StackPanel Spacing="4"><TextBlock Text="失败请求" Opacity="0.62" FontSize="11"/><TextBlock Text="{Binding FailureCount}" FontSize="22" FontWeight="Bold"/><TextBlock Text="HTTP 5xx" Opacity="0.52" FontSize="10"/></StackPanel></Border>
+      <Border Grid.Column="3" Classes="panel" Padding="14"><StackPanel Spacing="4"><TextBlock Text="P95 延迟" Opacity="0.62" FontSize="11"/><TextBlock Text="{Binding P95Latency}" FontSize="22" FontWeight="Bold"/><TextBlock Text="最近活动" Opacity="0.52" FontSize="10"/></StackPanel></Border>
+    </Grid>
+    <Grid Grid.Row="1" ColumnDefinitions="1.45*,0.75*" ColumnSpacing="14" MinHeight="420">
+      <Border Grid.Column="0" Classes="panel">
+        <Grid RowDefinitions="Auto,*">
+          <Grid Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="10">
+            <TextBox Classes="filter" Watermark="搜索模型、Provider 或 request ID" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+            <ComboBox Grid.Column="1" Classes="filter" ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus}"/>
+            <ComboBox Grid.Column="2" Classes="filter" ItemsSource="{Binding ProtocolOptions}" SelectedItem="{Binding SelectedProtocol}"/>
+          </Grid>
+          <Grid Grid.Row="1" RowDefinitions="Auto,*">
+            <Border BorderBrush="#D9DEE6" BorderThickness="0,1,0,1" Padding="12,9">
+              <Grid ColumnDefinitions="100,1.15*,1.2*,90,76" ColumnSpacing="8"><TextBlock Text="时间 / request ID" Opacity="0.56" FontSize="10"/><TextBlock Grid.Column="1" Text="模型 / Provider" Opacity="0.56" FontSize="10"/><TextBlock Grid.Column="2" Text="入口与转换路径" Opacity="0.56" FontSize="10"/><TextBlock Grid.Column="3" Text="状态" Opacity="0.56" FontSize="10"/><TextBlock Grid.Column="4" Text="延迟" Opacity="0.56" FontSize="10"/></Grid>
+            </Border>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemTemplate><DataTemplate>
+                  <Button Classes="row" Command="{Binding $parent[UserControl].DataContext.SelectCommand}" CommandParameter="{Binding}">
+                    <Border Padding="12,10" BorderBrush="#E5E8EC" BorderThickness="0,0,0,1">
+                      <Grid ColumnDefinitions="100,1.15*,1.2*,90,76" ColumnSpacing="8">
+                        <StackPanel><TextBlock Text="{Binding Time}" FontFamily="Consolas" FontSize="11"/><TextBlock Text="{Binding RequestId}" Opacity="0.52" FontFamily="Consolas" FontSize="10"/></StackPanel>
+                        <StackPanel Grid.Column="1"><TextBlock Text="{Binding ModelId}" FontWeight="SemiBold" FontSize="12" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding ProviderId}" Opacity="0.58" FontSize="10" TextTrimming="CharacterEllipsis"/></StackPanel>
+                        <StackPanel Grid.Column="2"><TextBlock Text="{Binding Route}" FontFamily="Consolas" FontSize="10" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Protocol}" Opacity="0.58" FontSize="10"/></StackPanel>
+                        <TextBlock Grid.Column="3" Text="{Binding StatusLabel}" Foreground="{Binding StatusColor}" FontWeight="SemiBold" FontSize="11" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="4" Text="{Binding Latency}" FontFamily="Consolas" FontSize="11" VerticalAlignment="Center"/>
+                      </Grid>
+                    </Border>
+                  </Button>
+                </DataTemplate></ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Grid>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Classes="panel" Padding="18">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="13">
+            <TextBlock Text="SELECTED REQUEST" Foreground="#176B87" FontSize="10" LetterSpacing="1.2"/>
+            <TextBlock Text="{Binding SelectedItem.ModelId, FallbackValue=暂无选中请求}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding SelectedItem.RequestId, FallbackValue=选择左侧请求查看详情}" Opacity="0.62" FontSize="11"/>
+            <Grid ColumnDefinitions="*,Auto" Margin="0,3,0,0"><TextBlock Text="{Binding SelectedItem.StatusCode}" FontSize="13" FontWeight="SemiBold"/><Button Grid.Column="1" Classes="outline" Content="复制 request ID" Click="CopyRequestId_OnClick"/></Grid>
+            <Border BorderBrush="#D9DEE6" BorderThickness="0,1,0,0" Padding="0,12,0,0"><Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="10"><Border Grid.Row="0" Padding="9" BorderBrush="#D9DEE6" BorderThickness="1"><StackPanel><TextBlock Text="入口协议" Opacity="0.56" FontSize="10"/><TextBlock Text="{Binding SelectedItem.Protocol}" FontSize="11"/></StackPanel></Border><Border Grid.Row="0" Grid.Column="1" Padding="9" BorderBrush="#D9DEE6" BorderThickness="1"><StackPanel><TextBlock Text="转换路径" Opacity="0.56" FontSize="10"/><TextBlock Text="{Binding SelectedItem.Transform}" FontSize="11" TextWrapping="Wrap"/></StackPanel></Border><Border Grid.Row="1" Padding="9" BorderBrush="#D9DEE6" BorderThickness="1"><StackPanel><TextBlock Text="上游响应" Opacity="0.56" FontSize="10"/><TextBlock Text="{Binding SelectedItem.Latency}" FontSize="11"/></StackPanel></Border><Border Grid.Row="1" Grid.Column="1" Padding="9" BorderBrush="#D9DEE6" BorderThickness="1"><StackPanel><TextBlock Text="响应大小" Opacity="0.56" FontSize="10"/><TextBlock Text="{Binding SelectedItem.ResponseBytes}" FontSize="11"/></StackPanel></Border><Border Grid.Row="2" Grid.ColumnSpan="2" Padding="9" BorderBrush="#D9DEE6" BorderThickness="1"><StackPanel><TextBlock Text="错误分类" Opacity="0.56" FontSize="10"/><TextBlock Text="{Binding SelectedItem.ErrorType}" FontSize="11"/></StackPanel></Border></Grid></Border>
+            <StackPanel Spacing="6"><TextBlock Text="脱敏诊断摘要" FontWeight="SemiBold" FontSize="12"/><TextBlock Text="{Binding SelectedItem.LogSummary, FallbackValue=暂无诊断摘要}" FontFamily="Consolas" FontSize="10" TextWrapping="Wrap" Background="#F4F6F8" Padding="10"/></StackPanel>
+            <TextBlock Text="{Binding Status}" Opacity="0.58" FontSize="10" TextWrapping="Wrap"/>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

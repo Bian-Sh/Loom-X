@@ -9,6 +9,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     public DbSet<AppSettingsEntity> AppSettings => Set<AppSettingsEntity>();
     public DbSet<ProviderEntity> Providers => Set<ProviderEntity>();
     public DbSet<ModelEntity> Models => Set<ModelEntity>();
+    public DbSet<GatewayEndpointEntity> GatewayEndpoints => Set<GatewayEndpointEntity>();
+    public DbSet<GatewayRouteEntity> GatewayRoutes => Set<GatewayRouteEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +46,22 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.HasIndex(item => new { item.ProviderId, item.ModelId }).IsUnique();
             entity.Property(item => item.ModelId).HasMaxLength(256).IsRequired();
             entity.Property(item => item.DisplayName).HasMaxLength(256).IsRequired();
+        });
+        modelBuilder.Entity<GatewayEndpointEntity>(entity =>
+        {
+            entity.HasKey(item => item.Key);
+            entity.Property(item => item.Key).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.DisplayName).HasMaxLength(64).IsRequired();
+            entity.Property(item => item.PublicPath).HasMaxLength(128).IsRequired();
+            entity.HasMany(item => item.Routes).WithOne(item => item.Endpoint).HasForeignKey(item => item.EndpointKey).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<GatewayRouteEntity>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.HasIndex(item => new { item.EndpointKey, item.ModelId }).IsUnique();
+            entity.Property(item => item.EndpointKey).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.Alias).HasMaxLength(256);
+            entity.HasOne(item => item.Model).WithMany().HasForeignKey(item => item.ModelId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 }
@@ -111,6 +129,27 @@ public sealed class ModelEntity
     public int SortOrder { get; set; }
 }
 
+public sealed class GatewayEndpointEntity
+{
+    public string Key { get; set; } = string.Empty;
+    public string DisplayName { get; set; } = string.Empty;
+    public string PublicPath { get; set; } = string.Empty;
+    public bool Enabled { get; set; } = true;
+    public List<GatewayRouteEntity> Routes { get; set; } = [];
+}
+
+public sealed class GatewayRouteEntity
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string EndpointKey { get; set; } = string.Empty;
+    public GatewayEndpointEntity Endpoint { get; set; } = null!;
+    public Guid ModelId { get; set; }
+    public ModelEntity Model { get; set; } = null!;
+    public string? Alias { get; set; }
+    public bool Enabled { get; set; } = true;
+    public int SortOrder { get; set; }
+}
+
 public static class ConfigurationDatabase
 {
     public static async Task InitializeAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken = default)
@@ -173,5 +212,39 @@ public static class ConfigurationDatabase
         catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
         {
         }
+
+        await dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS GatewayEndpoints (
+                Key TEXT NOT NULL CONSTRAINT PK_GatewayEndpoints PRIMARY KEY,
+                DisplayName TEXT NOT NULL,
+                PublicPath TEXT NOT NULL,
+                Enabled INTEGER NOT NULL
+            )
+            """, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS GatewayRoutes (
+                Id TEXT NOT NULL CONSTRAINT PK_GatewayRoutes PRIMARY KEY,
+                EndpointKey TEXT NOT NULL,
+                ModelId TEXT NOT NULL,
+                Alias TEXT NULL,
+                Enabled INTEGER NOT NULL,
+                SortOrder INTEGER NOT NULL,
+                CONSTRAINT FK_GatewayRoutes_GatewayEndpoints_EndpointKey FOREIGN KEY (EndpointKey) REFERENCES GatewayEndpoints (Key) ON DELETE CASCADE,
+                CONSTRAINT FK_GatewayRoutes_Models_ModelId FOREIGN KEY (ModelId) REFERENCES Models (Id) ON DELETE RESTRICT
+            )
+            """, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/v1' WHERE Key = 'openai' AND PublicPath = '/v1/responses'", cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/azure/v1' WHERE Key = 'azure' AND PublicPath = '/azure/v1/responses'", cancellationToken);
+        foreach (var endpoint in new[]
+        {
+            new GatewayEndpointEntity { Key = "openai", DisplayName = "OpenAI", PublicPath = "/v1" },
+            new GatewayEndpointEntity { Key = "ollama", DisplayName = "Ollama", PublicPath = "/api" },
+            new GatewayEndpointEntity { Key = "azure", DisplayName = "Azure", PublicPath = "/azure/v1" }
+        })
+        {
+            if (!await dbContext.GatewayEndpoints.AnyAsync(item => item.Key == endpoint.Key, cancellationToken))
+                dbContext.GatewayEndpoints.Add(endpoint);
+        }
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

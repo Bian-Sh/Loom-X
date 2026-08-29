@@ -4,14 +4,14 @@
 
 在 Provider 页面的“模型” Tab 增加可选的模型列表请求 URL，并将其持久化为 Provider 级配置。该地址只服务于模型列表同步：填写时直接请求该地址，留空时根据 Provider Base URL 推导；聊天、补全和其他上游请求继续使用既有 Base URL/模型级 Base URL。
 
-同时将 Provider 请求 Tab 的 API Key 输入改为带显示/隐藏操作的密码输入框，保持密钥默认不回显以及现有“清除已保存的 API Key”语义。
+同时将 Provider 请求 Tab 的 API Key 输入改为带显示/隐藏操作的密码输入框，默认掩码显示，允许通过输入框右侧眼睛图标回看和隐藏当前密钥，并保持现有清除语义。
 
 ## 数据与 API 契约
 
 - `ProviderEntity` 增加可空 `ModelListUrl` 字段，最大长度 2048。
 - `ProviderInput`、`ProviderResponse` 增加 `ModelListUrl`；创建和更新时使用与 Base URL 相同的 HTTP/HTTPS 绝对地址校验及去尾斜杠规范化，空白值保存为 null。
 - SQLite 初始化兼容已有数据库：在 `EnsureSchemaAsync` 中为旧 `Providers` 表补充可空列，新数据库由 EF 模型直接创建该列。
-- API 响应只返回模型列表 URL，不返回任何 API Key 明文；原有密钥保护逻辑保持不变。
+- API 响应回传当前 Provider API Key 供本机桌面编辑器回填；数据库和运行时配置仍使用 DPAPI 保护值，模型密钥不随 Provider 响应回传。
 
 ## 桌面端交互
 

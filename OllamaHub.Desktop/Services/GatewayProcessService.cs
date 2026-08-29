@@ -1,6 +1,8 @@
 using System.Net.Http;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using OllamaHub;
+using OllamaHub.Activity;
 
 namespace OllamaHub.Desktop.Services;
 
@@ -18,11 +20,13 @@ public sealed class GatewayProcessService : IDisposable
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(1) };
     private readonly SemaphoreSlim lifecycleLock = new(1, 1);
     private WebApplication? app;
+    private ActivityStore? activityStore;
 
     public GatewayState State { get; private set; } = GatewayState.Stopped;
     public string? Error { get; private set; }
     public DateTimeOffset? LastCheckedAt { get; private set; }
     public event EventHandler? StateChanged;
+    public event EventHandler<ActivityEventInput>? ActivityEnqueued;
 
     public async Task StartAsync(string endpoint, CancellationToken cancellationToken = default)
     {
@@ -34,6 +38,8 @@ public sealed class GatewayProcessService : IDisposable
 
             SetState(GatewayState.Starting, null);
             app = await OllamaHubHost.CreateAsync(cancellationToken);
+            activityStore = app.Services.GetRequiredService<ActivityStore>();
+            activityStore.ActivityEnqueued += OnActivityEnqueued;
             await app.StartAsync(cancellationToken);
 
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
@@ -82,6 +88,8 @@ public sealed class GatewayProcessService : IDisposable
             SetState(GatewayState.Stopping, null);
             await app.StopAsync(cancellationToken);
             await app.DisposeAsync();
+            if (activityStore is not null) activityStore.ActivityEnqueued -= OnActivityEnqueued;
+            activityStore = null;
             app = null;
             SetState(GatewayState.Stopped, null);
         }
@@ -123,10 +131,14 @@ public sealed class GatewayProcessService : IDisposable
     {
         if (app is not null)
         {
+            if (activityStore is not null) activityStore.ActivityEnqueued -= OnActivityEnqueued;
             app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            activityStore = null;
             app = null;
         }
         httpClient.Dispose();
         lifecycleLock.Dispose();
     }
+
+    private void OnActivityEnqueued(object? sender, ActivityEventInput input) => ActivityEnqueued?.Invoke(this, input);
 }

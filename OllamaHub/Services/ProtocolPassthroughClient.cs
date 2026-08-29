@@ -9,6 +9,7 @@ namespace OllamaHub.Services;
 public interface IProtocolPassthroughClient
 {
     Task ProxyAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken);
+    Task<bool> ProxyGatewayAttemptAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken);
 }
 
 public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<ProtocolPassthroughClient> logger) : IProtocolPassthroughClient
@@ -87,6 +88,37 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
                 upstreamPath,
                 Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             throw;
+        }
+    }
+
+    public async Task<bool> ProxyGatewayAttemptAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken)
+    {
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            using var upstreamRequest = BuildRequestMessage(httpContext, model, apiMode, upstreamPath, payload);
+            using var upstreamResponse = await httpClient.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            await using var responseStream = await upstreamResponse.Content.ReadAsStreamAsync(cancellationToken);
+            await using var buffer = new MemoryStream();
+            await responseStream.CopyToAsync(buffer, cancellationToken);
+            buffer.Position = 0;
+            var retryable = (int)upstreamResponse.StatusCode is 408 or 429 or >= 500;
+            if (retryable)
+            {
+                logger.LogWarning("网关路由尝试可转移 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ResponseBytes}B {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, (int)upstreamResponse.StatusCode, buffer.Length, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+                return false;
+            }
+            httpContext.Response.StatusCode = (int)upstreamResponse.StatusCode;
+            CopyResponseHeaders(upstreamResponse, httpContext.Response);
+            await buffer.CopyToAsync(httpContext.Response.Body, cancellationToken);
+            logger.LogInformation("网关路由尝试完成 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ResponseBytes}B {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, (int)upstreamResponse.StatusCode, buffer.Length, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "网关路由尝试异常，将尝试下一条路由 {ProviderId}/{ModelId} {ApiMode} {Path} {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            return false;
         }
     }
 

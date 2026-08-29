@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows.Input;
 using OllamaHub.Configuration;
+using OllamaHub.Activity;
 using OllamaHub.Desktop.Services;
 
 namespace OllamaHub.Desktop.ViewModels;
@@ -28,9 +29,9 @@ public sealed class MainWindowViewModel : NotifyViewModel
         this.gatewayService = gatewayService;
         NavigationItems = new([
             new("概览", "◉", () => ShowOverview()),
-            new("网关", "▦", () => ShowPlaceholder("网关", "网关路由与监听地址将在下一阶段接入。")),
+            new("网关", "▦", () => ShowGateway()),
             new("Provider", "⇄", () => ShowProviders()),
-            new("活动", "≋", () => ShowPlaceholder("活动", "请求诊断与协议转换记录将在下一阶段接入。")),
+            new("活动", "≋", () => ShowActivity()),
             new("控制台", "⌘", () => ShowConsole(), "运维"),
             new("设置", "⚙", () => ShowSettings())
         ]);
@@ -44,7 +45,9 @@ public sealed class MainWindowViewModel : NotifyViewModel
 
     private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = new OverviewViewModel(gatewayService, configService); }
     private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService); }
+    private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = new GatewayViewModel(configService); }
     private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = new ConsoleViewModel(); }
+    private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = new ActivityViewModel(gatewayService); }
     private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = new SettingsViewModel(configService); }
     private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
 }
@@ -237,7 +240,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
             var input = provider.ToInput();
             var response = provider.Id == Guid.Empty ? await configService.CreateProviderAsync(input) : await configService.UpdateProviderAsync(provider.Id, input);
             suppressAutoSave = true;
-            provider.ApplyResponse(response, preserveApiKey: true);
+            provider.ApplyResponse(response);
             suppressAutoSave = false;
             UpdateSummary();
             Status = "Provider 已保存";
@@ -435,18 +438,20 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public IReadOnlyList<EndpointFormatOption> EndpointFormatOptions { get; } = EndpointFormatOption.All;
     public EndpointFormatOption SelectedEndpointFormat { get => EndpointFormatOption.FromValue(EndpointFormat); set { if (value is not null) EndpointFormat = value.Value; } }
     public bool IsEndpointFormatVisible => string.Equals(ApiMode, "openai", StringComparison.OrdinalIgnoreCase);
-    public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set { if (SetProperty(ref apiKey, value)) apiKeyEdited = true; } } public bool IsApiKeyVisible { get => isApiKeyVisible; private set { if (SetProperty(ref isApiKeyVisible, value)) OnPropertyChanged(nameof(ApiKeyPasswordChar)); } } public char ApiKeyPasswordChar => IsApiKeyVisible ? '\0' : '●'; public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; } public string ApiKeyWatermark => HasApiKey ? "已配置 API Key，输入新值替换" : "请输入 API Key";
+    public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set { if (SetProperty(ref apiKey, value)) apiKeyEdited = true; } } public bool IsApiKeyVisible { get => isApiKeyVisible; private set { if (SetProperty(ref isApiKeyVisible, value)) { OnPropertyChanged(nameof(IsApiKeyHidden)); OnPropertyChanged(nameof(ApiKeyPasswordChar)); OnPropertyChanged(nameof(ApiKeyVisibilityToolTip)); } } } public bool IsApiKeyHidden => !IsApiKeyVisible; public char ApiKeyPasswordChar => IsApiKeyVisible ? '\0' : '●'; public string ApiKeyVisibilityToolTip => IsApiKeyVisible ? "隐藏 API Key" : "显示 API Key"; public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; } public string ApiKeyWatermark => HasApiKey ? "已配置 API Key" : "请输入 API Key";
     public ObservableCollection<ModelEditorViewModel> Models { get; } = [];
     public ObservableCollection<HeaderEditorViewModel> Headers { get; } = [];
     public bool HasNoHeaders => Headers.Count == 0;
-    public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel(); value.ApplyResponse(response, preserveApiKey: false); foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
+    public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel(); value.ApplyResponse(response); foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
     public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, apiKeyEdited ? ApiKey : null, false, ToHeaderDictionary(), UseProxy, string.IsNullOrWhiteSpace(ModelListUrl) ? null : ModelListUrl, EndpointFormat);
-    public void ApplyResponse(ProviderResponse response, bool preserveApiKey)
+    public void ApplyResponse(ProviderResponse response)
     {
         Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ModelListUrl = response.ModelListUrl ?? ""; ApiMode = response.ApiMode; EndpointFormat = response.EndpointFormat; UseProxy = response.UseProxy; HasApiKey = response.HasApiKey; OnPropertyChanged(nameof(ApiKeyWatermark));
-        if (!preserveApiKey) SetApiKeyFromResponse("");
-        else apiKeyEdited = false;
-        if (!preserveApiKey) SetHeadersFromJson(response.HeadersJson);
+        if (response.ApiKey is not null || !response.HasApiKey)
+            SetApiKeyFromResponse(response.ApiKey ?? "");
+        else
+            apiKeyEdited = false;
+        SetHeadersFromJson(response.HeadersJson);
     }
     public void ToggleApiKeyVisibility() => IsApiKeyVisible = !IsApiKeyVisible;
     public void AddHeader() => Headers.Add(new HeaderEditorViewModel());

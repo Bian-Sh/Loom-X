@@ -17,8 +17,8 @@
 
 ## 运行时
 
-- OpenAI 对外入口为 `POST /v1/responses`，并兼容 `POST /openai/v1/responses`。
-- Ollama 继续提供原生接口；Azure 使用 `/azure/v1/responses`。
+- OpenAI 客户端使用的 Endpoint Base URL 为 `/v1`，实际请求入口为 `POST /v1/responses`，并兼容 `POST /openai/v1/responses`；客户端负责拼接 `/responses`。
+- Ollama 继续提供原生接口；Azure 客户端使用 `/azure/v1`，实际请求入口为 `/azure/v1/responses`。
 - 请求模型名先在当前 Endpoint 的启用路由副本中解析，未指定模型时使用第一条启用路由。
 - 路由按优先级尝试。网络异常、408、429、5xx 允许转移到下一条；成功或不可转移的 4xx 立即返回。
 - OpenAI Provider 根据 `EndpointFormat` 调用 Responses 或 Chat Completions 上游；Anthropic/Ollama 沿用现有转换和透传客户端。

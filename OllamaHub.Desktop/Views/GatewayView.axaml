@@ -1,0 +1,79 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:OllamaHub.Desktop.ViewModels" x:Class="OllamaHub.Desktop.Views.GatewayView">
+  <UserControl.Styles>
+    <Style Selector="Border.panel"><Setter Property="Background" Value="#FFFFFF"/><Setter Property="BorderBrush" Value="#D7DCE3"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Opacity" Value="0.62"/></Style>
+    <Style Selector="Button.icon"><Setter Property="Width" Value="34"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/></Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="Auto,*" RowSpacing="12">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+      <TextBlock Text="{Binding Status}" Classes="muted" VerticalAlignment="Center"/>
+    </Grid>
+    <Grid Grid.Row="1" ColumnDefinitions="300,*" ColumnSpacing="14">
+      <Border Classes="panel" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Margin="16,14,16,12" Spacing="3"><TextBlock Text="Endpoint" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="独立维护模型组合与故障转移顺序" Classes="muted" FontSize="11"/></StackPanel>
+          <ListBox Grid.Row="1" ItemsSource="{Binding Endpoints}" SelectedItem="{Binding SelectedEndpoint}">
+            <ListBox.ItemTemplate><DataTemplate>
+              <Border Padding="14,12" Margin="0,0,0,1" Background="#F5F7FA">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+                  <TextBlock Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold"/>
+                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[ItemsControl].DataContext.ToggleEndpointCommand}" CommandParameter="{Binding}" OnContent="" OffContent=""/>
+                  <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding PublicPath}" Classes="muted" FontFamily="Consolas" FontSize="11"/>
+                  <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Routes.Count, StringFormat='{}{0} 条路由'}" Classes="muted" FontSize="11"/>
+                </Grid>
+              </Border>
+            </DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Classes="panel" Padding="16" IsVisible="{Binding HasSelectedEndpoint}">
+        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12">
+          <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="3"><TextBlock Text="{Binding SelectedEndpoint.DisplayName}" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="{Binding SelectedEndpoint.PublicUrl}" Classes="muted" FontFamily="Consolas"/></StackPanel><Button Grid.Column="1" Content="复制地址" Click="CopyEndpointButton_OnClick"/></Grid>
+          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <Button x:Name="modelPickerButton" Content="选择模型" Click="ToggleModelPicker_OnClick" HorizontalContentAlignment="Left"/>
+            <Popup x:Name="modelPopup" DataContext="{Binding ElementName=modelPickerButton, Path=DataContext}" Placement="Bottom" IsLightDismissEnabled="True" HorizontalOffset="0" VerticalOffset="5">
+              <Border Width="360" MaxHeight="420" Background="#FFFFFF" BorderBrush="#D7DCE3" BorderThickness="1" CornerRadius="7" Padding="8">
+                <Grid RowDefinitions="Auto,Auto,*" RowSpacing="8">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBox x:Name="modelSearch" Watermark="搜索模型..." TextChanged="ModelSearch_OnTextChanged"/><ComboBox Grid.Column="1" Width="100" ItemsSource="{Binding SortModeOptions}" SelectedItem="{Binding SelectedSortMode}"/></Grid>
+                  <TextBlock Grid.Row="1" Text="选择模型以加入当前 Endpoint" Classes="muted" FontSize="11" Margin="4,0"/>
+                  <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding ModelGroups}">
+                      <ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:GatewayModelGroup}">
+                        <StackPanel>
+                          <Button Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="8,8">
+                            <Grid ColumnDefinitions="22,*,Auto,18" ColumnSpacing="6"><TextBlock Text="◉" Classes="muted" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding ProviderName}" VerticalAlignment="Center"/><Border Grid.Column="2" Background="#EEF1F5" CornerRadius="10" Padding="7,2"><TextBlock Text="{Binding ModelCount}" Classes="muted" FontSize="10"/></Border><TextBlock Grid.Column="3" Text="{Binding ExpandGlyph}" Classes="muted" VerticalAlignment="Center"/></Grid>
+                          </Button>
+                          <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding IsExpanded}">
+                            <ItemsControl.ItemTemplate><DataTemplate>
+                              <Button Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="8,7">
+                                <Grid ColumnDefinitions="22,*,Auto" ColumnSpacing="6"><TextBlock Text="◉" Classes="muted" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding ModelName}" VerticalAlignment="Center"/><TextBlock Grid.Column="2" Text="✓" IsVisible="{Binding IsSelected}" FontSize="15" VerticalAlignment="Center"/></Grid>
+                              </Button>
+                            </DataTemplate></ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </DataTemplate></ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </Grid>
+              </Border>
+            </Popup>
+          </Grid>
+          <ListBox Grid.Row="2" ItemsSource="{Binding SelectedEndpoint.Routes}" ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.ItemTemplate><DataTemplate>
+              <Border BorderBrush="#D7DCE3" BorderThickness="0,0,0,1" Padding="8,10">
+                <Grid ColumnDefinitions="28,*,160,Auto,Auto,Auto" ColumnSpacing="8">
+                  <TextBlock Text="{Binding SortOrder, StringFormat='{}{0}'}" Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                  <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding ModelName}" FontWeight="SemiBold"/><TextBlock Text="{Binding ProviderName}" Classes="muted" FontSize="11"/></StackPanel>
+                  <TextBox Grid.Column="2" Text="{Binding Alias}" Watermark="Endpoint 模型名" VerticalContentAlignment="Center" LostFocus="RouteAlias_OnLostFocus"/>
+                  <ToggleSwitch Grid.Column="3" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[ItemsControl].DataContext.ToggleRouteCommand}" CommandParameter="{Binding}" OnContent="" OffContent=""/>
+                  <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="2"><Button Content="↑" Classes="icon" Command="{Binding $parent[ItemsControl].DataContext.MoveUpCommand}" CommandParameter="{Binding}"/><Button Content="↓" Classes="icon" Command="{Binding $parent[ItemsControl].DataContext.MoveDownCommand}" CommandParameter="{Binding}"/></StackPanel>
+                  <Button Grid.Column="5" Content="删除" Command="{Binding $parent[ItemsControl].DataContext.RemoveRouteCommand}" CommandParameter="{Binding}"/>
+                </Grid>
+              </Border>
+            </DataTemplate></ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OllamaHub.Configuration;
 using OllamaHub.Contracts;
 using OllamaHub.Services;
+using OllamaHub.Activity;
 using Serilog;
 
 namespace OllamaHub;
@@ -48,9 +49,13 @@ public static class OllamaHubHost
         builder.Services.AddSingleton<IAnthropicResponseMapper, AnthropicResponseMapper>();
         builder.Services.AddHttpClient<IAnthropicProxyClient, AnthropicProxyClient>();
         builder.Services.AddHttpClient<IProtocolPassthroughClient, ProtocolPassthroughClient>();
+        builder.Services.AddSingleton<ActivityStore>();
+        builder.Services.AddSingleton<IActivityStore>(services => services.GetRequiredService<ActivityStore>());
+        builder.Services.AddHostedService(services => services.GetRequiredService<ActivityStore>());
 
         var app = builder.Build();
         app.Lifetime.ApplicationStopped.Register(startupDb.Dispose);
+        app.UseMiddleware<ActivityMiddleware>();
         MapEndpoints(app);
         return app;
     }
@@ -73,6 +78,11 @@ public static class OllamaHubHost
         adminApi.MapPost("/providers/{providerId:guid}/models", async (Guid providerId, ConfigurationManagementService service, ModelInput input, CancellationToken cancellationToken) => Results.Ok(await service.CreateModelAsync(providerId, input, cancellationToken)));
         adminApi.MapPut("/models/{id:guid}", async (Guid id, ConfigurationManagementService service, ModelInput input, CancellationToken cancellationToken) => Results.Ok(await service.UpdateModelAsync(id, input, cancellationToken)));
         adminApi.MapDelete("/models/{id:guid}", async (Guid id, ConfigurationManagementService service, CancellationToken cancellationToken) => { await service.DeleteModelAsync(id, cancellationToken); return Results.NoContent(); });
+        adminApi.MapGet("/gateway", (ConfigurationManagementService service, CancellationToken cancellationToken) => service.ListGatewayEndpointsAsync(cancellationToken));
+        adminApi.MapPut("/gateway/{key}/enabled", async (string key, GatewayEndpointToggleInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.SetGatewayEndpointEnabledAsync(key, input.Enabled, cancellationToken)));
+        adminApi.MapPost("/gateway/{key}/routes", async (string key, GatewayRouteInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.CreateGatewayRouteAsync(key, input, cancellationToken)));
+        adminApi.MapPut("/gateway/routes/{id:guid}", async (Guid id, GatewayRouteInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.UpdateGatewayRouteAsync(id, input, cancellationToken)));
+        adminApi.MapDelete("/gateway/routes/{id:guid}", async (Guid id, ConfigurationManagementService service, CancellationToken cancellationToken) => { await service.DeleteGatewayRouteAsync(id, cancellationToken); return Results.NoContent(); });
 
         app.MapPost("/api/show", (IDatabaseConfigurationProvider configProvider, OllamaShowRequest request) =>
         {
@@ -99,6 +109,13 @@ public static class OllamaHubHost
             });
         });
 
+        app.MapPost("/v1/responses", HandleResponsesAsync);
+        app.MapPost("/openai/v1/responses", HandleResponsesAsync);
+        app.MapPost("/azure/v1/responses", HandleResponsesAsync);
+        app.MapPost("/api/chat", HandleResponsesAsync);
+        app.MapGet("/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "openai")));
+        app.MapGet("/openai/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "openai")));
+        app.MapGet("/azure/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "azure")));
         app.MapPost("/v1/chat/completions", HandleChatCompletionsAsync);
         app.MapPost("/openai/v1/chat/completions", HandleChatCompletionsAsync);
         app.MapFallback((HttpContext httpContext, ILoggerFactory loggerFactory) =>
@@ -165,6 +182,15 @@ public static class OllamaHubHost
         if (!TryGetString(requestObject, "model", out var modelName)) return Results.BadRequest(new OllamaErrorResponse { Error = "Model name is required." });
 
         var model = configProvider.FindModel(modelName);
+        if (httpContext.Items[ActivityContextKeys.Request] is ActivityRequestContext activityContext)
+        {
+            activityContext.ProviderId = model?.ProviderId;
+            activityContext.ModelId = model?.ModelId ?? modelName;
+            activityContext.Route = model?.SupportsApiMode("openai") == true ? "OpenAI 直通" : "OpenAI → Anthropic";
+            activityContext.IsStreaming = requestObject["stream"] is JsonValue streamValue
+                && streamValue.TryGetValue<bool>(out var isStreaming)
+                && isStreaming;
+        }
         if (model is null)
         {
             logger.LogWarning("OpenAI chat completion model not configured. Requested model: {RequestedModel}. Available models: {AvailableModels}", modelName, string.Join(", ", configProvider.GetModels().Select(m => m.OllamaModelName)));
@@ -196,5 +222,37 @@ public static class OllamaHubHost
         await using var anthropicStream = streamResult.Stream;
         await responseMapper.WriteOpenAiStreamAsync(model, anthropicStream, httpContext.Response.Body, cancellationToken);
         return Results.Empty;
+    }
+
+    private static async Task<IResult> HandleResponsesAsync(
+        HttpContext httpContext,
+        IDatabaseConfigurationProvider configProvider,
+        IProtocolPassthroughClient passthroughClient,
+        ILoggerFactory loggerFactory,
+        JsonNode? requestJson,
+        CancellationToken cancellationToken)
+    {
+        var endpointKey = httpContext.Request.Path.StartsWithSegments("/azure") ? "azure" : httpContext.Request.Path.StartsWithSegments("/api") ? "ollama" : "openai";
+        var endpoint = configProvider.Current.GatewayEndpoints.FirstOrDefault(item => item.Key == endpointKey && item.Enabled);
+        if (endpoint is null) return Results.NotFound(new OllamaErrorResponse { Error = "Endpoint is disabled or not configured." });
+        if (requestJson is not JsonObject requestObject) return Results.BadRequest(new OllamaErrorResponse { Error = "Request body must be a JSON object." });
+        var requestedModel = TryGetString(requestObject, "model", out var modelName) ? modelName : null;
+        var routes = endpoint.Routes.Where(item => item.Enabled && (requestedModel is null || string.Equals(item.Alias, requestedModel, StringComparison.OrdinalIgnoreCase) || string.Equals(item.Model.OllamaModelName, requestedModel, StringComparison.OrdinalIgnoreCase) || string.Equals(item.Model.DisplayName, requestedModel, StringComparison.OrdinalIgnoreCase))).OrderBy(item => item.SortOrder).ToArray();
+        if (routes.Length == 0) return Results.NotFound(new OllamaErrorResponse { Error = requestedModel is null ? "No enabled model route is configured." : $"Model '{requestedModel}' is not configured for this Endpoint." });
+        foreach (var route in routes)
+        {
+            requestObject["model"] = route.Model.ModelId;
+            var upstreamPath = route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase) ? "/v1/chat/completions" : "/v1/responses";
+            if (route.Model.SupportsApiMode("ollama")) upstreamPath = "/api/chat";
+            if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, route.Model, route.Model.SupportsApiMode("ollama") ? "ollama" : "openai", upstreamPath, requestObject, cancellationToken)) return Results.Empty;
+        }
+        return Results.StatusCode(StatusCodes.Status502BadGateway);
+    }
+
+    private static object ListGatewayModels(IDatabaseConfigurationProvider provider, string endpointKey)
+    {
+        var endpoint = provider.Current.GatewayEndpoints.FirstOrDefault(item => item.Key == endpointKey && item.Enabled);
+        var data = endpoint?.Routes.Where(item => item.Enabled).OrderBy(item => item.SortOrder).Select(item => new { id = item.Alias, @object = "model", owned_by = item.Model.ProviderId }).ToArray() ?? [];
+        return new { @object = "list", data };
     }
 }

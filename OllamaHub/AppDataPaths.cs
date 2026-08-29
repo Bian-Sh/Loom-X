@@ -8,6 +8,8 @@ public static class AppDataPaths
 
     public static string DatabasePath { get; } = Path.Combine(RootDirectory, "OllamaHub.db");
 
+    public static string ActivityDatabasePath { get; } = Path.Combine(RootDirectory, "Activity.db");
+
     public static string LogDirectory { get; } = Path.Combine(RootDirectory, "logs");
 
     public static void EnsureCreated()

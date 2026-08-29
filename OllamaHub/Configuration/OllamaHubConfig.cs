@@ -84,4 +84,22 @@ public sealed class ResolvedAppConfig
     public IReadOnlyList<ResolvedProviderConfig> Providers { get; init; } = [];
 
     public IReadOnlyList<ResolvedModelConfig> Models { get; init; } = [];
+
+    public IReadOnlyList<ResolvedGatewayEndpointConfig> GatewayEndpoints { get; init; } = [];
+}
+
+public sealed class ResolvedGatewayEndpointConfig
+{
+    public required string Key { get; init; }
+    public required string PublicPath { get; init; }
+    public bool Enabled { get; init; }
+    public IReadOnlyList<ResolvedGatewayRouteConfig> Routes { get; init; } = [];
+}
+
+public sealed class ResolvedGatewayRouteConfig
+{
+    public required string Alias { get; init; }
+    public required ResolvedModelConfig Model { get; init; }
+    public bool Enabled { get; init; }
+    public int SortOrder { get; init; }
 }

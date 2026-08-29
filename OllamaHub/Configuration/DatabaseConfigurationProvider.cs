@@ -40,6 +40,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
             var gateway = await dbContext.GatewayConfigurations.AsNoTracking().SingleAsync(cancellationToken);
             var settings = await dbContext.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
             var providers = await dbContext.Providers.AsNoTracking().Include(provider => provider.Models).ToListAsync(cancellationToken);
+            var endpoints = await dbContext.GatewayEndpoints.AsNoTracking().Include(endpoint => endpoint.Routes).ThenInclude(route => route.Model).ThenInclude(model => model.Provider).ToListAsync(cancellationToken);
             var resolvedProviders = providers.OrderBy(provider => provider.SortOrder).Select(provider => new ResolvedProviderConfig
             {
                 Id = provider.BusinessId,
@@ -52,6 +53,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
             var models = providers.Where(provider => provider.Enabled)
                 .SelectMany(provider => provider.Models.Where(model => model.Enabled).OrderBy(model => model.SortOrder).Select(model => ResolveModel(provider, model)))
                 .ToArray();
+            var modelLookup = providers.Where(provider => provider.Enabled).SelectMany(provider => provider.Models.Where(model => model.Enabled).Select(model => (model.Id, Config: ResolveModel(provider, model)))).ToDictionary(item => item.Id, item => item.Config);
             Volatile.Write(ref current, new ResolvedAppConfig
             {
                 Server = new ResolvedServerConfig { Urls = [gateway.ListenUrl] },
@@ -71,7 +73,20 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     LogRetentionDays = settings.LogRetentionDays
                 },
                 Providers = resolvedProviders,
-                Models = models
+                Models = models,
+                GatewayEndpoints = endpoints.OrderBy(endpoint => endpoint.Key).Select(endpoint => new ResolvedGatewayEndpointConfig
+                {
+                    Key = endpoint.Key,
+                    PublicPath = endpoint.PublicPath,
+                    Enabled = endpoint.Enabled,
+                    Routes = endpoint.Routes.OrderBy(route => route.SortOrder).Where(route => modelLookup.ContainsKey(route.ModelId)).Select(route => new ResolvedGatewayRouteConfig
+                    {
+                        Alias = string.IsNullOrWhiteSpace(route.Alias) ? modelLookup[route.ModelId].OllamaModelName : route.Alias!,
+                        Model = modelLookup[route.ModelId],
+                        Enabled = route.Enabled,
+                        SortOrder = route.SortOrder
+                    }).ToArray()
+                }).ToArray()
             });
         }
         finally

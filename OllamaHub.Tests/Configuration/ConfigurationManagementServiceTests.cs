@@ -35,11 +35,28 @@ public sealed class ConfigurationManagementServiceTests
     }
 
     [Fact]
-    public void ProviderEditor_LoadedApiKeyIsNotMarkedAsEdited()
+    public void ProviderEditor_LoadedApiKeyIsVisibleButNotMarkedAsEdited()
     {
-        var editor = ProviderEditorViewModel.FromResponse(new ProviderResponse(Guid.NewGuid(), "provider", "Provider", "https://example.com", "openai", true, false, true, 0, "{}", []));
+        var editor = ProviderEditorViewModel.FromResponse(new ProviderResponse(Guid.NewGuid(), "provider", "Provider", "https://example.com", "openai", true, false, true, 0, "{}", [], ApiKey: "secret"));
 
+        Assert.Equal("secret", editor.ApiKey);
         Assert.Null(editor.ToInput().ApiKey);
+    }
+
+    [Fact]
+    public void ProviderEditor_ApiKeyVisibilityTogglesEyeIcon()
+    {
+        var editor = new ProviderEditorViewModel();
+
+        Assert.False(editor.IsApiKeyVisible);
+        Assert.True(editor.IsApiKeyHidden);
+        Assert.Equal("显示 API Key", editor.ApiKeyVisibilityToolTip);
+
+        editor.ToggleApiKeyVisibility();
+
+        Assert.True(editor.IsApiKeyVisible);
+        Assert.False(editor.IsApiKeyHidden);
+        Assert.Equal("隐藏 API Key", editor.ApiKeyVisibilityToolTip);
     }
 
     [Fact]
@@ -178,6 +195,31 @@ public sealed class ConfigurationManagementServiceTests
     }
 
     [Fact]
+    public async Task GatewayRoutes_AreIndependentPerEndpoint()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+            var provider = await service.CreateProviderAsync(new ProviderInput("gateway", "网关 Provider", "https://example.com", "openai", true, null, false, null));
+            var model = await service.CreateModelAsync(provider.Id, new ModelInput("model", "模型", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+
+            await service.CreateGatewayRouteAsync("openai", new GatewayRouteInput(model.Id, "公共模型", true, 2));
+            await service.CreateGatewayRouteAsync("ollama", new GatewayRouteInput(model.Id, null, false, 0));
+            var endpoints = await service.ListGatewayEndpointsAsync();
+            Assert.Contains(endpoints.Single(item => item.Key == "openai").Routes, route => route.Alias == "公共模型" && route.Enabled && route.SortOrder == 2);
+            Assert.Contains(endpoints.Single(item => item.Key == "ollama").Routes, route => !route.Enabled);
+            Assert.Equal(2, configurationProvider.Current.GatewayEndpoints.Count(item => item.Routes.Count > 0));
+        }
+        finally { DeleteDatabaseFiles(databasePath); }
+    }
+
+    [Fact]
     public async Task DeleteProvider_WithModels_IsRejected()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
@@ -298,9 +340,11 @@ public sealed class ConfigurationManagementServiceTests
             var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
             var provider = await service.CreateProviderAsync(new ProviderInput("empty-key", "空密钥", "https://example.com", "openai", true, "secret", false, null));
             Assert.True(provider.HasApiKey);
+            Assert.Equal("secret", provider.ApiKey);
 
             var updated = await service.UpdateProviderAsync(provider.Id, new ProviderInput("empty-key", "空密钥", "https://example.com", "openai", true, string.Empty, false, null));
             Assert.False(updated.HasApiKey);
+            Assert.Null(updated.ApiKey);
         }
         finally
         {
