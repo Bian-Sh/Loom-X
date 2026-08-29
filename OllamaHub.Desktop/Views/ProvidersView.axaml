@@ -64,7 +64,7 @@
             <Border Padding="18,16,18,0" BorderBrush="#D9DEE6" BorderThickness="0,0,0,1" IsVisible="{Binding HasSelectedProvider}">
               <Grid RowDefinitions="Auto,*" RowSpacing="10">
                 <Grid ColumnDefinitions="*">
-                  <StackPanel Spacing="3" IsVisible="{Binding HasSelectedProvider}"><TextBlock Text="{Binding SelectedProvider.DisplayName}" FontSize="20" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding SelectedProvider.Models.Count}" Classes="muted"/><TextBlock Text="个模型 ·" Classes="muted"/><TextBlock Text="{Binding SelectedProvider.ApiMode}" Classes="muted"/><TextBlock Text="兼容 ·" Classes="muted"/><TextBlock Text="密钥已保护" Classes="muted" IsVisible="{Binding SelectedProvider.HasApiKey}"/></StackPanel></StackPanel>
+                  <StackPanel Spacing="3" IsVisible="{Binding HasSelectedProvider}"><TextBlock Text="{Binding SelectedProvider.DisplayName}" FontSize="20" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding SelectedProvider.Models.Count}" Classes="muted"/><TextBlock Text="个模型 ·" Classes="muted"/><TextBlock Text="{Binding SelectedProvider.ApiMode}" Classes="muted"/><TextBlock Text="兼容 ·" Classes="muted"/><TextBlock Text="{Binding SelectedProvider.SelectedEndpointFormat.DisplayName}" Classes="muted" IsVisible="{Binding SelectedProvider.IsEndpointFormatVisible}"/><TextBlock Text="密钥已保护" Classes="muted" IsVisible="{Binding SelectedProvider.HasApiKey}"/></StackPanel></StackPanel>
                 </Grid>
                 <TabControl Grid.Row="1" SelectedIndex="{Binding ActiveTabIndex, Mode=TwoWay}">
                   <TabItem Header="基础">
@@ -79,6 +79,7 @@
                           <StackPanel Spacing="5"><TextBlock Text="Provider 类型" Classes="muted"/><ComboBox ItemsSource="{Binding ProviderTypeOptions}" SelectedItem="{Binding SelectedProvider.ApiMode, Mode=TwoWay}"/></StackPanel>
                           <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="Base URL" Classes="muted"/><TextBox Text="{Binding SelectedProvider.BaseUrl}" Watermark="https://api.example.com"/></StackPanel>
                         </Grid>
+                        <StackPanel Spacing="5" IsVisible="{Binding SelectedProvider.IsEndpointFormatVisible}"><TextBlock Text="请求格式" Classes="muted"/><ComboBox ItemsSource="{Binding SelectedProvider.EndpointFormatOptions}" SelectedItem="{Binding SelectedProvider.SelectedEndpointFormat, Mode=TwoWay}"/></StackPanel>
                       </StackPanel>
                     </ScrollViewer>
                   </TabItem>

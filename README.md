@@ -13,12 +13,12 @@ OllamaHub 是一个本地 HTTP 代理服务，对外提供 Ollama 与 OpenAI 兼
 
 ## 配置与数据
 
-运行时不读取、不导入、不生成 `settings.json`。应用首次运行会在 `%LOCALAPPDATA%\OllamaHub\` 创建 `OllamaHub.db`，并建立默认网关监听地址 `http://127.0.0.1:11434`。应用程序目录中的旧数据库不会被读取或迁移。
+应用首次运行会在 `%LOCALAPPDATA%\OllamaHub\` 创建 `OllamaHub.db`，并建立默认网关监听地址 `http://127.0.0.1:11434`。应用程序目录中的旧数据库不会被读取或迁移。
 
 数据库主要包含：
 
 - `GatewayConfigurations`：网关监听地址。
-- `Providers`：Provider 身份、Base URL、协议、启用状态、受保护 API Key 和 Headers。
+- `Providers`：Provider 身份、Base URL、协议、OpenAI 请求格式、启用状态、受保护 API Key 和 Headers。
 - `Models`：模型信息、Provider 关系、协议覆盖、能力、参数、排序和模型级密钥。
 
 Provider/Model 的保存会立即刷新运行时内存快照；监听地址的变更需要重启网关进程后生效。

@@ -224,7 +224,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
         catch (Exception exception) { suppressSelectionInvariant = false; Status = $"加载失败：{exception.Message}"; }
     }
 
-    private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = "新 Provider", ApiMode = "openai", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); Status = "正在编辑新 Provider"; }
+    private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = "新 Provider", ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); Status = "正在编辑新 Provider"; }
 
     private async Task SaveProviderAsync()
     {
@@ -426,16 +426,22 @@ public sealed class ProvidersViewModel : NotifyViewModel
 public sealed class ProviderEditorViewModel : NotifyViewModel
 {
     public Guid Id { get; set; }
-    private string businessId = ""; private string displayName = ""; private string baseUrl = ""; private string modelListUrl = ""; private string apiMode = "openai"; private bool enabled; private bool useProxy; private string apiKey = ""; private bool isApiKeyVisible; private string headersJson = "{}";
-    public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ModelListUrl { get => modelListUrl; set => SetProperty(ref modelListUrl, value); } public string ApiMode { get => apiMode; set => SetProperty(ref apiMode, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool IsApiKeyVisible { get => isApiKeyVisible; private set { if (SetProperty(ref isApiKeyVisible, value)) OnPropertyChanged(nameof(ApiKeyPasswordChar)); } } public char ApiKeyPasswordChar => IsApiKeyVisible ? '\0' : '●'; public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; }
+    private string businessId = ""; private string displayName = ""; private string baseUrl = ""; private string modelListUrl = ""; private string apiMode = "openai"; private string endpointFormat = "responses"; private bool enabled; private bool useProxy; private string apiKey = ""; private bool isApiKeyVisible; private string headersJson = "{}";
+    public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ModelListUrl { get => modelListUrl; set => SetProperty(ref modelListUrl, value); }
+    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); } }
+    public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); } }
+    public IReadOnlyList<EndpointFormatOption> EndpointFormatOptions { get; } = EndpointFormatOption.All;
+    public EndpointFormatOption SelectedEndpointFormat { get => EndpointFormatOption.FromValue(EndpointFormat); set { if (value is not null) EndpointFormat = value.Value; } }
+    public bool IsEndpointFormatVisible => string.Equals(ApiMode, "openai", StringComparison.OrdinalIgnoreCase);
+    public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool IsApiKeyVisible { get => isApiKeyVisible; private set { if (SetProperty(ref isApiKeyVisible, value)) OnPropertyChanged(nameof(ApiKeyPasswordChar)); } } public char ApiKeyPasswordChar => IsApiKeyVisible ? '\0' : '●'; public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; }
     public ObservableCollection<ModelEditorViewModel> Models { get; } = [];
     public ObservableCollection<HeaderEditorViewModel> Headers { get; } = [];
     public bool HasNoHeaders => Headers.Count == 0;
     public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel(); value.ApplyResponse(response, preserveApiKey: false); foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
-    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, ApiKey, false, ToHeaderDictionary(), UseProxy, string.IsNullOrWhiteSpace(ModelListUrl) ? null : ModelListUrl);
+    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, ApiKey, false, ToHeaderDictionary(), UseProxy, string.IsNullOrWhiteSpace(ModelListUrl) ? null : ModelListUrl, EndpointFormat);
     public void ApplyResponse(ProviderResponse response, bool preserveApiKey)
     {
-        Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ModelListUrl = response.ModelListUrl ?? ""; ApiMode = response.ApiMode; Enabled = response.Enabled; UseProxy = response.UseProxy; HasApiKey = response.HasApiKey;
+        Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ModelListUrl = response.ModelListUrl ?? ""; ApiMode = response.ApiMode; EndpointFormat = response.EndpointFormat; UseProxy = response.UseProxy; HasApiKey = response.HasApiKey;
         if (!preserveApiKey) ApiKey = "";
         if (!preserveApiKey) SetHeadersFromJson(response.HeadersJson);
     }
@@ -473,6 +479,14 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
         return result;
     }
     internal static Dictionary<string, string>? ParseDictionary(string json) => string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+}
+
+public sealed record EndpointFormatOption(string Value, string DisplayName)
+{
+    public static IReadOnlyList<EndpointFormatOption> All { get; } = [new("chat_completions", "OpenAI-Completions"), new("responses", "Responses API")];
+    public static EndpointFormatOption FromValue(string? value) => All.FirstOrDefault(item => string.Equals(item.Value, value, StringComparison.OrdinalIgnoreCase)) ?? All[1];
+    public static string Normalize(string? value) => FromValue(value).Value;
+    public override string ToString() => DisplayName;
 }
 
 public sealed class HeaderEditorViewModel : NotifyViewModel

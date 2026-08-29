@@ -7,6 +7,110 @@ namespace OllamaHub.Tests.Configuration;
 public sealed class ConfigurationManagementServiceTests
 {
     [Fact]
+    public async Task NewProvider_DefaultsEndpointFormatToResponses()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+
+            var provider = await service.CreateProviderAsync(new ProviderInput("default-format", "默认格式", "https://example.com", "openai", true, null, false, null));
+
+            Assert.Equal("responses", provider.EndpointFormat);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task ProviderEndpointFormat_CanBeUpdatedAndAppearsInSnapshot()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+
+            var provider = await service.CreateProviderAsync(new ProviderInput("format", "格式", "https://example.com", "openai", true, null, false, null));
+            provider = await service.UpdateProviderAsync(provider.Id, new ProviderInput("format", "格式", "https://example.com", "openai", true, null, false, null, false, null, "chat_completions"));
+            Assert.Equal("chat_completions", provider.EndpointFormat);
+
+            var model = await service.CreateModelAsync(provider.Id, new ModelInput("model", "模型", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+            Assert.Equal("chat_completions", configurationProvider.FindModel(model.DisplayName)?.EndpointFormat);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task InvalidEndpointFormat_IsRejectedWithoutChangingStoredValue()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+            var provider = await service.CreateProviderAsync(new ProviderInput("format", "格式", "https://example.com", "openai", true, null, false, null, false, null, "responses"));
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateProviderAsync(provider.Id, new ProviderInput("format", "格式", "https://example.com", "openai", true, null, false, null, false, null, "invalid")));
+
+            await using var verifyContext = new ConfigurationDbContext(options);
+            Assert.Equal("responses", (await verifyContext.Providers.SingleAsync(item => item.Id == provider.Id)).EndpointFormat);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task ExistingDatabase_MissingEndpointFormatColumn_GetsDefaultValue()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var connectionString = $"Data Source={databasePath}";
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite(connectionString).Options;
+            await using (var context = new ConfigurationDbContext(options))
+            {
+                await ConfigurationDatabase.InitializeAsync(context);
+                context.Providers.Add(new ProviderEntity { BusinessId = "legacy", DisplayName = "旧 Provider", BaseUrl = "https://example.com" });
+                await context.SaveChangesAsync();
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE Providers DROP COLUMN EndpointFormat");
+                context.ChangeTracker.Clear();
+            }
+
+            await using (var migratedContext = new ConfigurationDbContext(options))
+            {
+                await ConfigurationDatabase.InitializeAsync(migratedContext);
+                var provider = await migratedContext.Providers.SingleAsync();
+                Assert.Equal("responses", provider.EndpointFormat);
+            }
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
     public async Task ProviderAndModelCrud_RebuildsRuntimeSnapshot()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");

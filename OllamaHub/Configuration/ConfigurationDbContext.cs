@@ -35,6 +35,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.Property(item => item.DisplayName).HasMaxLength(256).IsRequired();
             entity.Property(item => item.BaseUrl).HasMaxLength(2048).IsRequired();
             entity.Property(item => item.ModelListUrl).HasMaxLength(2048);
+            entity.Property(item => item.EndpointFormat).HasMaxLength(32).IsRequired().HasDefaultValue("responses");
             entity.HasMany(item => item.Models).WithOne(item => item.Provider).HasForeignKey(item => item.ProviderId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<ModelEntity>(entity =>
@@ -78,6 +79,7 @@ public sealed class ProviderEntity
     public string BaseUrl { get; set; } = string.Empty;
     public string? ModelListUrl { get; set; }
     public string ApiMode { get; set; } = "openai";
+    public string EndpointFormat { get; set; } = "responses";
     public bool Enabled { get; set; } = true;
     public bool UseProxy { get; set; }
     public string? ProtectedApiKey { get; set; }
@@ -159,6 +161,14 @@ public static class ConfigurationDatabase
         try
         {
             await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Providers ADD COLUMN ModelListUrl TEXT NULL", cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
+        }
+
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE Providers ADD COLUMN EndpointFormat TEXT NOT NULL DEFAULT 'responses'", cancellationToken);
         }
         catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
         {

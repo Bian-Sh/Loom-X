@@ -45,6 +45,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                 Id = provider.BusinessId,
                 BaseUrl = provider.BaseUrl,
                 ApiModes = SplitApiModes(provider.ApiMode),
+                EndpointFormat = provider.EndpointFormat,
                 HasApiKey = !string.IsNullOrWhiteSpace(provider.ProtectedApiKey),
                 UseProxy = provider.UseProxy
             }).ToArray();
@@ -93,6 +94,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
             UseProxy = provider.UseProxy,
             ProviderId = provider.BusinessId,
             ApiModes = SplitApiModes(apiMode),
+            EndpointFormat = provider.EndpointFormat,
             BaseUrl = (string.IsNullOrWhiteSpace(model.BaseUrl) ? provider.BaseUrl : model.BaseUrl).TrimEnd('/'),
             ApiKey = apiKey,
             DisplayName = model.DisplayName,
