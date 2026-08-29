@@ -1,11 +1,29 @@
 using Microsoft.EntityFrameworkCore;
 using OllamaHub.Configuration;
+using OllamaHub.Desktop.ViewModels;
 using Xunit;
 
 namespace OllamaHub.Tests.Configuration;
 
 public sealed class ConfigurationManagementServiceTests
 {
+    [Fact]
+    public void ProviderEditor_EmptyApiKeyIsTreatedAsUnchanged()
+    {
+        var editor = new ProviderEditorViewModel
+        {
+            BusinessId = "provider",
+            DisplayName = "Provider",
+            BaseUrl = "https://example.com",
+            ApiMode = "openai",
+            ApiKey = string.Empty,
+        };
+
+        var input = editor.ToInput();
+
+        Assert.Null(input.ApiKey);
+    }
+
     [Fact]
     public async Task NewProvider_DefaultsEndpointFormatToResponses()
     {

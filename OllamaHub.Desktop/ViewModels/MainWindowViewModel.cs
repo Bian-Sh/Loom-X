@@ -440,7 +440,7 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public ObservableCollection<HeaderEditorViewModel> Headers { get; } = [];
     public bool HasNoHeaders => Headers.Count == 0;
     public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel(); value.ApplyResponse(response, preserveApiKey: false); foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
-    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, ApiKey, false, ToHeaderDictionary(), UseProxy, string.IsNullOrWhiteSpace(ModelListUrl) ? null : ModelListUrl, EndpointFormat);
+    public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey, false, ToHeaderDictionary(), UseProxy, string.IsNullOrWhiteSpace(ModelListUrl) ? null : ModelListUrl, EndpointFormat);
     public void ApplyResponse(ProviderResponse response, bool preserveApiKey)
     {
         Id = response.Id; BusinessId = response.BusinessId; DisplayName = response.DisplayName; BaseUrl = response.BaseUrl; ModelListUrl = response.ModelListUrl ?? ""; ApiMode = response.ApiMode; EndpointFormat = response.EndpointFormat; UseProxy = response.UseProxy; HasApiKey = response.HasApiKey;
