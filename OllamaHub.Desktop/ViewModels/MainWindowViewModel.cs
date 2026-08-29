@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows.Input;
+using Avalonia.Threading;
 using OllamaHub.Configuration;
 using OllamaHub.Activity;
 using OllamaHub.Desktop.Services;
@@ -66,7 +67,7 @@ public sealed class NavigationItemViewModel : NotifyViewModel
     public NavigationItemViewModel(string title, string icon, Action action, string? sectionLabel = null) { Title = title; Icon = icon; SectionLabel = sectionLabel; NavigateCommand = new DelegateCommand(action); }
 }
 
-public sealed class OverviewViewModel : NotifyViewModel
+public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 {
     private readonly GatewayProcessService gatewayService;
     private readonly ConfigSnapshotService configService;
@@ -76,6 +77,17 @@ public sealed class OverviewViewModel : NotifyViewModel
     private string lastChecked = "尚未检查";
     private int providerCount;
     private int modelCount;
+    private int activeRequestCount;
+    private int throughput;
+    private string p95Latency = "—";
+    private string graphStatus = "等待网关启动";
+    private readonly Dictionary<string, RequestTelemetryEvent> activeRequests = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> activeEdgeCounts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, HashSet<string>> requestEdges = new(StringComparer.Ordinal);
+    private readonly List<RequestTelemetryEvent> completionWindow = [];
+
+    public event EventHandler? TopologyChanged;
+    public event EventHandler<RequestTelemetryEvent>? GraphTelemetryPublished;
 
     public string GatewayStatus { get => gatewayStatus; private set => SetProperty(ref gatewayStatus, value); }
     public string Endpoint { get => endpoint; private set => SetProperty(ref endpoint, value); }
@@ -83,6 +95,19 @@ public sealed class OverviewViewModel : NotifyViewModel
     public string LastChecked { get => lastChecked; private set => SetProperty(ref lastChecked, value); }
     public int ProviderCount { get => providerCount; private set => SetProperty(ref providerCount, value); }
     public int ModelCount { get => modelCount; private set => SetProperty(ref modelCount, value); }
+    public int ActiveRequestCount { get => activeRequestCount; private set => SetProperty(ref activeRequestCount, value); }
+    public int Throughput { get => throughput; private set => SetProperty(ref throughput, value); }
+    public string P95Latency { get => p95Latency; private set => SetProperty(ref p95Latency, value); }
+    public string GraphStatus { get => graphStatus; private set => SetProperty(ref graphStatus, value); }
+    public ObservableCollection<OverviewEndpointViewModel> Endpoints { get; } = [];
+    public ObservableCollection<OverviewModelViewModel> Models { get; } = [];
+    public ObservableCollection<OverviewRecentRequestViewModel> RecentRequests { get; } = [];
+    public string TopologyJson => JsonSerializer.Serialize(new
+    {
+        endpoints = Endpoints.Select(item => new { key = item.Key, displayName = item.DisplayName, publicPath = item.PublicPath, enabled = item.Enabled }),
+        models = Models.Select(item => new { displayName = item.DisplayName, modelId = item.ModelId, providerId = item.ProviderId }),
+        edges = Endpoints.SelectMany(endpoint => endpoint.Routes.Select(route => new { endpointKey = endpoint.Key, modelId = route.ModelId, providerId = route.ProviderId, alias = route.Alias }))
+    });
     public ICommand StartCommand { get; }
     public ICommand StopCommand { get; }
     public ICommand RefreshCommand { get; }
@@ -95,6 +120,7 @@ public sealed class OverviewViewModel : NotifyViewModel
         StopCommand = new AsyncCommand(StopAsync);
         RefreshCommand = new AsyncCommand(RefreshAsync);
         gatewayService.StateChanged += OnGatewayStateChanged;
+        gatewayService.TelemetryPublished += OnTelemetryPublished;
         _ = RefreshAsync();
     }
 
@@ -117,6 +143,7 @@ public sealed class OverviewViewModel : NotifyViewModel
         Endpoint = config.Server.Urls.Count > 0 ? config.Server.Urls[0] : "http://127.0.0.1:11434";
         ProviderCount = config.Providers.Count;
         ModelCount = config.Models.Count;
+        BuildTopology(config);
         GatewayStatus = gatewayService.State switch
         {
             GatewayState.Running => "运行中",
@@ -127,7 +154,23 @@ public sealed class OverviewViewModel : NotifyViewModel
         };
         LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "尚未检查";
         Version = gatewayService.State == GatewayState.Running ? "OllamaHub API 在线" : "未连接";
+        GraphStatus = gatewayService.State == GatewayState.Running ? "实时拓扑已连接" : "等待网关启动";
         await Task.CompletedTask;
+    }
+
+    private void BuildTopology(ResolvedAppConfig config)
+    {
+        Endpoints.Clear();
+        Models.Clear();
+        foreach (var model in config.Models.GroupBy(item => $"{item.ProviderId}:{item.ModelId}", StringComparer.OrdinalIgnoreCase).Select(group => group.First()))
+            Models.Add(new OverviewModelViewModel(model.DisplayName, model.ModelId, model.ProviderId));
+        foreach (var endpoint in config.GatewayEndpoints.OrderBy(item => item.Key))
+        {
+            var endpointVm = new OverviewEndpointViewModel(endpoint.Key, EndpointLabel(endpoint.Key), endpoint.PublicPath, endpoint.Enabled);
+            foreach (var route in endpoint.Routes.Where(item => item.Enabled)) endpointVm.Routes.Add(new OverviewRouteViewModel(route.Alias, route.Model.DisplayName, route.Model.ModelId, route.Model.ProviderId));
+            Endpoints.Add(endpointVm);
+        }
+        TopologyChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private string LoadEndpoint()
@@ -137,6 +180,116 @@ public sealed class OverviewViewModel : NotifyViewModel
     }
 
     private void OnGatewayStateChanged(object? sender, EventArgs args) => _ = RefreshAsync();
+
+    private void OnTelemetryPublished(object? sender, RequestTelemetryEvent telemetryEvent) => Dispatcher.UIThread.Post(() =>
+    {
+        ApplyTelemetry(telemetryEvent);
+        GraphTelemetryPublished?.Invoke(this, telemetryEvent);
+    });
+
+    private void ApplyTelemetry(RequestTelemetryEvent telemetryEvent)
+    {
+        if (telemetryEvent.Kind == TelemetryEventKind.RequestStarted)
+        {
+            activeRequests[telemetryEvent.RequestId] = telemetryEvent;
+            requestEdges.TryAdd(telemetryEvent.RequestId, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            ActiveRequestCount = activeRequests.Count;
+            return;
+        }
+        if (telemetryEvent.Kind == TelemetryEventKind.EdgeAttemptStarted)
+        {
+            var edgeKey = EdgeKey(telemetryEvent.EndpointKey, telemetryEvent.ModelId);
+            if (requestEdges.TryGetValue(telemetryEvent.RequestId, out var edges) && edges.Add(edgeKey)) SetRouteActive(edgeKey, true);
+            return;
+        }
+        if (telemetryEvent.Kind is TelemetryEventKind.EdgeAttemptCompleted or TelemetryEventKind.EdgeAttemptFailed or TelemetryEventKind.EdgeAttemptCancelled)
+        {
+            var edgeKey = EdgeKey(telemetryEvent.EndpointKey, telemetryEvent.ModelId);
+            if (requestEdges.TryGetValue(telemetryEvent.RequestId, out var edges) && edges.Remove(edgeKey)) SetRouteActive(edgeKey, false);
+            return;
+        }
+        if (telemetryEvent.Kind != TelemetryEventKind.RequestCompleted) return;
+        activeRequests.Remove(telemetryEvent.RequestId);
+        if (requestEdges.Remove(telemetryEvent.RequestId, out var pendingEdges)) foreach (var edgeKey in pendingEdges) SetRouteActive(edgeKey, false);
+        ActiveRequestCount = activeRequests.Count;
+        completionWindow.Add(telemetryEvent);
+        var cutoff = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(5);
+        completionWindow.RemoveAll(item => item.Timestamp < cutoff);
+        Throughput = completionWindow.Count;
+        if (telemetryEvent.StatusCode.HasValue) RecentRequests.Insert(0, OverviewRecentRequestViewModel.From(telemetryEvent));
+        while (RecentRequests.Count > 8) RecentRequests.RemoveAt(RecentRequests.Count - 1);
+        P95Latency = completionWindow.Count == 0 ? "—" : $"{completionWindow.Select(item => item.ElapsedMs).OrderBy(item => item).ElementAt(Math.Max(0, (int)Math.Ceiling(completionWindow.Count * .95) - 1))} ms";
+    }
+
+    private void SetRouteActive(string edgeKey, bool active)
+    {
+        if (active) activeEdgeCounts[edgeKey] = activeEdgeCounts.GetValueOrDefault(edgeKey) + 1;
+        else if (activeEdgeCounts.TryGetValue(edgeKey, out var count) && count <= 1) activeEdgeCounts.Remove(edgeKey);
+        else if (!active) activeEdgeCounts[edgeKey] = count - 1;
+        var separator = edgeKey.IndexOf('|');
+        if (separator < 0) return;
+        var endpointKey = edgeKey[..separator];
+        var modelId = edgeKey[(separator + 1)..];
+        var route = Endpoints.FirstOrDefault(item => item.Key.Equals(endpointKey, StringComparison.OrdinalIgnoreCase))?.Routes.FirstOrDefault(item => item.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+        if (route is not null) route.IsActive = activeEdgeCounts.ContainsKey(edgeKey);
+    }
+
+    private static string EdgeKey(string endpointKey, string? modelId) => $"{endpointKey}|{modelId}";
+
+    public void Dispose()
+    {
+        gatewayService.StateChanged -= OnGatewayStateChanged;
+        gatewayService.TelemetryPublished -= OnTelemetryPublished;
+        activeRequests.Clear();
+        requestEdges.Clear();
+        activeEdgeCounts.Clear();
+    }
+
+    private static string EndpointLabel(string key) => key.ToLowerInvariant() switch { "openai" => "OpenAI", "ollama" => "Ollama", "azure" => "Azure", _ => key };
+}
+
+public sealed class OverviewEndpointViewModel : NotifyViewModel
+{
+    public string Key { get; }
+    public string DisplayName { get; }
+    public string PublicPath { get; }
+    public bool Enabled { get; }
+    public ObservableCollection<OverviewRouteViewModel> Routes { get; } = [];
+    public int ActiveCount => Routes.Count(item => item.IsActive);
+    public string Status => !Enabled ? "已停用" : Routes.Count == 0 ? "无路由" : ActiveCount > 0 ? "有请求" : "已就绪";
+    public OverviewEndpointViewModel(string key, string displayName, string publicPath, bool enabled) => (Key, DisplayName, PublicPath, Enabled) = (key, displayName, publicPath, enabled);
+}
+
+public sealed class OverviewRouteViewModel : NotifyViewModel
+{
+    private bool isActive;
+    public string Alias { get; }
+    public string ModelName { get; }
+    public string ModelId { get; }
+    public string ProviderId { get; }
+    public bool IsActive { get => isActive; set { if (!SetProperty(ref isActive, value)) return; OnPropertyChanged(nameof(Status)); } }
+    public string Status => IsActive ? "活跃" : "待命";
+    public OverviewRouteViewModel(string alias, string modelName, string modelId, string providerId) => (Alias, ModelName, ModelId, ProviderId) = (alias, modelName, modelId, providerId);
+}
+
+public sealed class OverviewModelViewModel
+{
+    public string DisplayName { get; }
+    public string ModelId { get; }
+    public string ProviderId { get; }
+    public OverviewModelViewModel(string displayName, string modelId, string providerId) => (DisplayName, ModelId, ProviderId) = (displayName, modelId, providerId);
+}
+
+public sealed class OverviewRecentRequestViewModel
+{
+    public string Time { get; }
+    public string Endpoint { get; }
+    public string Model { get; }
+    public string Status { get; }
+    public long ElapsedMs { get; }
+    public string Latency => $"{ElapsedMs} ms";
+    private OverviewRecentRequestViewModel(RequestTelemetryEvent item) { Time = item.Timestamp.ToLocalTime().ToString("HH:mm:ss"); Endpoint = item.EndpointKey; Model = item.ModelId ?? item.ModelAlias ?? "未知模型"; Status = item.StatusCode is >= 200 and < 300 ? "成功" : "失败"; ElapsedMs = item.ElapsedMs; }
+    public static OverviewRecentRequestViewModel From(RequestTelemetryEvent item) => new(item);
 }
 
 public sealed class ProvidersViewModel : NotifyViewModel

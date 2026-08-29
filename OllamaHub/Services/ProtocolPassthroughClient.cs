@@ -2,6 +2,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Diagnostics;
+using OllamaHub.Activity;
 using OllamaHub.Configuration;
 
 namespace OllamaHub.Services;
@@ -12,13 +13,16 @@ public interface IProtocolPassthroughClient
     Task<bool> ProxyGatewayAttemptAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken);
 }
 
-public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<ProtocolPassthroughClient> logger) : IProtocolPassthroughClient
+public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<ProtocolPassthroughClient> logger, RequestTelemetryHub? telemetryHub = null) : IProtocolPassthroughClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task ProxyAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken)
     {
         var startedAt = Stopwatch.GetTimestamp();
+        var requestContext = httpContext.Items[ActivityContextKeys.Request] as ActivityRequestContext;
+        var attemptIndex = requestContext?.AttemptIndex ?? 0;
+        if (requestContext is not null) telemetryHub?.EdgeAttemptStarted(requestContext, model.ProviderId, model.ModelId, attemptIndex);
         try
         {
             using var upstreamRequest = BuildRequestMessage(httpContext, model, apiMode, upstreamPath, payload);
@@ -39,6 +43,7 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
 
             if (upstreamResponse.IsSuccessStatusCode)
             {
+                if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, attemptIndex);
                 logger.LogInformation(
                     "代理请求完成 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
                     model.ProviderId,
@@ -52,6 +57,7 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
             }
             else
             {
+                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, false, attemptIndex);
                 logger.LogError(
                     "代理请求失败 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
                     model.ProviderId,
@@ -68,6 +74,7 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            if (requestContext is not null) telemetryHub?.EdgeAttemptCancelled(requestContext, model.ProviderId, model.ModelId, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, attemptIndex);
             logger.LogDebug(
                 "代理请求已取消 {ProviderId}/{ModelId} {ApiMode} {Path} {ElapsedMs:F0}ms",
                 model.ProviderId,
@@ -79,6 +86,7 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
         }
         catch (Exception exception)
         {
+            if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, null, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, false, attemptIndex, exception.GetType().Name);
             logger.LogError(
                 exception,
                 "代理请求异常 {ProviderId}/{ModelId} {ApiMode} {Path} {ElapsedMs:F0}ms",
@@ -94,6 +102,9 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
     public async Task<bool> ProxyGatewayAttemptAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken)
     {
         var startedAt = Stopwatch.GetTimestamp();
+        var requestContext = httpContext.Items[ActivityContextKeys.Request] as ActivityRequestContext;
+        var attemptIndex = requestContext?.AttemptIndex ?? 0;
+        if (requestContext is not null) telemetryHub?.EdgeAttemptStarted(requestContext, model.ProviderId, model.ModelId, attemptIndex);
         try
         {
             using var upstreamRequest = BuildRequestMessage(httpContext, model, apiMode, upstreamPath, payload);
@@ -105,18 +116,25 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
             var retryable = (int)upstreamResponse.StatusCode is 408 or 429 or >= 500;
             if (retryable)
             {
+                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, true, attemptIndex);
                 logger.LogWarning("网关路由尝试可转移 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ResponseBytes}B {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, (int)upstreamResponse.StatusCode, buffer.Length, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
                 return false;
             }
             httpContext.Response.StatusCode = (int)upstreamResponse.StatusCode;
             CopyResponseHeaders(upstreamResponse, httpContext.Response);
             await buffer.CopyToAsync(httpContext.Response.Body, cancellationToken);
+            if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, attemptIndex);
             logger.LogInformation("网关路由尝试完成 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ResponseBytes}B {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, (int)upstreamResponse.StatusCode, buffer.Length, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             return true;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            if (requestContext is not null) telemetryHub?.EdgeAttemptCancelled(requestContext, model.ProviderId, model.ModelId, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, attemptIndex);
+            throw;
+        }
         catch (Exception exception)
         {
+            if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, null, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, true, attemptIndex, exception.GetType().Name);
             logger.LogWarning(exception, "网关路由尝试异常，将尝试下一条路由 {ProviderId}/{ModelId} {ApiMode} {Path} {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             return false;
         }

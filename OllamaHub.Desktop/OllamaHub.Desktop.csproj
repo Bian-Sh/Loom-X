@@ -2,17 +2,24 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="11.4.0" />
     <ProjectReference Include="..\OllamaHub\OllamaHub.csproj" />
     <PackageReference Include="Avalonia" Version="11.3.20" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.20" />
     <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.20" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\Overview\index.html" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Overview\three.core.min.js" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\Overview\three.module.min.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

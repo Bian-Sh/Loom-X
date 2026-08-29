@@ -7,8 +7,11 @@ namespace OllamaHub.Activity;
 public sealed class ActivityRequestContext
 {
     public string RequestId { get; init; } = string.Empty;
+    public string EndpointKey { get; set; } = "openai";
     public string Protocol { get; set; } = "OpenAI";
     public string Route { get; set; } = "OpenAI 直通";
+    public string? ModelAlias { get; set; }
+    public int AttemptIndex { get; set; }
     public string? ProviderId { get; set; }
     public string? ModelId { get; set; }
     public bool IsStreaming { get; set; }
@@ -19,7 +22,7 @@ public static class ActivityContextKeys
     public const string Request = "OllamaHub.Activity.Request";
 }
 
-public sealed class ActivityMiddleware(RequestDelegate next, IActivityStore activityStore, ILogger<ActivityMiddleware> logger)
+public sealed class ActivityMiddleware(RequestDelegate next, IActivityStore activityStore, ILogger<ActivityMiddleware> logger, RequestTelemetryHub? telemetryHub = null)
 {
     public async Task InvokeAsync(HttpContext httpContext)
     {
@@ -30,19 +33,24 @@ public sealed class ActivityMiddleware(RequestDelegate next, IActivityStore acti
         }
 
         var requestId = $"req_{Guid.NewGuid():N}"[..16];
-        var context = new ActivityRequestContext { RequestId = requestId };
+        var context = new ActivityRequestContext { RequestId = requestId, EndpointKey = ResolveEndpointKey(httpContext), Protocol = ResolveProtocol(httpContext) };
         httpContext.Items[ActivityContextKeys.Request] = context;
         httpContext.Response.Headers["X-Request-ID"] = requestId;
         var startedAt = Stopwatch.GetTimestamp();
+        telemetryHub?.StartRequest(context);
         try
         {
             await next(httpContext);
         }
         catch (Exception exception)
         {
+            var elapsedMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+            telemetryHub?.CompleteRequest(context, 500, elapsedMs, exception.GetType().Name);
             await RecordAsync(httpContext, context, startedAt, 500, exception.GetType().Name);
             throw;
         }
+        var responseElapsedMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+        telemetryHub?.CompleteRequest(context, httpContext.Response.StatusCode, responseElapsedMs, null);
         await RecordAsync(httpContext, context, startedAt, httpContext.Response.StatusCode, null);
     }
 
@@ -55,5 +63,18 @@ public sealed class ActivityMiddleware(RequestDelegate next, IActivityStore acti
 
     private static bool IsTrackedRequest(HttpContext context) =>
         HttpMethods.IsPost(context.Request.Method)
-        && (context.Request.Path.Equals("/v1/chat/completions") || context.Request.Path.Equals("/openai/v1/chat/completions"));
+        && (context.Request.Path.StartsWithSegments("/v1/chat/completions")
+            || context.Request.Path.StartsWithSegments("/openai/v1/chat/completions")
+            || context.Request.Path.StartsWithSegments("/v1/responses")
+            || context.Request.Path.StartsWithSegments("/openai/v1/responses")
+            || context.Request.Path.StartsWithSegments("/azure/v1/responses")
+            || context.Request.Path.StartsWithSegments("/api/chat"));
+
+    private static string ResolveEndpointKey(HttpContext context) =>
+        context.Request.Path.StartsWithSegments("/azure") ? "azure" :
+        context.Request.Path.StartsWithSegments("/api") ? "ollama" : "openai";
+
+    private static string ResolveProtocol(HttpContext context) =>
+        context.Request.Path.StartsWithSegments("/azure") ? "Azure" :
+        context.Request.Path.StartsWithSegments("/api") ? "Ollama" : "OpenAI";
 }

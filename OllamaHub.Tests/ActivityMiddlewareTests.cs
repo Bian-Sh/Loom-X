@@ -8,6 +8,36 @@ namespace OllamaHub.Tests;
 public sealed class ActivityMiddlewareTests
 {
     [Fact]
+    public void TelemetryHubPublishesRequestLifecycleWithoutSensitiveFields()
+    {
+        var hub = new RequestTelemetryHub();
+        var events = new List<RequestTelemetryEvent>();
+        hub.Published += (_, item) => events.Add(item);
+        var context = new ActivityRequestContext
+        {
+            RequestId = "req_test",
+            EndpointKey = "openai",
+            Protocol = "OpenAI",
+            ModelAlias = "public-model"
+        };
+
+        hub.StartRequest(context);
+        hub.EdgeAttemptStarted(context, "provider-a", "model-a", 0);
+        hub.EdgeAttemptCompleted(context, "provider-a", "model-a", 200, 12);
+        hub.CompleteRequest(context, 200, 20, null);
+
+        Assert.Equal(
+            [TelemetryEventKind.RequestStarted, TelemetryEventKind.EdgeAttemptStarted, TelemetryEventKind.EdgeAttemptCompleted, TelemetryEventKind.RequestCompleted],
+            events.Select(item => item.Kind));
+        Assert.All(events, item =>
+        {
+            Assert.DoesNotContain("prompt", item.ToString(), StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("authorization", item.ToString(), StringComparison.OrdinalIgnoreCase);
+        });
+        Assert.Empty(hub.ActiveRequests);
+    }
+
+    [Fact]
     public void ActivityStore_NotifiesObserversWhenActivityIsEnqueued()
     {
         using var store = new ActivityStore(NullLogger<ActivityStore>.Instance);
@@ -60,6 +90,29 @@ public sealed class ActivityMiddlewareTests
 
         Assert.True(called);
         Assert.Empty(store.Records);
+    }
+
+    [Fact]
+    public async Task TracksAzureResponsesWithEndpointTelemetry()
+    {
+        var store = new RecordingActivityStore();
+        var hub = new RequestTelemetryHub();
+        RequestTelemetryEvent? started = null;
+        hub.Published += (_, item) => { if (item.Kind == TelemetryEventKind.RequestStarted) started = item; };
+        var middleware = new ActivityMiddleware(context =>
+        {
+            context.Response.StatusCode = 202;
+            return Task.CompletedTask;
+        }, store, NullLogger<ActivityMiddleware>.Instance, hub);
+        var context = new DefaultHttpContext();
+        context.Request.Method = "POST";
+        context.Request.Path = "/azure/v1/responses";
+
+        await middleware.InvokeAsync(context);
+
+        Assert.NotNull(started);
+        Assert.Equal("azure", started.EndpointKey);
+        Assert.Equal(202, store.Records.Single().StatusCode);
     }
 
     private sealed class RecordingActivityStore : IActivityStore

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -51,6 +52,7 @@ public static class OllamaHubHost
         builder.Services.AddHttpClient<IProtocolPassthroughClient, ProtocolPassthroughClient>();
         builder.Services.AddSingleton<ActivityStore>();
         builder.Services.AddSingleton<IActivityStore>(services => services.GetRequiredService<ActivityStore>());
+        builder.Services.AddSingleton<RequestTelemetryHub>();
         builder.Services.AddHostedService(services => services.GetRequiredService<ActivityStore>());
 
         var app = builder.Build();
@@ -173,6 +175,7 @@ public static class OllamaHubHost
         IAnthropicProxyClient proxyClient,
         IAnthropicResponseMapper responseMapper,
         IProtocolPassthroughClient passthroughClient,
+        RequestTelemetryHub telemetryHub,
         ILoggerFactory loggerFactory,
         JsonNode? requestJson,
         CancellationToken cancellationToken)
@@ -186,6 +189,7 @@ public static class OllamaHubHost
         {
             activityContext.ProviderId = model?.ProviderId;
             activityContext.ModelId = model?.ModelId ?? modelName;
+            activityContext.ModelAlias = modelName;
             activityContext.Route = model?.SupportsApiMode("openai") == true ? "OpenAI 直通" : "OpenAI → Anthropic";
             activityContext.IsStreaming = requestObject["stream"] is JsonValue streamValue
                 && streamValue.TryGetValue<bool>(out var isStreaming)
@@ -208,13 +212,28 @@ public static class OllamaHubHost
         }
 
         var anthropicRequest = requestFactory.Create(model, requestObject);
+        var telemetryContext = httpContext.Items[ActivityContextKeys.Request] as ActivityRequestContext;
+        var attemptStartedAt = Stopwatch.GetTimestamp();
+        if (telemetryContext is not null) telemetryHub.EdgeAttemptStarted(telemetryContext, model.ProviderId, model.ModelId, telemetryContext.AttemptIndex);
         if (!anthropicRequest.Stream)
         {
             var (statusCode, response, error) = await proxyClient.SendAsync(model, anthropicRequest, cancellationToken);
+            if (telemetryContext is not null)
+            {
+                var elapsedMs = (long)Stopwatch.GetElapsedTime(attemptStartedAt).TotalMilliseconds;
+                if (response is null) telemetryHub.EdgeAttemptFailed(telemetryContext, model.ProviderId, model.ModelId, (int)statusCode, elapsedMs, false);
+                else telemetryHub.EdgeAttemptCompleted(telemetryContext, model.ProviderId, model.ModelId, (int)statusCode, elapsedMs);
+            }
             return response is null ? ToError(statusCode, error) : Results.Ok(responseMapper.MapOpenAiResponse(model, response));
         }
 
         var streamResult = await proxyClient.SendStreamAsync(model, anthropicRequest, cancellationToken);
+        if (telemetryContext is not null)
+        {
+            var elapsedMs = (long)Stopwatch.GetElapsedTime(attemptStartedAt).TotalMilliseconds;
+            if (streamResult.Stream is null) telemetryHub.EdgeAttemptFailed(telemetryContext, model.ProviderId, model.ModelId, (int)streamResult.StatusCode, elapsedMs, false);
+            else telemetryHub.EdgeAttemptCompleted(telemetryContext, model.ProviderId, model.ModelId, (int)streamResult.StatusCode, elapsedMs);
+        }
         if (streamResult.Stream is null) return ToError(streamResult.StatusCode, streamResult.Error);
         httpContext.Response.StatusCode = StatusCodes.Status200OK;
         httpContext.Response.ContentType = "text/event-stream";
@@ -239,8 +258,22 @@ public static class OllamaHubHost
         var requestedModel = TryGetString(requestObject, "model", out var modelName) ? modelName : null;
         var routes = endpoint.Routes.Where(item => item.Enabled && (requestedModel is null || string.Equals(item.Alias, requestedModel, StringComparison.OrdinalIgnoreCase) || string.Equals(item.Model.OllamaModelName, requestedModel, StringComparison.OrdinalIgnoreCase) || string.Equals(item.Model.DisplayName, requestedModel, StringComparison.OrdinalIgnoreCase))).OrderBy(item => item.SortOrder).ToArray();
         if (routes.Length == 0) return Results.NotFound(new OllamaErrorResponse { Error = requestedModel is null ? "No enabled model route is configured." : $"Model '{requestedModel}' is not configured for this Endpoint." });
-        foreach (var route in routes)
+        if (httpContext.Items[ActivityContextKeys.Request] is ActivityRequestContext activityContext)
         {
+            activityContext.ModelAlias = requestedModel;
+            activityContext.Protocol = EndpointLabel(endpointKey);
+        }
+        for (var routeIndex = 0; routeIndex < routes.Length; routeIndex++)
+        {
+            var route = routes[routeIndex];
+            if (httpContext.Items[ActivityContextKeys.Request] is ActivityRequestContext requestContext) requestContext.AttemptIndex++;
+            if (httpContext.Items[ActivityContextKeys.Request] is ActivityRequestContext routeContext)
+            {
+                routeContext.ProviderId = route.Model.ProviderId;
+                routeContext.ModelId = route.Model.ModelId;
+                routeContext.ModelAlias = route.Alias;
+                routeContext.Route = $"{EndpointLabel(endpointKey)} → {route.Model.ProviderId}";
+            }
             requestObject["model"] = route.Model.ModelId;
             var upstreamPath = route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase) ? "/v1/chat/completions" : "/v1/responses";
             if (route.Model.SupportsApiMode("ollama")) upstreamPath = "/api/chat";
@@ -248,6 +281,14 @@ public static class OllamaHubHost
         }
         return Results.StatusCode(StatusCodes.Status502BadGateway);
     }
+
+    private static string EndpointLabel(string key) => key.ToLowerInvariant() switch
+    {
+        "openai" => "OpenAI",
+        "ollama" => "Ollama",
+        "azure" => "Azure",
+        _ => key
+    };
 
     private static object ListGatewayModels(IDatabaseConfigurationProvider provider, string endpointKey)
     {

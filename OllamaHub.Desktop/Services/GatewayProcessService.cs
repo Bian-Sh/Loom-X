@@ -21,12 +21,14 @@ public sealed class GatewayProcessService : IDisposable
     private readonly SemaphoreSlim lifecycleLock = new(1, 1);
     private WebApplication? app;
     private ActivityStore? activityStore;
+    private RequestTelemetryHub? telemetryHub;
 
     public GatewayState State { get; private set; } = GatewayState.Stopped;
     public string? Error { get; private set; }
     public DateTimeOffset? LastCheckedAt { get; private set; }
     public event EventHandler? StateChanged;
     public event EventHandler<ActivityEventInput>? ActivityEnqueued;
+    public event EventHandler<RequestTelemetryEvent>? TelemetryPublished;
 
     public async Task StartAsync(string endpoint, CancellationToken cancellationToken = default)
     {
@@ -39,7 +41,9 @@ public sealed class GatewayProcessService : IDisposable
             SetState(GatewayState.Starting, null);
             app = await OllamaHubHost.CreateAsync(cancellationToken);
             activityStore = app.Services.GetRequiredService<ActivityStore>();
+            telemetryHub = app.Services.GetRequiredService<RequestTelemetryHub>();
             activityStore.ActivityEnqueued += OnActivityEnqueued;
+            telemetryHub.Published += OnTelemetryPublished;
             await app.StartAsync(cancellationToken);
 
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
@@ -89,7 +93,9 @@ public sealed class GatewayProcessService : IDisposable
             await app.StopAsync(cancellationToken);
             await app.DisposeAsync();
             if (activityStore is not null) activityStore.ActivityEnqueued -= OnActivityEnqueued;
+            if (telemetryHub is not null) telemetryHub.Published -= OnTelemetryPublished;
             activityStore = null;
+            telemetryHub = null;
             app = null;
             SetState(GatewayState.Stopped, null);
         }
@@ -132,8 +138,10 @@ public sealed class GatewayProcessService : IDisposable
         if (app is not null)
         {
             if (activityStore is not null) activityStore.ActivityEnqueued -= OnActivityEnqueued;
+            if (telemetryHub is not null) telemetryHub.Published -= OnTelemetryPublished;
             app.DisposeAsync().AsTask().GetAwaiter().GetResult();
             activityStore = null;
+            telemetryHub = null;
             app = null;
         }
         httpClient.Dispose();
@@ -141,4 +149,5 @@ public sealed class GatewayProcessService : IDisposable
     }
 
     private void OnActivityEnqueued(object? sender, ActivityEventInput input) => ActivityEnqueued?.Invoke(this, input);
+    private void OnTelemetryPublished(object? sender, RequestTelemetryEvent input) => TelemetryPublished?.Invoke(this, input);
 }
