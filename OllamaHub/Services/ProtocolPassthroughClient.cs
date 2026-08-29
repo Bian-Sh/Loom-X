@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics;
 using OllamaHub.Configuration;
 
 namespace OllamaHub.Services;
@@ -16,80 +17,76 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
 
     public async Task ProxyAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken)
     {
-        using var upstreamRequest = BuildRequestMessage(httpContext, model, apiMode, upstreamPath, payload);
-        var requestBody = await GetRequestBodyAsync(upstreamRequest, cancellationToken);
-        using var upstreamResponse = await httpClient.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-
-        httpContext.Response.StatusCode = (int)upstreamResponse.StatusCode;
-        CopyResponseHeaders(upstreamResponse, httpContext.Response);
-
-        await using var responseStream = await upstreamResponse.Content.ReadAsStreamAsync(cancellationToken);
-        await using var buffer = new MemoryStream();
-        await responseStream.CopyToAsync(buffer, cancellationToken);
-        buffer.Position = 0;
-
-        var contentType = upstreamResponse.Content.Headers.ContentType?.ToString()
-            ?? httpContext.Response.ContentType
-            ?? "application/octet-stream";
-
-        var responseBody = await ReadBodyAsStringAsync(buffer, upstreamResponse.Content.Headers.ContentType?.CharSet, cancellationToken);
-
-        if (upstreamResponse.IsSuccessStatusCode)
-        {
-            logger.LogInformation(
-                "Passthrough response {ApiMode} {Path} ({StatusCode}, {ContentType}): {ResponseBody}",
-                apiMode,
-                upstreamPath,
-                (int)upstreamResponse.StatusCode,
-                contentType,
-                responseBody);
-        }
-        else
-        {
-            logger.LogError(
-                "Passthrough request failed {ApiMode} {Path}. RequestBody: {RequestBody}. Response ({StatusCode}, {ContentType}): {ResponseBody}",
-                apiMode,
-                upstreamPath,
-                requestBody,
-                (int)upstreamResponse.StatusCode,
-                contentType,
-                responseBody);
-        }
-
-        buffer.Position = 0;
-        await buffer.CopyToAsync(httpContext.Response.Body, cancellationToken);
-    }
-
-    private static async Task<string> GetRequestBodyAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        if (request.Content is null)
-        {
-            return string.Empty;
-        }
-
-        return await request.Content.ReadAsStringAsync(cancellationToken);
-    }
-
-    private static async Task<string> ReadBodyAsStringAsync(Stream stream, string? charset, CancellationToken cancellationToken)
-    {
-        using var reader = new StreamReader(stream, GetEncoding(charset), detectEncodingFromByteOrderMarks: true, leaveOpen: true);
-        return await reader.ReadToEndAsync(cancellationToken);
-    }
-
-    private static Encoding GetEncoding(string? charset)
-    {
-        if (string.IsNullOrWhiteSpace(charset))
-        {
-            return Encoding.UTF8;
-        }
-
+        var startedAt = Stopwatch.GetTimestamp();
         try
         {
-            return Encoding.GetEncoding(charset);
+            using var upstreamRequest = BuildRequestMessage(httpContext, model, apiMode, upstreamPath, payload);
+            using var upstreamResponse = await httpClient.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+            httpContext.Response.StatusCode = (int)upstreamResponse.StatusCode;
+            CopyResponseHeaders(upstreamResponse, httpContext.Response);
+
+            await using var responseStream = await upstreamResponse.Content.ReadAsStreamAsync(cancellationToken);
+            await using var buffer = new MemoryStream();
+            await responseStream.CopyToAsync(buffer, cancellationToken);
+            buffer.Position = 0;
+
+            var contentType = upstreamResponse.Content.Headers.ContentType?.ToString()
+                ?? httpContext.Response.ContentType
+                ?? "application/octet-stream";
+            var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+
+            if (upstreamResponse.IsSuccessStatusCode)
+            {
+                logger.LogInformation(
+                    "代理请求完成 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
+                    model.ProviderId,
+                    model.ModelId,
+                    apiMode,
+                    upstreamPath,
+                    (int)upstreamResponse.StatusCode,
+                    contentType,
+                    buffer.Length,
+                    elapsedMs);
+            }
+            else
+            {
+                logger.LogError(
+                    "代理请求失败 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
+                    model.ProviderId,
+                    model.ModelId,
+                    apiMode,
+                    upstreamPath,
+                    (int)upstreamResponse.StatusCode,
+                    contentType,
+                    buffer.Length,
+                    elapsedMs);
+            }
+
+            await buffer.CopyToAsync(httpContext.Response.Body, cancellationToken);
         }
-        catch
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return Encoding.UTF8;
+            logger.LogDebug(
+                "代理请求已取消 {ProviderId}/{ModelId} {ApiMode} {Path} {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                apiMode,
+                upstreamPath,
+                Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "代理请求异常 {ProviderId}/{ModelId} {ApiMode} {Path} {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                apiMode,
+                upstreamPath,
+                Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            throw;
         }
     }
 

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
 using OllamaHub.Configuration;
 using OllamaHub.Contracts;
+using OllamaHub.Tests.Logging;
 using OllamaHub.Services;
 using Xunit;
 
@@ -14,6 +15,36 @@ namespace OllamaHub.Tests.Services;
 
 public sealed class ProtocolPassthroughClientTests
 {
+    [Fact]
+    public async Task ProxyAsync_FailureLog_ContainsSafeSummaryWithoutBodies()
+    {
+        const string prompt = "sensitive-user-prompt";
+        const string upstreamBody = "sensitive-upstream-response";
+        var handler = new CapturingHandler(HttpStatusCode.BadRequest, upstreamBody);
+        using var httpClient = new HttpClient(handler);
+        var logger = new RecordingLogger<ProtocolPassthroughClient>();
+        var client = new ProtocolPassthroughClient(httpClient, logger);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Method = HttpMethods.Post;
+        httpContext.Request.ContentType = "application/json";
+        httpContext.Response.Body = new MemoryStream();
+        var model = CreateModel();
+        var payload = new OpenAIChatCompletionsRequest
+        {
+            Model = model.ModelId,
+            Messages = [new OpenAIChatMessage { Role = "user", Content = JsonValue.Create(prompt) }]
+        };
+
+        await client.ProxyAsync(httpContext, model, "openai", "/v1/chat/completions", payload, CancellationToken.None);
+
+        var message = Assert.Single(logger.Messages);
+        Assert.Contains(model.ProviderId, message);
+        Assert.Contains(model.ModelId, message);
+        Assert.Contains("400", message);
+        Assert.DoesNotContain(prompt, message);
+        Assert.DoesNotContain(upstreamBody, message);
+    }
+
     [Fact]
     public async Task ProxyAsync_OpenAiRequest_SendsConfiguredModelId()
     {
@@ -213,7 +244,19 @@ public sealed class ProtocolPassthroughClientTests
         Assert.Equal("deepseek/deepseek-v4-pro", json.RootElement.GetProperty("model").GetString());
     }
 
-    private sealed class CapturingHandler : HttpMessageHandler
+    private static ResolvedModelConfig CreateModel() => new()
+    {
+        ModelId = "deepseek/deepseek-v4-pro",
+        OllamaModelName = "360智脑/deepseek-v4-pro",
+        DisplayName = "360智脑/deepseek-v4-pro",
+        ProviderId = "360智脑",
+        ApiModes = ["openai"],
+        BaseUrl = "https://api.360.cn",
+        ApiKey = "secret",
+        AnthropicModel = "deepseek/deepseek-v4-pro"
+    };
+
+    private sealed class CapturingHandler(HttpStatusCode statusCode = HttpStatusCode.OK, string responseBody = "{}") : HttpMessageHandler
     {
         public string? RequestBody { get; private set; }
 
@@ -223,9 +266,9 @@ public sealed class ProtocolPassthroughClientTests
                 ? null
                 : await request.Content.ReadAsStringAsync(cancellationToken);
 
-            return new HttpResponseMessage(HttpStatusCode.OK)
+            return new HttpResponseMessage(statusCode)
             {
-                Content = new StringContent("{}", Encoding.UTF8, "application/json")
+                Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
             };
         }
     }

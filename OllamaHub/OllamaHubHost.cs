@@ -21,7 +21,14 @@ public static class OllamaHubHost
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Information()
             .Enrich.FromLogContext()
-            .WriteTo.File(Path.Combine(logDirectory, "ollamahub-.log"), rollingInterval: RollingInterval.Day, fileSizeLimitBytes: 10 * 1024 * 1024, rollOnFileSizeLimit: true, retainedFileCountLimit: 30, shared: true)
+            .WriteTo.File(
+                Path.Combine(logDirectory, "ollamahub-.log"),
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}",
+                rollingInterval: RollingInterval.Day,
+                fileSizeLimitBytes: 10 * 1024 * 1024,
+                rollOnFileSizeLimit: true,
+                retainedFileCountLimit: 30,
+                shared: true)
             .CreateLogger();
         builder.Host.UseSerilog();
 

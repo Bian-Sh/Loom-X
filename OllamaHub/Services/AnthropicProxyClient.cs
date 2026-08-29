@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Diagnostics;
 using OllamaHub.Configuration;
 using OllamaHub.Contracts;
 
@@ -20,63 +21,142 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
 
     public async Task<(HttpStatusCode StatusCode, AnthropicMessagesResponse? Response, string? Error)> SendAsync(ResolvedModelConfig model, AnthropicMessagesRequest request, CancellationToken cancellationToken)
     {
-        using var message = BuildRequestMessage(model, request);
-        var requestBody = await message.Content!.ReadAsStringAsync(cancellationToken);
-        using var response = await httpClient.SendAsync(message, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        var startedAt = Stopwatch.GetTimestamp();
+        try
+        {
+            using var message = BuildRequestMessage(model, request);
+            using var response = await httpClient.SendAsync(message, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
+            var responseBytes = Encoding.UTF8.GetByteCount(body);
+            var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
 
-        if (!response.IsSuccessStatusCode)
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogError(
+                    "Anthropic 请求失败 {ProviderId}/{ModelId} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
+                    model.ProviderId,
+                    model.ModelId,
+                    message.RequestUri?.AbsolutePath ?? "/v1/messages",
+                    (int)response.StatusCode,
+                    contentType,
+                    responseBytes,
+                    elapsedMs);
+                return (response.StatusCode, null, ReadError(body, response.StatusCode));
+            }
+
+            var result = JsonSerializer.Deserialize<AnthropicMessagesResponse>(body, JsonOptions);
+            if (result is null)
+            {
+                logger.LogError(
+                    "Anthropic 响应解析失败 {ProviderId}/{ModelId} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
+                    model.ProviderId,
+                    model.ModelId,
+                    message.RequestUri?.AbsolutePath ?? "/v1/messages",
+                    (int)response.StatusCode,
+                    contentType,
+                    responseBytes,
+                    elapsedMs);
+                return (HttpStatusCode.BadGateway, null, "Anthropic 返回了空响应。");
+            }
+
+            logger.LogInformation(
+                "Anthropic 请求完成 {ProviderId}/{ModelId} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                message.RequestUri?.AbsolutePath ?? "/v1/messages",
+                (int)response.StatusCode,
+                contentType,
+                responseBytes,
+                elapsedMs);
+
+            return (response.StatusCode, result, null);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            logger.LogDebug(
+                "Anthropic 请求已取消 {ProviderId}/{ModelId} {Path} {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                "/v1/messages",
+                Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            throw;
+        }
+        catch (Exception exception)
         {
             logger.LogError(
-                "Anthropic request failed {Path}. RequestBody: {RequestBody}. Response ({StatusCode}, {ContentType}): {ResponseBody}",
-                message.RequestUri?.AbsolutePath ?? "/v1/messages",
-                requestBody,
-                (int)response.StatusCode,
-                response.Content.Headers.ContentType?.ToString() ?? "application/json",
-                body);
-            return (response.StatusCode, null, ReadError(body, response.StatusCode));
+                exception,
+                "Anthropic 请求异常 {ProviderId}/{ModelId} {Path} {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                "/v1/messages",
+                Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            throw;
         }
-
-        logger.LogInformation(
-            "Anthropic response {Path} ({StatusCode}, {ContentType}): {ResponseBody}",
-            message.RequestUri?.AbsolutePath ?? "/v1/messages",
-            (int)response.StatusCode,
-            response.Content.Headers.ContentType?.ToString() ?? "application/json",
-            body);
-
-        var result = JsonSerializer.Deserialize<AnthropicMessagesResponse>(body, JsonOptions);
-        if (result is null)
-        {
-            return (HttpStatusCode.BadGateway, null, "Anthropic 返回了空响应。");
-        }
-
-        return (response.StatusCode, result, null);
     }
 
     public async Task<(HttpStatusCode StatusCode, Stream? Stream, string? Error)> SendStreamAsync(ResolvedModelConfig model, AnthropicMessagesRequest request, CancellationToken cancellationToken)
     {
-        var message = BuildRequestMessage(model, request);
-        var requestBody = await message.Content!.ReadAsStringAsync(cancellationToken);
-        var response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        var startedAt = Stopwatch.GetTimestamp();
+        try
         {
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            logger.LogError(
-                "Anthropic request failed {Path}. RequestBody: {RequestBody}. Response ({StatusCode}, {ContentType}): {ResponseBody}",
-                message.RequestUri?.AbsolutePath ?? "/v1/messages",
-                requestBody,
+            var message = BuildRequestMessage(model, request);
+            var response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            var path = message.RequestUri?.AbsolutePath ?? "/v1/messages";
+            var contentType = response.Content.Headers.ContentType?.ToString() ?? "text/event-stream";
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                logger.LogError(
+                    "Anthropic 流式请求失败 {ProviderId}/{ModelId} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
+                    model.ProviderId,
+                    model.ModelId,
+                    path,
+                    (int)response.StatusCode,
+                    contentType,
+                    Encoding.UTF8.GetByteCount(body),
+                    Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+
+                var error = ReadError(body, response.StatusCode);
+                response.Dispose();
+                message.Dispose();
+                return (response.StatusCode, null, error);
+            }
+
+            logger.LogInformation(
+                "Anthropic 流式请求已连接 {ProviderId}/{ModelId} {Path} {StatusCode} {ContentType} {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                path,
                 (int)response.StatusCode,
-                response.Content.Headers.ContentType?.ToString() ?? "application/json",
-                body);
+                contentType,
+                Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
 
-            var error = ReadError(body, response.StatusCode);
-            response.Dispose();
             message.Dispose();
-            return (response.StatusCode, null, error);
+            return (response.StatusCode, await response.Content.ReadAsStreamAsync(cancellationToken), null);
         }
-
-        message.Dispose();
-        return (response.StatusCode, await response.Content.ReadAsStreamAsync(cancellationToken), null);
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            logger.LogDebug(
+                "Anthropic 流式请求已取消 {ProviderId}/{ModelId} {Path} {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                "/v1/messages",
+                Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "Anthropic 流式请求异常 {ProviderId}/{ModelId} {Path} {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                "/v1/messages",
+                Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            throw;
+        }
     }
 
     private static HttpRequestMessage BuildRequestMessage(ResolvedModelConfig model, AnthropicMessagesRequest request)

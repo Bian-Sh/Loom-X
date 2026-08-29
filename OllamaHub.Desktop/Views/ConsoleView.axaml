@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.Views.ConsoleView">
+  <UserControl.Styles>
+    <Style Selector="Border.console-panel"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/></Style>
+    <Style Selector="Border.toolbar"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1,1,1,0"/><Setter Property="CornerRadius" Value="7,7,0,0"/></Style>
+    <Style Selector="Border.footer"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1,0,1,1"/><Setter Property="CornerRadius" Value="0,0,7,7"/></Style>
+    <Style Selector="Border.log-viewport"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1,0,1,0"/></Style>
+    <Style Selector="ComboBox.filter"><Setter Property="MinWidth" Value="128"/><Setter Property="MinHeight" Value="38"/><Setter Property="Background" Value="White"/></Style>
+    <Style Selector="TextBox.filter"><Setter Property="MinHeight" Value="38"/><Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#101820"/></Style>
+    <Style Selector="Button.outline"><Setter Property="MinHeight" Value="32"/><Setter Property="Padding" Value="10,6"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="Foreground" Value="#101820"/></Style>
+    <Style Selector="Button.jump"><Setter Property="Width" Value="40"/><Setter Property="Height" Value="40"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#176B87"/><Setter Property="Foreground" Value="#176B87"/><Setter Property="FontSize" Value="20"/></Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="Auto,*,Auto" MinHeight="420">
+    <Border Classes="toolbar" Padding="10" Grid.Row="0">
+      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="9">
+        <ComboBox Classes="filter" ItemsSource="{Binding LevelOptions}" SelectedItem="{Binding SelectedLevel}"/>
+        <ComboBox Grid.Column="1" Classes="filter" ItemsSource="{Binding ModuleOptions}" SelectedItem="{Binding SelectedModule}"/>
+        <TextBox Grid.Column="2" Classes="filter" Watermark="搜索 request ID、模型或错误信息" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+      </Grid>
+    </Border>
+    <Border Grid.Row="1" Classes="log-viewport">
+      <Grid>
+        <ScrollViewer x:Name="LogScroll" Background="Transparent" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" ScrollChanged="LogScroll_OnScroll">
+        <ItemsControl ItemsSource="{Binding VisibleLogs}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Padding="12,7" BorderBrush="#E5E8EC" BorderThickness="0,0,0,1" Background="Transparent">
+                <Grid ColumnDefinitions="92,72,84,*" ColumnSpacing="10">
+                  <TextBlock Text="{Binding Time}" Foreground="#6B7780" FontFamily="Consolas" FontSize="12"/>
+                  <TextBlock Grid.Column="1" Text="{Binding LevelLabel}" Foreground="{Binding LevelColor}" FontWeight="Bold" FontFamily="Consolas" FontSize="12"/>
+                  <TextBlock Grid.Column="2" Text="{Binding Module}" Foreground="#44515C" FontFamily="Consolas" FontSize="12"/>
+                  <TextBlock Grid.Column="3" Text="{Binding Message}" Foreground="#101820" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        </ScrollViewer>
+        <TextBlock Text="没有匹配当前筛选条件的日志。" Foreground="#6B7780" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasLogs}"/>
+        <Button x:Name="JumpButton" Classes="jump" Content="↓" ToolTip.Tip="跳转到底部" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,14" Click="JumpButton_OnClick" IsVisible="False"/>
+      </Grid>
+    </Border>
+    <Border Classes="footer" Grid.Row="2" Padding="12,7">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+        <TextBlock Text="{Binding CountLabel}" Foreground="#6B7780" FontSize="11" VerticalAlignment="Center"/>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <TextBlock Text="{Binding LogFileLabel}" Foreground="#6B7780" FontSize="11" VerticalAlignment="Center"/>
+          <Button Classes="outline" Content="清空" Command="{Binding ClearCommand}"/>
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

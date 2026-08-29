@@ -2,6 +2,7 @@
   <Application.DataTemplates>
     <DataTemplate DataType="{x:Type vm:OverviewViewModel}"><views:OverviewView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:ProvidersViewModel}"><views:ProvidersView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:ConsoleViewModel}"><views:ConsoleView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:PlaceholderViewModel}"><views:PlaceholderView /></DataTemplate>
   </Application.DataTemplates>
   <Application.Styles><FluentTheme /></Application.Styles>
