@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.Views.SettingsView">
+  <UserControl.Styles>
+    <Style Selector="Border.panel"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/></Style>
+    <Style Selector="TextBlock.label"><Setter Property="FontSize" Value="12"/><Setter Property="Opacity" Value="0.65"/></Style>
+    <Style Selector="TextBlock.hint"><Setter Property="FontSize" Value="11"/><Setter Property="Opacity" Value="0.6"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
+    <Style Selector="Button.outline"><Setter Property="MinHeight" Value="34"/><Setter Property="Padding" Value="11,7"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/></Style>
+    <Style Selector="Button.primary"><Setter Property="MinHeight" Value="36"/><Setter Property="Padding" Value="16,8"/><Setter Property="Background" Value="#176B87"/><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+  </UserControl.Styles>
+  <Grid MinHeight="450">
+    <TabControl>
+      <TabItem Header="通用">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="12" Margin="0,14,8,20">
+            <Border Classes="panel" Padding="18">
+              <StackPanel Spacing="14">
+                <StackPanel Spacing="4"><TextBlock Text="界面语言" FontWeight="SemiBold"/><TextBlock Text="切换控制中心的显示语言。" Classes="hint"/><ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"/></StackPanel>
+                <StackPanel Spacing="4"><TextBlock Text="主题" FontWeight="SemiBold"/><TextBlock Text="选择适合当前工作环境的配色。" Classes="hint"/><ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"/></StackPanel>
+                <CheckBox Content="启动时打开控制中心" IsChecked="{Binding OpenControlCenterOnStartup}"/><TextBlock Text="应用启动后自动打开本地控制台页面。" Classes="hint" Margin="24,-10,0,0"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="连接">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="12" Margin="0,14,8,20">
+            <Border Classes="panel" Padding="18">
+              <StackPanel Spacing="14">
+                <StackPanel Spacing="4"><TextBlock Text="代理模式" FontWeight="SemiBold"/><TextBlock Text="控制上游请求如何通过代理访问网络。" Classes="hint"/><ComboBox ItemsSource="{Binding ProxyModeOptions}" SelectedItem="{Binding SelectedProxyMode, Mode=TwoWay}"/></StackPanel>
+                <Grid ColumnDefinitions="*,120" ColumnSpacing="10" IsVisible="{Binding IsCustomProxyVisible}">
+                  <StackPanel Spacing="4"><TextBlock Text="代理地址" Classes="label"/><TextBox Text="{Binding ProxyHost}" Watermark="http://127.0.0.1"/></StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="端口" Classes="label"/><NumericUpDown Value="{Binding ProxyPort}" Minimum="1" Maximum="65535"/></StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding IsCustomProxyVisible}">
+                  <StackPanel Spacing="4"><TextBlock Text="用户名（可选）" Classes="label"/><TextBox Text="{Binding ProxyUsername}"/></StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="密码（可选）" Classes="label"/><TextBox Text="{Binding ProxyPassword}" PasswordChar="●"/></StackPanel>
+                </Grid>
+                <TextBlock Text="已有代理密码已保存，输入新密码后保存即可替换。" Classes="hint" IsVisible="{Binding HasProxyPassword}"/>
+                <CheckBox Content="清除已保存的代理密码" IsChecked="{Binding ClearProxyPassword}" IsVisible="{Binding HasProxyPassword}"/>
+                <Border Background="#F3F8FA" BorderBrush="#C7DDE4" BorderThickness="1" CornerRadius="6" Padding="11">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="2"><TextBlock Text="连接状态" FontWeight="SemiBold"/><TextBlock Text="{Binding ProxyStatus}" Classes="hint"/></StackPanel><Button Grid.Column="1" Content="测试连接" Command="{Binding TestProxyCommand}" Classes="outline" IsEnabled="{Binding IsNotBusy}"/></Grid>
+                </Border>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="更新">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="12" Margin="0,14,8,20">
+            <Border Classes="panel" Padding="18">
+              <StackPanel Spacing="14">
+                <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="3"><TextBlock Text="当前版本" FontWeight="SemiBold"/><TextBlock Text="本地桌面端版本信息。" Classes="hint"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding VersionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
+                <CheckBox Content="自动检查更新" IsChecked="{Binding AutoCheckUpdates}"/><TextBlock Text="每 24 小时检查一次，不会自动安装。" Classes="hint" Margin="24,-10,0,0"/>
+                <StackPanel Spacing="4"><TextBlock Text="更新渠道" FontWeight="SemiBold"/><TextBlock Text="稳定版经过完整验证；预览版可提前体验新功能。" Classes="hint"/><ComboBox ItemsSource="{Binding UpdateChannelOptions}" SelectedItem="{Binding SelectedUpdateChannel, Mode=TwoWay}"/></StackPanel>
+                <Button Content="检查更新" Command="{Binding CheckUpdateCommand}" Classes="outline" HorizontalAlignment="Left" IsEnabled="{Binding IsNotBusy}"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="数据与隐私">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="12" Margin="0,14,8,20">
+            <Border Classes="panel" Padding="18">
+              <StackPanel Spacing="14">
+                <CheckBox Content="发送匿名诊断数据" IsChecked="{Binding DiagnosticsEnabled}"/><TextBlock Text="不包含 API key、请求正文或模型内容。" Classes="hint" Margin="24,-10,0,0"/>
+                <StackPanel Spacing="4"><TextBlock Text="日志保留周期" FontWeight="SemiBold"/><TextBlock Text="控制台日志会在周期结束后自动清理。" Classes="hint"/><ComboBox ItemsSource="{Binding LogRetentionOptions}" SelectedItem="{Binding SelectedLogRetention, Mode=TwoWay}"/></StackPanel>
+                <StackPanel Spacing="8"><TextBlock Text="本地数据" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="数据目录：" Classes="hint"/><TextBlock Text="{Binding DataDirectory}" Classes="hint" TextWrapping="Wrap"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="10"><Button Content="打开数据目录" Command="{Binding OpenDataDirectoryCommand}" Classes="outline"/><Button Content="清除日志" Command="{Binding ClearLogsCommand}" Classes="outline"/></StackPanel></StackPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+      <TabItem Header="关于">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="12" Margin="0,14,8,20">
+            <Border Classes="panel" Padding="18"><StackPanel Spacing="6"><TextBlock Text="OllamaHub 控制中心" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="{Binding VersionLabel}" Classes="hint"/><TextBlock Text="本地优先，开源可审计。" Classes="hint"/><StackPanel Orientation="Horizontal" Spacing="12" Margin="0,6,0,0"><Button Content="项目主页" Classes="outline" Click="ProjectHomeButton_OnClick"/><Button Content="反馈问题" Classes="outline" Click="IssuesButton_OnClick"/></StackPanel></StackPanel></Border>
+            <Border Classes="panel" Padding="18"><Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="3"><TextBlock Text="导出诊断信息" FontWeight="SemiBold"/><TextBlock Text="生成不含密钥和请求正文的诊断摘要。" Classes="hint"/></StackPanel><Button Grid.Column="1" Content="导出诊断" Command="{Binding ExportDiagnosticsCommand}" Classes="outline"/></Grid></Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+  </Grid>
+</UserControl>

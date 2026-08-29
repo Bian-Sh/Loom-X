@@ -32,7 +32,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
             new("Provider", "⇄", () => ShowProviders()),
             new("活动", "≋", () => ShowPlaceholder("活动", "请求诊断与协议转换记录将在下一阶段接入。")),
             new("控制台", "⌘", () => ShowConsole(), "运维"),
-            new("设置", "⚙", () => ShowPlaceholder("设置", "主题、代理和数据设置将在下一阶段接入。"))
+            new("设置", "⚙", () => ShowSettings())
         ]);
         ShowOverview();
     }
@@ -45,6 +45,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = new OverviewViewModel(gatewayService, configService); }
     private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService); }
     private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = new ConsoleViewModel(); }
+    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = new SettingsViewModel(configService); }
     private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
 }
 
