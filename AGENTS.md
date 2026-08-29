@@ -1,5 +1,11 @@
 # OllamaHub 开发约定
 
+## 设置数据库路径
+
+- OllamaHub 的设置数据库唯一使用 `%LOCALAPPDATA%\OllamaHub\OllamaHub.db`。
+- 服务端、桌面端、命令行和测试中的运行时配置访问必须通过统一路径实现，不得使用 `AppContext.BaseDirectory`、当前工作目录或其他路径创建、读取或写入设置数据库。
+- 修改数据库路径逻辑时，必须验证所有入口仍指向上述唯一位置，并避免静默创建第二份空数据库。
+
 ## 日志规范
 
 - 业务代码、后台服务和 UI 运行诊断统一通过依赖注入使用 `ILogger<T>`；日志最终由 Serilog 写入 `AppDataPaths.LogDirectory`，供桌面端“控制台”实时查看。
