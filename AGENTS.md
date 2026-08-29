@@ -31,3 +31,10 @@
 - 禁止记录 API Key、Authorization、自定义 Header 值、请求正文、响应正文、用户 prompt、图片或工具调用参数。只记录 Provider/Model 标识、协议、路径、状态码、内容类型、字节数、耗时等安全摘要。
 - 不要逐 token、逐流式 chunk 或在无业务意义的高频循环中写日志。需要高频诊断时使用指标或采样后的 `Debug` 日志。
 - 新增事件驱动、函数驱动或异常驱动的业务流程时，同步补齐能够判断开始、完成、降级和失败的日志；测试必须覆盖敏感信息不会进入日志。
+
+## 桌面端 Toast 反馈
+
+- 全局即时反馈统一使用注入的 `ToastService`，由 `MainWindow` 负责渲染和自动隐藏。
+- ViewModel 中调用 `toastService.Show("消息", ToastLevel.Success|Info|Warning|Error)`；View 代码后置在剪贴板等 UI 操作完成后调用同一服务。
+- Toast 只放用户可见的安全摘要，禁止包含 API Key、Authorization、自定义 Header、请求/响应正文、用户 prompt 或工具参数。
+- 页面 `Status` 继续用于详细过程状态；Toast 用于复制、测试完成、保存完成等短暂结果反馈。
