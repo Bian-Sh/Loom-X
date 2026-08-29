@@ -1,5 +1,7 @@
 # 修复设计
 
-Provider 编辑器在生成 `ProviderInput` 时，将空白 API Key 规范化为 `null`。配置服务已将 `null` 定义为“未修改”，因此更新 Enabled、UseProxy 或其它字段时不会覆盖已有密钥；仍可由调用方传入空字符串触发清除逻辑。
+Provider 编辑器记录 API Key 是否被用户编辑。加载后端响应时清空编辑框并重置编辑标志；用户对 TextBox 做出实际修改（包括清空）时设置编辑标志。生成 `ProviderInput` 时，未编辑传 `null` 表示不修改，已编辑则传入当前字符串，空字符串仍表示显式清除。配置服务已有对应语义，因此更新 Enabled、UseProxy 或其它字段时不会覆盖已有密钥。
 
-回归测试先创建带密钥的 Provider，再以 `ApiKey: null` 更新 `Enabled`，断言响应仍报告 `HasApiKey`，随后重新读取数据库确认保护值仍存在。
+API Key 明文不从后端返回到 UI；已有密钥通过状态提示和 Watermark 表达“已配置，输入新值替换”，避免误认为 Tab 切换导致数据丢失。
+
+回归测试覆盖未编辑时生成 `null`、用户清空时生成空字符串，以及加载带密钥响应后仍保持未编辑状态。

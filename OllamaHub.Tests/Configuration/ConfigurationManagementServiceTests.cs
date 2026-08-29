@@ -25,6 +25,24 @@ public sealed class ConfigurationManagementServiceTests
     }
 
     [Fact]
+    public void ProviderEditor_UserClearingApiKeySubmitsExplicitClear()
+    {
+        var editor = new ProviderEditorViewModel { ApiKey = "replacement" };
+
+        editor.ApiKey = string.Empty;
+
+        Assert.Equal(string.Empty, editor.ToInput().ApiKey);
+    }
+
+    [Fact]
+    public void ProviderEditor_LoadedApiKeyIsNotMarkedAsEdited()
+    {
+        var editor = ProviderEditorViewModel.FromResponse(new ProviderResponse(Guid.NewGuid(), "provider", "Provider", "https://example.com", "openai", true, false, true, 0, "{}", []));
+
+        Assert.Null(editor.ToInput().ApiKey);
+    }
+
+    [Fact]
     public async Task NewProvider_DefaultsEndpointFormatToResponses()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
