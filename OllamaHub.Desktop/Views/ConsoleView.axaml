@@ -3,18 +3,45 @@
     <Style Selector="Border.console-panel"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/></Style>
     <Style Selector="Border.toolbar"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1,1,1,0"/><Setter Property="CornerRadius" Value="7,7,0,0"/></Style>
     <Style Selector="Border.footer"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1,0,1,1"/><Setter Property="CornerRadius" Value="0,0,7,7"/></Style>
-    <Style Selector="Border.log-viewport"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1,0,1,0"/></Style>
-    <Style Selector="ComboBox.filter"><Setter Property="MinWidth" Value="128"/><Setter Property="MinHeight" Value="38"/><Setter Property="Background" Value="White"/></Style>
-    <Style Selector="TextBox.filter"><Setter Property="MinHeight" Value="38"/><Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#101820"/></Style>
-    <Style Selector="Button.outline"><Setter Property="MinHeight" Value="32"/><Setter Property="Padding" Value="10,6"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="Foreground" Value="#101820"/></Style>
-    <Style Selector="Button.jump"><Setter Property="Width" Value="40"/><Setter Property="Height" Value="40"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#176B87"/><Setter Property="Foreground" Value="#176B87"/><Setter Property="FontSize" Value="20"/></Style>
+    <Style Selector="Border.log-viewport"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1"/></Style>
+    <Style Selector="TextBox.filter"><Setter Property="MinHeight" Value="38"/><Setter Property="Background" Value="White"/><Setter Property="Foreground" Value="#101820"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="HorizontalContentAlignment" Value="Left"/></Style>
+    <Style Selector="Button.clear-search"><Setter Property="Width" Value="30"/><Setter Property="Height" Value="30"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Foreground" Value="#6B7780"/><Setter Property="FontSize" Value="18"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style Selector="ToggleButton.log-toggle"><Setter Property="MinWidth" Value="76"/><Setter Property="MinHeight" Value="38"/><Setter Property="Padding" Value="8,4"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="Foreground" Value="#35A66F"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style Selector="ToggleButton.log-toggle:checked"><Setter Property="Background" Value="#F1F5F7"/><Setter Property="BorderBrush" Value="#176B87"/></Style>
+    <Style Selector="TextBlock.log-icon.info"><Setter Property="Foreground" Value="#35A66F"/></Style>
+    <Style Selector="TextBlock.log-icon.warning"><Setter Property="Foreground" Value="#A26B16"/></Style>
+    <Style Selector="TextBlock.log-icon.error"><Setter Property="Foreground" Value="#B83E48"/></Style>
+    <Style Selector="ToggleButton.log-toggle:checked TextBlock.log-icon.info"><Setter Property="Foreground" Value="#35A66F"/></Style>
+    <Style Selector="ToggleButton.log-toggle:checked TextBlock.log-icon.warning"><Setter Property="Foreground" Value="#A26B16"/></Style>
+    <Style Selector="ToggleButton.log-toggle:checked TextBlock.log-icon.error"><Setter Property="Foreground" Value="#B83E48"/></Style>
+    <Style Selector="Button.copy-log"><Setter Property="Width" Value="30"/><Setter Property="Height" Value="30"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Foreground" Value="#6B7780"/><Setter Property="FontSize" Value="16"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="IsVisible" Value="False"/></Style>
+    <Style Selector="Border.log-row:pointerover Button.copy-log"><Setter Property="IsVisible" Value="True"/></Style>
+    <Style Selector="Border.log-row"><Setter Property="MinHeight" Value="45"/></Style>
+    <Style Selector="ToggleButton.log-toggle.info"><Setter Property="BorderThickness" Value="1"/><Setter Property="Foreground" Value="#35A66F"/></Style>
+    <Style Selector="ToggleButton.log-toggle.warning"><Setter Property="Foreground" Value="#A26B16"/></Style>
+    <Style Selector="ToggleButton.log-toggle.error"><Setter Property="Foreground" Value="#B83E48"/></Style>
+    <Style Selector="Button.outline"><Setter Property="MinHeight" Value="32"/><Setter Property="Padding" Value="10,6"/><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="Foreground" Value="#101820"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style Selector="Button.jump"><Setter Property="Width" Value="40"/><Setter Property="Height" Value="40"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="#F7FAFB"/><Setter Property="BorderBrush" Value="#C8D6DC"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Foreground" Value="#7B8B92"/><Setter Property="FontSize" Value="20"/><Setter Property="CornerRadius" Value="20"/><Setter Property="Opacity" Value="0.8"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style Selector="Button.jump:pointerover"><Setter Property="Background" Value="#EAF4F7"/><Setter Property="BorderBrush" Value="#176B87"/><Setter Property="Foreground" Value="#176B87"/><Setter Property="Opacity" Value="1"/></Style>
   </UserControl.Styles>
   <Grid RowDefinitions="Auto,*,Auto" MinHeight="420">
     <Border Classes="toolbar" Padding="10" Grid.Row="0">
-      <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="9">
-        <ComboBox Classes="filter" ItemsSource="{Binding LevelOptions}" SelectedItem="{Binding SelectedLevel}"/>
-        <ComboBox Grid.Column="1" Classes="filter" ItemsSource="{Binding ModuleOptions}" SelectedItem="{Binding SelectedModule}"/>
-        <TextBox Grid.Column="2" Classes="filter" Watermark="搜索 request ID、模型或错误信息" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="9">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Classes="filter" Watermark="搜索 request ID、模型或错误信息" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Padding="12,4,38,4"/>
+          <Button Classes="clear-search" Content="×" Command="{Binding ClearSearchCommand}" IsVisible="{Binding HasSearchText}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"/>
+        </Grid>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+          <ToggleButton Classes="log-toggle info" IsChecked="{Binding ShowInfo}" ToolTip.Tip="普通日志" AutomationProperties.Name="普通日志">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="2"><TextBlock Classes="log-icon info" Text="ⓘ" FontSize="20" HorizontalAlignment="Left" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding InfoCount}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
+          </ToggleButton>
+          <ToggleButton Classes="log-toggle warning" IsChecked="{Binding ShowWarning}" ToolTip.Tip="警告日志" AutomationProperties.Name="警告日志">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="2"><TextBlock Classes="log-icon warning" Text="⚠" FontSize="20" HorizontalAlignment="Left" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding WarningCount}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
+          </ToggleButton>
+          <ToggleButton Classes="log-toggle error" IsChecked="{Binding ShowError}" ToolTip.Tip="错误日志" AutomationProperties.Name="错误日志">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="2"><TextBlock Classes="log-icon error" Text="⛔" FontSize="19" HorizontalAlignment="Left" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding ErrorCount}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
+          </ToggleButton>
+        </StackPanel>
       </Grid>
     </Border>
     <Border Grid.Row="1" Classes="log-viewport">
@@ -23,13 +50,15 @@
         <ItemsControl ItemsSource="{Binding VisibleLogs}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Border Padding="12,7" BorderBrush="#E5E8EC" BorderThickness="0,0,0,1" Background="Transparent">
-                <Grid ColumnDefinitions="92,72,84,*" ColumnSpacing="10">
-                  <TextBlock Text="{Binding Time}" Foreground="#6B7780" FontFamily="Consolas" FontSize="12"/>
-                  <TextBlock Grid.Column="1" Text="{Binding LevelLabel}" Foreground="{Binding LevelColor}" FontWeight="Bold" FontFamily="Consolas" FontSize="12"/>
-                  <TextBlock Grid.Column="2" Text="{Binding Module}" Foreground="#44515C" FontFamily="Consolas" FontSize="12"/>
-                  <TextBlock Grid.Column="3" Text="{Binding Message}" Foreground="#101820" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap"/>
-                </Grid>
+              <Border Classes="log-row" Padding="12,7" BorderBrush="#E5E8EC" BorderThickness="0,0,0,1" Background="Transparent">
+                <Panel>
+                  <Grid ColumnDefinitions="92,72,*" ColumnSpacing="10">
+                    <TextBlock Text="{Binding Time}" Foreground="#6B7780" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text="{Binding LevelLabel}" Foreground="{Binding LevelColor}" FontWeight="Bold" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" Text="{Binding Message}" Foreground="#101820" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                  </Grid>
+                  <Button Classes="copy-log" Content="⧉" Tag="{Binding}" ToolTip.Tip="复制日志" AutomationProperties.Name="复制日志" Click="CopyLog_OnClick" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Panel>
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
@@ -42,10 +71,7 @@
     <Border Classes="footer" Grid.Row="2" Padding="12,7">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
         <TextBlock Text="{Binding CountLabel}" Foreground="#6B7780" FontSize="11" VerticalAlignment="Center"/>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-          <TextBlock Text="{Binding LogFileLabel}" Foreground="#6B7780" FontSize="11" VerticalAlignment="Center"/>
-          <Button Classes="outline" Content="清空" Command="{Binding ClearCommand}"/>
-        </StackPanel>
+        <Button Grid.Column="1" Classes="outline" Content="清空" Command="{Binding ClearCommand}"/>
       </Grid>
     </Border>
   </Grid>
