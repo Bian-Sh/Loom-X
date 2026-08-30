@@ -37,7 +37,7 @@ public sealed class ActivityStore(ILogger<ActivityStore> logger) : BackgroundSer
     {
         await using var db = CreateContext();
         await ActivityDatabase.InitializeAsync(db, cancellationToken);
-        var events = db.Events.AsNoTracking().OrderByDescending(item => item.CreatedAt).AsQueryable();
+        var events = db.Events.AsNoTracking().OrderByDescending(item => item.Id).AsQueryable();
         if (!string.IsNullOrWhiteSpace(query.Status))
         {
             events = query.Status switch
@@ -55,7 +55,11 @@ public sealed class ActivityStore(ILogger<ActivityStore> logger) : BackgroundSer
             events = events.Where(item => (item.RequestId.Contains(search) || (item.ProviderId ?? "").Contains(search) || (item.ModelId ?? "").Contains(search) || item.Route.Contains(search)));
         }
         var limit = Math.Clamp(query.Limit, 1, 5000);
-        return await events.Take(limit).Select(item => ToRecord(item)).ToListAsync(cancellationToken);
+        var records = await events.Take(limit).Select(item => ToRecord(item)).ToListAsync(cancellationToken);
+        return records
+            .OrderByDescending(item => item.CreatedAt)
+            .ThenByDescending(item => item.Id)
+            .ToArray();
     }
 
     public async Task<ActivityEventRecord?> GetAsync(long id, CancellationToken cancellationToken = default)
@@ -113,7 +117,7 @@ public sealed class ActivityStore(ILogger<ActivityStore> logger) : BackgroundSer
             await db.SaveChangesAsync(cancellationToken);
             var cutoff = DateTimeOffset.UtcNow - MaxAge;
             await db.Events.Where(item => item.CreatedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
-            var overflow = await db.Events.OrderByDescending(item => item.CreatedAt).Skip(MaxRows).Select(item => item.Id).ToListAsync(cancellationToken);
+            var overflow = await db.Events.OrderByDescending(item => item.Id).Skip(MaxRows).Select(item => item.Id).ToListAsync(cancellationToken);
             if (overflow.Count > 0) await db.Events.Where(item => overflow.Contains(item.Id)).ExecuteDeleteAsync(cancellationToken);
         }
         catch (Exception exception)
