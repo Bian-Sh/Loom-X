@@ -1,5 +1,7 @@
 using Avalonia.Controls;
 using Avalonia;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using OllamaHub.Desktop.ViewModels;
 namespace OllamaHub.Desktop.Views;
 public partial class OverviewView : UserControl
@@ -9,7 +11,9 @@ public partial class OverviewView : UserControl
     public OverviewView()
     {
         InitializeComponent();
-        graphHost = new OverviewGraphHost(GraphWebView);
+        var logger = (Application.Current as App)?.LoggerFactory?.CreateLogger<OverviewGraphHost>()
+            ?? NullLogger<OverviewGraphHost>.Instance;
+        graphHost = new OverviewGraphHost(GraphWebView, logger);
         DataContextChanged += OnDataContextChanged;
         AttachedToVisualTree += OnAttachedToVisualTree;
         DetachedFromVisualTree += OnDetachedFromVisualTree;

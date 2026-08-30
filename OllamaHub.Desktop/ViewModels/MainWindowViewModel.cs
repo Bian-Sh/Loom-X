@@ -51,7 +51,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
         foreach (var item in NavigationItems) item.IsActive = item.Title == title;
     }
 
-    private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = new OverviewViewModel(gatewayService, configService); }
+    private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = new OverviewViewModel(gatewayService, configService, loggerFactory.CreateLogger<MainWindowViewModel>()); }
     private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService, toastService); }
     private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = new GatewayViewModel(configService, toastService); }
     private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = consoleViewModel; }
@@ -74,6 +74,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 {
     private readonly GatewayProcessService gatewayService;
     private readonly ConfigSnapshotService configService;
+    private readonly ILogger<MainWindowViewModel>? logger;
     private string gatewayStatus = "未运行";
     private string endpoint = "未配置";
     private string version = "未知";
@@ -115,10 +116,11 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public ICommand StopCommand { get; }
     public ICommand RefreshCommand { get; }
 
-    public OverviewViewModel(GatewayProcessService gatewayService, ConfigSnapshotService configService)
+    public OverviewViewModel(GatewayProcessService gatewayService, ConfigSnapshotService configService, ILogger<MainWindowViewModel>? logger = null)
     {
         this.gatewayService = gatewayService;
         this.configService = configService;
+        this.logger = logger;
         StartCommand = new AsyncCommand(StartAsync);
         StopCommand = new AsyncCommand(StopAsync);
         RefreshCommand = new AsyncCommand(RefreshAsync);
@@ -142,22 +144,31 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 
     private async Task RefreshAsync()
     {
-        var config = configService.Load();
-        Endpoint = config.Server.Urls.Count > 0 ? config.Server.Urls[0] : "http://127.0.0.1:11434";
-        ProviderCount = config.Providers.Count;
-        ModelCount = config.Models.Count;
-        BuildTopology(config);
-        GatewayStatus = gatewayService.State switch
+        try
         {
-            GatewayState.Running => "运行中",
-            GatewayState.Starting => "启动中",
-            GatewayState.Stopping => "停止中",
-            GatewayState.Failed => $"异常：{gatewayService.Error}",
-            _ => "未运行"
-        };
-        LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "尚未检查";
-        Version = gatewayService.State == GatewayState.Running ? "OllamaHub API 在线" : "未连接";
-        GraphStatus = gatewayService.State == GatewayState.Running ? "实时拓扑已连接" : "等待网关启动";
+            var config = configService.Load();
+            Endpoint = config.Server.Urls.Count > 0 ? config.Server.Urls[0] : "http://127.0.0.1:11434";
+            ProviderCount = config.Providers.Count;
+            ModelCount = config.Models.Count;
+            BuildTopology(config);
+            GatewayStatus = gatewayService.State switch
+            {
+                GatewayState.Running => "运行中",
+                GatewayState.Starting => "启动中",
+                GatewayState.Stopping => "停止中",
+                GatewayState.Failed => $"异常：{gatewayService.Error}",
+                _ => "未运行"
+            };
+            LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "尚未检查";
+            Version = gatewayService.State == GatewayState.Running ? "OllamaHub API 在线" : "未连接";
+            GraphStatus = gatewayService.State == GatewayState.Running ? "实时拓扑已连接" : "等待网关启动";
+            logger?.LogInformation("概览刷新完成 {ProviderCount} 个 Provider、{ModelCount} 个模型、{EndpointCount} 个 Endpoint、{RouteCount} 条路由，网关状态 {GatewayState}", ProviderCount, ModelCount, Endpoints.Count, Endpoints.Sum(item => item.Routes.Count), gatewayService.State);
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "概览刷新失败");
+            GraphStatus = "概览加载失败";
+        }
         await Task.CompletedTask;
     }
 
@@ -203,13 +214,13 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         }
         if (telemetryEvent.Kind == TelemetryEventKind.EdgeAttemptStarted)
         {
-            var edgeKey = EdgeKey(telemetryEvent.EndpointKey, telemetryEvent.ModelId);
+            var edgeKey = EdgeKey(telemetryEvent.EndpointKey, telemetryEvent.ProviderId, telemetryEvent.ModelId);
             if (requestEdges.TryGetValue(telemetryEvent.RequestId, out var edges) && edges.Add(edgeKey)) SetRouteActive(edgeKey, true);
             return;
         }
         if (telemetryEvent.Kind is TelemetryEventKind.EdgeAttemptCompleted or TelemetryEventKind.EdgeAttemptFailed or TelemetryEventKind.EdgeAttemptCancelled)
         {
-            var edgeKey = EdgeKey(telemetryEvent.EndpointKey, telemetryEvent.ModelId);
+            var edgeKey = EdgeKey(telemetryEvent.EndpointKey, telemetryEvent.ProviderId, telemetryEvent.ModelId);
             if (requestEdges.TryGetValue(telemetryEvent.RequestId, out var edges) && edges.Remove(edgeKey)) SetRouteActive(edgeKey, false);
             return;
         }
@@ -234,12 +245,15 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         var separator = edgeKey.IndexOf('|');
         if (separator < 0) return;
         var endpointKey = edgeKey[..separator];
-        var modelId = edgeKey[(separator + 1)..];
-        var route = Endpoints.FirstOrDefault(item => item.Key.Equals(endpointKey, StringComparison.OrdinalIgnoreCase))?.Routes.FirstOrDefault(item => item.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
+        var providerSeparator = edgeKey.IndexOf('|', separator + 1);
+        if (providerSeparator < 0) return;
+        var providerId = edgeKey[(separator + 1)..providerSeparator];
+        var modelId = edgeKey[(providerSeparator + 1)..];
+        var route = Endpoints.FirstOrDefault(item => item.Key.Equals(endpointKey, StringComparison.OrdinalIgnoreCase))?.Routes.FirstOrDefault(item => item.ProviderId.Equals(providerId, StringComparison.OrdinalIgnoreCase) && item.ModelId.Equals(modelId, StringComparison.OrdinalIgnoreCase));
         if (route is not null) route.IsActive = activeEdgeCounts.ContainsKey(edgeKey);
     }
 
-    private static string EdgeKey(string endpointKey, string? modelId) => $"{endpointKey}|{modelId}";
+    internal static string EdgeKey(string endpointKey, string? providerId, string? modelId) => OverviewGraphEdgeKey.Create(endpointKey, providerId, modelId);
 
     public void Dispose()
     {
@@ -251,6 +265,11 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     }
 
     private static string EndpointLabel(string key) => key.ToLowerInvariant() switch { "openai" => "OpenAI", "ollama" => "Ollama", "azure" => "Azure", _ => key };
+}
+
+public static class OverviewGraphEdgeKey
+{
+    public static string Create(string endpointKey, string? providerId, string? modelId) => $"{endpointKey}|{providerId}|{modelId}";
 }
 
 public sealed class OverviewEndpointViewModel : NotifyViewModel
