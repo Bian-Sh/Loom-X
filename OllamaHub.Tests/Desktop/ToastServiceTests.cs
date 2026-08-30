@@ -34,12 +34,22 @@ public sealed class ToastServiceTests
     }
 
     [Fact]
-    public void GatewayEndpoint_UsesFullPublicUrl()
+    public void OllamaGatewayEndpoint_UsesServerRootUrl()
     {
         var endpoint = GatewayEndpointEditorViewModel.FromResponse(
-            new GatewayEndpointResponse("openai", "OpenAI", "/v1", true, []),
+            new GatewayEndpointResponse("ollama", "Ollama", "/api", true, []),
             "http://127.0.0.1:11434/");
 
-        Assert.Equal("http://127.0.0.1:11434/v1", endpoint.PublicUrl);
+        Assert.Equal("http://127.0.0.1:11434", endpoint.PublicUrl);
+    }
+
+    [Fact]
+    public void OpenAiGatewayEndpoint_RetainsProtocolPath()
+    {
+        var endpoint = GatewayEndpointEditorViewModel.FromResponse(
+            new GatewayEndpointResponse("openai", "OpenAI", "/openai", true, []),
+            "http://127.0.0.1:11434/");
+
+        Assert.Equal("http://127.0.0.1:11434/openai", endpoint.PublicUrl);
     }
 }

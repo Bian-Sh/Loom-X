@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using OllamaHub.Hosting;
 
 namespace OllamaHub.Activity;
 
@@ -33,7 +34,7 @@ public sealed class ActivityMiddleware(RequestDelegate next, IActivityStore acti
         }
 
         var requestId = $"req_{Guid.NewGuid():N}"[..16];
-        var context = new ActivityRequestContext { RequestId = requestId, EndpointKey = ResolveEndpointKey(httpContext), Protocol = ResolveProtocol(httpContext) };
+        var context = new ActivityRequestContext { RequestId = requestId, EndpointKey = GatewayEndpointRouting.ResolveKey(httpContext.Request.Path) ?? "unknown", Protocol = GatewayEndpointRouting.ResolveLabel(httpContext.Request.Path) };
         httpContext.Items[ActivityContextKeys.Request] = context;
         httpContext.Response.Headers["X-Request-ID"] = requestId;
         var startedAt = Stopwatch.GetTimestamp();
@@ -65,16 +66,8 @@ public sealed class ActivityMiddleware(RequestDelegate next, IActivityStore acti
         HttpMethods.IsPost(context.Request.Method)
         && (context.Request.Path.StartsWithSegments("/v1/chat/completions")
             || context.Request.Path.StartsWithSegments("/openai/v1/chat/completions")
-            || context.Request.Path.StartsWithSegments("/v1/responses")
             || context.Request.Path.StartsWithSegments("/openai/v1/responses")
             || context.Request.Path.StartsWithSegments("/azure/v1/responses")
             || context.Request.Path.StartsWithSegments("/api/chat"));
 
-    private static string ResolveEndpointKey(HttpContext context) =>
-        context.Request.Path.StartsWithSegments("/azure") ? "azure" :
-        context.Request.Path.StartsWithSegments("/api") ? "ollama" : "openai";
-
-    private static string ResolveProtocol(HttpContext context) =>
-        context.Request.Path.StartsWithSegments("/azure") ? "Azure" :
-        context.Request.Path.StartsWithSegments("/api") ? "Ollama" : "OpenAI";
 }

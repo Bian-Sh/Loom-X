@@ -43,7 +43,7 @@ public sealed class ActivityMiddlewareTests
         using var store = new ActivityStore(NullLogger<ActivityStore>.Instance);
         ActivityEventInput? received = null;
         store.ActivityEnqueued += (_, input) => received = input;
-        var input = new ActivityEventInput(DateTimeOffset.UtcNow, "req_observer", "POST", "/v1/chat/completions", "OpenAI", "OpenAI 直通", null, "model", 200, 4, 0, false, null);
+        var input = new ActivityEventInput(DateTimeOffset.UtcNow, "req_observer", "POST", "/openai/v1/chat/completions", "OpenAI", "OpenAI 直通", null, "model", 200, 4, 0, false, null);
 
         Assert.True(store.TryEnqueue(input));
         Assert.Same(input, received);
@@ -64,7 +64,7 @@ public sealed class ActivityMiddlewareTests
         }, store, NullLogger<ActivityMiddleware>.Instance);
         var context = new DefaultHttpContext();
         context.Request.Method = "POST";
-        context.Request.Path = "/v1/chat/completions";
+        context.Request.Path = "/openai/v1/chat/completions";
 
         await middleware.InvokeAsync(context);
 
@@ -74,6 +74,28 @@ public sealed class ActivityMiddlewareTests
         Assert.Equal("claude-sonnet", record.ModelId);
         Assert.Equal("OpenAI → Anthropic", record.Route);
         Assert.Equal(record.RequestId, context.Response.Headers["X-Request-ID"].ToString());
+    }
+
+    [Fact]
+    public async Task TracksOllamaOpenAiCompatibleChatPathAsOllama()
+    {
+        var store = new RecordingActivityStore();
+        var hub = new RequestTelemetryHub();
+        RequestTelemetryEvent? started = null;
+        hub.Published += (_, item) => { if (item.Kind == TelemetryEventKind.RequestStarted) started = item; };
+        var middleware = new ActivityMiddleware(context =>
+        {
+            context.Response.StatusCode = 200;
+            return Task.CompletedTask;
+        }, store, NullLogger<ActivityMiddleware>.Instance, hub);
+        var context = new DefaultHttpContext();
+        context.Request.Method = "POST";
+        context.Request.Path = "/v1/chat/completions";
+
+        await middleware.InvokeAsync(context);
+
+        Assert.Equal("ollama", started?.EndpointKey);
+        Assert.Equal("Ollama", store.Records.Single().Protocol);
     }
 
     [Fact]

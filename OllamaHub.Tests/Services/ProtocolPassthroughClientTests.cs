@@ -35,7 +35,7 @@ public sealed class ProtocolPassthroughClientTests
             Messages = [new OpenAIChatMessage { Role = "user", Content = JsonValue.Create(prompt) }]
         };
 
-        await client.ProxyAsync(httpContext, model, "openai", "/v1/chat/completions", payload, CancellationToken.None);
+        await client.ProxyAsync(httpContext, model, "openai", "/chat/completions", payload, CancellationToken.None);
 
         var message = Assert.Single(logger.Messages);
         Assert.Contains(model.ProviderId, message);
@@ -82,11 +82,45 @@ public sealed class ProtocolPassthroughClientTests
             Stream = false
         };
 
-        await client.ProxyAsync(httpContext, model, "openai", "/v1/chat/completions", payload, CancellationToken.None);
+        await client.ProxyAsync(httpContext, model, "openai", "/chat/completions", payload, CancellationToken.None);
 
         Assert.NotNull(handler.RequestBody);
         using var json = JsonDocument.Parse(handler.RequestBody!);
         Assert.Equal("deepseek/deepseek-v4-pro", json.RootElement.GetProperty("model").GetString());
+    }
+
+    [Fact]
+    public async Task ProxyAsync_UsesV1OnlyWhenProviderBaseUrlContainsIt()
+    {
+        var handler = new CapturingHandler();
+        using var httpClient = new HttpClient(handler);
+        var client = new ProtocolPassthroughClient(httpClient, NullLogger<ProtocolPassthroughClient>.Instance);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Method = HttpMethods.Post;
+        httpContext.Request.ContentType = "application/json";
+        httpContext.Response.Body = new MemoryStream();
+        var model = CreateModel("https://token.sensenova.cn/v1");
+
+        await client.ProxyAsync(httpContext, model, "openai", "/chat/completions", new { model = model.ModelId }, CancellationToken.None);
+
+        Assert.Equal("https://token.sensenova.cn/v1/chat/completions", handler.RequestUri);
+    }
+
+    [Fact]
+    public async Task ProxyAsync_DoesNotAddV1ToProviderBaseUrl()
+    {
+        var handler = new CapturingHandler();
+        using var httpClient = new HttpClient(handler);
+        var client = new ProtocolPassthroughClient(httpClient, NullLogger<ProtocolPassthroughClient>.Instance);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Method = HttpMethods.Post;
+        httpContext.Request.ContentType = "application/json";
+        httpContext.Response.Body = new MemoryStream();
+        var model = CreateModel("https://token.sensenova.cn");
+
+        await client.ProxyAsync(httpContext, model, "openai", "/chat/completions", new { model = model.ModelId }, CancellationToken.None);
+
+        Assert.Equal("https://token.sensenova.cn/chat/completions", handler.RequestUri);
     }
 
     [Fact]
@@ -130,7 +164,7 @@ public sealed class ProtocolPassthroughClientTests
 
         payload["model"] = model.ModelId;
 
-        await client.ProxyAsync(httpContext, model, "openai", "/v1/chat/completions", payload, CancellationToken.None);
+        await client.ProxyAsync(httpContext, model, "openai", "/chat/completions", payload, CancellationToken.None);
 
         Assert.NotNull(handler.RequestBody);
         using var json = JsonDocument.Parse(handler.RequestBody!);
@@ -191,7 +225,7 @@ public sealed class ProtocolPassthroughClientTests
             payload[kvp.Key] = kvp.Value?.DeepClone();
         }
 
-        await client.ProxyAsync(httpContext, model, "openai", "/v1/chat/completions", payload, CancellationToken.None);
+        await client.ProxyAsync(httpContext, model, "openai", "/chat/completions", payload, CancellationToken.None);
 
         Assert.NotNull(handler.RequestBody);
         using var json = JsonDocument.Parse(handler.RequestBody!);
@@ -244,14 +278,14 @@ public sealed class ProtocolPassthroughClientTests
         Assert.Equal("deepseek/deepseek-v4-pro", json.RootElement.GetProperty("model").GetString());
     }
 
-    private static ResolvedModelConfig CreateModel() => new()
+    private static ResolvedModelConfig CreateModel(string baseUrl = "https://api.360.cn") => new()
     {
         ModelId = "deepseek/deepseek-v4-pro",
         OllamaModelName = "360智脑/deepseek-v4-pro",
         DisplayName = "360智脑/deepseek-v4-pro",
         ProviderId = "360智脑",
         ApiModes = ["openai"],
-        BaseUrl = "https://api.360.cn",
+        BaseUrl = baseUrl,
         ApiKey = "secret",
         AnthropicModel = "deepseek/deepseek-v4-pro"
     };
@@ -259,9 +293,11 @@ public sealed class ProtocolPassthroughClientTests
     private sealed class CapturingHandler(HttpStatusCode statusCode = HttpStatusCode.OK, string responseBody = "{}") : HttpMessageHandler
     {
         public string? RequestBody { get; private set; }
+        public string? RequestUri { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            RequestUri = request.RequestUri?.ToString();
             RequestBody = request.Content is null
                 ? null
                 : await request.Content.ReadAsStringAsync(cancellationToken);

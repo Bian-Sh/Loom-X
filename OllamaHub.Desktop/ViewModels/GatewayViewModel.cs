@@ -170,7 +170,11 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
     public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); }
     public static GatewayEndpointEditorViewModel FromResponse(GatewayEndpointResponse response, string baseUrl)
     {
-        var value = new GatewayEndpointEditorViewModel { Key = response.Key, DisplayName = response.DisplayName, PublicPath = response.PublicPath, PublicUrl = $"{baseUrl.TrimEnd('/')}{response.PublicPath}", Enabled = response.Enabled };
+        var normalizedBaseUrl = baseUrl.TrimEnd('/');
+        var publicUrl = string.Equals(response.Key, "ollama", StringComparison.OrdinalIgnoreCase)
+            ? normalizedBaseUrl
+            : $"{normalizedBaseUrl}{response.PublicPath}";
+        var value = new GatewayEndpointEditorViewModel { Key = response.Key, DisplayName = response.DisplayName, PublicPath = response.PublicPath, PublicUrl = publicUrl, Enabled = response.Enabled };
         foreach (var combo in response.Combos) value.Combos.Add(GatewayComboEditorViewModel.FromResponse(combo)); return value;
     }
 }

@@ -290,13 +290,14 @@ public static class ConfigurationDatabase
         catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
         {
         }
-        await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/v1' WHERE Key = 'openai' AND PublicPath = '/v1/responses'", cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/azure/v1' WHERE Key = 'azure' AND PublicPath = '/azure/v1/responses'", cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/openai' WHERE Key = 'openai' AND PublicPath IN ('/v1', '/openai/v1', '/v1/responses')", cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/' WHERE Key = 'ollama' AND (PublicPath = '/api' OR PublicPath = '')", cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/azure' WHERE Key = 'azure' AND PublicPath IN ('/azure/v1', '/azure/v1/responses')", cancellationToken);
         foreach (var endpoint in new[]
         {
-            new GatewayEndpointEntity { Key = "openai", DisplayName = "OpenAI", PublicPath = "/v1" },
-            new GatewayEndpointEntity { Key = "ollama", DisplayName = "Ollama", PublicPath = "/api" },
-            new GatewayEndpointEntity { Key = "azure", DisplayName = "Azure", PublicPath = "/azure/v1" }
+            new GatewayEndpointEntity { Key = "openai", DisplayName = "OpenAI", PublicPath = "/openai" },
+            new GatewayEndpointEntity { Key = "ollama", DisplayName = "Ollama", PublicPath = "/" },
+            new GatewayEndpointEntity { Key = "azure", DisplayName = "Azure", PublicPath = "/azure" }
         })
         {
             if (!await dbContext.GatewayEndpoints.AnyAsync(item => item.Key == endpoint.Key, cancellationToken))

@@ -465,7 +465,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
         try
         {
             var baseUrl = provider.BaseUrl.TrimEnd('/');
-            var endpoint = baseUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? $"{baseUrl}/models" : $"{baseUrl}/v1/models";
+            var endpoint = $"{baseUrl}/models";
             using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
             if (!string.IsNullOrWhiteSpace(provider.ApiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.ApiKey);
             foreach (var header in ProviderEditorViewModel.ParseDictionary(provider.HeadersJson) ?? []) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
@@ -519,7 +519,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
     {
         if (!string.IsNullOrWhiteSpace(provider.ModelListUrl)) return provider.ModelListUrl.TrimEnd('/');
         var baseUrl = provider.BaseUrl.TrimEnd('/');
-        return baseUrl.EndsWith("/v1", StringComparison.OrdinalIgnoreCase) ? $"{baseUrl}/models" : $"{baseUrl}/v1/models";
+        return $"{baseUrl}/models";
     }
 
     private static IEnumerable<string> ExtractModelNames(JsonElement root)

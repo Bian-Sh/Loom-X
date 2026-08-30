@@ -83,6 +83,29 @@ public sealed class ConfigurationManagementServiceTests
     }
 
     [Fact]
+    public async Task GatewayEndpoints_UseUniqueCanonicalPaths()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+
+            var paths = await context.GatewayEndpoints.OrderBy(item => item.Key).Select(item => new { item.Key, item.PublicPath }).ToListAsync();
+
+            Assert.Equal("/openai", paths.Single(item => item.Key == "openai").PublicPath);
+            Assert.Equal("/", paths.Single(item => item.Key == "ollama").PublicPath);
+            Assert.Equal("/azure", paths.Single(item => item.Key == "azure").PublicPath);
+            Assert.Equal(3, paths.Select(item => item.PublicPath).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
     public async Task ProviderEndpointFormat_CanBeUpdatedAndAppearsInSnapshot()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");

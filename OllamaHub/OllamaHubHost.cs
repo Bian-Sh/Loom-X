@@ -8,6 +8,7 @@ using OllamaHub.Contracts;
 using OllamaHub.Services;
 using OllamaHub.Activity;
 using OllamaHub.Logging;
+using OllamaHub.Hosting;
 using Serilog;
 
 namespace OllamaHub;
@@ -102,14 +103,13 @@ public static class OllamaHubHost
             });
         });
 
-        app.MapPost("/v1/responses", HandleResponsesAsync);
         app.MapPost("/openai/v1/responses", HandleResponsesAsync);
         app.MapPost("/azure/v1/responses", HandleResponsesAsync);
         app.MapPost("/api/chat", HandleResponsesAsync);
-        app.MapGet("/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "openai")));
+        app.MapGet("/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "ollama")));
         app.MapGet("/openai/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "openai")));
         app.MapGet("/azure/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "azure")));
-        app.MapPost("/v1/chat/completions", HandleChatCompletionsAsync);
+        app.MapPost("/v1/chat/completions", HandleResponsesAsync);
         app.MapPost("/openai/v1/chat/completions", HandleChatCompletionsAsync);
         app.MapFallback((HttpContext httpContext, ILoggerFactory loggerFactory) =>
         {
@@ -211,7 +211,7 @@ public static class OllamaHubHost
                 foreach (var kvp in model.Extra) attemptRequest[kvp.Key] = kvp.Value?.DeepClone();
                 if (model.Temperature.HasValue && !attemptRequest.ContainsKey("temperature")) attemptRequest["temperature"] = model.Temperature.Value;
                 if (model.TopP.HasValue && !attemptRequest.ContainsKey("top_p")) attemptRequest["top_p"] = model.TopP.Value;
-                if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, model, "openai", "/v1/chat/completions", attemptRequest, cancellationToken)) return Results.Empty;
+                if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, model, "openai", "/chat/completions", attemptRequest, cancellationToken)) return Results.Empty;
                 continue;
             }
 
@@ -262,20 +262,21 @@ public static class OllamaHubHost
         JsonNode? requestJson,
         CancellationToken cancellationToken)
     {
-        var endpointKey = httpContext.Request.Path.StartsWithSegments("/azure") ? "azure" : httpContext.Request.Path.StartsWithSegments("/api") ? "ollama" : "openai";
+        var endpointKey = GatewayEndpointRouting.ResolveKey(httpContext.Request.Path);
+        if (endpointKey is null) return Results.NotFound(new OllamaErrorResponse { Error = "Endpoint is not configured for this URI." });
         var endpoint = configProvider.Current.GatewayEndpoints.FirstOrDefault(item => item.Key == endpointKey && item.Enabled);
         if (endpoint is null) return Results.NotFound(new OllamaErrorResponse { Error = "Endpoint is disabled or not configured." });
         if (requestJson is not JsonObject requestObject) return Results.BadRequest(new OllamaErrorResponse { Error = "Request body must be a JSON object." });
         var requestedModel = TryGetString(requestObject, "model", out var modelName) ? modelName : null;
         var combo = requestedModel is null
-            ? endpoint.Combos.Where(item => item.Enabled).OrderBy(item => item.SortOrder).FirstOrDefault()
-            : endpoint.Combos.FirstOrDefault(item => item.Enabled && string.Equals(item.Name, requestedModel, StringComparison.OrdinalIgnoreCase));
+            ? ListEnabledCombos(configProvider, endpointKey).FirstOrDefault()
+            : FindEnabledCombo(configProvider, endpointKey, requestedModel);
         var routes = combo?.Routes.Where(item => item.Enabled).OrderBy(item => item.SortOrder).ToArray() ?? [];
         if (routes.Length == 0) return Results.NotFound(new OllamaErrorResponse { Error = requestedModel is null ? "No enabled model route is configured." : $"Model '{requestedModel}' is not configured for this Endpoint." });
         if (httpContext.Items[ActivityContextKeys.Request] is ActivityRequestContext activityContext)
         {
             activityContext.ModelAlias = combo?.Name;
-            activityContext.Protocol = EndpointLabel(endpointKey);
+            activityContext.Protocol = GatewayEndpointRouting.ResolveLabel(httpContext.Request.Path);
         }
         for (var routeIndex = 0; routeIndex < routes.Length; routeIndex++)
         {
@@ -286,23 +287,15 @@ public static class OllamaHubHost
                 routeContext.ProviderId = route.Model.ProviderId;
                 routeContext.ModelId = route.Model.ModelId;
                 routeContext.ModelAlias = combo!.Name;
-                routeContext.Route = $"{EndpointLabel(endpointKey)} → {route.Model.ProviderId}";
+                routeContext.Route = $"{GatewayEndpointRouting.ResolveLabel(httpContext.Request.Path)} → {route.Model.ProviderId}";
             }
             requestObject["model"] = route.Model.ModelId;
-            var upstreamPath = route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase) ? "/v1/chat/completions" : "/v1/responses";
+            var upstreamPath = route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase) ? "/chat/completions" : "/responses";
             if (route.Model.SupportsApiMode("ollama")) upstreamPath = "/api/chat";
             if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, route.Model, route.Model.SupportsApiMode("ollama") ? "ollama" : "openai", upstreamPath, requestObject, cancellationToken)) return Results.Empty;
         }
         return Results.StatusCode(StatusCodes.Status502BadGateway);
     }
-
-    private static string EndpointLabel(string key) => key.ToLowerInvariant() switch
-    {
-        "openai" => "OpenAI",
-        "ollama" => "Ollama",
-        "azure" => "Azure",
-        _ => key
-    };
 
     private static object ListGatewayModels(IDatabaseConfigurationProvider provider, string endpointKey)
     {
@@ -311,10 +304,8 @@ public static class OllamaHubHost
     }
 
     private static IReadOnlyList<ResolvedGatewayComboConfig> ListEnabledCombos(IDatabaseConfigurationProvider provider, string endpointKey) =>
-        provider.Current.GatewayEndpoints.FirstOrDefault(item => item.Key == endpointKey && item.Enabled)?.Combos
-            .Where(item => item.Enabled && item.Routes.Any(route => route.Enabled))
-            .OrderBy(item => item.SortOrder).ToArray() ?? [];
+        GatewayComboCatalog.ForEndpoint(provider.Current, endpointKey);
 
     private static ResolvedGatewayComboConfig? FindEnabledCombo(IDatabaseConfigurationProvider provider, string endpointKey, string name) =>
-        ListEnabledCombos(provider, endpointKey).FirstOrDefault(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase));
+        ListEnabledCombos(provider, endpointKey).FirstOrDefault(item => GatewayComboMatcher.Matches(item, name));
 }
