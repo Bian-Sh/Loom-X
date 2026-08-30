@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Diagnostics;
 using OllamaHub.Activity;
 using OllamaHub.Configuration;
@@ -34,6 +35,8 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
             await using var responseStream = await upstreamResponse.Content.ReadAsStreamAsync(cancellationToken);
             await using var buffer = new MemoryStream();
             await responseStream.CopyToAsync(buffer, cancellationToken);
+            var responseNormalized = NormalizeOpenAiFinishReasons(buffer, upstreamResponse.Content.Headers.ContentType, apiMode);
+            if (responseNormalized) httpContext.Response.Headers.ContentLength = null;
             buffer.Position = 0;
 
             var contentType = upstreamResponse.Content.Headers.ContentType?.ToString()
@@ -112,6 +115,7 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
             await using var responseStream = await upstreamResponse.Content.ReadAsStreamAsync(cancellationToken);
             await using var buffer = new MemoryStream();
             await responseStream.CopyToAsync(buffer, cancellationToken);
+            var responseNormalized = NormalizeOpenAiFinishReasons(buffer, upstreamResponse.Content.Headers.ContentType, apiMode);
             buffer.Position = 0;
             var retryable = (int)upstreamResponse.StatusCode is 408 or 429 or >= 500;
             if (retryable)
@@ -122,6 +126,7 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
             }
             httpContext.Response.StatusCode = (int)upstreamResponse.StatusCode;
             CopyResponseHeaders(upstreamResponse, httpContext.Response);
+            if (responseNormalized) httpContext.Response.Headers.ContentLength = null;
             await buffer.CopyToAsync(httpContext.Response.Body, cancellationToken);
             if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, attemptIndex);
             logger.LogInformation("网关路由尝试完成 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ResponseBytes}B {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, (int)upstreamResponse.StatusCode, buffer.Length, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
@@ -242,5 +247,117 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
         }
 
         downstreamResponse.Headers.Remove("transfer-encoding");
+    }
+
+    private static bool NormalizeOpenAiFinishReasons(MemoryStream buffer, MediaTypeHeaderValue? contentType, string apiMode)
+    {
+        if (!string.Equals(apiMode, "openai", StringComparison.OrdinalIgnoreCase) || buffer.Length == 0)
+        {
+            return false;
+        }
+
+        var mediaType = contentType?.MediaType;
+        if (!string.Equals(mediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(mediaType, "application/json", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var original = Encoding.UTF8.GetString(buffer.ToArray());
+        var normalized = string.Equals(mediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase)
+            ? NormalizeOpenAiSse(original)
+            : NormalizeOpenAiJson(original);
+        if (normalized is null || string.Equals(original, normalized, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        buffer.SetLength(0);
+        var bytes = Encoding.UTF8.GetBytes(normalized);
+        buffer.Write(bytes, 0, bytes.Length);
+        return true;
+    }
+
+    private static string? NormalizeOpenAiSse(string body)
+    {
+        var lines = body.Split('\n');
+        var changed = false;
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index];
+            var lineEnding = line.EndsWith('\r') ? "\r" : string.Empty;
+            var content = lineEnding.Length == 0 ? line : line[..^1];
+            if (!content.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var payload = content[5..].Trim();
+            if (payload.Length == 0 || string.Equals(payload, "[DONE]", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            JsonNode? node;
+            try
+            {
+                node = JsonNode.Parse(payload);
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
+            if (!NormalizeOpenAiFinishReasons(node))
+            {
+                continue;
+            }
+
+            var leadingWhitespaceLength = content[5..].Length - content[5..].TrimStart().Length;
+            lines[index] = $"{content[..5]}{content.Substring(5, leadingWhitespaceLength)}{node!.ToJsonString(JsonOptions)}{lineEnding}";
+            changed = true;
+        }
+
+        return changed ? string.Join('\n', lines) : null;
+    }
+
+    private static string? NormalizeOpenAiJson(string body)
+    {
+        JsonNode? node;
+        try
+        {
+            node = JsonNode.Parse(body);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return NormalizeOpenAiFinishReasons(node) ? node!.ToJsonString(JsonOptions) : null;
+    }
+
+    private static bool NormalizeOpenAiFinishReasons(JsonNode? node)
+    {
+        if (node is not JsonObject response || response["choices"] is not JsonArray choices)
+        {
+            return false;
+        }
+
+        var changed = false;
+        foreach (var choiceNode in choices)
+        {
+            if (choiceNode is not JsonObject choice
+                || choice["finish_reason"] is not JsonValue finishReason
+                || !finishReason.TryGetValue<string>(out var value)
+                || value.Length != 0)
+            {
+                continue;
+            }
+
+            choice["finish_reason"] = null;
+            changed = true;
+        }
+
+        return changed;
     }
 }

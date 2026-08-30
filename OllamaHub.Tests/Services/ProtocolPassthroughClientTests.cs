@@ -124,6 +124,27 @@ public sealed class ProtocolPassthroughClientTests
     }
 
     [Fact]
+    public async Task ProxyGatewayAttemptAsync_NormalizesEmptyOpenAiFinishReasonInSse()
+    {
+        const string responseBody = "data: {\"id\":\"completion-1\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"thinking\"},\"finish_reason\":\"\"}]}\n\ndata: [DONE]\n";
+        var handler = new CapturingHandler(responseBody: responseBody, mediaType: "text/event-stream");
+        using var httpClient = new HttpClient(handler);
+        var client = new ProtocolPassthroughClient(httpClient, NullLogger<ProtocolPassthroughClient>.Instance);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Method = HttpMethods.Post;
+        httpContext.Request.ContentType = "application/json";
+        httpContext.Response.Body = new MemoryStream();
+        var model = CreateModel("https://token.sensenova.cn/v1");
+
+        Assert.True(await client.ProxyGatewayAttemptAsync(httpContext, model, "openai", "/chat/completions", new { model = model.ModelId }, CancellationToken.None));
+
+        httpContext.Response.Body.Position = 0;
+        var forwarded = await new StreamReader(httpContext.Response.Body).ReadToEndAsync();
+        Assert.Contains("\"finish_reason\":null", forwarded);
+        Assert.DoesNotContain("\"finish_reason\":\"\"", forwarded);
+    }
+
+    [Fact]
     public async Task ProxyAsync_OpenAiJsonNode_PreservesRawJsonFields()
     {
         var handler = new CapturingHandler();
@@ -290,7 +311,7 @@ public sealed class ProtocolPassthroughClientTests
         AnthropicModel = "deepseek/deepseek-v4-pro"
     };
 
-    private sealed class CapturingHandler(HttpStatusCode statusCode = HttpStatusCode.OK, string responseBody = "{}") : HttpMessageHandler
+    private sealed class CapturingHandler(HttpStatusCode statusCode = HttpStatusCode.OK, string responseBody = "{}", string mediaType = "application/json") : HttpMessageHandler
     {
         public string? RequestBody { get; private set; }
         public string? RequestUri { get; private set; }
@@ -304,7 +325,7 @@ public sealed class ProtocolPassthroughClientTests
 
             return new HttpResponseMessage(statusCode)
             {
-                Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
+                Content = new StringContent(responseBody, Encoding.UTF8, mediaType)
             };
         }
     }
