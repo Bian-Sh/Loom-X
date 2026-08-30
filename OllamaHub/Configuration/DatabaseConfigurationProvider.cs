@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using OllamaHub.Logging;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -39,6 +40,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
         {
             var gateway = await dbContext.GatewayConfigurations.AsNoTracking().SingleAsync(cancellationToken);
             var settings = await dbContext.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
+            LoggingBootstrap.SetIncludeStackTrace(settings.LogStackTrace);
             var providers = await dbContext.Providers.AsNoTracking().Include(provider => provider.Models).ToListAsync(cancellationToken);
             var endpoints = await dbContext.GatewayEndpoints.AsNoTracking().Include(endpoint => endpoint.Combos).ThenInclude(combo => combo.Routes).ThenInclude(route => route.Model).ThenInclude(model => model.Provider).ToListAsync(cancellationToken);
             var resolvedProviders = providers.OrderBy(provider => provider.SortOrder).Select(provider => new ResolvedProviderConfig
@@ -69,7 +71,8 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     AutoCheckUpdates = settings.AutoCheckUpdates,
                     UpdateChannel = settings.UpdateChannel,
                     DiagnosticsEnabled = settings.DiagnosticsEnabled,
-                    LogRetentionDays = settings.LogRetentionDays
+                    LogRetentionDays = settings.LogRetentionDays,
+                    LogStackTrace = settings.LogStackTrace
                 },
                 Providers = resolvedProviders,
                 Models = models,

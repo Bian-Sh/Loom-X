@@ -5,8 +5,8 @@ using Microsoft.EntityFrameworkCore;
 namespace OllamaHub.Configuration;
 
 public sealed record ProviderInput(string BusinessId, string DisplayName, string BaseUrl, string ApiMode, bool Enabled, string? ApiKey, bool ClearApiKey, Dictionary<string, string>? Headers, bool UseProxy = false, string? ModelListUrl = null, string? EndpointFormat = "responses");
-public sealed record AppSettingsInput(string Language, string Theme, string ProxyMode, string ProxyHost, int ProxyPort, string? ProxyUsername, string? ProxyPassword, bool ClearProxyPassword, bool AutoCheckUpdates, string UpdateChannel, bool DiagnosticsEnabled, int LogRetentionDays);
-public sealed record AppSettingsResponse(int Id, string Language, string Theme, string ProxyMode, string ProxyHost, int ProxyPort, string? ProxyUsername, bool HasProxyPassword, bool AutoCheckUpdates, string UpdateChannel, bool DiagnosticsEnabled, int LogRetentionDays);
+public sealed record AppSettingsInput(string Language, string Theme, string ProxyMode, string ProxyHost, int ProxyPort, string? ProxyUsername, string? ProxyPassword, bool ClearProxyPassword, bool AutoCheckUpdates, string UpdateChannel, bool DiagnosticsEnabled, int LogRetentionDays, bool LogStackTrace = false);
+public sealed record AppSettingsResponse(int Id, string Language, string Theme, string ProxyMode, string ProxyHost, int ProxyPort, string? ProxyUsername, bool HasProxyPassword, bool AutoCheckUpdates, string UpdateChannel, bool DiagnosticsEnabled, int LogRetentionDays, bool LogStackTrace = false);
 public sealed record ModelInput(string ModelId, string DisplayName, string? ConfigId, string Family, string? BaseUrl, string? ApiMode, int ContextLength, int MaxTokens, bool Vision, double? Temperature, double? TopP, bool Enabled, string? ApiKey, bool ClearApiKey, Dictionary<string, string>? Headers, Dictionary<string, JsonElement>? Extra);
 public sealed record ProviderResponse(Guid Id, string BusinessId, string DisplayName, string BaseUrl, string ApiMode, bool Enabled, bool UseProxy, bool HasApiKey, int ModelCount, string HeadersJson, IReadOnlyList<ModelResponse> Models, string? ModelListUrl = null, string EndpointFormat = "responses", string? ApiKey = null);
 public sealed record ModelResponse(Guid Id, string ProviderId, string ModelId, string DisplayName, string? ConfigId, string Family, string? BaseUrl, string? ApiMode, int ContextLength, int MaxTokens, bool Vision, double? Temperature, double? TopP, bool Enabled, bool HasApiKey, string HeadersJson, string ExtraJson);
@@ -63,6 +63,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         settings.UpdateChannel = NormalizeUpdateChannel(input.UpdateChannel);
         settings.DiagnosticsEnabled = input.DiagnosticsEnabled;
         settings.LogRetentionDays = input.LogRetentionDays;
+        settings.LogStackTrace = input.LogStackTrace;
         await db.SaveChangesAsync(cancellationToken);
         await configurationProvider.ReloadAsync(cancellationToken);
         return ToResponse(settings);
@@ -270,7 +271,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     private static void ApplyApiKey(ProviderEntity entity, string? value, bool clear) { if (clear || value is not null) entity.ProtectedApiKey = ProtectApiKey(value); }
     private static void ApplyApiKey(ModelEntity entity, string? value, bool clear) { if (clear) entity.ProtectedApiKey = null; else if (!string.IsNullOrWhiteSpace(value)) entity.ProtectedApiKey = ProtectApiKey(value); }
     private static ProviderResponse ToResponse(ProviderEntity provider) => new(provider.Id, provider.BusinessId, provider.DisplayName, provider.BaseUrl, provider.ApiMode, provider.Enabled, provider.UseProxy, !string.IsNullOrWhiteSpace(provider.ProtectedApiKey), provider.Models.Count, provider.HeadersJson, provider.Models.OrderBy(model => model.SortOrder).Select(model => ToResponse(provider, model)).ToArray(), provider.ModelListUrl, provider.EndpointFormat, ReadApiKey(provider.ProtectedApiKey));
-    private static AppSettingsResponse ToResponse(AppSettingsEntity settings) => new(settings.Id, settings.Language, settings.Theme, settings.ProxyMode, settings.ProxyHost, settings.ProxyPort, settings.ProxyUsername, !string.IsNullOrWhiteSpace(settings.ProtectedProxyPassword), settings.AutoCheckUpdates, settings.UpdateChannel, settings.DiagnosticsEnabled, settings.LogRetentionDays);
+    private static AppSettingsResponse ToResponse(AppSettingsEntity settings) => new(settings.Id, settings.Language, settings.Theme, settings.ProxyMode, settings.ProxyHost, settings.ProxyPort, settings.ProxyUsername, !string.IsNullOrWhiteSpace(settings.ProtectedProxyPassword), settings.AutoCheckUpdates, settings.UpdateChannel, settings.DiagnosticsEnabled, settings.LogRetentionDays, settings.LogStackTrace);
     private static ModelResponse ToResponse(ProviderEntity provider, ModelEntity model) => new(model.Id, provider.BusinessId, model.ModelId, model.DisplayName, model.ConfigId, model.Family, model.BaseUrl, model.ApiMode, model.ContextLength, model.MaxTokens, model.Vision, model.Temperature, model.TopP, model.Enabled, !string.IsNullOrWhiteSpace(model.ProtectedApiKey), model.HeadersJson, model.ExtraJson);
     private static string? ReadApiKey(string? protectedValue) => string.IsNullOrWhiteSpace(protectedValue) ? null : ProtectedApiKeyStore.Unprotect(protectedValue);
 }

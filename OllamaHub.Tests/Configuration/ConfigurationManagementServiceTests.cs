@@ -387,11 +387,13 @@ public sealed class ConfigurationManagementServiceTests
             var defaults = await service.GetSettingsAsync();
             Assert.Equal("direct", defaults.ProxyMode);
             Assert.Equal(30, defaults.LogRetentionDays);
+            Assert.False(defaults.LogStackTrace);
 
-            var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7));
+            var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true));
             Assert.Equal("dark", updatedSettings.Theme);
             Assert.True(updatedSettings.HasProxyPassword);
             Assert.True(configurationProvider.Current.Settings.DiagnosticsEnabled);
+            Assert.True(updatedSettings.LogStackTrace);
 
             var provider = await service.CreateProviderAsync(new ProviderInput("proxy", "代理 Provider", "https://example.com", "anthropic", true, null, false, null, true, "https://models.example.com/list"));
             Assert.True(provider.UseProxy);

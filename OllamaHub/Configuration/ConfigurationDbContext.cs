@@ -95,6 +95,7 @@ public sealed class AppSettingsEntity
     public string UpdateChannel { get; set; } = "stable";
     public bool DiagnosticsEnabled { get; set; }
     public int LogRetentionDays { get; set; } = 30;
+    public bool LogStackTrace { get; set; }
 }
 
 public sealed class ProviderEntity
@@ -205,7 +206,8 @@ public static class ConfigurationDatabase
                 AutoCheckUpdates INTEGER NOT NULL,
                 UpdateChannel TEXT NOT NULL,
                 DiagnosticsEnabled INTEGER NOT NULL,
-                LogRetentionDays INTEGER NOT NULL
+                LogRetentionDays INTEGER NOT NULL,
+                LogStackTrace INTEGER NOT NULL DEFAULT 0
             )
             """, cancellationToken);
 
@@ -214,6 +216,14 @@ public static class ConfigurationDatabase
             await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE AppSettings DROP COLUMN OpenControlCenterOnStartup", cancellationToken);
         }
         catch (SqliteException exception) when (exception.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase))
+        {
+        }
+
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE AppSettings ADD COLUMN LogStackTrace INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
         {
         }
 

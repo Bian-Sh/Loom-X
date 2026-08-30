@@ -7,6 +7,7 @@ using OllamaHub.Configuration;
 using OllamaHub.Contracts;
 using OllamaHub.Services;
 using OllamaHub.Activity;
+using OllamaHub.Logging;
 using Serilog;
 
 namespace OllamaHub;
@@ -18,20 +19,7 @@ public static class OllamaHubHost
         AppDataPaths.EnsureCreated();
         var databasePath = AppDataPaths.DatabasePath;
         var builder = WebApplication.CreateBuilder(Array.Empty<string>());
-        var logDirectory = AppDataPaths.LogDirectory;
-
-        Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Information()
-            .Enrich.FromLogContext()
-            .WriteTo.File(
-                Path.Combine(logDirectory, "ollamahub-.log"),
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}",
-                rollingInterval: RollingInterval.Day,
-                fileSizeLimitBytes: 10 * 1024 * 1024,
-                rollOnFileSizeLimit: true,
-                retainedFileCountLimit: 30,
-                shared: true)
-            .CreateLogger();
+        LoggingBootstrap.Configure();
         builder.Host.UseSerilog();
 
         var dbOptions = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -39,6 +27,7 @@ public static class OllamaHubHost
         await ConfigurationDatabase.InitializeAsync(startupDb, cancellationToken);
         var startupConfiguration = new DatabaseConfigurationProvider(startupDb);
         await startupConfiguration.ReloadAsync(cancellationToken);
+        LoggingBootstrap.SetIncludeStackTrace(startupConfiguration.Current.Settings.LogStackTrace);
         builder.WebHost.UseUrls(startupConfiguration.Current.Server.Urls.ToArray());
 
         builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.PropertyNamingPolicy = null);

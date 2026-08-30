@@ -36,7 +36,7 @@ internal sealed class FileLogger(string categoryName, string filePath, LogLevel 
             return;
         }
 
-        var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} [{logLevel}] {categoryName}: {message}";
+        var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}\t[{logLevel}]\t{categoryName}\t{message}";
         if (exception is not null)
         {
             line = $"{line}{Environment.NewLine}{exception}";

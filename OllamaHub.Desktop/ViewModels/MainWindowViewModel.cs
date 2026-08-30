@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Microsoft.Extensions.Logging;
 using OllamaHub.Configuration;
 using OllamaHub.Activity;
 using OllamaHub.Desktop.Services;
@@ -16,7 +17,9 @@ public sealed class MainWindowViewModel : NotifyViewModel
 {
     private readonly GatewayProcessService gatewayService;
     private readonly ToastService toastService;
+    private readonly ILoggerFactory loggerFactory;
     private readonly ConfigSnapshotService configService = new();
+    private readonly ConsoleViewModel consoleViewModel;
     private object currentView = new PlaceholderViewModel("加载中", "正在加载桌面控制中心。");
     private string pageTitle = "概览";
     private string pageDescription = "确认本地服务健康，快速查看网关与模型配置。";
@@ -26,10 +29,12 @@ public sealed class MainWindowViewModel : NotifyViewModel
     public string PageTitle { get => pageTitle; private set => SetProperty(ref pageTitle, value); }
     public string PageDescription { get => pageDescription; private set => SetProperty(ref pageDescription, value); }
 
-    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null)
+    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
+        this.loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
+        consoleViewModel = new ConsoleViewModel(toastService: this.toastService);
         NavigationItems = new([
             new("概览", "◉", () => ShowOverview()),
             new("网关", "▦", () => ShowGateway()),
@@ -49,9 +54,9 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = new OverviewViewModel(gatewayService, configService); }
     private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService, toastService); }
     private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = new GatewayViewModel(configService, toastService); }
-    private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = new ConsoleViewModel(); }
-    private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = new ActivityViewModel(gatewayService); }
-    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = new SettingsViewModel(configService, toastService: toastService); }
+    private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = consoleViewModel; }
+    private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = new ActivityViewModel(gatewayService, loggerFactory.CreateLogger<ActivityViewModel>()); }
+    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = new SettingsViewModel(configService, loggerFactory.CreateLogger<SettingsViewModel>(), toastService); }
     private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
 }
 

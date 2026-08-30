@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OllamaHub;
 using OllamaHub.Configuration;
 using OllamaHub.Desktop.Services;
+using OllamaHub.Logging;
 
 namespace OllamaHub.Desktop.ViewModels;
 
@@ -32,6 +33,7 @@ public sealed class SettingsViewModel : NotifyViewModel
     private bool clearProxyPassword;
     private bool autoCheckUpdates = true;
     private bool diagnosticsEnabled;
+    private bool logStackTrace;
     private SettingOption selectedLogRetention = LogRetentionOptions[1];
     private bool isBusy;
     private string status = "正在加载设置…";
@@ -67,6 +69,7 @@ public sealed class SettingsViewModel : NotifyViewModel
     public bool HasProxyPassword { get => hasProxyPassword; private set => SetProperty(ref hasProxyPassword, value); }
     public bool AutoCheckUpdates { get => autoCheckUpdates; set { if (SetProperty(ref autoCheckUpdates, value)) QueueAutoSave(); } }
     public bool DiagnosticsEnabled { get => diagnosticsEnabled; set { if (SetProperty(ref diagnosticsEnabled, value)) QueueAutoSave(); } }
+    public bool LogStackTrace { get => logStackTrace; set { if (SetProperty(ref logStackTrace, value)) { LoggingBootstrap.SetIncludeStackTrace(value); QueueAutoSave(); } } }
     public SettingOption SelectedLogRetention { get => selectedLogRetention; set { if (SetProperty(ref selectedLogRetention, value)) OnPropertyChanged(nameof(LogRetentionDays)); } }
     public int LogRetentionDays => int.Parse(SelectedLogRetention.Value);
     public bool IsBusy { get => isBusy; private set { if (SetProperty(ref isBusy, value)) { OnPropertyChanged(nameof(IsNotBusy)); } } }
@@ -118,6 +121,7 @@ public sealed class SettingsViewModel : NotifyViewModel
             SelectedUpdateChannel = FindOption(UpdateChannelOptions, settings.UpdateChannel, UpdateChannelOptions[0]);
             AutoCheckUpdates = settings.AutoCheckUpdates;
             DiagnosticsEnabled = settings.DiagnosticsEnabled;
+            LogStackTrace = settings.LogStackTrace;
             ProxyHost = settings.ProxyHost;
             ProxyPort = settings.ProxyPort;
             ProxyUsername = settings.ProxyUsername ?? "";
@@ -155,7 +159,8 @@ public sealed class SettingsViewModel : NotifyViewModel
                 AutoCheckUpdates,
                 SelectedUpdateChannel.Value,
                 DiagnosticsEnabled,
-                LogRetentionDays);
+                LogRetentionDays,
+                LogStackTrace);
             var response = await configService.UpdateSettingsAsync(input, cancellationToken);
             HasProxyPassword = response.HasProxyPassword;
             ProxyPassword = "";

@@ -41,6 +41,7 @@ public sealed class FileLoggerTests
 
             var content = File.ReadAllText(logPath);
             Assert.Contains("[Error]", content);
+            Assert.Contains("\t[Error]\tTestLogger\terror message", content);
             Assert.Contains("error message", content);
         }
         finally

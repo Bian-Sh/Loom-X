@@ -72,6 +72,7 @@ public sealed class ResolvedAppSettings
     public string UpdateChannel { get; init; } = "stable";
     public bool DiagnosticsEnabled { get; init; }
     public int LogRetentionDays { get; init; } = 30;
+    public bool LogStackTrace { get; init; }
 }
 
 public sealed class ResolvedAppConfig

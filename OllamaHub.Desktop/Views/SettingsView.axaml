@@ -64,6 +64,7 @@
             <Border Classes="panel" Padding="18">
               <StackPanel Spacing="14">
                 <CheckBox Content="发送匿名诊断数据" IsChecked="{Binding DiagnosticsEnabled}"/><TextBlock Text="不包含 API key、请求正文或模型内容。" Classes="hint" Margin="24,-10,0,0"/>
+                <CheckBox Content="记录日志堆栈信息" IsChecked="{Binding LogStackTrace}"/><TextBlock Text="默认关闭；开启后便于定位异常，但日志会包含更完整的调用路径。" Classes="hint" Margin="24,-10,0,0"/>
                 <StackPanel Spacing="4"><TextBlock Text="日志保留周期" FontWeight="SemiBold"/><TextBlock Text="控制台日志会在周期结束后自动清理。" Classes="hint"/><ComboBox ItemsSource="{Binding LogRetentionOptions}" SelectedItem="{Binding SelectedLogRetention, Mode=TwoWay}"/></StackPanel>
                 <StackPanel Spacing="8"><TextBlock Text="本地数据" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="数据目录：" Classes="hint"/><TextBlock Text="{Binding DataDirectory}" Classes="hint" TextWrapping="Wrap"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="10"><Button Content="打开数据目录" Command="{Binding OpenDataDirectoryCommand}" Classes="outline"/><Button Content="清除日志" Command="{Binding ClearLogsCommand}" Classes="outline"/></StackPanel></StackPanel>
               </StackPanel>

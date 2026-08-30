@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Microsoft.Extensions.Logging;
 using OllamaHub.Activity;
 using OllamaHub.Desktop.Services;
 
@@ -10,6 +11,7 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
 {
     private readonly ActivityQueryService queryService = new();
     private readonly GatewayProcessService gatewayService;
+    private readonly ILogger<ActivityViewModel> logger;
     private readonly EventHandler<ActivityEventInput> activityHandler;
     private string searchText = string.Empty;
     private string selectedStatus = "全部状态";
@@ -37,9 +39,10 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     public string P95Latency { get => p95Latency; private set => SetProperty(ref p95Latency, value); }
     public ICommand SelectCommand { get; }
 
-    public ActivityViewModel(GatewayProcessService gatewayService)
+    public ActivityViewModel(GatewayProcessService gatewayService, ILogger<ActivityViewModel>? logger = null)
     {
         this.gatewayService = gatewayService;
+        this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ActivityViewModel>.Instance;
         SelectCommand = new AsyncCommand(parameter => { SelectedItem = parameter as ActivityItemViewModel; return Task.CompletedTask; });
         activityHandler = (_, input) => Dispatcher.UIThread.Post(() => AddPushedActivity(input));
         gatewayService.ActivityEnqueued += activityHandler;
@@ -63,6 +66,7 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             Status = $"活动加载失败：{exception.Message}";
+            logger.LogError(exception, "活动加载失败");
         }
         finally { isRefreshing = false; }
     }
