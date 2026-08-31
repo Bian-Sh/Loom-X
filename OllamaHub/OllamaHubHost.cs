@@ -299,6 +299,15 @@ public static class OllamaHubHost
                 routeContext.Route = $"{GatewayEndpointRouting.ResolveLabel(httpContext.Request.Path)} → {route.Model.ProviderId}";
             }
             requestObject["model"] = route.Model.ModelId;
+            if (endpointKey == "ollama"
+                && httpContext.Request.Path.StartsWithSegments("/v1/chat/completions")
+                && route.Model.SupportsApiMode("openai")
+                && !route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase))
+            {
+                if (await passthroughClient.ProxyOpenAiResponsesGatewayAttemptAsync(httpContext, route.Model, requestObject, cancellationToken)) return Results.Empty;
+                continue;
+            }
+
             var upstreamPath = route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase) ? "/chat/completions" : "/responses";
             if (route.Model.SupportsApiMode("ollama")) upstreamPath = "/api/chat";
             if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, route.Model, route.Model.SupportsApiMode("ollama") ? "ollama" : "openai", upstreamPath, requestObject, cancellationToken)) return Results.Empty;
