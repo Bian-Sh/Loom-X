@@ -13,9 +13,11 @@
 - `dotnet test OllamaHub.slnx --no-restore`：85/85 通过。
 - `dotnet test OllamaHub.slnx -c Release --no-restore`：85/85 通过。
 - `scripts/publish-desktop.ps1 -Configuration Release`：发布成功。
+- 最新发布目录：`outputs/20260901-010313`，包含桌面包和独立 `Gateway` 宿主。
 - 独立 Gateway 发布成功并启动，`GET http://127.0.0.1:11434/` 返回 `{"name":"OllamaHub","status":"ok"}`。
 - `git diff --check` 和暂存区检查通过；未发现硬编码密钥或新增不安全操作。
 - 回归测试断言请求正文、响应正文和 API Key 不进入桥接日志。
+- 兼容代理附带的 `data: [DONE]` 事件，以及字符串形式的 `image_url` 输入。
 
 ## Visual Studio 烟测
 

@@ -54,6 +54,8 @@ public sealed class OpenAiResponsesBridgeTests
         event: response.completed
         data: {"type":"response.completed","response":{"id":"resp_123"}}
 
+        data: [DONE]
+
         """;
 
         var result = OpenAiResponsesBridge.CreateChatCompletionsSse(responsesSse, "configured-model");

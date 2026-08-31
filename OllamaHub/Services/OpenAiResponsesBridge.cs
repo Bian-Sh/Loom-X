@@ -157,6 +157,11 @@ internal static class OpenAiResponsesBridge
 
             var data = string.Join("\n", eventData);
             eventData.Clear();
+            if (string.Equals(data, "[DONE]", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             JsonObject? payload;
             try
             {
@@ -373,15 +378,16 @@ internal static class OpenAiResponsesBridge
             {
                 part["type"] = "input_text";
             }
-            else if (string.Equals(type, "image_url", StringComparison.OrdinalIgnoreCase)
-                && part["image_url"] is JsonObject imageUrl
-                && imageUrl["url"] is { } url)
+            else if (string.Equals(type, "image_url", StringComparison.OrdinalIgnoreCase))
             {
                 part["type"] = "input_image";
-                part["image_url"] = url.DeepClone();
-                if (imageUrl["detail"] is { } detail)
+                if (part["image_url"] is JsonObject imageUrl && imageUrl["url"] is { } url)
                 {
-                    part["detail"] = detail.DeepClone();
+                    part["image_url"] = url.DeepClone();
+                    if (imageUrl["detail"] is { } detail)
+                    {
+                        part["detail"] = detail.DeepClone();
+                    }
                 }
             }
 
