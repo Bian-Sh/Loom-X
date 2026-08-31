@@ -28,8 +28,13 @@
             </Border>
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
               <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemContainerTheme>
+                  <ControlTheme TargetType="ContentPresenter">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                  </ControlTheme>
+                </ItemsControl.ItemContainerTheme>
                 <ItemsControl.ItemTemplate><DataTemplate>
-                  <Button Classes="row" Command="{Binding $parent[UserControl].DataContext.SelectCommand}" CommandParameter="{Binding}">
+                  <Button Classes="row" HorizontalAlignment="Stretch" Command="{Binding $parent[UserControl].DataContext.SelectCommand}" CommandParameter="{Binding}">
                     <Border Padding="12,10" BorderBrush="#E5E8EC" BorderThickness="0,0,0,1">
                       <Grid ColumnDefinitions="100,1.15*,1.2*,90,76" ColumnSpacing="8">
                         <StackPanel><TextBlock Text="{Binding Time}" FontFamily="Consolas" FontSize="11"/><TextBlock Text="{Binding RequestId}" Opacity="0.52" FontFamily="Consolas" FontSize="10"/></StackPanel>
