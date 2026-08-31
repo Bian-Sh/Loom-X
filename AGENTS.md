@@ -38,3 +38,13 @@
 - ViewModel 中调用 `toastService.Show("消息", ToastLevel.Success|Info|Warning|Error)`；View 代码后置在剪贴板等 UI 操作完成后调用同一服务。
 - Toast 只放用户可见的安全摘要，禁止包含 API Key、Authorization、自定义 Header、请求/响应正文、用户 prompt 或工具参数。
 - 页面 `Status` 继续用于详细过程状态；Toast 用于复制、测试完成、保存完成等短暂结果反馈。
+
+## GitHub 跨 Session 协作
+
+- GitHub `origin` 是多个 Codex 项目共享代码和开发进度的唯一来源；本文件的修改必须提交并推送后，其他 session 才能读取到。
+- 多个 Codex 项目可以共用工作目录和当前分支。每次开始开发前先执行 `git pull --ff-only`，确认工作区状态后再修改。
+- 开发时只改当前负责的模块和必要的测试、文档；发现其他 session 的未提交修改时，不覆盖、不重置、不清理。
+- 完成功能并通过必要验证后，使用中文提交消息提交并及时 `git push`，让其他 session 可以继续同步。
+- `git pull` 因本地修改或分支分歧失败时暂停开发并报告，不自动执行 `reset`、`clean`、`stash` 或强制推送。
+- 发生 Git 冲突时保留冲突现场，说明各版本的行为差异，由用户决定取舍；解决后必须重新测试再提交。
+- 不删除其他 session 的未跟踪、ignored、`outputs/`、`.codegraph/` 或流程状态文件；只有用户明确要求时才处理。
