@@ -1,9 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using OllamaHub.Logging;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace OllamaHub.Configuration;
 
@@ -15,7 +15,7 @@ public interface IDatabaseConfigurationProvider
     Task ReloadAsync(CancellationToken cancellationToken = default);
 }
 
-public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbContext) : IDatabaseConfigurationProvider
+public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbContext, ILogger<DatabaseConfigurationProvider>? logger = null) : IDatabaseConfigurationProvider
 {
     private readonly SemaphoreSlim reloadLock = new(1, 1);
     private ResolvedAppConfig current = new();
@@ -38,11 +38,13 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
         await reloadLock.WaitAsync(cancellationToken);
         try
         {
+            logger?.LogInformation("数据库配置重载开始");
             var gateway = await dbContext.GatewayConfigurations.AsNoTracking().SingleAsync(cancellationToken);
             var settings = await dbContext.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
             LoggingBootstrap.SetIncludeStackTrace(settings.LogStackTrace);
             var providers = await dbContext.Providers.AsNoTracking().Include(provider => provider.Models).ToListAsync(cancellationToken);
             var endpoints = await dbContext.GatewayEndpoints.AsNoTracking().Include(endpoint => endpoint.Combos).ThenInclude(combo => combo.Routes).ThenInclude(route => route.Model).ThenInclude(model => model.Provider).ToListAsync(cancellationToken);
+            logger?.LogInformation("数据库配置行读取完成，Provider {ProviderCount}，模型 {ModelCount}，Endpoint {EndpointCount}，启用 Provider {EnabledProviderCount}", providers.Count, providers.Sum(provider => provider.Models.Count), endpoints.Count, providers.Count(provider => provider.Enabled));
             var resolvedProviders = providers.OrderBy(provider => provider.SortOrder).Select(provider => new ResolvedProviderConfig
             {
                 Id = provider.BusinessId,
@@ -95,6 +97,17 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     }).ToArray()
                 }).ToArray()
             });
+            logger?.LogInformation("数据库配置重载完成，Provider {ProviderCount}，模型 {ModelCount}，Endpoint {EndpointCount}", current.Providers.Count, current.Models.Count, current.GatewayEndpoints.Count);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            logger?.LogWarning("数据库配置重载已取消");
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "数据库配置重载失败");
+            throw;
         }
         finally
         {
@@ -102,12 +115,14 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
         }
     }
 
-    private static ResolvedModelConfig ResolveModel(ProviderEntity provider, ModelEntity model)
+    private ResolvedModelConfig ResolveModel(ProviderEntity provider, ModelEntity model)
     {
         var headers = ReadDictionary(provider.HeadersJson);
         foreach (var pair in ReadDictionary(model.HeadersJson)) headers[pair.Key] = pair.Value;
         var protectedApiKey = string.IsNullOrWhiteSpace(model.ProtectedApiKey) ? provider.ProtectedApiKey : model.ProtectedApiKey;
-        var apiKey = string.IsNullOrWhiteSpace(protectedApiKey) ? string.Empty : ProtectedApiKeyStore.Unprotect(protectedApiKey);
+        var apiKey = string.Empty;
+        if (!string.IsNullOrWhiteSpace(protectedApiKey) && !ProtectedApiKeyStore.TryUnprotect(protectedApiKey, out apiKey))
+            logger?.LogWarning("Provider 密钥解密失败，继续加载配置 {ProviderId}", provider.BusinessId);
         var apiMode = string.IsNullOrWhiteSpace(model.ApiMode) ? provider.ApiMode : model.ApiMode;
         return new ResolvedModelConfig
         {

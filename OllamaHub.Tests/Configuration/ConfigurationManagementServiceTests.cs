@@ -505,6 +505,40 @@ public sealed class ConfigurationManagementServiceTests
         }
     }
 
+    [Fact]
+    public async Task InvalidProtectedProviderKey_DoesNotHideProvider()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            context.Providers.Add(new ProviderEntity
+            {
+                BusinessId = "corrupt-key",
+                DisplayName = "密钥异常 Provider",
+                BaseUrl = "https://example.com",
+                ProtectedApiKey = "dpapi:not-valid-base64"
+            });
+            await context.SaveChangesAsync();
+
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+
+            var providers = await service.ListProvidersAsync();
+            var provider = Assert.Single(providers);
+            Assert.Equal("corrupt-key", provider.BusinessId);
+            Assert.True(provider.HasApiKey);
+            Assert.Null(provider.ApiKey);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
     private sealed class TestDbContextFactory(DbContextOptions<ConfigurationDbContext> options) : IDbContextFactory<ConfigurationDbContext>
     {
         public ConfigurationDbContext CreateDbContext() => new(options);

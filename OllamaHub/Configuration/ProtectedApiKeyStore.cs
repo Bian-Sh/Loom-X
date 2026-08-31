@@ -37,6 +37,25 @@ public static class ProtectedApiKeyStore
         finally { input.Free(); output.Free(); }
     }
 
+    public static bool TryUnprotect(string value, out string plainText)
+    {
+        try
+        {
+            plainText = Unprotect(value);
+            return true;
+        }
+        catch (CryptographicException) when (IsProtectedValue(value))
+        {
+            plainText = string.Empty;
+            return false;
+        }
+        catch (FormatException) when (IsProtectedValue(value))
+        {
+            plainText = string.Empty;
+            return false;
+        }
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private struct DATA_BLOB
     {
