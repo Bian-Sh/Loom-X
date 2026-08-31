@@ -29,7 +29,7 @@
 ## 已知限制
 
 - 当前工作区没有 `openspec` 可执行文件，自动 `openspec status/instructions` 无法运行；本报告依据已存在的 OpenSpec 产物和 Comet 守卫完成手工核对。
-- 远端 GitHub 在本次会话不可连接，提交 `0a63dfc` 已创建但尚未推送。
+- 远端 GitHub 在本次会话不可连接，本次三个实现/验证提交均已创建但尚未推送。
 
 ## 结论
 
