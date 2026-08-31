@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
+using OllamaHub;
 using OllamaHub.Configuration;
 using OllamaHub.Activity;
 using OllamaHub.Desktop.Services;
@@ -18,7 +19,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private readonly GatewayProcessService gatewayService;
     private readonly ToastService toastService;
     private readonly ILoggerFactory loggerFactory;
-    private readonly ConfigSnapshotService configService = new();
+    private readonly ConfigSnapshotService configService;
     private readonly ConsoleViewModel consoleViewModel;
     private object currentView = new PlaceholderViewModel("加载中", "正在加载桌面控制中心。");
     private string pageTitle = "概览";
@@ -29,11 +30,12 @@ public sealed class MainWindowViewModel : NotifyViewModel
     public string PageTitle { get => pageTitle; private set => SetProperty(ref pageTitle, value); }
     public string PageDescription { get => pageDescription; private set => SetProperty(ref pageDescription, value); }
 
-    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null)
+    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
         this.loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
+        this.configService = configService ?? new ConfigSnapshotService(this.loggerFactory.CreateLogger<ConfigSnapshotService>());
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService);
         NavigationItems = new([
             new("概览", "◉", () => ShowOverview()),
@@ -52,7 +54,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     }
 
     private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = new OverviewViewModel(gatewayService, configService, loggerFactory.CreateLogger<MainWindowViewModel>()); }
-    private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService, toastService); }
+    private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService, toastService, loggerFactory.CreateLogger<ProvidersViewModel>()); }
     private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = new GatewayViewModel(configService, toastService); }
     private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = consoleViewModel; }
     private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = new ActivityViewModel(gatewayService, loggerFactory.CreateLogger<ActivityViewModel>()); }
@@ -162,7 +164,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "尚未检查";
             Version = gatewayService.State == GatewayState.Running ? "OllamaHub API 在线" : "未连接";
             GraphStatus = gatewayService.State == GatewayState.Running ? "实时拓扑已连接" : "等待网关启动";
-            logger?.LogInformation("概览刷新完成 {ProviderCount} 个 Provider、{ModelCount} 个模型、{EndpointCount} 个 Endpoint、{RouteCount} 条路由，网关状态 {GatewayState}", ProviderCount, ModelCount, Endpoints.Count, Endpoints.Sum(item => item.Routes.Count), gatewayService.State);
+            logger?.LogInformation("概览刷新完成 {ProviderCount} 个 Provider、{ModelCount} 个模型、{EndpointCount} 个 Endpoint、{RouteCount} 条路由，网关状态 {GatewayState}，配置库 {DatabasePath}，进程 {ProcessId}", ProviderCount, ModelCount, Endpoints.Count, Endpoints.Sum(item => item.Routes.Count), gatewayService.State, AppDataPaths.DatabasePath, Environment.ProcessId);
         }
         catch (Exception exception)
         {
@@ -320,6 +322,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
 {
     private readonly ConfigSnapshotService configService;
     private readonly ToastService toastService;
+    private readonly ILogger<ProvidersViewModel>? logger;
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private ProviderEditorViewModel? selectedProvider;
     private ModelEditorViewModel? selectedModel;
@@ -386,10 +389,11 @@ public sealed class ProvidersViewModel : NotifyViewModel
     public ICommand TestConnectionCommand { get; }
     public ICommand SyncModelsCommand { get; }
 
-    public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null)
+    public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null)
     {
         this.configService = configService;
         this.toastService = toastService ?? new ToastService();
+        this.logger = logger;
         RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(DeleteModelAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
     }
 
@@ -397,6 +401,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
     {
         try
         {
+            logger?.LogInformation("Provider 页面刷新开始，进程 {ProcessId}", Environment.ProcessId);
             var selectedId = SelectedProvider?.Id;
             suppressSelectionInvariant = true;
             Providers.Clear();
@@ -406,8 +411,9 @@ public sealed class ProvidersViewModel : NotifyViewModel
             OnPropertyChanged(nameof(HasNoSelectedProvider));
             UpdateSummary();
             Status = $"已加载 {Providers.Count} 个 Provider";
+            logger?.LogInformation("Provider 页面刷新完成，Provider {ProviderCount}，模型 {ModelCount}，启用 Provider {EnabledProviderCount}，健康 Provider {HealthyProviderCount}", Providers.Count, TotalModelCount, EnabledProviderCount, HealthyProviderCount);
         }
-        catch (Exception exception) { suppressSelectionInvariant = false; Status = $"加载失败：{exception.Message}"; }
+        catch (Exception exception) { suppressSelectionInvariant = false; logger?.LogError(exception, "Provider 页面刷新失败"); Status = $"加载失败：{exception.Message}"; }
     }
 
     private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = "新 Provider", ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); Status = "正在编辑新 Provider"; }
