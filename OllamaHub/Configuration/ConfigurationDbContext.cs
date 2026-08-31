@@ -174,8 +174,33 @@ public sealed class GatewayRouteEntity
 
 public static class ConfigurationDatabase
 {
+    private static readonly string InitializationLockPath = Path.Combine(AppDataPaths.RootDirectory, "OllamaHub.db.init.lock");
+
+    public static IDisposable AcquireInitializationLock()
+    {
+        AppDataPaths.EnsureCreated();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (true)
+        {
+            try
+            {
+                return new FileStream(InitializationLockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(50);
+            }
+            catch (UnauthorizedAccessException) when (DateTime.UtcNow < deadline)
+            {
+                Thread.Sleep(50);
+            }
+            if (DateTime.UtcNow >= deadline) throw new TimeoutException("配置库初始化锁等待超时。");
+        }
+    }
+
     public static async Task InitializeAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken = default)
     {
+        using var initializationLock = AcquireInitializationLock();
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         await EnsureSchemaAsync(dbContext, cancellationToken);
         if (!await dbContext.GatewayConfigurations.AnyAsync(cancellationToken))
@@ -190,6 +215,7 @@ public static class ConfigurationDatabase
             await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
+
 
     private static async Task EnsureSchemaAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
     {

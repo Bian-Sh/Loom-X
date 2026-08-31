@@ -2,6 +2,7 @@ using System.Net;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using OllamaHub.Configuration;
 using OllamaHub.Contracts;
@@ -23,7 +24,7 @@ public static class OllamaHubHost
         LoggingBootstrap.Configure();
         builder.Host.UseSerilog();
 
-        var dbOptions = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+        var dbOptions = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite(CreateConnectionString(databasePath)).Options;
         var startupDb = new ConfigurationDbContext(dbOptions);
         await ConfigurationDatabase.InitializeAsync(startupDb, cancellationToken);
         var startupConfiguration = new DatabaseConfigurationProvider(startupDb);
@@ -32,7 +33,7 @@ public static class OllamaHubHost
         builder.WebHost.UseUrls(startupConfiguration.Current.Server.Urls.ToArray());
 
         builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.PropertyNamingPolicy = null);
-        builder.Services.AddDbContextFactory<ConfigurationDbContext>(options => options.UseSqlite($"Data Source={databasePath}"));
+        builder.Services.AddDbContextFactory<ConfigurationDbContext>(options => options.UseSqlite(CreateConnectionString(databasePath)));
         builder.Services.AddSingleton<IDatabaseConfigurationProvider>(startupConfiguration);
         builder.Services.AddSingleton<ConfigurationManagementService>();
         builder.Services.AddHostedService<ConfigurationRefreshService>();
@@ -51,6 +52,14 @@ public static class OllamaHubHost
         MapEndpoints(app);
         return app;
     }
+
+    private static string CreateConnectionString(string databasePath) => new SqliteConnectionStringBuilder
+    {
+        DataSource = databasePath,
+        Cache = SqliteCacheMode.Private,
+        Pooling = false,
+        DefaultTimeout = 5
+    }.ToString();
 
     private static void MapEndpoints(WebApplication app)
     {
