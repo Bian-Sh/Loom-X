@@ -577,7 +577,12 @@ public sealed class ProvidersViewModel : NotifyViewModel
 
     private void AttachModel(ModelEditorViewModel? model) { if (model is not null) model.PropertyChanged += ModelChanged; }
     private void DetachModel(ModelEditorViewModel? model) { if (model is not null) model.PropertyChanged -= ModelChanged; }
-    private void ModelChanged(object? sender, PropertyChangedEventArgs args) => ScheduleModelAutoSave();
+    private void ModelChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (sender is ModelEditorViewModel model && !ReferenceEquals(SelectedModel, model))
+            SelectedModel = model;
+        ScheduleModelAutoSave();
+    }
 
     private void UpdateSummary()
     {
