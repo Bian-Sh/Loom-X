@@ -20,8 +20,10 @@ public sealed class GatewayViewContractTests
         Assert.Contains("<Border Classes=\"icon drag-handle\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.drag-handle\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<Button Classes=\"icon\" Tag=\"{Binding}\" PointerPressed=\"RouteHandle_OnPointerPressed\"", source, StringComparison.Ordinal);
-        Assert.Contains("DragDrop.DragOver=\"Route_OnDragOver\"", source, StringComparison.Ordinal);
-        Assert.Contains("DragDrop.Drop=\"Route_OnDrop\"", source, StringComparison.Ordinal);
+        Assert.Contains("drag-placeholder", source, StringComparison.Ordinal);
+        Assert.Contains("route-drag-preview", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsPlaceholder}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding $parent[UserControl].DataContext.IsRouteDragActive}\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.member-footbar\"", source, StringComparison.Ordinal);
         Assert.Contains("Property=\"Padding\" Value=\"8,2\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.footbar-add\"", source, StringComparison.Ordinal);
@@ -50,8 +52,13 @@ public sealed class GatewayViewContractTests
         var viewSource = ReadDesktopFile("Views", "GatewayView.axaml.cs");
         var viewModelSource = ReadDesktopFile("ViewModels", "GatewayViewModel.cs");
 
-        Assert.Contains("private void Route_OnDragOver", viewSource, StringComparison.Ordinal);
-        Assert.Contains("e.DragEffects = Guid.TryParse", viewSource, StringComparison.Ordinal);
+        Assert.Contains("private void RouteDrag_OnPointerMoved", viewSource, StringComparison.Ordinal);
+        Assert.Contains("GetInsertionSlot", viewSource, StringComparison.Ordinal);
+        Assert.Contains("AnimateMovedRows", viewSource, StringComparison.Ordinal);
+        Assert.Contains("CompleteRouteDragAsync", viewSource, StringComparison.Ordinal);
+        Assert.Contains("BeginRouteDrag", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("MoveRouteDragPlaceholder", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("CancelRouteDrag", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("public void ToggleModelSortDirection()", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("FilterModels(modelSearchTerm);", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("grouped.OrderByDescending", viewModelSource, StringComparison.Ordinal);

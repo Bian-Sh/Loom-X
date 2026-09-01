@@ -5,7 +5,8 @@
     <Style Selector="Button.icon"><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
     <Style Selector="Border.drag-handle"><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/></Style>
     <Style Selector="Border.member"><Setter Property="BorderBrush" Value="#E4E8EE"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="8,9"/></Style>
-    <Style Selector="Border.member:dragover"><Setter Property="Background" Value="#EAF3FF"/></Style>
+    <Style Selector="Border.drag-placeholder"><Setter Property="Background" Value="#F3F6FA"/><Setter Property="BorderBrush" Value="#9AA9BB"/><Setter Property="BorderThickness" Value="1"/><Setter Property="Padding" Value="8,9"/><Setter Property="Opacity" Value="0.7"/></Style>
+    <Style Selector="Border.route-drag-preview"><Setter Property="Background" Value="#FFFFFF"/><Setter Property="BorderBrush" Value="#2563EB"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="6"/><Setter Property="Padding" Value="8,9"/><Setter Property="Opacity" Value="0.96"/></Style>
     <Style Selector="Border.member-footbar"><Setter Property="BorderBrush" Value="#E4E8EE"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="8,2"/></Style>
     <Style Selector="Button.footbar-add"><Setter Property="Width" Value="24"/><Setter Property="Height" Value="24"/></Style>
   </UserControl.Styles>
@@ -44,23 +45,37 @@
                       <ToggleSwitch Grid.Column="2" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleComboCommand}" CommandParameter="{Binding}" OnContent="" OffContent="" ToolTip.Tip="启用或停用 Combo"/>
                       <Button Grid.Column="3" Classes="icon" Command="{Binding $parent[UserControl].DataContext.RemoveComboCommand}" CommandParameter="{Binding}" ToolTip.Tip="移除 Combo 模型" AutomationProperties.Name="移除 Combo 模型"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23"/></Button>
                     </Grid></Border>
-                    <StackPanel Grid.Row="1" IsVisible="{Binding IsExpanded}">
-                      <ItemsControl ItemsSource="{Binding Routes}">
-                        <ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:GatewayRouteEditorViewModel}">
-                          <Border Classes="member" Tag="{Binding}" DragDrop.AllowDrop="True" DragDrop.DragOver="Route_OnDragOver" DragDrop.Drop="Route_OnDrop">
-                            <Grid ColumnDefinitions="26,*,Auto,Auto" ColumnSpacing="8">
-                              <Border Classes="icon drag-handle" Tag="{Binding}" PointerPressed="RouteHandle_OnPointerPressed" ToolTip.Tip="拖动调整故障转移顺序" AutomationProperties.Name="拖动调整故障转移顺序" Cursor="SizeAll" Background="Transparent"><TextBlock Text="⋮⋮" Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Center"/></Border>
-                              <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding ModelName}" FontWeight="SemiBold"/><TextBlock Text="{Binding ProviderName}" Classes="muted" FontSize="11"/></StackPanel>
-                              <ToggleSwitch Grid.Column="2" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleRouteCommand}" CommandParameter="{Binding}" OnContent="" OffContent="" ToolTip.Tip="启用或停用成员"/>
-                              <Button Grid.Column="3" Classes="icon" Command="{Binding $parent[UserControl].DataContext.RemoveRouteCommand}" CommandParameter="{Binding}" ToolTip.Tip="从 Combo 移除模型" AutomationProperties.Name="从 Combo 移除模型"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23"/></Button>
-                            </Grid>
-                          </Border>
-                        </DataTemplate></ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                      <Border Classes="member-footbar">
-                        <Grid ColumnDefinitions="*,Auto"><TextBlock Text="成员模型按顺序故障转移" Classes="muted" FontSize="11" VerticalAlignment="Center"/><Button Grid.Column="1" Classes="icon footbar-add" Tag="{Binding}" Click="OpenModelPicker_OnClick" ToolTip.Tip="向 Combo 添加模型" AutomationProperties.Name="向 Combo 添加模型"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z" Width="14" Height="14"/></Button></Grid>
-                      </Border>
-                    </StackPanel>
+                    <Grid Grid.Row="1" IsVisible="{Binding IsExpanded}" RowDefinitions="Auto,Auto">
+                      <Grid>
+                        <ItemsControl ItemsSource="{Binding Routes}">
+                          <ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:GatewayRouteEditorViewModel}">
+                            <Panel>
+                              <Border Classes="member drag-placeholder" IsVisible="{Binding IsPlaceholder}"><TextBlock Text="释放到此处" Classes="muted" HorizontalAlignment="Center"/></Border>
+                              <Border Classes="member" IsVisible="{Binding IsRealRoute}" Tag="{Binding}">
+                                <Grid ColumnDefinitions="26,*,Auto,Auto" ColumnSpacing="8">
+                                  <Border Classes="icon drag-handle" Tag="{Binding}" PointerPressed="RouteHandle_OnPointerPressed" ToolTip.Tip="拖动调整故障转移顺序" AutomationProperties.Name="拖动调整故障转移顺序" Cursor="SizeAll" Background="Transparent"><TextBlock Text="⋮⋮" Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Center"/></Border>
+                                  <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding ModelName}" FontWeight="SemiBold"/><TextBlock Text="{Binding ProviderName}" Classes="muted" FontSize="11"/></StackPanel>
+                                  <ToggleSwitch Grid.Column="2" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleRouteCommand}" CommandParameter="{Binding}" OnContent="" OffContent="" ToolTip.Tip="启用或停用成员"/>
+                                  <Button Grid.Column="3" Classes="icon" Command="{Binding $parent[UserControl].DataContext.RemoveRouteCommand}" CommandParameter="{Binding}" ToolTip.Tip="从 Combo 移除模型" AutomationProperties.Name="从 Combo 移除模型"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23"/></Button>
+                                </Grid>
+                              </Border>
+                            </Panel>
+                          </DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border x:Name="routeDragPreview" Classes="route-drag-preview" IsVisible="{Binding $parent[UserControl].DataContext.IsRouteDragActive}" DataContext="{Binding $parent[UserControl].DataContext.DraggingRoute}" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+                          <Grid ColumnDefinitions="26,*,Auto" ColumnSpacing="8">
+                            <TextBlock Text="⋮⋮" Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding ModelName}" FontWeight="SemiBold"/><TextBlock Text="{Binding ProviderName}" Classes="muted" FontSize="11"/></StackPanel>
+                            <TextBlock Grid.Column="2" Text="拖动中" Foreground="#2563EB" FontSize="11" VerticalAlignment="Center"/>
+                          </Grid>
+                        </Border>
+                      </Grid>
+                      <Grid Grid.Row="1">
+                        <Border Classes="member-footbar">
+                          <Grid ColumnDefinitions="*,Auto"><TextBlock Text="成员模型按顺序故障转移" Classes="muted" FontSize="11" VerticalAlignment="Center"/><Button Grid.Column="1" Classes="icon footbar-add" Tag="{Binding}" Click="OpenModelPicker_OnClick" ToolTip.Tip="向 Combo 添加模型" AutomationProperties.Name="向 Combo 添加模型"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z" Width="14" Height="14"/></Button></Grid>
+                        </Border>
+                      </Grid>
+                    </Grid>
                   </Grid>
                 </Border>
               </DataTemplate></ItemsControl.ItemTemplate>

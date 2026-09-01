@@ -11,6 +11,9 @@ public sealed class GatewayViewModel : NotifyViewModel
     private readonly ToastService toastService;
     private GatewayEndpointEditorViewModel? selectedEndpoint;
     private GatewayComboEditorViewModel? selectedCombo;
+    private GatewayRouteEditorViewModel? draggingRoute;
+    private GatewayRouteEditorViewModel? dragPlaceholder;
+    private int dragOriginIndex = -1;
     private string status = "";
     private bool isModelSortAscending = true;
     private string modelSearchTerm = "";
@@ -31,6 +34,8 @@ public sealed class GatewayViewModel : NotifyViewModel
     public string ModelSortToolTip => IsModelSortAscending ? "按字母降序排序" : "按字母升序排序";
     public GatewayEndpointEditorViewModel? SelectedEndpoint { get => selectedEndpoint; set { if (SetProperty(ref selectedEndpoint, value)) { SelectedCombo = null; OnPropertyChanged(nameof(HasSelectedEndpoint)); FilterModels(""); } } }
     public GatewayComboEditorViewModel? SelectedCombo { get => selectedCombo; private set { if (SetProperty(ref selectedCombo, value)) FilterModels(""); } }
+    public GatewayRouteEditorViewModel? DraggingRoute { get => draggingRoute; private set { if (SetProperty(ref draggingRoute, value)) OnPropertyChanged(nameof(IsRouteDragActive)); } }
+    public bool IsRouteDragActive => DraggingRoute is not null;
     public bool HasSelectedEndpoint => SelectedEndpoint is not null;
     public string Status { get => status; private set => SetProperty(ref status, value); }
     public ICommand AddComboCommand { get; }
@@ -93,7 +98,70 @@ public sealed class GatewayViewModel : NotifyViewModel
         catch (Exception exception) { Status = $"保存 Combo 模型失败：{exception.Message}"; }
     }
     public void SelectCombo(GatewayComboEditorViewModel? combo) => SelectedCombo = combo;
-    public GatewayRouteEditorViewModel? FindSelectedRoute(Guid id) => SelectedCombo?.Routes.FirstOrDefault(item => item.Id == id);
+    public GatewayRouteEditorViewModel? FindSelectedRoute(Guid id) => SelectedCombo?.Routes.FirstOrDefault(item => !item.IsPlaceholder && item.Id == id);
+
+    public bool BeginRouteDrag(GatewayRouteEditorViewModel? route)
+    {
+        if (route is null || route.IsPlaceholder || DraggingRoute is not null || SelectedCombo is null) return false;
+        var index = SelectedCombo.Routes.IndexOf(route);
+        if (index < 0) return false;
+
+        dragOriginIndex = index;
+        dragPlaceholder = GatewayRouteEditorViewModel.CreatePlaceholder();
+        SelectedCombo.Routes.RemoveAt(index);
+        SelectedCombo.Routes.Insert(index, dragPlaceholder);
+        route.IsDragging = true;
+        DraggingRoute = route;
+        return true;
+    }
+
+    public bool MoveRouteDragPlaceholder(int targetIndex)
+    {
+        if (SelectedCombo is null || dragPlaceholder is null) return false;
+        var currentIndex = SelectedCombo.Routes.IndexOf(dragPlaceholder);
+        if (currentIndex < 0) return false;
+        var clampedIndex = Math.Clamp(targetIndex, 0, SelectedCombo.Routes.Count - 1);
+        if (currentIndex == clampedIndex) return false;
+        SelectedCombo.Routes.Move(currentIndex, clampedIndex);
+        return true;
+    }
+
+    public async Task CompleteRouteDragAsync()
+    {
+        if (SelectedCombo is null || DraggingRoute is null || dragPlaceholder is null) return;
+        var targetIndex = SelectedCombo.Routes.IndexOf(dragPlaceholder);
+        if (targetIndex < 0) { CancelRouteDrag(); return; }
+
+        SelectedCombo.Routes.RemoveAt(targetIndex);
+        DraggingRoute.IsDragging = false;
+        SelectedCombo.Routes.Insert(targetIndex, DraggingRoute);
+        ClearRouteDragState();
+        Renumber(SelectedCombo);
+        try
+        {
+            foreach (var item in SelectedCombo.Routes.Where(item => !item.IsPlaceholder)) await SaveRouteAsync(item);
+            Status = "故障转移顺序已保存";
+        }
+        catch (Exception exception) { Status = $"保存排序失败：{exception.Message}"; }
+    }
+
+    public void CancelRouteDrag()
+    {
+        if (SelectedCombo is null || DraggingRoute is null || dragPlaceholder is null) return;
+        var placeholderIndex = SelectedCombo.Routes.IndexOf(dragPlaceholder);
+        if (placeholderIndex >= 0) SelectedCombo.Routes.RemoveAt(placeholderIndex);
+        var restoreIndex = Math.Clamp(dragOriginIndex, 0, SelectedCombo.Routes.Count);
+        DraggingRoute.IsDragging = false;
+        SelectedCombo.Routes.Insert(restoreIndex, DraggingRoute);
+        ClearRouteDragState();
+    }
+
+    private void ClearRouteDragState()
+    {
+        DraggingRoute = null;
+        dragPlaceholder = null;
+        dragOriginIndex = -1;
+    }
     public void ToggleModelSortDirection()
     {
         IsModelSortAscending = !IsModelSortAscending;
@@ -171,7 +239,7 @@ public sealed class GatewayViewModel : NotifyViewModel
     public void FilterModels(string? search)
     {
         modelSearchTerm = search?.Trim() ?? "";
-        var routeIds = SelectedCombo?.Routes.Select(item => item.ModelId).ToHashSet() ?? [];
+        var routeIds = SelectedCombo?.Routes.Where(item => !item.IsPlaceholder).Select(item => item.ModelId).ToHashSet() ?? [];
         foreach (var item in AvailableModels) item.IsSelected = routeIds.Contains(item.Id);
         ModelGroups.Clear();
         var filtered = AvailableModels.Where(item => item.MatchesSearch(modelSearchTerm));
@@ -215,9 +283,13 @@ public sealed class GatewayComboEditorViewModel : NotifyViewModel
 }
 public sealed class GatewayRouteEditorViewModel : NotifyViewModel
 {
-    private bool enabled; private int sortOrder;
+    private bool enabled; private int sortOrder; private bool isPlaceholder; private bool isDragging;
     public Guid Id { get; init; } public Guid ModelId { get; init; } public string ModelName { get; init; } = ""; public string ProviderName { get; init; } = ""; public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public int SortOrder { get => sortOrder; set => SetProperty(ref sortOrder, value); }
+    public bool IsPlaceholder { get => isPlaceholder; private init => isPlaceholder = value; }
+    public bool IsRealRoute => !IsPlaceholder;
+    public bool IsDragging { get => isDragging; set => SetProperty(ref isDragging, value); }
     public static GatewayRouteEditorViewModel FromResponse(GatewayRouteResponse response) => new() { Id = response.Id, ModelId = response.ModelId, ModelName = response.ModelName, ProviderName = response.ProviderName, Enabled = response.Enabled, SortOrder = response.SortOrder };
+    public static GatewayRouteEditorViewModel CreatePlaceholder() => new() { IsPlaceholder = true };
 }
 public sealed class GatewayModelOption : NotifyViewModel
 {
