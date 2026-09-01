@@ -365,3 +365,4 @@ FodyWeavers.xsd
 
 # OllamaHub 发布产物
 /outputs/
+/graphify-out
