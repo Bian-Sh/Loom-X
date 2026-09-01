@@ -25,6 +25,7 @@
       <Setter Property="Fill" Value="Transparent" />
       <Setter Property="Stroke" Value="{DynamicResource AccentBrush}" />
       <Setter Property="StrokeThickness" Value="1.8" />
+      <Setter Property="Stretch" Value="Uniform" />
     </Style>
     <Style Selector="Border.glass-sidebar">
       <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
@@ -107,9 +108,9 @@
             <Border Classes="window-chrome" PointerPressed="WindowChrome_OnPointerPressed">
               <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="2">
                 <TextBlock Text="OllamaHub 控制中心" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化"><Path Data="M 9,16 L 23,16" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Width="16" Height="16" /></Button>
-                <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="最大化或还原" AutomationProperties.Name="最大化或还原"><Path Data="M 8,8 L 24,8 L 24,24 L 8,24 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Width="16" Height="16" /></Button>
-                <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="关闭" AutomationProperties.Name="关闭"><Path Data="M 9,9 L 23,23 M 23,9 L 9,23" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Width="16" Height="16" /></Button>
+                <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化"><Path Data="M 9,16 L 23,16" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="最大化或还原" AutomationProperties.Name="最大化或还原"><Path Data="M 8,8 L 24,8 L 24,24 L 8,24 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
+                <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="关闭" AutomationProperties.Name="关闭"><Path Data="M 9,9 L 23,23 M 23,9 L 9,23" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
               </Grid>
             </Border>
             <StackPanel Grid.Row="1" Margin="32,4,32,0" VerticalAlignment="Center" Spacing="5">
