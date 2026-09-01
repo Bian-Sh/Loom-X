@@ -86,7 +86,10 @@ public partial class App : Application
             LoggingBootstrap.SetIncludeStackTrace(initialSettings.Settings.LogStackTrace);
             gatewayService = new GatewayProcessService();
             var toastService = new ToastService();
-            desktop.MainWindow = new MainWindow(toastService) { DataContext = new MainWindowViewModel(gatewayService, toastService, loggerFactory, configService) };
+            var mainWindow = new MainWindow(toastService);
+            mainWindow.ApplyAppearance(initialSettings.Settings.TransparencyEnabled, initialSettings.Settings.TransparencyOpacity, initialSettings.Settings.BlurAmount, initialSettings.Settings.TransparencyAlgorithm);
+            mainWindow.DataContext = new MainWindowViewModel(gatewayService, toastService, loggerFactory, configService, mainWindow.ApplyAppearance);
+            desktop.MainWindow = mainWindow;
             desktop.Exit += async (_, _) =>
             {
                 await gatewayService.StopAsync();

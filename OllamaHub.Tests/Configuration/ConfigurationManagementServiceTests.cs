@@ -411,12 +411,20 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal("direct", defaults.ProxyMode);
             Assert.Equal(30, defaults.LogRetentionDays);
             Assert.False(defaults.LogStackTrace);
+            Assert.True(defaults.TransparencyEnabled);
+            Assert.Equal(86, defaults.TransparencyOpacity);
+            Assert.Equal(24, defaults.BlurAmount);
+            Assert.Equal("acrylic", defaults.TransparencyAlgorithm);
 
-            var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true));
+            var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 92, 48, "mica"));
             Assert.Equal("dark", updatedSettings.Theme);
             Assert.True(updatedSettings.HasProxyPassword);
             Assert.True(configurationProvider.Current.Settings.DiagnosticsEnabled);
             Assert.True(updatedSettings.LogStackTrace);
+            Assert.True(updatedSettings.TransparencyEnabled);
+            Assert.Equal(92, updatedSettings.TransparencyOpacity);
+            Assert.Equal(48, updatedSettings.BlurAmount);
+            Assert.Equal("mica", updatedSettings.TransparencyAlgorithm);
 
             var provider = await service.CreateProviderAsync(new ProviderInput("proxy", "代理 Provider", "https://example.com", "anthropic", true, null, false, null, true, "https://models.example.com/list"));
             Assert.True(provider.UseProxy);
@@ -430,6 +438,9 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal("https://models.example.com/list", storedProvider.ModelListUrl);
             Assert.Equal("dark", storedSettings.Theme);
             Assert.Equal("custom", storedSettings.ProxyMode);
+            Assert.Equal(92, storedSettings.TransparencyOpacity);
+            Assert.Equal(48, storedSettings.BlurAmount);
+            Assert.Equal("mica", storedSettings.TransparencyAlgorithm);
         }
         finally
         {

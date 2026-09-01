@@ -181,10 +181,13 @@ public sealed class ConfigSnapshotService
             await using var command = db.Database.GetDbConnection().CreateCommand();
             command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('AppSettings', 'GatewayConfigurations', 'Providers', 'Models')";
             var tableCount = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
-            logger?.LogInformation("配置库只读预检完成，必要表 {RequiredTableCount}/4", tableCount);
-            if (tableCount < 4)
+            await using var columnCommand = db.Database.GetDbConnection().CreateCommand();
+            columnCommand.CommandText = "SELECT COUNT(*) FROM pragma_table_info('AppSettings') WHERE name IN ('TransparencyEnabled', 'TransparencyOpacity', 'BlurAmount', 'TransparencyAlgorithm')";
+            var appearanceColumnCount = Convert.ToInt32(await columnCommand.ExecuteScalarAsync(cancellationToken));
+            logger?.LogInformation("配置库只读预检完成，必要表 {RequiredTableCount}/4，外观字段 {AppearanceColumnCount}/4", tableCount, appearanceColumnCount);
+            if (tableCount < 4 || appearanceColumnCount < 4)
             {
-                logger?.LogWarning("配置库缺少必要表，执行初始化 {DatabasePath}", databasePath);
+                logger?.LogWarning("配置库需要结构迁移，必要表 {RequiredTableCount}/4，外观字段 {AppearanceColumnCount}/4，执行初始化 {DatabasePath}", tableCount, appearanceColumnCount, databasePath);
                 await db.Database.CloseConnectionAsync();
                 await using var writableDb = new ConfigurationDbContext(CreateOptions());
                 await ConfigurationDatabase.InitializeAsync(writableDb, cancellationToken);

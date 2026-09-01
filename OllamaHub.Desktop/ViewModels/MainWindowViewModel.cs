@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private readonly ILoggerFactory loggerFactory;
     private readonly ConfigSnapshotService configService;
     private readonly ConsoleViewModel consoleViewModel;
+    private readonly Action<bool, int, int, string>? applyAppearance;
     private object currentView = new PlaceholderViewModel("加载中", "正在加载桌面控制中心。");
     private string pageTitle = "概览";
     private string pageDescription = "确认本地服务健康，快速查看网关与模型配置。";
@@ -31,18 +32,19 @@ public sealed class MainWindowViewModel : NotifyViewModel
     public string PageTitle { get => pageTitle; private set => SetProperty(ref pageTitle, value); }
     public string PageDescription { get => pageDescription; private set => SetProperty(ref pageDescription, value); }
 
-    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null)
+    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null, Action<bool, int, int, string>? applyAppearance = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
         this.loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
         this.configService = configService ?? new ConfigSnapshotService(this.loggerFactory.CreateLogger<ConfigSnapshotService>());
+        this.applyAppearance = applyAppearance;
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService);
         NavigationItems = new([
             new("概览", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
-            new("网关", "M 4,4 L 28,4 L 28,28 L 4,28 Z M 10,10 L 22,10 M 10,16 L 22,16 M 10,22 L 18,22", () => ShowGateway()),
+            new("网关", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
             new("Provider", "M 7,8 L 25,8 M 7,16 L 25,16 M 7,24 L 25,24 M 4,8 L 4,8 M 4,16 L 4,16 M 4,24 L 4,24", () => ShowProviders()),
-            new("活动", "M 4,18 C 8,10 12,26 16,18 C 20,10 24,26 28,18", () => ShowActivity()),
+            new("活动", "M 7,28 L 7,5 M 8,6 C 13,4 18,8 25,6 L 25,18 C 18,20 13,16 8,18", () => ShowActivity()),
             new("控制台", "M 5,6 L 27,6 L 27,26 L 5,26 Z M 9,12 L 13,16 L 9,20 M 16,20 L 23,20", () => ShowConsole()),
             new("设置", "M 16,4 L 18,7 L 22,8 L 25,6 L 28,9 L 26,12 L 27,16 L 30,18 L 28,22 L 24,21 L 21,24 L 21,28 L 16,29 L 14,25 L 10,24 L 7,26 L 4,22 L 6,19 L 5,15 L 2,13 L 4,8 L 8,9 L 11,6 L 11,3 Z M 16,12 A 4,4 0 1,0 16,20 A 4,4 0 1,0 16,12 Z", () => ShowSettings())
         ]);
@@ -59,7 +61,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = new GatewayViewModel(configService, toastService); }
     private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = consoleViewModel; }
     private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = new ActivityViewModel(gatewayService, loggerFactory.CreateLogger<ActivityViewModel>()); }
-    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = new SettingsViewModel(configService, loggerFactory.CreateLogger<SettingsViewModel>(), toastService); }
+    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = new SettingsViewModel(configService, loggerFactory.CreateLogger<SettingsViewModel>(), toastService, applyAppearance); }
     private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
 }
 

@@ -96,6 +96,10 @@ public sealed class AppSettingsEntity
     public bool DiagnosticsEnabled { get; set; }
     public int LogRetentionDays { get; set; } = 30;
     public bool LogStackTrace { get; set; }
+    public bool TransparencyEnabled { get; set; } = true;
+    public int TransparencyOpacity { get; set; } = 86;
+    public int BlurAmount { get; set; } = 24;
+    public string TransparencyAlgorithm { get; set; } = "acrylic";
 }
 
 public sealed class ProviderEntity
@@ -233,7 +237,11 @@ public static class ConfigurationDatabase
                 UpdateChannel TEXT NOT NULL,
                 DiagnosticsEnabled INTEGER NOT NULL,
                 LogRetentionDays INTEGER NOT NULL,
-                LogStackTrace INTEGER NOT NULL DEFAULT 0
+                LogStackTrace INTEGER NOT NULL DEFAULT 0,
+                TransparencyEnabled INTEGER NOT NULL DEFAULT 1,
+                TransparencyOpacity INTEGER NOT NULL DEFAULT 86,
+                BlurAmount INTEGER NOT NULL DEFAULT 24,
+                TransparencyAlgorithm TEXT NOT NULL DEFAULT 'acrylic'
             )
             """, cancellationToken);
 
@@ -251,6 +259,23 @@ public static class ConfigurationDatabase
         }
         catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
         {
+        }
+
+        foreach (var statement in new[]
+        {
+            "ALTER TABLE AppSettings ADD COLUMN TransparencyEnabled INTEGER NOT NULL DEFAULT 1",
+            "ALTER TABLE AppSettings ADD COLUMN TransparencyOpacity INTEGER NOT NULL DEFAULT 86",
+            "ALTER TABLE AppSettings ADD COLUMN BlurAmount INTEGER NOT NULL DEFAULT 24",
+            "ALTER TABLE AppSettings ADD COLUMN TransparencyAlgorithm TEXT NOT NULL DEFAULT 'acrylic'"
+        })
+        {
+            try
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);
+            }
+            catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+            {
+            }
         }
 
         try

@@ -276,7 +276,7 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
 public sealed class GatewayComboEditorViewModel : NotifyViewModel
 {
     private string name = ""; private bool enabled; private bool isExpanded = true; private int sortOrder;
-    public Guid Id { get; init; } public string Name { get => name; set => SetProperty(ref name, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool IsExpanded { get => isExpanded; set => SetProperty(ref isExpanded, value); } public int SortOrder { get => sortOrder; set => SetProperty(ref sortOrder, value); }
+    public Guid Id { get; init; } public string Name { get => name; set => SetProperty(ref name, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public double ExpandIconAngle => IsExpanded ? 90 : 0; public bool IsExpanded { get => isExpanded; set { if (SetProperty(ref isExpanded, value)) OnPropertyChanged(nameof(ExpandIconAngle)); } } public int SortOrder { get => sortOrder; set => SetProperty(ref sortOrder, value); }
     public ObservableCollection<GatewayRouteEditorViewModel> Routes { get; } = [];
     public static GatewayComboEditorViewModel FromResponse(GatewayComboResponse response) { var value = new GatewayComboEditorViewModel { Id = response.Id, Name = response.Name, Enabled = response.Enabled, SortOrder = response.SortOrder }; foreach (var route in response.Routes) value.Routes.Add(GatewayRouteEditorViewModel.FromResponse(route)); return value; }
     public void ApplyResponse(GatewayComboResponse response) { Name = response.Name; Enabled = response.Enabled; SortOrder = response.SortOrder; }

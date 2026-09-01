@@ -51,18 +51,18 @@
     </Style>
     <Style Selector="Border.window-chrome">
       <Setter Property="MinHeight" Value="40" />
-      <Setter Property="Padding" Value="16,4,10,4" />
+      <Setter Property="Padding" Value="16,0,16,0" />
       <Setter Property="Background" Value="Transparent" />
     </Style>
     <Style Selector="Button.window-control">
       <Setter Property="Width" Value="42" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="Height" Value="40" />
+      <Setter Property="MinHeight" Value="40" />
       <Setter Property="Padding" Value="0" />
-      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Background" Value="{DynamicResource GlassStrongBrush}" />
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="CornerRadius" Value="0" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
@@ -139,9 +139,9 @@
       </Grid>
       <!-- 标题栏覆盖两列，品牌区与内容区都可拖动；按钮位于同一层避免命中区被遮挡。 -->
       <Border Grid.ColumnSpan="2" Classes="window-chrome" Height="40" VerticalAlignment="Top" PointerPressed="WindowChrome_OnPointerPressed">
-        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="2">
+        <Grid ColumnDefinitions="*,42,42,42" ColumnSpacing="0" Margin="0,0,-16,0">
           <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化">
-            <Path Data="M 4,11 L 20,11 L 20,13 L 4,13 Z" Fill="{DynamicResource TextSecondaryBrush}" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Border Width="16" Height="2" Background="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,2,0,0" />
           </Button>
           <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="最大化或还原" AutomationProperties.Name="最大化或还原">
             <Path Data="M 5,5 L 19,5 L 19,19 L 5,19 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />

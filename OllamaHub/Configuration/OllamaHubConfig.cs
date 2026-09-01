@@ -73,6 +73,10 @@ public sealed class ResolvedAppSettings
     public bool DiagnosticsEnabled { get; init; }
     public int LogRetentionDays { get; init; } = 30;
     public bool LogStackTrace { get; init; }
+    public bool TransparencyEnabled { get; init; } = true;
+    public int TransparencyOpacity { get; init; } = 86;
+    public int BlurAmount { get; init; } = 24;
+    public string TransparencyAlgorithm { get; init; } = "acrylic";
 }
 
 public sealed class ResolvedAppConfig

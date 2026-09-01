@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         this.toastService = toastService;
         InitializeComponent();
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
+        AddHandler(InputElement.PointerMovedEvent, Window_OnPointerMoved, RoutingStrategies.Tunnel);
         toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         toastTimer.Tick += (_, _) =>
         {
@@ -79,6 +80,28 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void Window_OnPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (WindowState == WindowState.Maximized || IsInsideButton(e.Source))
+        {
+            Cursor = null;
+            return;
+        }
+
+        Cursor = GetResizeCursor(GetResizeEdge(e.GetPosition(this)));
+    }
+
+    private static Cursor? GetResizeCursor(WindowEdge? edge) => edge switch
+    {
+        WindowEdge.West or WindowEdge.East => new Cursor(StandardCursorType.SizeWestEast),
+        WindowEdge.North or WindowEdge.South => new Cursor(StandardCursorType.SizeNorthSouth),
+        WindowEdge.NorthWest => new Cursor(StandardCursorType.TopLeftCorner),
+        WindowEdge.NorthEast => new Cursor(StandardCursorType.TopRightCorner),
+        WindowEdge.SouthWest => new Cursor(StandardCursorType.BottomLeftCorner),
+        WindowEdge.SouthEast => new Cursor(StandardCursorType.BottomRightCorner),
+        _ => null
+    };
+
     private WindowEdge? GetResizeEdge(Point position)
     {
         const double grip = 8;
@@ -116,4 +139,48 @@ public partial class MainWindow : Window
     private void CloseButton_OnClick(object? sender, RoutedEventArgs e) => Close();
 
     private void ToggleWindowState() => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    public void ApplyAppearance(bool enabled, int opacity, int blurAmount, string algorithm)
+    {
+        opacity = Math.Clamp(opacity, 40, 100);
+        blurAmount = Math.Clamp(blurAmount, 0, 64);
+        var blurFactor = 0.9 + (blurAmount / 64d * 0.1);
+        SetBrushAlpha("WindowBackgroundBrush", ScaleAlpha(230, opacity, blurFactor));
+        SetBrushAlpha("GlassBrush", ScaleAlpha(184, opacity, blurFactor));
+        SetBrushAlpha("GlassStrongBrush", ScaleAlpha(208, opacity, blurFactor));
+        SetBrushAlpha("SurfaceBrush", ScaleAlpha(199, opacity, blurFactor));
+        SetBrushAlpha("SurfaceSubtleBrush", ScaleAlpha(164, opacity, blurFactor));
+        SetBrushAlpha("SurfaceMutedBrush", ScaleAlpha(128, opacity, blurFactor));
+        SetBrushAlpha("NavigationHoverBrush", ScaleAlpha(214, opacity, blurFactor));
+
+        TransparencyBackgroundFallback = ResolveBrush("WindowBackgroundBrush");
+        Background = enabled
+            ? Brushes.Transparent
+            : OpaqueCopy(ResolveBrush("WindowBackgroundBrush"));
+        TransparencyLevelHint = !enabled
+            ? [WindowTransparencyLevel.None]
+            : algorithm.Trim().ToLowerInvariant() switch
+            {
+                "mica" => [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur],
+                "blur" => [WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur],
+                _ => [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur]
+            };
+    }
+
+    private IBrush ResolveBrush(string key) => TryGetResource(key, null, out var value) && value is IBrush brush
+        ? brush
+        : Brushes.Transparent;
+
+    private void SetBrushAlpha(string key, int alpha)
+    {
+        if (TryGetResource(key, null, out var value) && value is SolidColorBrush brush)
+            brush.Color = Color.FromArgb((byte)Math.Clamp(alpha, 0, 255), brush.Color.R, brush.Color.G, brush.Color.B);
+    }
+
+    private static byte ScaleAlpha(byte baseAlpha, int opacity, double blurFactor) =>
+        (byte)Math.Clamp(Math.Round(baseAlpha * (opacity / 86d) * blurFactor), 32, 255);
+
+    private static SolidColorBrush OpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
+        ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
+        : new SolidColorBrush(Color.FromArgb(255, 230, 240, 243));
 }

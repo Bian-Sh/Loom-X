@@ -74,7 +74,11 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     UpdateChannel = settings.UpdateChannel,
                     DiagnosticsEnabled = settings.DiagnosticsEnabled,
                     LogRetentionDays = settings.LogRetentionDays,
-                    LogStackTrace = settings.LogStackTrace
+                    LogStackTrace = settings.LogStackTrace,
+                    TransparencyEnabled = settings.TransparencyEnabled,
+                    TransparencyOpacity = settings.TransparencyOpacity,
+                    BlurAmount = settings.BlurAmount,
+                    TransparencyAlgorithm = settings.TransparencyAlgorithm
                 },
                 Providers = resolvedProviders,
                 Models = models,
