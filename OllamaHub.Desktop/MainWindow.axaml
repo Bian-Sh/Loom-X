@@ -1,68 +1,90 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="OllamaHub 控制中心" Background="#F7F8FA">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="OllamaHub 控制中心">
   <Window.Styles>
     <Style Selector="ToggleButton.nav-button">
-      <Setter Property="HorizontalContentAlignment" Value="Left"/>
-      <Setter Property="HorizontalAlignment" Value="Stretch"/>
-      <Setter Property="Padding" Value="12,10"/>
-      <Setter Property="Margin" Value="0,2"/>
-      <Setter Property="MinHeight" Value="40"/>
-      <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Padding" Value="12,10" />
+      <Setter Property="Margin" Value="0,2" />
+      <Setter Property="MinHeight" Value="42" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="CornerRadius" Value="10" />
     </Style>
-    <Style Selector="ToggleButton.nav-button:checked"><Setter Property="Background" Value="#DCE5EC"/><Setter Property="Foreground" Value="#101820"/></Style>
+    <Style Selector="ToggleButton.nav-button:pointerover">
+      <Setter Property="Background" Value="#66FFFFFF" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ToggleButton.nav-button:checked">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.glass-sidebar">
+      <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="0,0,1,0" />
+    </Style>
+    <Style Selector="Border.topbar">
+      <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
   </Window.Styles>
   <Grid>
-    <Grid ColumnDefinitions="208,*">
-      <Border Grid.Column="0" Background="#EEF1F5" BorderBrush="#D7DCE3" BorderThickness="0,0,1,0" Padding="14,22">
-      <Grid RowDefinitions="Auto,*,Auto">
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="10" Margin="8,0,8,28">
-          <Border Width="34" Height="34" BorderBrush="#176B87" BorderThickness="2" CornerRadius="8">
-            <TextBlock Text="O" Foreground="#176B87" FontWeight="Bold" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-          </Border>
-          <StackPanel Spacing="1" VerticalAlignment="Center">
-            <TextBlock Text="OllamaHub" FontSize="16" FontWeight="Bold"/>
-            <TextBlock Text="控制中心" FontSize="10" Opacity="0.58"/>
+    <Grid ColumnDefinitions="228,*">
+      <Border Grid.Column="0" Classes="glass-sidebar" Padding="16,24">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28">
+            <Border Width="38" Height="38" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12">
+              <PathIcon Data="M 19,3 L 22,3 L 22,16 L 35,16 L 35,19 L 22,19 L 22,32 L 19,32 L 19,19 L 6,19 L 6,16 L 19,16 Z" Foreground="{DynamicResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Spacing="1" VerticalAlignment="Center">
+              <TextBlock Text="OllamaHub" FontSize="16" FontWeight="SemiBold" />
+              <TextBlock Text="控制中心" FontSize="10" Foreground="{DynamicResource TextTertiaryBrush}" />
+            </StackPanel>
           </StackPanel>
-        </StackPanel>
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-          <ItemsControl ItemsSource="{Binding NavigationItems}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <StackPanel Spacing="3">
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding NavigationItems}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
                   <ToggleButton Command="{Binding NavigateCommand}" IsChecked="{Binding IsActive, Mode=OneWay}" Classes="nav-button">
                     <StackPanel Orientation="Horizontal" Spacing="11">
-                      <TextBlock Text="{Binding Icon}" Width="18" Foreground="#176B87" HorizontalAlignment="Center"/>
-                      <TextBlock Text="{Binding Title}"/>
+                      <PathIcon Data="{Binding IconData}" Width="18" Height="18" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" />
+                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
                     </StackPanel>
                   </ToggleButton>
-                </StackPanel>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-        <Border Grid.Row="2" BorderBrush="#D7DCE3" BorderThickness="0,1,0,0" Padding="8,14,8,0">
-          <StackPanel Spacing="3">
-            <TextBlock Text="本地服务" FontSize="11" Opacity="0.58"/>
-            <TextBlock Text="服务版本" FontSize="11" Opacity="0.58"/>
-            <TextBlock Text="本地服务" FontSize="11" Foreground="#23835A"/>
-          </StackPanel>
-        </Border>
-      </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="8,16,8,0">
+            <StackPanel Spacing="4">
+              <TextBlock Text="本地服务" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" />
+              <TextBlock Text="服务版本" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" />
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Ellipse Width="7" Height="7" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" />
+                <TextBlock Text="本地服务" FontSize="11" Foreground="{DynamicResource SuccessBrush}" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </Grid>
       </Border>
-      <Grid Grid.Column="1" RowDefinitions="92,*">
-        <Border Grid.Row="0" Background="#F7F8FA" BorderBrush="#D7DCE3" BorderThickness="0,0,0,1" Padding="32,0">
-          <StackPanel VerticalAlignment="Center" Spacing="4">
-            <TextBlock Text="{Binding PageTitle}" FontSize="28" FontWeight="Bold"/>
-            <TextBlock Text="{Binding PageDescription}" FontSize="12" Opacity="0.62"/>
+      <Grid Grid.Column="1" RowDefinitions="104,*">
+        <Border Grid.Row="0" Classes="topbar" Padding="32,0">
+          <StackPanel VerticalAlignment="Center" Spacing="5">
+            <TextBlock Text="{Binding PageTitle}" FontSize="26" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding PageDescription}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
           </StackPanel>
         </Border>
-        <Border Grid.Row="1" Padding="32,18" Background="#F7F8FA">
-          <ContentControl Content="{Binding CurrentView}"/>
+        <Border Grid.Row="1" Padding="32,20" Background="Transparent">
+          <ContentControl Content="{Binding CurrentView}" />
         </Border>
       </Grid>
     </Grid>
-    <Border x:Name="toastBorder" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Background="#17212B" CornerRadius="6" Padding="14,10" MaxWidth="420">
-      <TextBlock x:Name="toastText" Foreground="White" TextWrapping="Wrap"/>
+    <Border x:Name="toastBorder" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Background="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="14,11" MaxWidth="420">
+      <TextBlock x:Name="toastText" Foreground="White" TextWrapping="Wrap" />
     </Border>
   </Grid>
 </Window>

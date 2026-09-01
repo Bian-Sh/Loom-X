@@ -8,5 +8,82 @@
     <DataTemplate DataType="{x:Type vm:GatewayViewModel}"><views:GatewayView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:PlaceholderViewModel}"><views:PlaceholderView /></DataTemplate>
   </Application.DataTemplates>
-  <Application.Styles><FluentTheme /></Application.Styles>
+  <Application.Resources>
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#F3F5F6" />
+    <SolidColorBrush x:Key="GlassBrush" Color="#CCFFFFFF" />
+    <SolidColorBrush x:Key="GlassStrongBrush" Color="#EBFFFFFF" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#F7F9FA" />
+    <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#EEF2F3" />
+    <SolidColorBrush x:Key="BorderBrush" Color="#D5DEE1" />
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="#C3D0D4" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="#172126" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5F6D73" />
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="#8A969B" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#287C83" />
+    <SolidColorBrush x:Key="AccentSoftBrush" Color="#E2F0F0" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#2D8666" />
+    <SolidColorBrush x:Key="SuccessSoftBrush" Color="#E8F4EE" />
+    <SolidColorBrush x:Key="SuccessBorderBrush" Color="#B8DCC8" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#9A6B2B" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#A94E59" />
+    <SolidColorBrush x:Key="GraphBackgroundBrush" Color="#07131B" />
+    <SolidColorBrush x:Key="GraphBorderBrush" Color="#1D3944" />
+    <SolidColorBrush x:Key="GraphTextBrush" Color="#F1F7FA" />
+    <SolidColorBrush x:Key="GraphMutedBrush" Color="#91A7B1" />
+    <SolidColorBrush x:Key="GraphLiveBrush" Color="#6EE7B7" />
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="Button:pressed">
+      <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />
+    </Style>
+    <Style Selector="TextBox, ComboBox, NumericUpDown">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="10,7" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBox:focus, ComboBox:focus, NumericUpDown:focus">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="Padding" Value="14,9" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TabItem:selected">
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="ToggleSwitch">
+      <Setter Property="MinHeight" Value="28" />
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+  </Application.Styles>
 </Application>

@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Avalonia.Media;
 using Microsoft.Extensions.Logging;
 using OllamaHub;
 using OllamaHub.Configuration;
@@ -38,12 +39,12 @@ public sealed class MainWindowViewModel : NotifyViewModel
         this.configService = configService ?? new ConfigSnapshotService(this.loggerFactory.CreateLogger<ConfigSnapshotService>());
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService);
         NavigationItems = new([
-            new("概览", "◉", () => ShowOverview()),
-            new("网关", "▦", () => ShowGateway()),
-            new("Provider", "⇄", () => ShowProviders()),
-            new("活动", "≋", () => ShowActivity()),
-            new("控制台", "⌘", () => ShowConsole()),
-            new("设置", "⚙", () => ShowSettings())
+            new("概览", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
+            new("网关", "M 4,4 L 28,4 L 28,28 L 4,28 Z M 10,10 L 22,10 M 10,16 L 22,16 M 10,22 L 18,22", () => ShowGateway()),
+            new("Provider", "M 7,8 L 25,8 M 7,16 L 25,16 M 7,24 L 25,24 M 4,8 L 4,8 M 4,16 L 4,16 M 4,24 L 4,24", () => ShowProviders()),
+            new("活动", "M 4,18 C 8,10 12,26 16,18 C 20,10 24,26 28,18", () => ShowActivity()),
+            new("控制台", "M 5,6 L 27,6 L 27,26 L 5,26 Z M 9,12 L 13,16 L 9,20 M 16,20 L 23,20", () => ShowConsole()),
+            new("设置", "M 16,4 L 18,7 L 22,8 L 25,6 L 28,9 L 26,12 L 27,16 L 30,18 L 28,22 L 24,21 L 21,24 L 21,28 L 16,29 L 14,25 L 10,24 L 7,26 L 4,22 L 6,19 L 5,15 L 2,13 L 4,8 L 8,9 L 11,6 L 11,3 Z M 16,12 A 4,4 0 1,0 16,20 A 4,4 0 1,0 16,12 Z", () => ShowSettings())
         ]);
         ShowOverview();
     }
@@ -66,10 +67,11 @@ public sealed class NavigationItemViewModel : NotifyViewModel
 {
     public string Title { get; }
     public string Icon { get; }
+    public Geometry IconData { get; }
     private bool isActive;
     public bool IsActive { get => isActive; set => SetProperty(ref isActive, value); }
     public ICommand NavigateCommand { get; }
-    public NavigationItemViewModel(string title, string icon, Action action) { Title = title; Icon = icon; NavigateCommand = new DelegateCommand(action); }
+    public NavigationItemViewModel(string title, string icon, Action action) { Title = title; Icon = icon; IconData = Geometry.Parse(icon); NavigateCommand = new DelegateCommand(action); }
 }
 
 public sealed class OverviewViewModel : NotifyViewModel, IDisposable

@@ -1,56 +1,56 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.Views.ProvidersView">
   <UserControl.Styles>
-    <Style Selector="TextBlock.muted"><Setter Property="Opacity" Value="0.62"/><Setter Property="FontSize" Value="10"/></Style>
-    <Style Selector="Border.panel"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/></Style>
-    <Style Selector="Border.stat"><Setter Property="Background" Value="White"/><Setter Property="BorderBrush" Value="#D9DEE6"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/><Setter Property="Padding" Value="14,12"/></Style>
-    <Style Selector="Button.icon-button"><Setter Property="Width" Value="36"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/></Style>
-    <Style Selector="Button.small-button"><Setter Property="Padding" Value="10,6"/><Setter Property="MinHeight" Value="32"/></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="FontSize" Value="10"/></Style>
+    <Style Selector="Border.panel"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/></Style>
+    <Style Selector="Border.stat"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="16,14"/></Style>
+    <Style Selector="Button.icon-button"><Setter Property="Width" Value="36"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/><Setter Property="CornerRadius" Value="10"/></Style>
+    <Style Selector="Button.small-button"><Setter Property="Padding" Value="11,7"/><Setter Property="MinHeight" Value="34"/></Style>
   </UserControl.Styles>
   <Grid RowDefinitions="Auto,*" RowSpacing="12">
       <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
         <Border Classes="stat">
-          <StackPanel Spacing="3"><TextBlock Text="Provider" Classes="muted"/><TextBlock Text="{Binding Providers.Count}" FontSize="21" FontWeight="Bold"/><TextBlock Text="{Binding EnabledProviderCount, StringFormat='{}{0} 个已启用'}" Foreground="#23835A" FontSize="11"/></StackPanel>
+          <StackPanel Spacing="3"><TextBlock Text="Provider" Classes="muted"/><TextBlock Text="{Binding Providers.Count}" FontSize="21" FontWeight="Bold"/><TextBlock Text="{Binding EnabledProviderCount, StringFormat='{}{0} 个已启用'}" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/></StackPanel>
         </Border>
         <Border Grid.Column="1" Classes="stat">
-          <StackPanel Spacing="3"><TextBlock Text="可用模型" Classes="muted"/><TextBlock Text="{Binding TotalModelCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="远程模型已发现" Foreground="#23835A" FontSize="11"/></StackPanel>
+          <StackPanel Spacing="3"><TextBlock Text="可用模型" Classes="muted"/><TextBlock Text="{Binding TotalModelCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="远程模型已发现" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/></StackPanel>
         </Border>
         <Border Grid.Column="2" Classes="stat">
-          <StackPanel Spacing="3"><TextBlock Text="受保护密钥" Classes="muted"/><TextBlock Text="{Binding ProtectedKeyCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="DPAPI CurrentUser" Foreground="#23835A" FontSize="11"/></StackPanel>
+          <StackPanel Spacing="3"><TextBlock Text="受保护密钥" Classes="muted"/><TextBlock Text="{Binding ProtectedKeyCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="DPAPI CurrentUser" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/></StackPanel>
         </Border>
         <Border Grid.Column="3" Classes="stat">
-          <StackPanel Spacing="3"><TextBlock Text="连接健康" Classes="muted"/><StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="{Binding HealthyProviderCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="/" FontSize="17" VerticalAlignment="Center" Opacity="0.5"/><TextBlock Text="{Binding Providers.Count}" FontSize="17" VerticalAlignment="Center" Opacity="0.7"/></StackPanel><TextBlock Text="等待验证" Foreground="#23835A" FontSize="11"/></StackPanel>
+          <StackPanel Spacing="3"><TextBlock Text="连接健康" Classes="muted"/><StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="{Binding HealthyProviderCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="/" FontSize="17" VerticalAlignment="Center" Opacity="0.5"/><TextBlock Text="{Binding Providers.Count}" FontSize="17" VerticalAlignment="Center" Opacity="0.7"/></StackPanel><TextBlock Text="等待验证" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/></StackPanel>
         </Border>
       </Grid>
 
       <Grid Grid.Row="1" ColumnDefinitions="310,*" ColumnSpacing="14" VerticalAlignment="Stretch">
         <Border Grid.Column="0" Classes="panel" ClipToBounds="True">
           <Grid RowDefinitions="Auto,Auto,*">
-            <Border Padding="14,12" BorderBrush="#D9DEE6" BorderThickness="0,0,0,1">
+            <Border Padding="14,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="2"><TextBlock Text="Provider 目录" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="按当前路由顺序显示" Classes="muted"/></StackPanel>
-                <Button Grid.Column="1" Content="＋" Command="{Binding NewProviderCommand}" Classes="icon-button" AutomationProperties.Name="新增 Provider"/>
+                <Button Grid.Column="1" Command="{Binding NewProviderCommand}" Classes="icon-button" AutomationProperties.Name="新增 Provider"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z" Width="16" Height="16"/></Button>
               </Grid>
             </Border>
-            <Border Grid.Row="1" Padding="10" BorderBrush="#D9DEE6" BorderThickness="0,0,0,1">
+            <Border Grid.Row="1" Padding="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
               <TextBox Watermark="搜索 Provider"/>
             </Border>
             <ListBox Grid.Row="2" ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate>
                 <DataTemplate>
-                  <Border Padding="12" Margin="0,0,0,1" Background="#F5F7FA">
+                  <Border Padding="12" Margin="0,0,0,1" Background="{DynamicResource SurfaceSubtleBrush}">
                     <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
                       <StackPanel Orientation="Horizontal" Spacing="9">
-                        <Border Width="30" Height="30" Background="#D9EEF2" CornerRadius="6"><TextBlock Text="P" Foreground="#176B87" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                        <StackPanel VerticalAlignment="Center" Spacing="1"><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="●" Foreground="#23835A" FontSize="9" VerticalAlignment="Center" IsVisible="{Binding Enabled}"/></StackPanel></StackPanel>
+                        <Border Width="30" Height="30" Background="{DynamicResource AccentSoftBrush}" CornerRadius="9"><TextBlock Text="P" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                        <StackPanel VerticalAlignment="Center" Spacing="1"><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><Ellipse Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" IsVisible="{Binding Enabled}"/></StackPanel></StackPanel>
                       </StackPanel>
                       <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="启用 Provider" AutomationProperties.Name="启用 Provider" VerticalAlignment="Center"/>
                       <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding BaseUrl}" Classes="muted" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="39,7,0,0"/>
                       <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="9" Margin="39,5,0,0">
                         <TextBlock Text="{Binding ApiMode}" Classes="muted"/>
                         <TextBlock Text="{Binding Models.Count, StringFormat='{}{0} 个模型'}" Classes="muted"/>
-                        <TextBlock Text="密钥已配置" Foreground="#23835A" FontSize="10" IsVisible="{Binding HasApiKey}"/>
+                        <TextBlock Text="密钥已配置" Foreground="{DynamicResource SuccessBrush}" FontSize="10" IsVisible="{Binding HasApiKey}"/>
                       </StackPanel>
-                      <Button Grid.Row="3" Grid.Column="1" Content="⌫" Classes="icon-button" Click="DeleteProviderButton_OnClick" ToolTip.Tip="删除 Provider" AutomationProperties.Name="删除 Provider" HorizontalAlignment="Right"/>
+                      <Button Grid.Row="3" Grid.Column="1" Classes="icon-button" Click="DeleteProviderButton_OnClick" ToolTip.Tip="删除 Provider" AutomationProperties.Name="删除 Provider" HorizontalAlignment="Right"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23" Width="15" Height="15"/></Button>
                     </Grid>
                   </Border>
                 </DataTemplate>
@@ -61,7 +61,7 @@
 
         <Border Grid.Column="1" Classes="panel" Padding="0">
           <Grid>
-            <Border Padding="18,16,18,0" BorderBrush="#D9DEE6" BorderThickness="0,0,0,1" IsVisible="{Binding HasSelectedProvider}">
+            <Border Padding="18,16,18,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" IsVisible="{Binding HasSelectedProvider}">
               <Grid RowDefinitions="Auto,*" RowSpacing="10">
                 <Grid ColumnDefinitions="*">
                   <StackPanel Spacing="3" IsVisible="{Binding HasSelectedProvider}"><TextBlock Text="{Binding SelectedProvider.DisplayName}" FontSize="20" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding SelectedProvider.Models.Count}" Classes="muted"/><TextBlock Text="个模型 ·" Classes="muted"/><TextBlock Text="{Binding SelectedProvider.ApiMode}" Classes="muted"/><TextBlock Text="兼容 ·" Classes="muted"/><TextBlock Text="{Binding SelectedProvider.SelectedEndpointFormat.DisplayName}" Classes="muted" IsVisible="{Binding SelectedProvider.IsEndpointFormatVisible}"/><TextBlock Text="密钥已保护" Classes="muted" IsVisible="{Binding SelectedProvider.HasApiKey}"/></StackPanel></StackPanel>
@@ -77,7 +77,7 @@
                         </Grid>
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                           <StackPanel Spacing="5"><TextBlock Text="Provider 类型" Classes="muted"/><ComboBox ItemsSource="{Binding ProviderTypeOptions}" SelectedItem="{Binding SelectedProvider.ApiMode, Mode=TwoWay}"/></StackPanel>
-                          <StackPanel Grid.Column="1" Spacing="5"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="Base URL" Classes="muted" VerticalAlignment="Center"/><Border Grid.Column="1" Width="18" Height="18" Background="#EEF2F6" CornerRadius="9" Margin="6,0,0,0" ToolTip.Tip="加不加 v1 是个问题，请遵循供应商手册" AutomationProperties.Name="加不加 v1 是个问题，请遵循供应商手册"><TextBlock Text="?" FontSize="11" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid><TextBox Text="{Binding SelectedProvider.BaseUrl}" Watermark="https://api.example.com"/></StackPanel>
+                          <StackPanel Grid.Column="1" Spacing="5"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="Base URL" Classes="muted" VerticalAlignment="Center"/><Border Grid.Column="1" Width="18" Height="18" Background="{DynamicResource SurfaceMutedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" Margin="6,0,0,0" ToolTip.Tip="加不加 v1 是个问题，请遵循供应商手册" AutomationProperties.Name="加不加 v1 是个问题，请遵循供应商手册"><PathIcon Data="M 10,10 A 5,5 0 1,1 16,14 C 14,15 13,16 13,18 M 13,21 L 13,21" Width="11" Height="11" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></Grid><TextBox Text="{Binding SelectedProvider.BaseUrl}" Watermark="https://api.example.com"/></StackPanel>
                         </Grid>
                         <StackPanel Spacing="5" IsVisible="{Binding SelectedProvider.IsEndpointFormatVisible}"><TextBlock Text="请求格式" Classes="muted"/><ComboBox ItemsSource="{Binding SelectedProvider.EndpointFormatOptions}" SelectedItem="{Binding SelectedProvider.SelectedEndpointFormat, Mode=TwoWay}"/></StackPanel>
                       </StackPanel>
@@ -90,15 +90,15 @@
                         <StackPanel Spacing="5"><TextBlock Text="API Key" Classes="muted"/><Grid ColumnDefinitions="*,Auto"><TextBox Text="{Binding SelectedProvider.ApiKey}" PasswordChar="{Binding SelectedProvider.ApiKeyPasswordChar}" Watermark="{Binding SelectedProvider.ApiKeyWatermark}" Padding="12,9,46,9"/><Button Grid.Column="1" Width="38" Height="34" Margin="-42,0,4,0" Background="Transparent" BorderThickness="0" Click="ToggleApiKeyVisibilityButton_OnClick" ToolTip.Tip="{Binding SelectedProvider.ApiKeyVisibilityToolTip}" AutomationProperties.Name="{Binding SelectedProvider.ApiKeyVisibilityToolTip}"><Panel Width="18" Height="18"><PathIcon Data="M 1,12 C 4,5 20,5 23,12 C 20,19 4,19 1,12 Z M 12,8 A 4,4 0 1,0 12,16 A 4,4 0 1,0 12,8 Z" IsVisible="{Binding SelectedProvider.IsApiKeyVisible}"/><PathIcon Data="M 1,12 C 4,5 20,5 23,12 C 20,19 4,19 1,12 Z M 12,8 A 4,4 0 1,0 12,16 A 4,4 0 1,0 12,8 Z M 3,3 L 21,21" IsVisible="{Binding SelectedProvider.IsApiKeyHidden}"/></Panel></Button></Grid></StackPanel>
                         <CheckBox Content="使用代理" IsChecked="{Binding SelectedProvider.UseProxy}"/>
                         <StackPanel Spacing="7">
-                          <Grid ColumnDefinitions="*,Auto"><StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="自定义请求头" FontSize="13" FontWeight="SemiBold"/><Border Background="#EEF2F6" CornerRadius="8" Padding="6,2"><TextBlock Text="{Binding SelectedProvider.Headers.Count}" Classes="muted"/></Border></StackPanel><Button Grid.Column="1" Content="＋ 添加" Classes="small-button" Click="AddHeaderButton_OnClick"/></Grid>
+                          <Grid ColumnDefinitions="*,Auto"><StackPanel Orientation="Horizontal" Spacing="6"><TextBlock Text="自定义请求头" FontSize="13" FontWeight="SemiBold"/><Border Background="{DynamicResource SurfaceMutedBrush}" CornerRadius="8" Padding="6,2"><TextBlock Text="{Binding SelectedProvider.Headers.Count}" Classes="muted"/></Border></StackPanel><Button Grid.Column="1" Content="添加" Classes="small-button" Click="AddHeaderButton_OnClick"/></Grid>
                           <ItemsControl ItemsSource="{Binding SelectedProvider.Headers}">
                             <ItemsControl.ItemTemplate>
                               <DataTemplate>
-                                <Border BorderBrush="#D9DEE6" BorderThickness="1" CornerRadius="7" Margin="0,0,0,7" ClipToBounds="True">
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,7" ClipToBounds="True">
                                   <Grid ColumnDefinitions="*,2*,Auto">
                                     <TextBox Text="{Binding Name}" Watermark="Header 名称" BorderThickness="0" Padding="12,9" FontFamily="Consolas"/>
-                                    <TextBox Grid.Column="1" Text="{Binding Value}" Watermark="Header 值" BorderBrush="#D9DEE6" BorderThickness="1,0,0,0" Padding="12,9" FontFamily="Consolas"/>
-                                    <Button Grid.Column="2" Content="×" Classes="icon-button" Width="34" Height="34" Margin="4" Click="RemoveHeaderButton_OnClick" ToolTip.Tip="删除请求头" AutomationProperties.Name="删除请求头"/>
+                                    <TextBox Grid.Column="1" Text="{Binding Value}" Watermark="Header 值" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0" Padding="12,9" FontFamily="Consolas"/>
+                                    <Button Grid.Column="2" Classes="icon-button" Width="34" Height="34" Margin="4" Click="RemoveHeaderButton_OnClick" ToolTip.Tip="删除请求头" AutomationProperties.Name="删除请求头"><PathIcon Data="M 7,7 L 25,25 M 25,7 L 7,25" Width="14" Height="14"/></Button>
                                   </Grid>
                                 </Border>
                               </DataTemplate>
@@ -106,8 +106,8 @@
                           </ItemsControl>
                           <TextBlock Text="尚未添加自定义请求头" Classes="muted" IsVisible="{Binding SelectedProvider.HasNoHeaders}"/>
                         </StackPanel>
-                        <Border Background="#EDF7F0" BorderBrush="#B7DFC6" BorderThickness="1" CornerRadius="6" Padding="11">
-                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="2"><TextBlock Text="连接状态" FontWeight="SemiBold"/><TextBlock Text="{Binding ConnectionStatus}" Foreground="#23835A" TextWrapping="Wrap"/></StackPanel><Button Grid.Column="1" Content="测试连接" Command="{Binding TestConnectionCommand}" Classes="small-button" VerticalAlignment="Center"/></Grid>
+                          <Border Background="{DynamicResource SuccessSoftBrush}" BorderBrush="{DynamicResource SuccessBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="11">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="2"><TextBlock Text="连接状态" FontWeight="SemiBold"/><TextBlock Text="{Binding ConnectionStatus}" Foreground="{DynamicResource SuccessBrush}" TextWrapping="Wrap"/></StackPanel><Button Grid.Column="1" Content="测试连接" Command="{Binding TestConnectionCommand}" Classes="small-button" VerticalAlignment="Center"/></Grid>
                         </Border>
                       </StackPanel>
                     </ScrollViewer>
@@ -116,21 +116,21 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                       <StackPanel Spacing="12" Margin="0,16,0,18">
                         <StackPanel Spacing="4"><TextBlock Text="模型列表 URL（可选）" FontWeight="SemiBold"/><TextBox Text="{Binding SelectedProvider.ModelListUrl}" Watermark="例如：https://api.example.com/v1/models"/><TextBlock Text="留空时根据 Base URL 自动推导；填写后仅用此地址刷新模型，不影响聊天请求。" Classes="muted" TextWrapping="Wrap"/></StackPanel>
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Watermark="搜索模型"/><Button Grid.Column="1" Content="＋ 添加模型" Command="{Binding NewModelCommand}" Classes="small-button"/><Button Grid.Column="2" Content="↻ 同步模型" Command="{Binding SyncModelsCommand}" Classes="small-button" AutomationProperties.Name="同步模型"/></Grid>
-                        <Border BorderBrush="#D9DEE6" BorderThickness="1" CornerRadius="6" ClipToBounds="True">
+                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Watermark="搜索模型"/><Button Grid.Column="1" Command="{Binding NewModelCommand}" Classes="small-button"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z" Width="14" Height="14"/><TextBlock Text="添加模型" VerticalAlignment="Center"/></StackPanel></Button><Button Grid.Column="2" Command="{Binding SyncModelsCommand}" Classes="small-button" AutomationProperties.Name="同步模型"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6" Width="14" Height="14"/><TextBlock Text="同步模型" VerticalAlignment="Center"/></StackPanel></Button></Grid>
+                        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
                           <Grid RowDefinitions="Auto,*">
-                            <Border Background="#F5F7FA" Padding="10,8"><Grid ColumnDefinitions="28,1.5*,*,80,100,56" ColumnSpacing="8">
+                            <Border Background="{DynamicResource SurfaceSubtleBrush}" Padding="10,8"><Grid ColumnDefinitions="28,1.5*,*,80,100,56" ColumnSpacing="8">
                               <TextBlock Grid.Column="1" Text="模型" Classes="muted"/><TextBlock Grid.Column="2" Text="能力" Classes="muted"/><TextBlock Grid.Column="3" Text="上下文" Classes="muted"/><TextBlock Grid.Column="4" Text="远程状态" Classes="muted"/><TextBlock Grid.Column="5" Text="启用" Classes="muted"/>
                             </Grid></Border>
                             <ListBox Grid.Row="1" ItemsSource="{Binding SelectedProvider.Models}" SelectedItem="{Binding SelectedModel, Mode=TwoWay}" MinHeight="110">
                               <ListBox.ItemTemplate>
                                 <DataTemplate>
                                   <Grid ColumnDefinitions="28,1.5*,*,80,100,56" Margin="10,9" ColumnSpacing="8">
-                                    <TextBlock Text="⋮⋮" Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                    <PathIcon Data="M 6,8 L 11,8 M 6,16 L 11,16 M 6,24 L 11,24 M 21,8 L 26,8 M 21,16 L 26,16 M 21,24 L 26,24" Width="16" Height="16" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                                     <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12"/><TextBlock Text="{Binding ModelId}" Classes="muted" FontFamily="Consolas"/></StackPanel>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"><Border Background="#EDF1F5" CornerRadius="4" Padding="4,2"><TextBlock Text="{Binding Family}" FontSize="9"/></Border><Border Background="#EDF1F5" CornerRadius="4" Padding="4,2" IsVisible="{Binding Vision}"><TextBlock Text="视觉" FontSize="9"/></Border></StackPanel>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"><Border Background="{DynamicResource SurfaceMutedBrush}" CornerRadius="4" Padding="4,2"><TextBlock Text="{Binding Family}" FontSize="9"/></Border><Border Background="{DynamicResource SurfaceMutedBrush}" CornerRadius="4" Padding="4,2" IsVisible="{Binding Vision}"><TextBlock Text="视觉" FontSize="9"/></Border></StackPanel>
                                     <TextBlock Grid.Column="3" Text="{Binding ContextLength}" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="4" Text="已发现" Foreground="#23835A" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="4" Text="已发现" Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
                                     <ToggleSwitch Grid.Column="5" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
                                   </Grid>
                                 </DataTemplate>
@@ -138,12 +138,12 @@
                             </ListBox>
                           </Grid>
                         </Border>
-                        <Border IsVisible="{Binding HasSelectedModel}" Background="#F5F7FA" BorderBrush="#D9DEE6" BorderThickness="1" CornerRadius="6" Padding="12">
+                        <Border IsVisible="{Binding HasSelectedModel}" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
                           <StackPanel Spacing="10">
-                            <Grid ColumnDefinitions="*,Auto"><TextBlock Text="模型配置" FontSize="13" FontWeight="SemiBold"/><Button Grid.Column="1" Content="⌫" Command="{Binding DeleteModelCommand}" Classes="icon-button" AutomationProperties.Name="删除模型"/></Grid>
+                            <Grid ColumnDefinitions="*,Auto"><TextBlock Text="模型配置" FontSize="13" FontWeight="SemiBold"/><Button Grid.Column="1" Command="{Binding DeleteModelCommand}" Classes="icon-button" AutomationProperties.Name="删除模型"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23" Width="15" Height="15"/></Button></Grid>
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="10"><StackPanel Spacing="4"><TextBlock Text="模型 ID" Classes="muted"/><TextBox Text="{Binding SelectedModel.ModelId}"/></StackPanel><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="显示名称" Classes="muted"/><TextBox Text="{Binding SelectedModel.DisplayName}"/></StackPanel></Grid>
                             <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10"><StackPanel Spacing="4"><TextBlock Text="Family" Classes="muted"/><TextBox Text="{Binding SelectedModel.Family}"/></StackPanel><StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="上下文" Classes="muted"/><NumericUpDown Value="{Binding SelectedModel.ContextLength}" Minimum="1"/></StackPanel><StackPanel Grid.Column="2" Spacing="4"><TextBlock Text="Max Tokens" Classes="muted"/><NumericUpDown Value="{Binding SelectedModel.MaxTokens}" Minimum="1"/></StackPanel></Grid>
-                            <StackPanel Orientation="Horizontal" Spacing="12"><CheckBox Content="启用" IsChecked="{Binding SelectedModel.Enabled}"/><CheckBox Content="支持视觉" IsChecked="{Binding SelectedModel.Vision}"/><TextBlock Text="修改自动保存" Foreground="#23835A" VerticalAlignment="Center"/></StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="12"><CheckBox Content="启用" IsChecked="{Binding SelectedModel.Enabled}"/><CheckBox Content="支持视觉" IsChecked="{Binding SelectedModel.Vision}"/><TextBlock Text="修改自动保存" Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/></StackPanel>
                           </StackPanel>
                         </Border>
                       </StackPanel>

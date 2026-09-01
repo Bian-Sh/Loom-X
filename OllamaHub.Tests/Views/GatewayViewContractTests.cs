@@ -16,7 +16,7 @@ public sealed class GatewayViewContractTests
         Assert.True(
             source.IndexOf("<ItemsControl ItemsSource=\"{Binding Routes}\">", StringComparison.Ordinal) <
             source.IndexOf("<Border Classes=\"member-footbar\">", StringComparison.Ordinal));
-        Assert.Contains("Text=\"⋮⋮\"", source, StringComparison.Ordinal);
+        Assert.Contains("Data=\"M 6,8 L 11,8 M 6,16 L 11,16 M 6,24 L 11,24 M 21,8 L 26,8 M 21,16 L 26,16 M 21,24 L 26,24\"", source, StringComparison.Ordinal);
         Assert.Contains("<Border Classes=\"icon drag-handle\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.drag-handle\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<Button Classes=\"icon\" Tag=\"{Binding}\" PointerPressed=\"RouteHandle_OnPointerPressed\"", source, StringComparison.Ordinal);
@@ -40,9 +40,9 @@ public sealed class GatewayViewContractTests
         Assert.Contains("Grid.Column=\"1\" Text=\"{Binding ProviderName}\" FontWeight=\"SemiBold\"", source, StringComparison.Ordinal);
         Assert.Contains("Margin=\"22,0,0,0\"", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"&gt;\"", source, StringComparison.Ordinal);
+        Assert.Contains("Data=\"M 11,7 L 19,16 L 11,25\"", source, StringComparison.Ordinal);
         Assert.Contains("Angle=\"{Binding ExpandIconAngle}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Foreground=\"#16A34A\"", source, StringComparison.Ordinal);
+        Assert.Contains("Foreground=\"{DynamicResource SuccessBrush}\"", source, StringComparison.Ordinal);
         Assert.Contains("ColumnSpacing=\"12\"", source, StringComparison.Ordinal);
     }
 
