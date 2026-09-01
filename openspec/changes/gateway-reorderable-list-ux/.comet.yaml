@@ -1,6 +1,6 @@
 workflow: tweak
 language: zh-CN
-phase: build
+phase: verify
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,8 +13,8 @@ auto_transition: true
 base_ref: ad969ece9078b37ca8b4fb45616a4551dca8c55b
 design_doc: null
 plan: null
-verify_result: fail
-verification_report: null
+verify_result: pending
+verification_report: docs/superpowers/reports/2026-09-01-gateway-reorderable-list-ux-verify.md
 branch_status: pending
 created_at: 2026-08-31
 verified_at: null
