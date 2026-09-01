@@ -1,0 +1,6 @@
+{
+  "openspec_proposal": "openspec/changes/gateway-reorderable-list-ux/proposal.md",
+  "openspec_design": "openspec/changes/gateway-reorderable-list-ux/design.md",
+  "openspec_tasks": "openspec/changes/gateway-reorderable-list-ux/tasks.md",
+  "openspec_delta_spec": "openspec/changes/gateway-reorderable-list-ux/specs/gateway-reorderable-list/spec.md"
+}

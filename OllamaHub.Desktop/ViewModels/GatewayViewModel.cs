@@ -12,12 +12,23 @@ public sealed class GatewayViewModel : NotifyViewModel
     private GatewayEndpointEditorViewModel? selectedEndpoint;
     private GatewayComboEditorViewModel? selectedCombo;
     private string status = "";
-    private string selectedSortMode = "Provider";
+    private bool isModelSortAscending = true;
+    private string modelSearchTerm = "";
     public ObservableCollection<GatewayEndpointEditorViewModel> Endpoints { get; } = [];
     public ObservableCollection<GatewayModelOption> AvailableModels { get; } = [];
     public ObservableCollection<GatewayModelGroup> ModelGroups { get; } = [];
-    public IReadOnlyList<string> SortModeOptions { get; } = ["Provider", "模型名称"];
-    public string SelectedSortMode { get => selectedSortMode; set { if (SetProperty(ref selectedSortMode, value)) FilterModels(""); } }
+    public bool IsModelSortAscending
+    {
+        get => isModelSortAscending;
+        private set
+        {
+            if (!SetProperty(ref isModelSortAscending, value)) return;
+            OnPropertyChanged(nameof(IsModelSortDescending));
+            OnPropertyChanged(nameof(ModelSortToolTip));
+        }
+    }
+    public bool IsModelSortDescending => !IsModelSortAscending;
+    public string ModelSortToolTip => IsModelSortAscending ? "按字母降序排序" : "按字母升序排序";
     public GatewayEndpointEditorViewModel? SelectedEndpoint { get => selectedEndpoint; set { if (SetProperty(ref selectedEndpoint, value)) { SelectedCombo = null; OnPropertyChanged(nameof(HasSelectedEndpoint)); FilterModels(""); } } }
     public GatewayComboEditorViewModel? SelectedCombo { get => selectedCombo; private set { if (SetProperty(ref selectedCombo, value)) FilterModels(""); } }
     public bool HasSelectedEndpoint => SelectedEndpoint is not null;
@@ -83,6 +94,11 @@ public sealed class GatewayViewModel : NotifyViewModel
     }
     public void SelectCombo(GatewayComboEditorViewModel? combo) => SelectedCombo = combo;
     public GatewayRouteEditorViewModel? FindSelectedRoute(Guid id) => SelectedCombo?.Routes.FirstOrDefault(item => item.Id == id);
+    public void ToggleModelSortDirection()
+    {
+        IsModelSortAscending = !IsModelSortAscending;
+        FilterModels(modelSearchTerm);
+    }
     public async Task<bool> PrepareModelPickerAsync(GatewayComboEditorViewModel? combo)
     {
         if (combo is null) return false;
@@ -154,11 +170,22 @@ public sealed class GatewayViewModel : NotifyViewModel
     private static void Renumber(GatewayComboEditorViewModel combo) { for (var i = 0; i < combo.Routes.Count; i++) combo.Routes[i].SortOrder = i; }
     public void FilterModels(string? search)
     {
-        var term = search?.Trim() ?? ""; var routeIds = SelectedCombo?.Routes.Select(item => item.ModelId).ToHashSet() ?? [];
+        modelSearchTerm = search?.Trim() ?? "";
+        var routeIds = SelectedCombo?.Routes.Select(item => item.ModelId).ToHashSet() ?? [];
         foreach (var item in AvailableModels) item.IsSelected = routeIds.Contains(item.Id);
         ModelGroups.Clear();
-        var filtered = AvailableModels.Where(item => string.IsNullOrWhiteSpace(term) || item.ModelName.Contains(term, StringComparison.OrdinalIgnoreCase) || item.ProviderName.Contains(term, StringComparison.OrdinalIgnoreCase));
-        foreach (var group in filtered.GroupBy(item => item.ProviderName).OrderBy(item => SelectedSortMode == "模型名称" ? item.Min(model => model.ModelName) : item.Key, StringComparer.OrdinalIgnoreCase)) ModelGroups.Add(new GatewayModelGroup(group.Key, group.OrderBy(item => item.ModelName, StringComparer.OrdinalIgnoreCase).ToArray()));
+        var filtered = AvailableModels.Where(item => item.MatchesSearch(modelSearchTerm));
+        var grouped = filtered.GroupBy(item => item.ProviderName);
+        var orderedGroups = IsModelSortAscending
+            ? grouped.OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            : grouped.OrderByDescending(group => group.Key, StringComparer.OrdinalIgnoreCase);
+        foreach (var group in orderedGroups)
+        {
+            var models = IsModelSortAscending
+                ? group.OrderBy(item => item.ModelName, StringComparer.OrdinalIgnoreCase)
+                : group.OrderByDescending(item => item.ModelName, StringComparer.OrdinalIgnoreCase);
+            ModelGroups.Add(new GatewayModelGroup(group.Key, models.ToArray()));
+        }
     }
 }
 
@@ -197,10 +224,22 @@ public sealed class GatewayModelOption : NotifyViewModel
     private bool isSelected;
     public Guid Id { get; } public string ModelName { get; } public string ProviderName { get; } public bool IsSelected { get => isSelected; set => SetProperty(ref isSelected, value); }
     public GatewayModelOption(Guid id, string modelName, string providerName) => (Id, ModelName, ProviderName) = (id, modelName, providerName);
+    public bool MatchesSearch(string searchTerm) => string.IsNullOrWhiteSpace(searchTerm) || ModelName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase);
 }
 public sealed class GatewayModelGroup : NotifyViewModel
 {
     private bool isExpanded = true;
-    public string ProviderName { get; } public IReadOnlyList<GatewayModelOption> Models { get; } public int ModelCount => Models.Count; public bool IsExpanded { get => isExpanded; set => SetProperty(ref isExpanded, value); }
+    public string ProviderName { get; }
+    public IReadOnlyList<GatewayModelOption> Models { get; }
+    public int ModelCount => Models.Count;
+    public double ExpandIconAngle => IsExpanded ? 90 : 0;
+    public bool IsExpanded
+    {
+        get => isExpanded;
+        set
+        {
+            if (SetProperty(ref isExpanded, value)) OnPropertyChanged(nameof(ExpandIconAngle));
+        }
+    }
     public GatewayModelGroup(string providerName, IReadOnlyList<GatewayModelOption> models) => (ProviderName, Models) = (providerName, models);
 }
