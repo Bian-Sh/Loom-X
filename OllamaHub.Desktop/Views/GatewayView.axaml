@@ -4,6 +4,9 @@
     <Style Selector="TextBlock.muted"><Setter Property="Opacity" Value="0.62"/></Style>
     <Style Selector="Button.icon"><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
     <Style Selector="Border.member"><Setter Property="BorderBrush" Value="#E4E8EE"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="8,9"/></Style>
+    <Style Selector="Border.member:dragover"><Setter Property="Background" Value="#EAF3FF"/></Style>
+    <Style Selector="Border.member-footbar"><Setter Property="BorderBrush" Value="#E4E8EE"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="8,2"/></Style>
+    <Style Selector="Button.footbar-add"><Setter Property="Width" Value="24"/><Setter Property="Height" Value="24"/></Style>
   </UserControl.Styles>
   <Grid RowDefinitions="Auto,*" RowSpacing="12">
     <TextBlock Text="{Binding Status}" Classes="muted" VerticalAlignment="Center"/>
@@ -41,12 +44,11 @@
                       <Button Grid.Column="3" Classes="icon" Command="{Binding $parent[UserControl].DataContext.RemoveComboCommand}" CommandParameter="{Binding}" ToolTip.Tip="移除 Combo 模型" AutomationProperties.Name="移除 Combo 模型"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23"/></Button>
                     </Grid></Border>
                     <StackPanel Grid.Row="1" IsVisible="{Binding IsExpanded}">
-                      <Grid Margin="8,7" ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBlock Text="成员模型按顺序故障转移" Classes="muted" FontSize="11" VerticalAlignment="Center"/><Button Grid.Column="1" Classes="icon" Tag="{Binding}" Click="OpenModelPicker_OnClick" ToolTip.Tip="向 Combo 添加模型" AutomationProperties.Name="向 Combo 添加模型"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z"/></Button></Grid>
                       <ItemsControl ItemsSource="{Binding Routes}">
                         <ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:GatewayRouteEditorViewModel}">
-                          <Border Classes="member" Tag="{Binding}" DragDrop.AllowDrop="True" DragDrop.Drop="Route_OnDrop">
+                          <Border Classes="member" Tag="{Binding}" DragDrop.AllowDrop="True" DragDrop.DragOver="Route_OnDragOver" DragDrop.Drop="Route_OnDrop">
                             <Grid ColumnDefinitions="26,*,Auto,Auto" ColumnSpacing="8">
-                              <Button Classes="icon" Tag="{Binding}" PointerPressed="RouteHandle_OnPointerPressed" ToolTip.Tip="拖动调整故障转移顺序" AutomationProperties.Name="拖动调整故障转移顺序"><PathIcon Data="M 11,9 A 2,2 0 1,0 11,13 A 2,2 0 1,0 11,9 M 21,9 A 2,2 0 1,0 21,13 A 2,2 0 1,0 21,9 M 11,19 A 2,2 0 1,0 11,23 A 2,2 0 1,0 11,19 M 21,19 A 2,2 0 1,0 21,23 A 2,2 0 1,0 21,19"/></Button>
+                              <Button Classes="icon" Tag="{Binding}" PointerPressed="RouteHandle_OnPointerPressed" ToolTip.Tip="拖动调整故障转移顺序" AutomationProperties.Name="拖动调整故障转移顺序" Cursor="SizeAll"><TextBlock Text="⋮⋮" Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Center"/></Button>
                               <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding ModelName}" FontWeight="SemiBold"/><TextBlock Text="{Binding ProviderName}" Classes="muted" FontSize="11"/></StackPanel>
                               <ToggleSwitch Grid.Column="2" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleRouteCommand}" CommandParameter="{Binding}" OnContent="" OffContent="" ToolTip.Tip="启用或停用成员"/>
                               <Button Grid.Column="3" Classes="icon" Command="{Binding $parent[UserControl].DataContext.RemoveRouteCommand}" CommandParameter="{Binding}" ToolTip.Tip="从 Combo 移除模型" AutomationProperties.Name="从 Combo 移除模型"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23"/></Button>
@@ -54,6 +56,9 @@
                           </Border>
                         </DataTemplate></ItemsControl.ItemTemplate>
                       </ItemsControl>
+                      <Border Classes="member-footbar">
+                        <Grid ColumnDefinitions="*,Auto"><TextBlock Text="成员模型按顺序故障转移" Classes="muted" FontSize="11" VerticalAlignment="Center"/><Button Grid.Column="1" Classes="icon footbar-add" Tag="{Binding}" Click="OpenModelPicker_OnClick" ToolTip.Tip="向 Combo 添加模型" AutomationProperties.Name="向 Combo 添加模型"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z" Width="14" Height="14"/></Button></Grid>
+                      </Border>
                     </StackPanel>
                   </Grid>
                 </Border>
@@ -64,7 +69,47 @@
       </Border>
     </Grid>
     <Popup x:Name="modelPopup" Placement="Bottom" IsLightDismissEnabled="True" HorizontalOffset="0" VerticalOffset="5">
-      <Border x:Name="modelPickerPanel" Width="360" MaxHeight="420" Background="#FFFFFF" BorderBrush="#D7DCE3" BorderThickness="1" CornerRadius="7" Padding="8"><Grid RowDefinitions="Auto,*" RowSpacing="8"><Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBox x:Name="modelSearch" Watermark="搜索模型..." TextChanged="ModelSearch_OnTextChanged"/><ComboBox Grid.Column="1" Width="100" ItemsSource="{Binding SortModeOptions}" SelectedItem="{Binding SelectedSortMode}"/></Grid><ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="modelGroupsItemsControl"><ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:GatewayModelGroup}"><StackPanel><Button Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="8"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding ProviderName}"/><TextBlock Grid.Column="1" Text="{Binding ModelCount}" Classes="muted"/></Grid></Button><ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding IsExpanded}"><ItemsControl.ItemTemplate><DataTemplate><Button Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="8"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding ModelName}"/><TextBlock Grid.Column="1" Text="✓" IsVisible="{Binding IsSelected}"/></Grid></Button></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer></Grid></Border>
+      <Border x:Name="modelPickerPanel" Width="360" MaxHeight="420" Background="#FFFFFF" BorderBrush="#D7DCE3" BorderThickness="1" CornerRadius="7" Padding="8">
+        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <TextBox x:Name="modelSearch" Watermark="搜索模型..." TextChanged="ModelSearch_OnTextChanged"/>
+            <Button Grid.Column="1" Classes="icon" Click="ModelSort_OnClick" ToolTip.Tip="{Binding ModelSortToolTip}" AutomationProperties.Name="{Binding ModelSortToolTip}">
+              <Panel Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <PathIcon Data="M 5,6 L 18,6 M 5,12 L 15,12 M 5,18 L 12,18 M 26,5 L 26,24 M 21,19 L 26,24 L 31,19" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsModelSortAscending}"/>
+                <PathIcon Data="M 5,6 L 18,6 M 5,12 L 15,12 M 5,18 L 12,18 M 26,24 L 26,5 M 21,10 L 26,5 L 31,10" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsModelSortDescending}"/>
+              </Panel>
+            </Button>
+          </Grid>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="modelGroupsItemsControl">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:GatewayModelGroup}">
+                  <StackPanel Spacing="2" Margin="0,0,0,6">
+                    <Button Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch" Background="#F5F7FA" BorderThickness="0" Padding="10,9">
+                      <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="8">
+                        <TextBlock Text="&gt;" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%">
+                          <TextBlock.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></TextBlock.RenderTransform>
+                        </TextBlock>
+                        <TextBlock Grid.Column="1" Text="{Binding ProviderName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="{Binding ModelCount}" Classes="muted" VerticalAlignment="Center"/>
+                      </Grid>
+                    </Button>
+                    <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding IsExpanded}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Button Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch" Background="Transparent" BorderThickness="0" Margin="22,0,0,0" Padding="12,8">
+                            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12"><TextBlock Text="{Binding ModelName}"/><TextBlock Grid.Column="1" Text="✓" Foreground="#16A34A" FontWeight="SemiBold" IsVisible="{Binding IsSelected}"/></Grid>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </Border>
     </Popup>
   </Grid>
 </UserControl>

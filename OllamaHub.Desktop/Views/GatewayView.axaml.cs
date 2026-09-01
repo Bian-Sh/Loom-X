@@ -32,6 +32,11 @@ public partial class GatewayView : UserControl
         if (DataContext is GatewayViewModel viewModel) viewModel.FilterModels(modelSearch.Text);
     }
 
+    private void ModelSort_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (DataContext is GatewayViewModel viewModel) viewModel.ToggleModelSortDirection();
+    }
+
     private void ToggleProviderGroup_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is Button { Tag: GatewayModelGroup group }) group.IsExpanded = !group.IsExpanded;
@@ -61,13 +66,23 @@ public partial class GatewayView : UserControl
         if (sender is not Button { Tag: GatewayRouteEditorViewModel route }) return;
         var data = new DataTransfer();
         data.Add(DataTransferItem.CreateText(route.Id.ToString("N")));
+        e.Handled = true;
         await DragDrop.DoDragDropAsync(e, data, DragDropEffects.Move);
+    }
+
+    private void Route_OnDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = Guid.TryParse(e.DataTransfer.TryGetText(), out _) ? DragDropEffects.Move : DragDropEffects.None;
+        e.Handled = true;
     }
 
     private async void Route_OnDrop(object? sender, DragEventArgs e)
     {
         if (sender is not Border { Tag: GatewayRouteEditorViewModel target } || DataContext is not GatewayViewModel viewModel) return;
-        if (Guid.TryParse(e.DataTransfer.TryGetText(), out var routeId)) await viewModel.MoveRouteAsync(viewModel.FindSelectedRoute(routeId), target);
+        if (!Guid.TryParse(e.DataTransfer.TryGetText(), out var routeId)) return;
+        e.DragEffects = DragDropEffects.Move;
+        e.Handled = true;
+        await viewModel.MoveRouteAsync(viewModel.FindSelectedRoute(routeId), target);
     }
 
     private async void CopyEndpointUrl_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
