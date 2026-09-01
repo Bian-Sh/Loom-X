@@ -27,7 +27,7 @@
                   <TextBlock Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold"/>
                   <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleEndpointCommand}" CommandParameter="{Binding}" OnContent="" OffContent=""/>
                   <TextBlock Grid.Row="1" Text="{Binding PublicUrl}" Classes="muted" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center"/>
-                  <Button Grid.Row="1" Grid.Column="1" Classes="icon endpoint-copy" ToolTip.Tip="复制 Base URL" AutomationProperties.Name="复制 Base URL" Click="CopyEndpointUrl_OnClick" HorizontalAlignment="Right" VerticalAlignment="Center"><PathIcon Data="M 9,9 L 25,9 L 25,25 L 9,25 Z M 5,5 L 21,5 L 21,9" Width="14" Height="14"/></Button>
+                  <Button Grid.Row="1" Grid.Column="1" Classes="icon endpoint-copy" Content="⧉" ToolTip.Tip="复制 Base URL" AutomationProperties.Name="复制 Base URL" Click="CopyEndpointUrl_OnClick" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                   <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Combos.Count, StringFormat='{}{0} 个 Combo'}" Classes="muted" FontSize="11"/>
                 </Grid>
               </Border>

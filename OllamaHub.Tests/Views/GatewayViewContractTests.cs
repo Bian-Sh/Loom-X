@@ -77,6 +77,18 @@ public sealed class GatewayViewContractTests
         Assert.True(matchingModel.MatchesSearch("deep"));
     }
 
+    [Fact]
+    public void CopyButtonsUseOriginalGlyph()
+    {
+        var gatewaySource = ReadDesktopFile("Views", "GatewayView.axaml");
+        var consoleSource = ReadDesktopFile("Views", "ConsoleView.axaml");
+
+        Assert.Contains("Classes=\"icon endpoint-copy\" Content=\"⧉\"", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"copy-log\" Content=\"⧉\"", consoleSource, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Button.copy-log\"", consoleSource, StringComparison.Ordinal);
+        Assert.Contains("Property=\"FontSize\" Value=\"16\"", consoleSource, StringComparison.Ordinal);
+    }
+
     private static string ReadDesktopFile(params string[] segments)
     {
         var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", .. segments]);

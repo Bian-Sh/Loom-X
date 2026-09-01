@@ -119,19 +119,18 @@
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBox Watermark="搜索模型"/><Button Grid.Column="1" Command="{Binding NewModelCommand}" Classes="small-button"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z" Width="14" Height="14"/><TextBlock Text="添加模型" VerticalAlignment="Center"/></StackPanel></Button><Button Grid.Column="2" Command="{Binding SyncModelsCommand}" Classes="small-button" AutomationProperties.Name="同步模型"><StackPanel Orientation="Horizontal" Spacing="6"><PathIcon Data="M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6" Width="14" Height="14"/><TextBlock Text="同步模型" VerticalAlignment="Center"/></StackPanel></Button></Grid>
                         <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
                           <Grid RowDefinitions="Auto,*">
-                            <Border Background="{DynamicResource SurfaceSubtleBrush}" Padding="10,8"><Grid ColumnDefinitions="28,1.5*,*,80,100,56" ColumnSpacing="8">
-                              <TextBlock Grid.Column="1" Text="模型" Classes="muted"/><TextBlock Grid.Column="2" Text="能力" Classes="muted"/><TextBlock Grid.Column="3" Text="上下文" Classes="muted"/><TextBlock Grid.Column="4" Text="远程状态" Classes="muted"/><TextBlock Grid.Column="5" Text="启用" Classes="muted"/>
+                            <Border Background="{DynamicResource SurfaceSubtleBrush}" Padding="10,8"><Grid ColumnDefinitions="1.5*,*,80,100,56" ColumnSpacing="8">
+                              <TextBlock Text="模型" Classes="muted"/><TextBlock Grid.Column="1" Text="能力" Classes="muted"/><TextBlock Grid.Column="2" Text="上下文" Classes="muted"/><TextBlock Grid.Column="3" Text="远程状态" Classes="muted"/><TextBlock Grid.Column="4" Text="启用" Classes="muted"/>
                             </Grid></Border>
                             <ListBox Grid.Row="1" ItemsSource="{Binding SelectedProvider.Models}" SelectedItem="{Binding SelectedModel, Mode=TwoWay}" MinHeight="110">
                               <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                  <Grid ColumnDefinitions="28,1.5*,*,80,100,56" Margin="10,9" ColumnSpacing="8">
-                                    <Path Classes="icon-glyph" Data="M 6,8 L 11,8 M 6,16 L 11,16 M 6,24 L 11,24 M 21,8 L 26,8 M 21,16 L 26,16 M 21,24 L 26,24" Width="16" Height="16" Stroke="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12"/><TextBlock Text="{Binding ModelId}" Classes="muted" FontFamily="Consolas"/></StackPanel>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"><Border Background="{DynamicResource SurfaceMutedBrush}" CornerRadius="4" Padding="4,2"><TextBlock Text="{Binding Family}" FontSize="9"/></Border><Border Background="{DynamicResource SurfaceMutedBrush}" CornerRadius="4" Padding="4,2" IsVisible="{Binding Vision}"><TextBlock Text="视觉" FontSize="9"/></Border></StackPanel>
-                                    <TextBlock Grid.Column="3" Text="{Binding ContextLength}" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="4" Text="已发现" Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
-                                    <ToggleSwitch Grid.Column="5" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
+                                  <Grid ColumnDefinitions="1.5*,*,80,100,56" Margin="10,9" ColumnSpacing="8">
+                                    <StackPanel Spacing="2"><TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" FontSize="12"/><TextBlock Text="{Binding ModelId}" Classes="muted" FontFamily="Consolas"/></StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"><Border Background="{DynamicResource SurfaceMutedBrush}" CornerRadius="4" Padding="4,2"><TextBlock Text="{Binding Family}" FontSize="9"/></Border><Border Background="{DynamicResource SurfaceMutedBrush}" CornerRadius="4" Padding="4,2" IsVisible="{Binding Vision}"><TextBlock Text="视觉" FontSize="9"/></Border></StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding ContextLength}" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="3" Text="已发现" Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
+                                    <ToggleSwitch Grid.Column="4" IsChecked="{Binding Enabled}" VerticalAlignment="Center"/>
                                   </Grid>
                                 </DataTemplate>
                               </ListBox.ItemTemplate>
