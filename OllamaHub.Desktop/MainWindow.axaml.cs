@@ -1,5 +1,7 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using OllamaHub.Desktop.Services;
 
@@ -47,4 +49,26 @@ public partial class MainWindow : Window
         if (Dispatcher.UIThread.CheckAccess()) ShowToast();
         else Dispatcher.UIThread.Post(ShowToast);
     }
+
+    private void WindowChrome_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.Source is Button) return;
+        var point = e.GetCurrentPoint(this);
+        if (point.Properties.PointerUpdateKind != PointerUpdateKind.LeftButtonPressed) return;
+        if (e.ClickCount == 2)
+        {
+            ToggleWindowState();
+            return;
+        }
+
+        BeginMoveDrag(e);
+    }
+
+    private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void MaximizeButton_OnClick(object? sender, RoutedEventArgs e) => ToggleWindowState();
+
+    private void CloseButton_OnClick(object? sender, RoutedEventArgs e) => Close();
+
+    private void ToggleWindowState() => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 }

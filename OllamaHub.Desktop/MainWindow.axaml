@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="OllamaHub 控制中心">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="OllamaHub 控制中心" Background="Transparent" TransparencyLevelHint="AcrylicBlur" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
   <Window.Styles>
     <Style Selector="ToggleButton.nav-button">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -21,18 +21,48 @@
       <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
       <Setter Property="BorderThickness" Value="1" />
     </Style>
+    <Style Selector="Path.nav-icon">
+      <Setter Property="Fill" Value="Transparent" />
+      <Setter Property="Stroke" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="StrokeThickness" Value="1.8" />
+    </Style>
     <Style Selector="Border.glass-sidebar">
       <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
       <Setter Property="BorderThickness" Value="0,0,1,0" />
     </Style>
     <Style Selector="Border.topbar">
-      <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
+      <Setter Property="Background" Value="{DynamicResource GlassStrongBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
+    <Style Selector="Border.window-chrome">
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="16,4,10,4" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.window-control">
+      <Setter Property="Width" Value="42" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.window-control:pointerover">
+      <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.window-close:pointerover">
+      <Setter Property="Background" Value="#D95F6A" />
+      <Setter Property="Foreground" Value="#FFFFFFFF" />
+    </Style>
   </Window.Styles>
-  <Grid>
+  <Grid Background="{DynamicResource WindowBackgroundBrush}">
     <Grid ColumnDefinitions="228,*">
       <Border Grid.Column="0" Classes="glass-sidebar" Padding="16,24">
         <Grid RowDefinitions="Auto,*,Auto">
@@ -51,7 +81,7 @@
                 <DataTemplate>
                   <ToggleButton Command="{Binding NavigateCommand}" IsChecked="{Binding IsActive, Mode=OneWay}" Classes="nav-button">
                     <StackPanel Orientation="Horizontal" Spacing="11">
-                      <PathIcon Data="{Binding IconData}" Width="18" Height="18" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" />
+                      <Path Classes="nav-icon" Data="{Binding IconData}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
                       <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
                     </StackPanel>
                   </ToggleButton>
@@ -72,11 +102,21 @@
         </Grid>
       </Border>
       <Grid Grid.Column="1" RowDefinitions="104,*">
-        <Border Grid.Row="0" Classes="topbar" Padding="32,0">
-          <StackPanel VerticalAlignment="Center" Spacing="5">
-            <TextBlock Text="{Binding PageTitle}" FontSize="26" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding PageDescription}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-          </StackPanel>
+        <Border Grid.Row="0" Classes="topbar">
+          <Grid RowDefinitions="40,*">
+            <Border Classes="window-chrome" PointerPressed="WindowChrome_OnPointerPressed">
+              <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="2">
+                <TextBlock Text="OllamaHub 控制中心" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化"><Path Data="M 9,16 L 23,16" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Width="16" Height="16" /></Button>
+                <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="最大化或还原" AutomationProperties.Name="最大化或还原"><Path Data="M 8,8 L 24,8 L 24,24 L 8,24 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Width="16" Height="16" /></Button>
+                <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="关闭" AutomationProperties.Name="关闭"><Path Data="M 9,9 L 23,23 M 23,9 L 9,23" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Width="16" Height="16" /></Button>
+              </Grid>
+            </Border>
+            <StackPanel Grid.Row="1" Margin="32,4,32,0" VerticalAlignment="Center" Spacing="5">
+              <TextBlock Text="{Binding PageTitle}" FontSize="26" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding PageDescription}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+            </StackPanel>
+          </Grid>
         </Border>
         <Border Grid.Row="1" Padding="32,20" Background="Transparent">
           <ContentControl Content="{Binding CurrentView}" />
