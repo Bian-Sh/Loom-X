@@ -9,7 +9,7 @@
 | 维度 | 状态 | 证据 |
 | --- | --- | --- |
 | 完整性 | 通过 | `tasks.md` 10/10 完成；5 项 requirements、8 个 scenarios 均有实现或测试映射 |
-| 正确性 | 通过 | Release 测试 87/87；桌面项目 Release build 0 error |
+| 正确性 | 通过 | 当前合并后 HEAD 的 Release 测试 92/92；桌面项目 Release build 0 error |
 | 一致性 | 通过 | OpenSpec design/spec、关联 Superpowers 设计文档与实现均采用左侧轻量 `>` 折叠指示器 |
 | 安全性 | 通过 | 本次实现 diff 未新增密钥、Authorization、敏感日志、`unsafe` 或控制台诊断输出 |
 | 视觉验收 | 用户验收 | 按用户要求未启动 App、未抓图；用户正在调试的实例不是本次最新发布包 |
@@ -28,7 +28,7 @@
 ## 实时验证
 
 - `dotnet test OllamaHub.slnx -c Release --no-restore`
-  - 通过：87
+  - 通过：92
   - 失败：0
   - 跳过：0
 - `dotnet build OllamaHub.Desktop/OllamaHub.Desktop.csproj -c Release --no-restore`
