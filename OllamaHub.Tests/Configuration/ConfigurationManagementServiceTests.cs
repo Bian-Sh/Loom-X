@@ -416,13 +416,13 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal(24, defaults.BlurAmount);
             Assert.Equal("acrylic", defaults.TransparencyAlgorithm);
 
-            var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 92, 48, "mica"));
+            var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 0, 48, "mica"));
             Assert.Equal("dark", updatedSettings.Theme);
             Assert.True(updatedSettings.HasProxyPassword);
             Assert.True(configurationProvider.Current.Settings.DiagnosticsEnabled);
             Assert.True(updatedSettings.LogStackTrace);
             Assert.True(updatedSettings.TransparencyEnabled);
-            Assert.Equal(92, updatedSettings.TransparencyOpacity);
+            Assert.Equal(0, updatedSettings.TransparencyOpacity);
             Assert.Equal(48, updatedSettings.BlurAmount);
             Assert.Equal("mica", updatedSettings.TransparencyAlgorithm);
 
@@ -438,7 +438,7 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal("https://models.example.com/list", storedProvider.ModelListUrl);
             Assert.Equal("dark", storedSettings.Theme);
             Assert.Equal("custom", storedSettings.ProxyMode);
-            Assert.Equal(92, storedSettings.TransparencyOpacity);
+            Assert.Equal(0, storedSettings.TransparencyOpacity);
             Assert.Equal(48, storedSettings.BlurAmount);
             Assert.Equal("mica", storedSettings.TransparencyAlgorithm);
         }

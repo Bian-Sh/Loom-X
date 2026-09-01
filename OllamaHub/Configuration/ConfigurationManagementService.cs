@@ -245,7 +245,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         if (input.ProxyPort is < 1 or > 65535) throw new ArgumentException("代理端口必须在 1 到 65535 之间。");
         if (proxyMode == "custom" && (!Uri.TryCreate(input.ProxyHost?.Trim(), UriKind.Absolute, out var proxyUri) || proxyUri.Scheme is not ("http" or "https"))) throw new ArgumentException("自定义代理地址必须是 HTTP 或 HTTPS 地址。");
         if (input.LogRetentionDays is < 1 or > 3650) throw new ArgumentException("日志保留天数必须在 1 到 3650 之间。");
-        if (input.TransparencyOpacity is < 40 or > 100) throw new ArgumentException("透明程度必须在 40 到 100 之间。");
+        if (input.TransparencyOpacity is < 0 or > 100) throw new ArgumentException("透明程度必须在 0 到 100 之间。");
         if (input.BlurAmount is < 0 or > 64) throw new ArgumentException("磨砂程度必须在 0 到 64 之间。");
         _ = NormalizeTransparencyAlgorithm(input.TransparencyAlgorithm);
     }

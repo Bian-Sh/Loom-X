@@ -142,7 +142,7 @@ public partial class MainWindow : Window
 
     public void ApplyAppearance(bool enabled, int opacity, int blurAmount, string algorithm)
     {
-        opacity = Math.Clamp(opacity, 40, 100);
+        opacity = Math.Clamp(opacity, 0, 100);
         blurAmount = Math.Clamp(blurAmount, 0, 64);
         var blurFactor = 0.9 + (blurAmount / 64d * 0.1);
         SetBrushAlpha("WindowBackgroundBrush", ScaleAlpha(230, opacity, blurFactor));
@@ -178,7 +178,7 @@ public partial class MainWindow : Window
     }
 
     private static byte ScaleAlpha(byte baseAlpha, int opacity, double blurFactor) =>
-        (byte)Math.Clamp(Math.Round(baseAlpha * (opacity / 86d) * blurFactor), 32, 255);
+        (byte)Math.Clamp(Math.Round(baseAlpha * (opacity / 86d) * blurFactor), 0, 255);
 
     private static SolidColorBrush OpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
         ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
