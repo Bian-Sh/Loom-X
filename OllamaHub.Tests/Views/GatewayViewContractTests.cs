@@ -53,6 +53,7 @@ public sealed class GatewayViewContractTests
         var viewModelSource = ReadDesktopFile("ViewModels", "GatewayViewModel.cs");
 
         Assert.Contains("private void RouteDrag_OnPointerMoved", viewSource, StringComparison.Ordinal);
+        Assert.Contains("if (e.Handled) return;", viewSource, StringComparison.Ordinal);
         Assert.Contains("GetInsertionSlot", viewSource, StringComparison.Ordinal);
         Assert.Contains("AnimateMovedRows", viewSource, StringComparison.Ordinal);
         Assert.Contains("CompleteRouteDragAsync", viewSource, StringComparison.Ordinal);
