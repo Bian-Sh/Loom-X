@@ -12,6 +12,7 @@ public interface IProtocolPassthroughClient
 {
     Task ProxyAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken);
     Task<bool> ProxyGatewayAttemptAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken);
+    Task<bool> ProxyOpenAiResponsesGatewayAttemptAsync(HttpContext httpContext, ResolvedModelConfig model, JsonObject payload, CancellationToken cancellationToken);
 }
 
 public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<ProtocolPassthroughClient> logger, RequestTelemetryHub? telemetryHub = null) : IProtocolPassthroughClient
@@ -141,6 +142,128 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
         {
             if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, null, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, true, attemptIndex, exception.GetType().Name);
             logger.LogWarning(exception, "网关路由尝试异常，将尝试下一条路由 {ProviderId}/{ModelId} {ApiMode} {Path} {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            return false;
+        }
+    }
+
+    public async Task<bool> ProxyOpenAiResponsesGatewayAttemptAsync(HttpContext httpContext, ResolvedModelConfig model, JsonObject payload, CancellationToken cancellationToken)
+    {
+        var startedAt = Stopwatch.GetTimestamp();
+        var requestContext = httpContext.Items[ActivityContextKeys.Request] as ActivityRequestContext;
+        var attemptIndex = requestContext?.AttemptIndex ?? 0;
+        if (requestContext is not null) telemetryHub?.EdgeAttemptStarted(requestContext, model.ProviderId, model.ModelId, attemptIndex);
+
+        try
+        {
+            var responsesRequest = OpenAiResponsesBridge.CreateResponsesRequest(payload);
+            using var upstreamRequest = BuildRequestMessage(httpContext, model, "openai", "/responses", responsesRequest);
+            using var upstreamResponse = await httpClient.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            await using var responseStream = await upstreamResponse.Content.ReadAsStreamAsync(cancellationToken);
+            await using var buffer = new MemoryStream();
+            await responseStream.CopyToAsync(buffer, cancellationToken);
+            var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+            var responseBytes = buffer.Length;
+            var retryable = (int)upstreamResponse.StatusCode is 408 or 429 or >= 500;
+            if (retryable)
+            {
+                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, true, attemptIndex);
+                logger.LogWarning(
+                    "Responses 协议桥接上游可转移 {ProviderId}/{ModelId} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
+                    model.ProviderId,
+                    model.ModelId,
+                    (int)upstreamResponse.StatusCode,
+                    upstreamResponse.Content.Headers.ContentType?.MediaType ?? "unknown",
+                    responseBytes,
+                    elapsedMs);
+                return false;
+            }
+
+            httpContext.Response.StatusCode = (int)upstreamResponse.StatusCode;
+            if (!upstreamResponse.IsSuccessStatusCode)
+            {
+                CopyResponseHeaders(upstreamResponse, httpContext.Response);
+                buffer.Position = 0;
+                await buffer.CopyToAsync(httpContext.Response.Body, cancellationToken);
+                if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, attemptIndex);
+                logger.LogInformation(
+                    "Responses 协议桥接上游拒绝 {ProviderId}/{ModelId} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
+                    model.ProviderId,
+                    model.ModelId,
+                    (int)upstreamResponse.StatusCode,
+                    upstreamResponse.Content.Headers.ContentType?.MediaType ?? "unknown",
+                    responseBytes,
+                    elapsedMs);
+                return true;
+            }
+
+            var contentType = upstreamResponse.Content.Headers.ContentType?.MediaType;
+            string downstreamPayload;
+            string downstreamContentType;
+            try
+            {
+                var responseBody = Encoding.UTF8.GetString(buffer.ToArray());
+                if (string.Equals(contentType, "text/event-stream", StringComparison.OrdinalIgnoreCase))
+                {
+                    downstreamPayload = OpenAiResponsesBridge.CreateChatCompletionsSse(responseBody, model.ModelId);
+                    downstreamContentType = "text/event-stream";
+                }
+                else if (string.Equals(contentType, "application/json", StringComparison.OrdinalIgnoreCase)
+                    && JsonNode.Parse(responseBody) is JsonObject responsesResponse)
+                {
+                    downstreamPayload = OpenAiResponsesBridge.CreateChatCompletionsResponse(responsesResponse, model.ModelId).ToJsonString(JsonOptions);
+                    downstreamContentType = "application/json";
+                }
+                else
+                {
+                    throw new InvalidDataException("Responses 协议桥接收到不支持的成功响应内容类型。");
+                }
+            }
+            catch (Exception exception) when (exception is InvalidDataException or JsonException)
+            {
+                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, true, attemptIndex, exception.GetType().Name);
+                logger.LogWarning(
+                    exception,
+                    "Responses 协议桥接转换失败，将尝试下一条路由 {ProviderId}/{ModelId} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
+                    model.ProviderId,
+                    model.ModelId,
+                    contentType,
+                    responseBytes,
+                    elapsedMs);
+                return false;
+            }
+
+            CopyResponseHeaders(upstreamResponse, httpContext.Response);
+            httpContext.Response.ContentType = downstreamContentType;
+            httpContext.Response.ContentLength = null;
+            httpContext.Response.Headers.Remove("content-encoding");
+            await httpContext.Response.WriteAsync(downstreamPayload, Encoding.UTF8, cancellationToken);
+            if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, attemptIndex);
+            logger.LogInformation(
+                "Responses 协议桥接完成 {ProviderId}/{ModelId} {StatusCode} {SourceContentType} {OutputContentType} {ResponseBytes}B {OutputBytes}B {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                (int)upstreamResponse.StatusCode,
+                contentType,
+                downstreamContentType,
+                responseBytes,
+                Encoding.UTF8.GetByteCount(downstreamPayload),
+                elapsedMs);
+            return true;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            if (requestContext is not null) telemetryHub?.EdgeAttemptCancelled(requestContext, model.ProviderId, model.ModelId, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, attemptIndex);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, null, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, true, attemptIndex, exception.GetType().Name);
+            logger.LogWarning(
+                exception,
+                "Responses 协议桥接异常，将尝试下一条路由 {ProviderId}/{ModelId} {ElapsedMs:F0}ms",
+                model.ProviderId,
+                model.ModelId,
+                Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             return false;
         }
     }

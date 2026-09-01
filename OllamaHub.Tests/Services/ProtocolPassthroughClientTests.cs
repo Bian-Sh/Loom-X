@@ -145,6 +145,55 @@ public sealed class ProtocolPassthroughClientTests
     }
 
     [Fact]
+    public async Task ProxyOpenAiResponsesGatewayAttemptAsync_ConvertsResponsesSseWithoutLoggingBodies()
+    {
+        const string prompt = "sensitive-user-prompt";
+        const string responseBody = """
+        event: response.created
+        data: {"type":"response.created","response":{"id":"resp_1","created_at":123}}
+
+        event: response.output_item.added
+        data: {"type":"response.output_item.added","item":{"id":"msg_1","type":"message","role":"assistant"}}
+
+        event: response.output_text.delta
+        data: {"type":"response.output_text.delta","delta":"healthy"}
+
+        event: response.completed
+        data: {"type":"response.completed","response":{"id":"resp_1"}}
+
+        """;
+        var handler = new CapturingHandler(responseBody: responseBody, mediaType: "text/event-stream");
+        using var httpClient = new HttpClient(handler);
+        var logger = new RecordingLogger<ProtocolPassthroughClient>();
+        var client = new ProtocolPassthroughClient(httpClient, logger);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Method = HttpMethods.Post;
+        httpContext.Request.ContentType = "application/json";
+        httpContext.Response.Body = new MemoryStream();
+        var model = CreateModel("https://token.sensenova.cn/v1");
+        var payload = JsonNode.Parse($$"""
+        {
+          "model": "{{model.ModelId}}",
+          "messages": [{"role": "user", "content": "{{prompt}}"}],
+          "stream": true
+        }
+        """)!.AsObject();
+
+        Assert.True(await client.ProxyOpenAiResponsesGatewayAttemptAsync(httpContext, model, payload, CancellationToken.None));
+
+        Assert.Equal("https://token.sensenova.cn/v1/responses", handler.RequestUri);
+        using var upstreamRequest = JsonDocument.Parse(handler.RequestBody!);
+        Assert.True(upstreamRequest.RootElement.TryGetProperty("input", out _));
+        Assert.False(upstreamRequest.RootElement.TryGetProperty("messages", out _));
+        Assert.Equal("text/event-stream", httpContext.Response.ContentType);
+        httpContext.Response.Body.Position = 0;
+        var downstreamBody = await new StreamReader(httpContext.Response.Body).ReadToEndAsync();
+        Assert.Contains("\"content\":\"healthy\"", downstreamBody);
+        Assert.EndsWith("data: [DONE]\n\n", downstreamBody);
+        Assert.All(logger.Messages, message => Assert.DoesNotContain(prompt, message));
+    }
+
+    [Fact]
     public async Task ProxyAsync_OpenAiJsonNode_PreservesRawJsonFields()
     {
         var handler = new CapturingHandler();
