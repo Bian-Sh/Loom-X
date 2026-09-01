@@ -63,7 +63,7 @@ public partial class GatewayView : UserControl
 
     private async void RouteHandle_OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Button { Tag: GatewayRouteEditorViewModel route }) return;
+        if (sender is not Border { Tag: GatewayRouteEditorViewModel route }) return;
         var data = new DataTransfer();
         data.Add(DataTransferItem.CreateText(route.Id.ToString("N")));
         e.Handled = true;

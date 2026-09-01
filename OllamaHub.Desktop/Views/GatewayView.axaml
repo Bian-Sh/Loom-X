@@ -3,6 +3,7 @@
     <Style Selector="Border.panel"><Setter Property="Background" Value="#FFFFFF"/><Setter Property="BorderBrush" Value="#D7DCE3"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="7"/></Style>
     <Style Selector="TextBlock.muted"><Setter Property="Opacity" Value="0.62"/></Style>
     <Style Selector="Button.icon"><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
+    <Style Selector="Border.drag-handle"><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/></Style>
     <Style Selector="Border.member"><Setter Property="BorderBrush" Value="#E4E8EE"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="8,9"/></Style>
     <Style Selector="Border.member:dragover"><Setter Property="Background" Value="#EAF3FF"/></Style>
     <Style Selector="Border.member-footbar"><Setter Property="BorderBrush" Value="#E4E8EE"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="8,2"/></Style>
@@ -48,7 +49,7 @@
                         <ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:GatewayRouteEditorViewModel}">
                           <Border Classes="member" Tag="{Binding}" DragDrop.AllowDrop="True" DragDrop.DragOver="Route_OnDragOver" DragDrop.Drop="Route_OnDrop">
                             <Grid ColumnDefinitions="26,*,Auto,Auto" ColumnSpacing="8">
-                              <Button Classes="icon" Tag="{Binding}" PointerPressed="RouteHandle_OnPointerPressed" ToolTip.Tip="拖动调整故障转移顺序" AutomationProperties.Name="拖动调整故障转移顺序" Cursor="SizeAll"><TextBlock Text="⋮⋮" Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Center"/></Button>
+                              <Border Classes="icon drag-handle" Tag="{Binding}" PointerPressed="RouteHandle_OnPointerPressed" ToolTip.Tip="拖动调整故障转移顺序" AutomationProperties.Name="拖动调整故障转移顺序" Cursor="SizeAll" Background="Transparent"><TextBlock Text="⋮⋮" Classes="muted" VerticalAlignment="Center" HorizontalAlignment="Center"/></Border>
                               <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding ModelName}" FontWeight="SemiBold"/><TextBlock Text="{Binding ProviderName}" Classes="muted" FontSize="11"/></StackPanel>
                               <ToggleSwitch Grid.Column="2" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleRouteCommand}" CommandParameter="{Binding}" OnContent="" OffContent="" ToolTip.Tip="启用或停用成员"/>
                               <Button Grid.Column="3" Classes="icon" Command="{Binding $parent[UserControl].DataContext.RemoveRouteCommand}" CommandParameter="{Binding}" ToolTip.Tip="从 Combo 移除模型" AutomationProperties.Name="从 Combo 移除模型"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23"/></Button>

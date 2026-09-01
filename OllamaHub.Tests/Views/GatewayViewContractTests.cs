@@ -17,6 +17,9 @@ public sealed class GatewayViewContractTests
             source.IndexOf("<ItemsControl ItemsSource=\"{Binding Routes}\">", StringComparison.Ordinal) <
             source.IndexOf("<Border Classes=\"member-footbar\">", StringComparison.Ordinal));
         Assert.Contains("Text=\"⋮⋮\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Border Classes=\"icon drag-handle\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Border.drag-handle\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Button Classes=\"icon\" Tag=\"{Binding}\" PointerPressed=\"RouteHandle_OnPointerPressed\"", source, StringComparison.Ordinal);
         Assert.Contains("DragDrop.DragOver=\"Route_OnDragOver\"", source, StringComparison.Ordinal);
         Assert.Contains("DragDrop.Drop=\"Route_OnDrop\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.member-footbar\"", source, StringComparison.Ordinal);
