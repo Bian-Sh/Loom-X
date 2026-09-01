@@ -8,6 +8,7 @@
   <SolidColorBrush x:Key="SurfaceBrush" Color="#C7F8FAFB" />
   <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#A4EDF3F5" />
   <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#80C9D9DE" />
+  <SolidColorBrush x:Key="NavigationHoverBrush" Color="#D6F4F8F8" />
   <SolidColorBrush x:Key="BorderBrush" Color="#8094A6AB" />
   <SolidColorBrush x:Key="BorderStrongBrush" Color="#A0A5B9BD" />
 
@@ -26,6 +27,9 @@
   <SolidColorBrush x:Key="DangerBrush" Color="#A94E59" />
   <SolidColorBrush x:Key="DangerSoftBrush" Color="#FBE8EC" />
   <SolidColorBrush x:Key="DangerBorderBrush" Color="#E2B5BE" />
+  <!-- Windows 标题栏关闭按钮使用系统语义红，避免悬停态与普通危险操作混淆。 -->
+  <SolidColorBrush x:Key="WindowCloseHoverBrush" Color="#E81123" />
+  <SolidColorBrush x:Key="WindowClosePressedBrush" Color="#C50F1F" />
 
   <!-- 深色拓扑图使用独立令牌，避免被玻璃层降低可读性。 -->
   <SolidColorBrush x:Key="GraphBackgroundBrush" Color="#07131B" />

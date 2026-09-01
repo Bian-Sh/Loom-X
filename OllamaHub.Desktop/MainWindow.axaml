@@ -12,10 +12,21 @@
       <Setter Property="CornerRadius" Value="10" />
     </Style>
     <Style Selector="ToggleButton.nav-button:pointerover">
-      <Setter Property="Background" Value="#66FFFFFF" />
+      <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
     </Style>
+    <Style Selector="ToggleButton.nav-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
     <Style Selector="ToggleButton.nav-button:checked">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="ToggleButton.nav-button:checked /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
@@ -26,6 +37,7 @@
       <Setter Property="Stroke" Value="{DynamicResource AccentBrush}" />
       <Setter Property="StrokeThickness" Value="1.8" />
       <Setter Property="Stretch" Value="Uniform" />
+      <Setter Property="StrokeLineCap" Value="Round" />
     </Style>
     <Style Selector="Border.glass-sidebar">
       <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
@@ -59,7 +71,19 @@
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
     </Style>
     <Style Selector="Button.window-close:pointerover">
-      <Setter Property="Background" Value="#D95F6A" />
+      <Setter Property="Background" Value="{DynamicResource WindowCloseHoverBrush}" />
+      <Setter Property="Foreground" Value="#FFFFFFFF" />
+    </Style>
+    <Style Selector="Button.window-close:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource WindowCloseHoverBrush}" />
+      <Setter Property="Foreground" Value="#FFFFFFFF" />
+    </Style>
+    <Style Selector="Button.window-close:pressed">
+      <Setter Property="Background" Value="{DynamicResource WindowClosePressedBrush}" />
+      <Setter Property="Foreground" Value="#FFFFFFFF" />
+    </Style>
+    <Style Selector="Button.window-close:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource WindowClosePressedBrush}" />
       <Setter Property="Foreground" Value="#FFFFFFFF" />
     </Style>
   </Window.Styles>
@@ -67,7 +91,7 @@
     <Grid ColumnDefinitions="228,*">
       <Border Grid.Column="0" Classes="glass-sidebar" Padding="16,24">
         <Grid RowDefinitions="Auto,*,Auto">
-          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28" PointerPressed="WindowChrome_OnPointerPressed">
             <Border Width="38" Height="38" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12">
               <PathIcon Data="M 19,3 L 22,3 L 22,16 L 35,16 L 35,19 L 22,19 L 22,32 L 19,32 L 19,19 L 6,19 L 6,16 L 19,16 Z" Foreground="{DynamicResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
@@ -104,25 +128,29 @@
       </Border>
       <Grid Grid.Column="1" RowDefinitions="104,*">
         <Border Grid.Row="0" Classes="topbar">
-          <Grid RowDefinitions="40,*">
-            <Border Classes="window-chrome" PointerPressed="WindowChrome_OnPointerPressed">
-              <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="2">
-                <TextBlock Text="OllamaHub 控制中心" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化"><Path Data="M 9,16 L 23,16" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="最大化或还原" AutomationProperties.Name="最大化或还原"><Path Data="M 8,8 L 24,8 L 24,24 L 8,24 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-                <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="关闭" AutomationProperties.Name="关闭"><Path Data="M 9,9 L 23,23 M 23,9 L 9,23" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" /></Button>
-              </Grid>
-            </Border>
-            <StackPanel Grid.Row="1" Margin="32,4,32,0" VerticalAlignment="Center" Spacing="5">
-              <TextBlock Text="{Binding PageTitle}" FontSize="26" FontWeight="SemiBold" />
-              <TextBlock Text="{Binding PageDescription}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-            </StackPanel>
-          </Grid>
+          <StackPanel Margin="32,40,32,0" VerticalAlignment="Center" Spacing="5">
+            <TextBlock Text="{Binding PageTitle}" FontSize="26" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding PageDescription}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+          </StackPanel>
         </Border>
         <Border Grid.Row="1" Padding="32,20" Background="Transparent">
           <ContentControl Content="{Binding CurrentView}" />
         </Border>
       </Grid>
+      <!-- 标题栏覆盖两列，品牌区与内容区都可拖动；按钮位于同一层避免命中区被遮挡。 -->
+      <Border Grid.ColumnSpan="2" Classes="window-chrome" Height="40" VerticalAlignment="Top" PointerPressed="WindowChrome_OnPointerPressed">
+        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="2">
+          <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化">
+            <Path Data="M 4,11 L 20,11 L 20,13 L 4,13 Z" Fill="{DynamicResource TextSecondaryBrush}" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Button>
+          <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="最大化或还原" AutomationProperties.Name="最大化或还原">
+            <Path Data="M 5,5 L 19,5 L 19,19 L 5,19 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.6" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Button>
+          <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="关闭" AutomationProperties.Name="关闭">
+            <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.7" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Button>
+        </Grid>
+      </Border>
     </Grid>
     <Border x:Name="toastBorder" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Background="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="14,11" MaxWidth="420">
       <TextBlock x:Name="toastText" Foreground="White" TextWrapping="Wrap" />
