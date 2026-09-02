@@ -27,6 +27,30 @@ public sealed class SettingsViewContractTests
     }
 
     [Fact]
+    public void LoadingSettingsDoesNotReapplyAppearance()
+    {
+        var source = ReadDesktopFile("ViewModels", "SettingsViewModel.cs");
+        var loadStart = source.IndexOf("private async Task LoadAsync()", StringComparison.Ordinal);
+        var saveStart = source.IndexOf("private async Task SaveAsync", StringComparison.Ordinal);
+
+        Assert.True(loadStart >= 0);
+        Assert.True(saveStart > loadStart);
+        Assert.DoesNotContain("ApplyAppearancePreview();", source[loadStart..saveStart], StringComparison.Ordinal);
+        Assert.Contains("if (!suppressAutoSave) ApplyAppearancePreview();", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindowReusesTheSettingsViewModelAcrossNavigation()
+    {
+        var source = ReadDesktopFile("ViewModels", "MainWindowViewModel.cs");
+
+        Assert.Contains("private readonly SettingsViewModel settingsViewModel;", source, StringComparison.Ordinal);
+        Assert.Contains("settingsViewModel = new SettingsViewModel", source, StringComparison.Ordinal);
+        Assert.Contains("CurrentView = settingsViewModel;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentView = new SettingsViewModel", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AppearancePipelineUsesAContinuousZeroToHundredOpacityRange()
     {
         var windowSource = ReadDesktopFile("MainWindow.axaml.cs");

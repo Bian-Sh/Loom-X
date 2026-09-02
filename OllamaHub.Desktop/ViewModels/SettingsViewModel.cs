@@ -67,7 +67,7 @@ public sealed class SettingsViewModel : NotifyViewModel
         }
     }
     public SettingOption SelectedUpdateChannel { get => selectedUpdateChannel; set { if (SetProperty(ref selectedUpdateChannel, value)) QueueAutoSave(); } }
-    public SettingOption SelectedTransparencyAlgorithm { get => selectedTransparencyAlgorithm; set { if (SetProperty(ref selectedTransparencyAlgorithm, value)) { ApplyAppearancePreview(); QueueAutoSave(); } } }
+    public SettingOption SelectedTransparencyAlgorithm { get => selectedTransparencyAlgorithm; set { if (SetProperty(ref selectedTransparencyAlgorithm, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
     public string ProxyHost { get => proxyHost; set { if (SetProperty(ref proxyHost, value)) { OnPropertyChanged(nameof(ProxyStatus)); QueueAutoSave(); } } }
     public int ProxyPort { get => proxyPort; set { if (SetProperty(ref proxyPort, value)) { OnPropertyChanged(nameof(ProxyStatus)); QueueAutoSave(); } } }
     public string ProxyUsername { get => proxyUsername; set { if (SetProperty(ref proxyUsername, value)) QueueAutoSave(); } }
@@ -77,9 +77,9 @@ public sealed class SettingsViewModel : NotifyViewModel
     public bool AutoCheckUpdates { get => autoCheckUpdates; set { if (SetProperty(ref autoCheckUpdates, value)) QueueAutoSave(); } }
     public bool DiagnosticsEnabled { get => diagnosticsEnabled; set { if (SetProperty(ref diagnosticsEnabled, value)) QueueAutoSave(); } }
     public bool LogStackTrace { get => logStackTrace; set { if (SetProperty(ref logStackTrace, value)) { LoggingBootstrap.SetIncludeStackTrace(value); QueueAutoSave(); } } }
-    public bool TransparencyEnabled { get => transparencyEnabled; set { if (SetProperty(ref transparencyEnabled, value)) { ApplyAppearancePreview(); QueueAutoSave(); } } }
-    public int TransparencyOpacity { get => transparencyOpacity; set { if (SetProperty(ref transparencyOpacity, value)) { ApplyAppearancePreview(); QueueAutoSave(); } } }
-    public int BlurAmount { get => blurAmount; set { if (SetProperty(ref blurAmount, value)) { ApplyAppearancePreview(); QueueAutoSave(); } } }
+    public bool TransparencyEnabled { get => transparencyEnabled; set { if (SetProperty(ref transparencyEnabled, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
+    public int TransparencyOpacity { get => transparencyOpacity; set { if (SetProperty(ref transparencyOpacity, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
+    public int BlurAmount { get => blurAmount; set { if (SetProperty(ref blurAmount, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
     public SettingOption SelectedLogRetention { get => selectedLogRetention; set { if (SetProperty(ref selectedLogRetention, value)) OnPropertyChanged(nameof(LogRetentionDays)); } }
     public int LogRetentionDays => int.Parse(SelectedLogRetention.Value);
     public bool IsBusy { get => isBusy; private set { if (SetProperty(ref isBusy, value)) { OnPropertyChanged(nameof(IsNotBusy)); } } }
@@ -144,7 +144,6 @@ public sealed class SettingsViewModel : NotifyViewModel
             TransparencyEnabled = settings.TransparencyEnabled;
             TransparencyOpacity = settings.TransparencyOpacity;
             BlurAmount = settings.BlurAmount;
-            ApplyAppearancePreview();
             Status = "设置已加载";
             logger.LogInformation("设置加载完成 {ProxyMode} {UpdateChannel}", settings.ProxyMode, settings.UpdateChannel);
         }

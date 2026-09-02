@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private readonly ILoggerFactory loggerFactory;
     private readonly ConfigSnapshotService configService;
     private readonly ConsoleViewModel consoleViewModel;
+    private readonly SettingsViewModel settingsViewModel;
     private readonly Action<bool, int, int, string>? applyAppearance;
     private object currentView = new PlaceholderViewModel("加载中", "正在加载桌面控制中心。");
     private string pageTitle = "概览";
@@ -40,6 +41,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
         this.configService = configService ?? new ConfigSnapshotService(this.loggerFactory.CreateLogger<ConfigSnapshotService>());
         this.applyAppearance = applyAppearance;
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService);
+        settingsViewModel = new SettingsViewModel(configService: this.configService, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance);
         NavigationItems = new([
             new("概览", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
             new("网关", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
@@ -61,7 +63,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = new GatewayViewModel(configService, toastService); }
     private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = consoleViewModel; }
     private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = new ActivityViewModel(gatewayService, loggerFactory.CreateLogger<ActivityViewModel>()); }
-    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = new SettingsViewModel(configService, loggerFactory.CreateLogger<SettingsViewModel>(), toastService, applyAppearance); }
+    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = settingsViewModel; }
     private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
 }
 
