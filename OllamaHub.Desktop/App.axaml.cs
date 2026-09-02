@@ -27,10 +27,9 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            allowMultipleInstances = string.Equals(
-                Environment.GetEnvironmentVariable("OLLAMAHUB_ALLOW_MULTIPLE_INSTANCES"),
-                "1",
-                StringComparison.Ordinal);
+            allowMultipleInstances = InstanceLaunchPolicy.AllowsMultipleInstances(
+                Environment.GetCommandLineArgs(),
+                Environment.GetEnvironmentVariable("OLLAMAHUB_ALLOW_MULTIPLE_INSTANCES"));
             if (!allowMultipleInstances)
             {
                 shellBootstrapMutex = new Mutex(true, ShellBootstrapMutexName, out var isShellBootstrapOwner);
