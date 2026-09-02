@@ -37,10 +37,23 @@ public sealed class SettingsViewContractTests
         var alphaAtFour = MainWindow.CalculateBrushAlpha(230, 4, tint);
         var alphaAtHundred = MainWindow.CalculateBrushAlpha(230, 100, tint);
 
-        Assert.Equal(0, alphaAtZero);
+        Assert.True(alphaAtZero > 0);
         Assert.True(alphaAtOne > alphaAtZero);
         Assert.True(alphaAtFour > alphaAtOne);
         Assert.True(alphaAtHundred > alphaAtFour);
+        Assert.Equal(0.16, MainWindow.CalculateOpacityFactor(0), 3);
+        Assert.Equal(1, MainWindow.CalculateOpacityFactor(100), 3);
+    }
+
+    [Fact]
+    public void TransparencyOpacityZeroKeepsAVisibleBaselineWithoutAJumpAtLowValues()
+    {
+        var tint = MainWindow.CalculateBlurTintFactor(24);
+        var alphaAtZero = MainWindow.CalculateBrushAlpha(230, 0, tint);
+        var alphaAtFour = MainWindow.CalculateBrushAlpha(230, 4, tint);
+
+        Assert.InRange(alphaAtZero, 1, 255);
+        Assert.InRange(alphaAtFour - alphaAtZero, 0, 12);
     }
 
     [Fact]

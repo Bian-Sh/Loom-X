@@ -11,6 +11,8 @@ using OllamaHub.Desktop.Services;
 namespace OllamaHub.Desktop;
 public partial class MainWindow : Window
 {
+    // 透明度为 0 时保留轻微基底，避免系统材质在 alpha=0 时退化为仅边框。
+    private const double MinimumOpacityFactor = 0.16;
     private readonly ToastService toastService;
     private readonly ILogger<MainWindow> logger;
     private readonly DispatcherTimer toastTimer;
@@ -211,8 +213,11 @@ public partial class MainWindow : Window
     internal static double CalculateBlurTintFactor(int blurAmount) =>
         0.35 + (Math.Clamp(blurAmount, 0, 64) / 64d * 0.65);
 
+    internal static double CalculateOpacityFactor(int opacity) =>
+        MinimumOpacityFactor + ((1 - MinimumOpacityFactor) * (Math.Clamp(opacity, 0, 100) / 100d));
+
     internal static byte CalculateBrushAlpha(byte baseAlpha, int opacity, double blurTintFactor) =>
-        (byte)Math.Clamp(Math.Round(baseAlpha * (Math.Clamp(opacity, 0, 100) / 100d) * Math.Clamp(blurTintFactor, 0, 1)), 0, 255);
+        (byte)Math.Clamp(Math.Round(baseAlpha * CalculateOpacityFactor(opacity) * Math.Clamp(blurTintFactor, 0, 1)), 0, 255);
 
     private static SolidColorBrush OpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
         ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
