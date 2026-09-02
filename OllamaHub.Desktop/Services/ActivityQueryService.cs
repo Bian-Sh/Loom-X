@@ -1,3 +1,4 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using OllamaHub;
 using OllamaHub.Activity;
@@ -6,6 +7,12 @@ namespace OllamaHub.Desktop.Services;
 
 public sealed class ActivityQueryService
 {
+    private readonly string databasePath;
+
+    public ActivityQueryService() : this(AppDataPaths.ActivityDatabasePath) { }
+
+    internal ActivityQueryService(string databasePath) => this.databasePath = databasePath;
+
     public async Task<IReadOnlyList<ActivityEventRecord>> QueryAsync(ActivityQuery query, CancellationToken cancellationToken = default)
     {
         await using var db = CreateContext();
@@ -37,10 +44,19 @@ public sealed class ActivityQueryService
             .ToArray();
     }
 
-    private static ActivityDbContext CreateContext()
+    private ActivityDbContext CreateContext()
     {
-        AppDataPaths.EnsureCreated();
-        var options = new DbContextOptionsBuilder<ActivityDbContext>().UseSqlite($"Data Source={AppDataPaths.ActivityDatabasePath}").Options;
+        var directory = Path.GetDirectoryName(databasePath);
+        if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = databasePath,
+            Mode = SqliteOpenMode.ReadWriteCreate,
+            Cache = SqliteCacheMode.Private,
+            Pooling = false,
+            DefaultTimeout = 5
+        }.ToString();
+        var options = new DbContextOptionsBuilder<ActivityDbContext>().UseSqlite(connectionString).Options;
         return new ActivityDbContext(options);
     }
 }

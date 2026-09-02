@@ -80,6 +80,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 {
     private readonly GatewayProcessService gatewayService;
     private readonly ConfigSnapshotService configService;
+    private readonly ActivityQueryService activityQueryService = new();
     private readonly ILogger<MainWindowViewModel>? logger;
     private string gatewayStatus = "未运行";
     private string endpoint = "未配置";
@@ -112,6 +113,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public ObservableCollection<OverviewEndpointViewModel> Endpoints { get; } = [];
     public ObservableCollection<OverviewModelViewModel> Models { get; } = [];
     public ObservableCollection<OverviewRecentRequestViewModel> RecentRequests { get; } = [];
+    public bool RecentRequestsEmpty => RecentRequests.Count == 0;
     public string TopologyJson => JsonSerializer.Serialize(new
     {
         endpoints = Endpoints.Select(item => new { key = item.Key, displayName = item.DisplayName, publicPath = item.PublicPath, enabled = item.Enabled }),
@@ -157,6 +159,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             ProviderCount = config.Providers.Count;
             ModelCount = config.Models.Count;
             BuildTopology(config);
+            await RefreshRecentRequestsAsync();
             GatewayStatus = gatewayService.State switch
             {
                 GatewayState.Running => "运行中",
@@ -176,6 +179,28 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             GraphStatus = "概览加载失败";
         }
         await Task.CompletedTask;
+    }
+
+    private async Task RefreshRecentRequestsAsync()
+    {
+        try
+        {
+            var records = await activityQueryService.QueryAsync(new ActivityQuery(Limit: 8));
+            await Dispatcher.UIThread.InvokeAsync(() => MergeRecentRequests(records.Select(OverviewRecentRequestViewModel.From)));
+            logger?.LogInformation("概览最近请求回填完成 {RequestCount} 条", RecentRequests.Count);
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "概览最近请求回填失败");
+        }
+    }
+
+    private void MergeRecentRequests(IEnumerable<OverviewRecentRequestViewModel> persistedRequests)
+    {
+        var merged = OverviewRecentRequestViewModel.Merge(persistedRequests, RecentRequests);
+        RecentRequests.Clear();
+        foreach (var item in merged) RecentRequests.Add(item);
+        OnPropertyChanged(nameof(RecentRequestsEmpty));
     }
 
     private void BuildTopology(ResolvedAppConfig config)
@@ -238,8 +263,13 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         var cutoff = DateTimeOffset.UtcNow - TimeSpan.FromMinutes(5);
         completionWindow.RemoveAll(item => item.Timestamp < cutoff);
         Throughput = completionWindow.Count;
-        if (telemetryEvent.StatusCode.HasValue) RecentRequests.Insert(0, OverviewRecentRequestViewModel.From(telemetryEvent));
-        while (RecentRequests.Count > 8) RecentRequests.RemoveAt(RecentRequests.Count - 1);
+        if (telemetryEvent.StatusCode.HasValue)
+        {
+            var request = OverviewRecentRequestViewModel.From(telemetryEvent);
+            if (!RecentRequests.Any(item => item.RequestId.Equals(request.RequestId, StringComparison.Ordinal))) RecentRequests.Insert(0, request);
+            while (RecentRequests.Count > 8) RecentRequests.RemoveAt(RecentRequests.Count - 1);
+            OnPropertyChanged(nameof(RecentRequestsEmpty));
+        }
         P95Latency = completionWindow.Count == 0 ? "—" : $"{completionWindow.Select(item => item.ElapsedMs).OrderBy(item => item).ElementAt(Math.Max(0, (int)Math.Ceiling(completionWindow.Count * .95) - 1))} ms";
     }
 
@@ -312,14 +342,43 @@ public sealed class OverviewModelViewModel
 
 public sealed class OverviewRecentRequestViewModel
 {
+    public string RequestId { get; }
+    public DateTimeOffset CreatedAt { get; }
     public string Time { get; }
     public string Endpoint { get; }
     public string Model { get; }
     public string Status { get; }
     public long ElapsedMs { get; }
     public string Latency => $"{ElapsedMs} ms";
-    private OverviewRecentRequestViewModel(RequestTelemetryEvent item) { Time = item.Timestamp.ToLocalTime().ToString("HH:mm:ss"); Endpoint = item.EndpointKey; Model = item.ModelId ?? item.ModelAlias ?? "未知模型"; Status = item.StatusCode is >= 200 and < 300 ? "成功" : "失败"; ElapsedMs = item.ElapsedMs; }
+    private OverviewRecentRequestViewModel(string requestId, DateTimeOffset createdAt, string endpoint, string model, int statusCode, long elapsedMs)
+    {
+        RequestId = requestId;
+        CreatedAt = createdAt;
+        Time = createdAt.ToLocalTime().ToString("HH:mm:ss");
+        Endpoint = endpoint;
+        Model = model;
+        Status = statusCode is >= 200 and < 300 ? "成功" : "失败";
+        ElapsedMs = elapsedMs;
+    }
+
+    private OverviewRecentRequestViewModel(RequestTelemetryEvent item)
+        : this(item.RequestId, item.Timestamp, item.EndpointKey, item.ModelId ?? item.ModelAlias ?? "未知模型", item.StatusCode ?? 0, item.ElapsedMs) { }
+
+    private OverviewRecentRequestViewModel(ActivityEventRecord item)
+        : this(item.RequestId, item.CreatedAt, item.Protocol, string.IsNullOrWhiteSpace(item.ModelId) ? "未知模型" : item.ModelId, item.StatusCode, item.ElapsedMs) { }
+
     public static OverviewRecentRequestViewModel From(RequestTelemetryEvent item) => new(item);
+    public static OverviewRecentRequestViewModel From(ActivityEventRecord item) => new(item);
+
+    internal static IReadOnlyList<OverviewRecentRequestViewModel> Merge(
+        IEnumerable<OverviewRecentRequestViewModel> persistedRequests,
+        IEnumerable<OverviewRecentRequestViewModel> currentRequests) => persistedRequests
+        .Concat(currentRequests)
+        .GroupBy(item => item.RequestId, StringComparer.Ordinal)
+        .Select(group => group.OrderByDescending(item => item.CreatedAt).First())
+        .OrderByDescending(item => item.CreatedAt)
+        .Take(8)
+        .ToArray();
 }
 
 public sealed class ProvidersViewModel : NotifyViewModel
