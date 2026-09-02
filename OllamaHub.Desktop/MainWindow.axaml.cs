@@ -12,6 +12,8 @@ public partial class MainWindow : Window
 {
     private readonly ToastService toastService;
     private readonly DispatcherTimer toastTimer;
+    private readonly Dictionary<string, Color> baseBrushColors = new(StringComparer.Ordinal);
+    private ResourceDictionary? appearanceResources;
 
     public ToastService ToastService => toastService;
 
@@ -21,6 +23,7 @@ public partial class MainWindow : Window
     {
         this.toastService = toastService;
         InitializeComponent();
+        TransparencyLevelHint = BuildTransparencyLevels("acrylic");
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerMovedEvent, Window_OnPointerMoved, RoutingStrategies.Tunnel);
         toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
@@ -144,7 +147,7 @@ public partial class MainWindow : Window
     {
         opacity = Math.Clamp(opacity, 0, 100);
         blurAmount = Math.Clamp(blurAmount, 0, 64);
-        var blurFactor = 0.9 + (blurAmount / 64d * 0.1);
+        var blurFactor = 0.35 + (blurAmount / 64d * 0.65);
         SetBrushAlpha("WindowBackgroundBrush", ScaleAlpha(230, opacity, blurFactor));
         SetBrushAlpha("GlassBrush", ScaleAlpha(184, opacity, blurFactor));
         SetBrushAlpha("GlassStrongBrush", ScaleAlpha(208, opacity, blurFactor));
@@ -157,15 +160,16 @@ public partial class MainWindow : Window
         Background = enabled
             ? Brushes.Transparent
             : OpaqueCopy(ResolveBrush("WindowBackgroundBrush"));
-        TransparencyLevelHint = !enabled
-            ? [WindowTransparencyLevel.None]
-            : algorithm.Trim().ToLowerInvariant() switch
-            {
-                "mica" => [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur],
-                "blur" => [WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur],
-                _ => [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur]
-            };
+        TransparencyLevelHint = BuildTransparencyLevels(algorithm);
     }
+
+    private static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm) =>
+        algorithm.Trim().ToLowerInvariant() switch
+        {
+            "mica" => [WindowTransparencyLevel.Transparent, WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur],
+            "blur" => [WindowTransparencyLevel.Transparent, WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur],
+            _ => [WindowTransparencyLevel.Transparent, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur]
+        };
 
     private IBrush ResolveBrush(string key) => TryGetResource(key, null, out var value) && value is IBrush brush
         ? brush
@@ -173,8 +177,25 @@ public partial class MainWindow : Window
 
     private void SetBrushAlpha(string key, int alpha)
     {
-        if (TryGetResource(key, null, out var value) && value is SolidColorBrush brush)
-            brush.Color = Color.FromArgb((byte)Math.Clamp(alpha, 0, 255), brush.Color.R, brush.Color.G, brush.Color.B);
+        if (!TryGetResource(key, null, out var value) || value is not ISolidColorBrush brush)
+            return;
+
+        if (!baseBrushColors.TryGetValue(key, out var baseColor))
+        {
+            baseColor = brush.Color;
+            baseBrushColors[key] = baseColor;
+        }
+
+        var replacement = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(alpha, 0, 255), baseColor.R, baseColor.G, baseColor.B));
+        if (Application.Current?.Resources is { } applicationResources)
+        {
+            appearanceResources ??= new ResourceDictionary();
+            if (!applicationResources.MergedDictionaries.Contains(appearanceResources))
+                applicationResources.MergedDictionaries.Add(appearanceResources);
+            appearanceResources[key] = replacement;
+        }
+        else
+            Resources[key] = replacement;
     }
 
     private static byte ScaleAlpha(byte baseAlpha, int opacity, double blurFactor) =>

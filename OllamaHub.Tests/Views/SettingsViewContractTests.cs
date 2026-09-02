@@ -30,6 +30,21 @@ public sealed class SettingsViewContractTests
         Assert.Contains("TransparencyOpacity is < 0 or > 100", serviceSource, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AppearancePipelineKeepsTransparentFallbackAndDoesNotDisableItAtRuntime()
+    {
+        var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
+
+        Assert.Contains("WindowTransparencyLevel.Transparent", windowSource, StringComparison.Ordinal);
+        Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(algorithm);", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.Transparent, WindowTransparencyLevel.Mica", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.Transparent, WindowTransparencyLevel.Blur", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.Transparent, WindowTransparencyLevel.AcrylicBlur", windowSource, StringComparison.Ordinal);
+        Assert.Contains("0.35 + (blurAmount / 64d * 0.65)", windowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("TransparencyLevelHint = !enabled", windowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("[WindowTransparencyLevel.None]", windowSource, StringComparison.Ordinal);
+    }
+
     private static string ReadDesktopFile(params string[] segments)
     {
         var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", .. segments]);
