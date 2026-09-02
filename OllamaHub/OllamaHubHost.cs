@@ -261,7 +261,7 @@ public static class OllamaHubHost
         return Results.StatusCode(StatusCodes.Status502BadGateway);
     }
 
-    private static async Task<IResult> HandleResponsesAsync(
+    internal static async Task<IResult> HandleResponsesAsync(
         HttpContext httpContext,
         IDatabaseConfigurationProvider configProvider,
         IProtocolPassthroughClient passthroughClient,
