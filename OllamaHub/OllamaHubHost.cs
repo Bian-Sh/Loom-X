@@ -213,11 +213,9 @@ public static class OllamaHubHost
                 routeContext.Route = model.SupportsApiMode("openai") ? "OpenAI Combo" : "OpenAI Combo → Anthropic";
             }
 
-            var attemptRequest = requestObject.DeepClone() as JsonObject ?? new JsonObject();
+            var attemptRequest = BuildGatewayAttemptPayload(requestObject, model);
             if (model.SupportsApiMode("openai"))
             {
-                attemptRequest["model"] = model.ModelId;
-                foreach (var kvp in model.Extra) attemptRequest[kvp.Key] = kvp.Value?.DeepClone();
                 if (model.Temperature.HasValue && !attemptRequest.ContainsKey("temperature")) attemptRequest["temperature"] = model.Temperature.Value;
                 if (model.TopP.HasValue && !attemptRequest.ContainsKey("top_p")) attemptRequest["top_p"] = model.TopP.Value;
                 if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, model, "openai", "/chat/completions", attemptRequest, cancellationToken)) return Results.Empty;
@@ -298,21 +296,33 @@ public static class OllamaHubHost
                 routeContext.ModelAlias = combo!.Name;
                 routeContext.Route = $"{GatewayEndpointRouting.ResolveLabel(httpContext.Request.Path)} → {route.Model.ProviderId}";
             }
-            requestObject["model"] = route.Model.ModelId;
+            var attemptRequest = BuildGatewayAttemptPayload(requestObject, route.Model);
             if (endpointKey == "ollama"
                 && httpContext.Request.Path.StartsWithSegments("/v1/chat/completions")
                 && route.Model.SupportsApiMode("openai")
                 && !route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase))
             {
-                if (await passthroughClient.ProxyOpenAiResponsesGatewayAttemptAsync(httpContext, route.Model, requestObject, cancellationToken)) return Results.Empty;
+                if (await passthroughClient.ProxyOpenAiResponsesGatewayAttemptAsync(httpContext, route.Model, attemptRequest, cancellationToken)) return Results.Empty;
                 continue;
             }
 
             var upstreamPath = route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase) ? "/chat/completions" : "/responses";
             if (route.Model.SupportsApiMode("ollama")) upstreamPath = "/api/chat";
-            if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, route.Model, route.Model.SupportsApiMode("ollama") ? "ollama" : "openai", upstreamPath, requestObject, cancellationToken)) return Results.Empty;
+            if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, route.Model, route.Model.SupportsApiMode("ollama") ? "ollama" : "openai", upstreamPath, attemptRequest, cancellationToken)) return Results.Empty;
         }
         return Results.StatusCode(StatusCodes.Status502BadGateway);
+    }
+
+    internal static JsonObject BuildGatewayAttemptPayload(JsonObject requestObject, ResolvedModelConfig model)
+    {
+        var attemptRequest = requestObject.DeepClone().AsObject();
+        attemptRequest["model"] = model.ModelId;
+        foreach (var kvp in model.Extra)
+        {
+            attemptRequest[kvp.Key] = kvp.Value?.DeepClone();
+        }
+
+        return attemptRequest;
     }
 
     private static object ListGatewayModels(IDatabaseConfigurationProvider provider, string endpointKey)
