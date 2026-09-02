@@ -1,6 +1,6 @@
 workflow: hotfix
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: d03d1cc72345db10ac3220c704f77a0c856a7846
 design_doc: null
 plan: null
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-09-02-fix-overview-recent-requests-verify.md
-branch_status: pending
+branch_status: handled
 created_at: 2026-09-02
-verified_at: null
+verified_at: 2026-09-02
 archived: false
 direct_override: null
 handoff_context: null
