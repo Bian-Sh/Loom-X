@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="OllamaHub 控制中心" Background="Transparent" TransparencyLevelHint="AcrylicBlur" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="OllamaHub.Desktop.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="OllamaHub 控制中心" Background="Transparent" TransparencyLevelHint="Transparent,AcrylicBlur,Blur" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
   <Window.Styles>
     <Style Selector="ToggleButton.nav-button">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
