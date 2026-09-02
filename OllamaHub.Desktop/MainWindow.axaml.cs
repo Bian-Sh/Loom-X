@@ -159,16 +159,21 @@ public partial class MainWindow : Window
         Background = enabled
             ? Brushes.Transparent
             : OpaqueCopy(ResolveBrush("WindowBackgroundBrush"));
-        TransparencyLevelHint = BuildTransparencyLevels(algorithm);
+        TransparencyLevelHint = BuildTransparencyLevels(algorithm, opacity);
     }
 
-    internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm) =>
-        algorithm.Trim().ToLowerInvariant() switch
+    internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm, int opacity = 100)
+    {
+        if (opacity <= 0)
+            return [WindowTransparencyLevel.Transparent];
+
+        return algorithm.Trim().ToLowerInvariant() switch
         {
             "mica" => [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent],
             "blur" => [WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent],
             _ => [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]
         };
+    }
 
     private IBrush ResolveBrush(string key) => TryGetResource(key, null, out var value) && value is IBrush brush
         ? brush

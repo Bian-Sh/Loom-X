@@ -39,7 +39,7 @@ public sealed class SettingsViewContractTests
         var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
 
         Assert.Contains("WindowTransparencyLevel.Transparent", windowSource, StringComparison.Ordinal);
-        Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(algorithm);", windowSource, StringComparison.Ordinal);
+        Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(algorithm, opacity);", windowSource, StringComparison.Ordinal);
         Assert.Contains("[WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
         Assert.Contains("[WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
         Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
@@ -92,6 +92,9 @@ public sealed class SettingsViewContractTests
                 WindowTransparencyLevel.Transparent
             },
             MainWindow.BuildTransparencyLevels("mica"));
+        Assert.Equal(
+            new[] { WindowTransparencyLevel.Transparent },
+            MainWindow.BuildTransparencyLevels("mica", 0));
     }
 
     private static string ReadDesktopFile(params string[] segments)
