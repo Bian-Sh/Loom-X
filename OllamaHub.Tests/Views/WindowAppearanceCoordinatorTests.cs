@@ -45,7 +45,7 @@ public sealed class WindowAppearanceCoordinatorTests
         window.ApplyAppearance(true, 86, 24, "mica");
         window.AppearanceCoordinator.ApplyTo(dialog);
         Assert.Same(Brushes.Transparent, dialog.Background);
-        Assert.Equal(WindowTransparencyLevel.Mica, dialog.TransparencyLevelHint[0]);
+        Assert.Equal(WindowTransparencyLevel.AcrylicBlur, dialog.TransparencyLevelHint[0]);
 
         window.ApplyAppearance(false, 86, 24, "acrylic");
 
