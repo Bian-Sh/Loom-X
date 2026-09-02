@@ -90,7 +90,7 @@
       </Border>
     </Grid>
     <Popup x:Name="modelPopup" Placement="Bottom" IsLightDismissEnabled="True" HorizontalOffset="0" VerticalOffset="5">
-      <Border x:Name="modelPickerPanel" Width="360" MaxHeight="420" Background="{DynamicResource GlassStrongBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="8">
+      <Border x:Name="modelPickerPanel" Width="360" MaxHeight="420" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="8" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*" RowSpacing="8">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
             <TextBox x:Name="modelSearch" Watermark="搜索模型..." TextChanged="ModelSearch_OnTextChanged"/>

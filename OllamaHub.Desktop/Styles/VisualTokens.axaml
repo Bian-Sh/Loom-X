@@ -9,6 +9,8 @@
   <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#A4EDF3F5" />
   <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#80C9D9DE" />
   <SolidColorBrush x:Key="NavigationHoverBrush" Color="#D6F4F8F8" />
+  <SolidColorBrush x:Key="DialogBackgroundBrush" Color="#E8F8FAFB" />
+  <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#E0F2F7F8" />
   <SolidColorBrush x:Key="BorderBrush" Color="#8094A6AB" />
   <SolidColorBrush x:Key="BorderStrongBrush" Color="#A0A5B9BD" />
 

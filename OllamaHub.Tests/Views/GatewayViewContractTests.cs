@@ -56,6 +56,18 @@ public sealed class GatewayViewContractTests
     }
 
     [Fact]
+    public void ModelPickerUsesDedicatedDynamicPopupSurface()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+
+        Assert.Contains("x:Name=\"modelPickerPanel\"", source, StringComparison.Ordinal);
+        Assert.Contains("Width=\"360\"", source, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"420\"", source, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{DynamicResource PopupBackgroundBrush}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsLightDismissEnabled=\"True\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DragAndAlphabeticalSortAreHandledByGatewayInteractions()
     {
         var viewSource = ReadDesktopFile("Views", "GatewayView.axaml.cs");

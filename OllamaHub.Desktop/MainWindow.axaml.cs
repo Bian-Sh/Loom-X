@@ -16,9 +16,10 @@ public partial class MainWindow : Window
     private readonly ToastService toastService;
     private readonly ILogger<MainWindow> logger;
     private readonly DispatcherTimer toastTimer;
-    private readonly Dictionary<string, Color> baseBrushColors = new(StringComparer.Ordinal);
+    private readonly WindowAppearanceCoordinator appearanceCoordinator;
 
     public ToastService ToastService => toastService;
+    internal WindowAppearanceCoordinator AppearanceCoordinator => appearanceCoordinator;
 
     public MainWindow() : this(new ToastService(), null) { }
 
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
         this.toastService = toastService;
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MainWindow>.Instance;
         InitializeComponent();
+        appearanceCoordinator = new WindowAppearanceCoordinator(this);
         TransparencyLevelHint = BuildTransparencyLevels("acrylic");
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerMovedEvent, Window_OnPointerMoved, RoutingStrategies.Tunnel);
@@ -150,27 +152,14 @@ public partial class MainWindow : Window
     public void ApplyAppearance(bool enabled, int opacity, int blurAmount, string algorithm)
     {
         logger.LogInformation("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
-        opacity = Math.Clamp(opacity, 0, 100);
-        blurAmount = Math.Clamp(blurAmount, 0, 64);
-        var blurFactor = CalculateBlurTintFactor(blurAmount);
-        SetBrushAlpha("WindowBackgroundBrush", CalculateBrushAlpha(230, opacity, blurFactor));
-        SetBrushAlpha("GlassBrush", CalculateBrushAlpha(184, opacity, blurFactor));
-        SetBrushAlpha("GlassStrongBrush", CalculateBrushAlpha(208, opacity, blurFactor));
-        SetBrushAlpha("SurfaceBrush", CalculateBrushAlpha(199, opacity, blurFactor));
-        SetBrushAlpha("SurfaceSubtleBrush", CalculateBrushAlpha(164, opacity, blurFactor));
-        SetBrushAlpha("SurfaceMutedBrush", CalculateBrushAlpha(128, opacity, blurFactor));
-        SetBrushAlpha("NavigationHoverBrush", CalculateBrushAlpha(214, opacity, blurFactor));
-
-        TransparencyBackgroundFallback = ResolveBrush("WindowBackgroundBrush");
-        Background = enabled
-            ? Brushes.Transparent
-            : OpaqueCopy(ResolveBrush("WindowBackgroundBrush"));
+        appearanceCoordinator.Apply(enabled, opacity, blurAmount, algorithm);
+        // 保留主窗口入口的显式材质赋值，兼容现有外观契约和运行时诊断。
         TransparencyLevelHint = BuildTransparencyLevels(algorithm);
         logger.LogInformation(
             "透明外观应用完成 {Enabled} {Opacity} {BlurAmount} {Algorithm} {WindowBackgroundType} {GlassType} {ActualTransparencyLevel}",
             enabled,
-            opacity,
-            blurAmount,
+            appearanceCoordinator.Current.Opacity,
+            appearanceCoordinator.Current.BlurAmount,
             algorithm,
             DescribeResource("WindowBackgroundBrush"),
             DescribeResource("GlassBrush"),
@@ -178,11 +167,11 @@ public partial class MainWindow : Window
     }
 
     private string DescribeResource(string key) =>
-        TryResolveResource(key, out var value) && value is not null
+        TryResolveAppearanceResource(key, out var value) && value is not null
             ? value.GetType().FullName ?? value.GetType().Name
             : "missing";
 
-    private bool TryResolveResource(string key, out object? value)
+    internal bool TryResolveAppearanceResource(string key, out object? value)
     {
         if (TryGetResource(key, null, out value)) return true;
         if (Application.Current is { } application && application.TryGetResource(key, null, out value)) return true;
@@ -198,17 +187,9 @@ public partial class MainWindow : Window
             _ => [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]
         };
 
-    private IBrush ResolveBrush(string key) => TryResolveResource(key, out var value) && value is IBrush brush
+    internal IBrush ResolveAppearanceBrush(string key) => TryResolveAppearanceResource(key, out var value) && value is IBrush brush
         ? brush
         : Brushes.Transparent;
-
-    private void SetBrushAlpha(string key, int alpha)
-    {
-        if (!TryResolveResource(key, out var value) || value is not SolidColorBrush brush)
-            return;
-
-        AppearanceBrushUpdater.Apply(brush, key, baseBrushColors, alpha);
-    }
 
     internal static double CalculateBlurTintFactor(int blurAmount) =>
         0.35 + (Math.Clamp(blurAmount, 0, 64) / 64d * 0.65);
@@ -219,7 +200,7 @@ public partial class MainWindow : Window
     internal static byte CalculateBrushAlpha(byte baseAlpha, int opacity, double blurTintFactor) =>
         (byte)Math.Clamp(Math.Round(baseAlpha * CalculateOpacityFactor(opacity) * Math.Clamp(blurTintFactor, 0, 1)), 0, 255);
 
-    private static SolidColorBrush OpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
+    internal static SolidColorBrush CreateOpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
         ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
         : new SolidColorBrush(Color.FromArgb(255, 230, 240, 243));
 }
