@@ -5,22 +5,25 @@ using Avalonia.Media;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Microsoft.Extensions.Logging;
 using OllamaHub.Desktop.Services;
 
 namespace OllamaHub.Desktop;
 public partial class MainWindow : Window
 {
     private readonly ToastService toastService;
+    private readonly ILogger<MainWindow> logger;
     private readonly DispatcherTimer toastTimer;
     private readonly Dictionary<string, Color> baseBrushColors = new(StringComparer.Ordinal);
 
     public ToastService ToastService => toastService;
 
-    public MainWindow() : this(new ToastService()) { }
+    public MainWindow() : this(new ToastService(), null) { }
 
-    public MainWindow(ToastService toastService)
+    public MainWindow(ToastService toastService, ILogger<MainWindow>? logger = null)
     {
         this.toastService = toastService;
+        this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MainWindow>.Instance;
         InitializeComponent();
         TransparencyLevelHint = BuildTransparencyLevels("acrylic");
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
@@ -144,6 +147,7 @@ public partial class MainWindow : Window
 
     public void ApplyAppearance(bool enabled, int opacity, int blurAmount, string algorithm)
     {
+        logger.LogInformation("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
         opacity = Math.Clamp(opacity, 0, 100);
         blurAmount = Math.Clamp(blurAmount, 0, 64);
         var blurFactor = 0.35 + (blurAmount / 64d * 0.65);
@@ -160,6 +164,28 @@ public partial class MainWindow : Window
             ? Brushes.Transparent
             : OpaqueCopy(ResolveBrush("WindowBackgroundBrush"));
         TransparencyLevelHint = BuildTransparencyLevels(algorithm, opacity);
+        logger.LogInformation(
+            "透明外观应用完成 {Enabled} {Opacity} {BlurAmount} {Algorithm} {WindowBackgroundType} {GlassType} {ActualTransparencyLevel}",
+            enabled,
+            opacity,
+            blurAmount,
+            algorithm,
+            DescribeResource("WindowBackgroundBrush"),
+            DescribeResource("GlassBrush"),
+            ActualTransparencyLevel);
+    }
+
+    private string DescribeResource(string key) =>
+        TryResolveResource(key, out var value) && value is not null
+            ? value.GetType().FullName ?? value.GetType().Name
+            : "missing";
+
+    private bool TryResolveResource(string key, out object? value)
+    {
+        if (TryGetResource(key, null, out value)) return true;
+        if (Application.Current is { } application && application.TryGetResource(key, null, out value)) return true;
+        value = null;
+        return false;
     }
 
     internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm, int opacity = 100)
@@ -175,13 +201,13 @@ public partial class MainWindow : Window
         };
     }
 
-    private IBrush ResolveBrush(string key) => TryGetResource(key, null, out var value) && value is IBrush brush
+    private IBrush ResolveBrush(string key) => TryResolveResource(key, out var value) && value is IBrush brush
         ? brush
         : Brushes.Transparent;
 
     private void SetBrushAlpha(string key, int alpha)
     {
-        if (!TryGetResource(key, null, out var value) || value is not SolidColorBrush brush)
+        if (!TryResolveResource(key, out var value) || value is not SolidColorBrush brush)
             return;
 
         AppearanceBrushUpdater.Apply(brush, key, baseBrushColors, alpha);
