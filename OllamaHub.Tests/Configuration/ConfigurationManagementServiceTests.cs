@@ -506,7 +506,7 @@ public sealed class ConfigurationManagementServiceTests
             Assert.True(updatedSettings.TransparencyEnabled);
             Assert.Equal(0, updatedSettings.TransparencyOpacity);
             Assert.Equal(48, updatedSettings.BlurAmount);
-            Assert.Equal("mica", updatedSettings.TransparencyAlgorithm);
+            Assert.Equal("acrylic", updatedSettings.TransparencyAlgorithm);
 
             var provider = await service.CreateProviderAsync(new ProviderInput("proxy", "代理 Provider", "https://example.com", "anthropic", true, null, false, null, true, "https://models.example.com/list"));
             Assert.True(provider.UseProxy);
@@ -522,7 +522,7 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal("custom", storedSettings.ProxyMode);
             Assert.Equal(0, storedSettings.TransparencyOpacity);
             Assert.Equal(48, storedSettings.BlurAmount);
-            Assert.Equal("mica", storedSettings.TransparencyAlgorithm);
+            Assert.Equal("acrylic", storedSettings.TransparencyAlgorithm);
         }
         finally
         {

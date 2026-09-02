@@ -18,6 +18,7 @@ public sealed record SettingOption(string Value, string DisplayName)
 
 public sealed class SettingsViewModel : NotifyViewModel
 {
+    private const string AcrylicTransparencyAlgorithm = "acrylic";
     private readonly ConfigSnapshotService configService;
     private readonly ToastService toastService;
     private readonly ILogger<SettingsViewModel> logger;
@@ -27,7 +28,6 @@ public sealed class SettingsViewModel : NotifyViewModel
     private SettingOption selectedTheme = ThemeOptions[0];
     private SettingOption selectedProxyMode = ProxyModeOptions[0];
     private SettingOption selectedUpdateChannel = UpdateChannelOptions[0];
-    private SettingOption selectedTransparencyAlgorithm = TransparencyAlgorithmOptions[0];
     private string proxyHost = "http://127.0.0.1";
     private int proxyPort = 7890;
     private string proxyUsername = "";
@@ -51,7 +51,6 @@ public sealed class SettingsViewModel : NotifyViewModel
     public static IReadOnlyList<SettingOption> ProxyModeOptions { get; } = [new("direct", "直连"), new("system", "系统代理"), new("custom", "自定义代理")];
     public static IReadOnlyList<SettingOption> UpdateChannelOptions { get; } = [new("stable", "稳定版"), new("preview", "预览版")];
     public static IReadOnlyList<SettingOption> LogRetentionOptions { get; } = [new("7", "7 天"), new("30", "30 天"), new("90", "90 天"), new("365", "365 天"), new("3650", "永久保留")];
-    public static IReadOnlyList<SettingOption> TransparencyAlgorithmOptions { get; } = [new("acrylic", "Acrylic（亚克力）"), new("blur", "Blur（模糊）"), new("mica", "Mica（云母）")];
 
     public SettingOption SelectedLanguage { get => selectedLanguage; set { if (SetProperty(ref selectedLanguage, value)) QueueAutoSave(); } }
     public SettingOption SelectedTheme { get => selectedTheme; set { if (SetProperty(ref selectedTheme, value)) QueueAutoSave(); } }
@@ -67,7 +66,6 @@ public sealed class SettingsViewModel : NotifyViewModel
         }
     }
     public SettingOption SelectedUpdateChannel { get => selectedUpdateChannel; set { if (SetProperty(ref selectedUpdateChannel, value)) QueueAutoSave(); } }
-    public SettingOption SelectedTransparencyAlgorithm { get => selectedTransparencyAlgorithm; set { if (SetProperty(ref selectedTransparencyAlgorithm, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
     public string ProxyHost { get => proxyHost; set { if (SetProperty(ref proxyHost, value)) { OnPropertyChanged(nameof(ProxyStatus)); QueueAutoSave(); } } }
     public int ProxyPort { get => proxyPort; set { if (SetProperty(ref proxyPort, value)) { OnPropertyChanged(nameof(ProxyStatus)); QueueAutoSave(); } } }
     public string ProxyUsername { get => proxyUsername; set { if (SetProperty(ref proxyUsername, value)) QueueAutoSave(); } }
@@ -130,7 +128,6 @@ public sealed class SettingsViewModel : NotifyViewModel
             SelectedTheme = FindOption(ThemeOptions, settings.Theme, ThemeOptions[0]);
             SelectedProxyMode = FindOption(ProxyModeOptions, settings.ProxyMode, ProxyModeOptions[0]);
             SelectedUpdateChannel = FindOption(UpdateChannelOptions, settings.UpdateChannel, UpdateChannelOptions[0]);
-            SelectedTransparencyAlgorithm = FindOption(TransparencyAlgorithmOptions, settings.TransparencyAlgorithm, TransparencyAlgorithmOptions[0]);
             AutoCheckUpdates = settings.AutoCheckUpdates;
             DiagnosticsEnabled = settings.DiagnosticsEnabled;
             LogStackTrace = settings.LogStackTrace;
@@ -179,7 +176,7 @@ public sealed class SettingsViewModel : NotifyViewModel
                 TransparencyEnabled,
                 TransparencyOpacity,
                 BlurAmount,
-                SelectedTransparencyAlgorithm.Value);
+                AcrylicTransparencyAlgorithm);
             var response = await configService.UpdateSettingsAsync(input, cancellationToken);
             HasProxyPassword = response.HasProxyPassword;
             ProxyPassword = "";
@@ -296,5 +293,5 @@ public sealed class SettingsViewModel : NotifyViewModel
 
     private static SettingOption FindOption(IReadOnlyList<SettingOption> options, string? value, SettingOption fallback) => options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)) ?? fallback;
 
-    private void ApplyAppearancePreview() => applyAppearance?.Invoke(TransparencyEnabled, TransparencyOpacity, BlurAmount, SelectedTransparencyAlgorithm.Value);
+    private void ApplyAppearancePreview() => applyAppearance?.Invoke(TransparencyEnabled, TransparencyOpacity, BlurAmount, AcrylicTransparencyAlgorithm);
 }

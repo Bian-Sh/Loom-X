@@ -22,6 +22,11 @@ public sealed class SettingsViewContractTests
         Assert.Contains("Text=\"{Binding BlurAmount}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<NumericUpDown Grid.Column=\"1\" Value=\"{Binding TransparencyOpacity}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<NumericUpDown Grid.Column=\"1\" Value=\"{Binding BlurAmount}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"磨砂算法\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Acrylic（亚克力）\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("TransparencyAlgorithmOptions", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectedTransparencyAlgorithm", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ComboBox ItemsSource=\"{Binding TransparencyAlgorithmOptions}\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -66,9 +71,9 @@ public sealed class SettingsViewContractTests
 
         Assert.Contains("WindowTransparencyLevel.Transparent", windowSource, StringComparison.Ordinal);
         Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(algorithm);", windowSource, StringComparison.Ordinal);
-        Assert.Contains("[WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
-        Assert.Contains("[WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
-        Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("WindowTransparencyLevel.Mica", windowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("WindowTransparencyLevel.Blur", windowSource, StringComparison.Ordinal);
         Assert.Contains("0.35 + (Math.Clamp(blurAmount, 0, 64) / 64d * 0.65)", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("TransparencyLevelHint = !enabled", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("[WindowTransparencyLevel.None]", windowSource, StringComparison.Ordinal);
@@ -105,20 +110,18 @@ public sealed class SettingsViewContractTests
     }
 
     [Fact]
-    public void TransparencyAlgorithmPrefersTheSelectedMaterialBeforeFallbacks()
+    public void TransparencyAlgorithmIsFixedToAcrylic()
     {
         Assert.Equal(
             new[]
             {
                 WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Blur,
                 WindowTransparencyLevel.Transparent
             },
             MainWindow.BuildTransparencyLevels(" acrylic "));
         Assert.Equal(
             new[]
             {
-                WindowTransparencyLevel.Blur,
                 WindowTransparencyLevel.AcrylicBlur,
                 WindowTransparencyLevel.Transparent
             },
@@ -126,12 +129,27 @@ public sealed class SettingsViewContractTests
         Assert.Equal(
             new[]
             {
-                WindowTransparencyLevel.Mica,
                 WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Blur,
                 WindowTransparencyLevel.Transparent
             },
             MainWindow.BuildTransparencyLevels("mica"));
+    }
+
+    [Fact]
+    public void LegacyTransparencyAlgorithmValuesAlwaysUseAcrylicLevel()
+    {
+        var expected = new[]
+        {
+            WindowTransparencyLevel.AcrylicBlur,
+            WindowTransparencyLevel.Transparent
+        };
+
+        Assert.Equal(
+            expected,
+            MainWindow.BuildTransparencyLevels("mica"));
+        Assert.Equal(
+            expected,
+            MainWindow.BuildTransparencyLevels("blur"));
     }
 
     [Fact]
@@ -170,9 +188,7 @@ public sealed class SettingsViewContractTests
         Assert.Equal(
             new[]
             {
-                WindowTransparencyLevel.Mica,
                 WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Blur,
                 WindowTransparencyLevel.Transparent
             },
             window.TransparencyLevelHint);

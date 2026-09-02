@@ -2,14 +2,14 @@
 
 ## 问题
 
-设置页切换 Acrylic、Blur、Mica 时，部分算法在 Windows 上显示效果相同或不明显。当前 Blur 的回退链会优先落到 AcrylicBlur，导致 Blur 与 Acrylic 无法区分；Mica 自带较厚的系统底色，又被窗口背景画刷再次覆盖，透明感不明显。
+设置页曾提供 Acrylic、Blur、Mica 三种材质，但在不同 Windows 环境下前两种效果接近，Mica 的透明感也不稳定。继续暴露三个选项会让用户面对无法可靠区分的结果，因此将桌面端材质收敛为唯一的 Acrylic。
 
 ## 根因
 
-`MainWindow.BuildTransparencyLevels` 为 Blur 和 Mica 包含其他模糊材质作为回退。Avalonia 在当前平台上不支持 Gaussian Blur 时，Blur 请求实际使用 AcrylicBlur。窗口根背景继续使用相同的高不透明度遮罩，使 Mica 的系统材质被压低。
+不同系统对 Blur、Mica 的支持和渲染结果不一致，旧配置中的算法值还会继续影响窗口级材质。设置页移除算法选择后，运行时必须忽略旧值并固定使用 Acrylic；数据库字段保留用于兼容已有配置，保存时将旧值归一化为 Acrylic。
 
 ## 修复目标
 
-- 所选算法只回退到 `Transparent`，避免不同算法静默合并为同一个原生材质。
-- 为 Mica 和 Blur 使用更合适的窗口底层遮罩强度，让切换结果可见。
+- 窗口材质固定为 `AcrylicBlur -> Transparent`，保证各平台都有一致的回退链。
+- 移除设置页算法下拉框，避免用户选择没有稳定视觉差异的材质。
 - 保留透明开关、透明度和磨砂程度的现有绑定、保存协议与跨平台回退行为。

@@ -36,10 +36,7 @@ public sealed class WindowAppearanceCoordinator
             NormalizeAlgorithm(algorithm));
 
         var blurFactor = MainWindow.CalculateBlurTintFactor(Current.BlurAmount);
-        var windowTintFactor = Math.Clamp(
-            blurFactor * MainWindow.CalculateMaterialTintFactor(Current.Algorithm),
-            0,
-            1);
+        var windowTintFactor = blurFactor;
         SetBrushAlpha("WindowBackgroundBrush", MainWindow.CalculateBrushAlpha(230, Current.Opacity, windowTintFactor));
         SetBrushAlpha("GlassBrush", MainWindow.CalculateBrushAlpha(184, Current.Opacity, blurFactor));
         SetBrushAlpha("GlassStrongBrush", MainWindow.CalculateBrushAlpha(208, Current.Opacity, blurFactor));
@@ -91,10 +88,5 @@ public sealed class WindowAppearanceCoordinator
         AppearanceBrushUpdater.Apply(brush, key, baseBrushColors, alpha);
     }
 
-    private static string NormalizeAlgorithm(string? algorithm) => algorithm?.Trim().ToLowerInvariant() switch
-    {
-        "blur" => "blur",
-        "mica" => "mica",
-        _ => "acrylic"
-    };
+    private static string NormalizeAlgorithm(string? algorithm) => "acrylic";
 }

@@ -151,6 +151,8 @@ public partial class MainWindow : Window
 
     public void ApplyAppearance(bool enabled, int opacity, int blurAmount, string algorithm)
     {
+        // 算法选择已固定为 Acrylic；保留参数仅兼容旧版调用方和配置数据。
+        algorithm = "acrylic";
         logger.LogInformation("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
         appearanceCoordinator.Apply(enabled, opacity, blurAmount, algorithm);
         // 保留主窗口入口的显式材质赋值，兼容现有外观契约和运行时诊断。
@@ -180,21 +182,7 @@ public partial class MainWindow : Window
     }
 
     internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm) =>
-        algorithm.Trim().ToLowerInvariant() switch
-        {
-            "mica" => [WindowTransparencyLevel.Mica, WindowTransparencyLevel.Transparent],
-            "blur" => [WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent],
-            _ => [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]
-        };
-
-    internal static double CalculateMaterialTintFactor(string algorithm) =>
-        algorithm.Trim().ToLowerInvariant() switch
-        {
-            // Mica 自带较厚的系统底色，降低窗口遮罩后才能看见材质纹理。
-            "mica" => 0.45,
-            "blur" => 0.72,
-            _ => 1
-        };
+        [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent];
 
     internal IBrush ResolveAppearanceBrush(string key) => TryResolveAppearanceResource(key, out var value) && value is IBrush brush
         ? brush

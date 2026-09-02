@@ -273,8 +273,9 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     };
     private static string NormalizeTransparencyAlgorithm(string value) => value.Trim().ToLowerInvariant() switch
     {
-        "acrylic" or "blur" or "mica" => value.Trim().ToLowerInvariant(),
-        _ => throw new ArgumentException("磨砂算法仅支持 acrylic、blur 或 mica。")
+        "acrylic" => "acrylic",
+        "blur" or "mica" => "acrylic",
+        _ => throw new ArgumentException("磨砂算法仅支持 acrylic。")
     };
     private static string? NormalizeOptionalModes(string? value) => string.IsNullOrWhiteSpace(value) ? null : NormalizeModes(value);
     private static string[] SplitModes(string value) { var modes = value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(); if (modes.Length == 0 || modes.Any(mode => mode is not ("openai" or "anthropic" or "ollama"))) throw new ArgumentException("协议仅支持 openai、anthropic 或 ollama。"); return modes; }
