@@ -220,7 +220,7 @@ public sealed class ConfigSnapshotService
                 logger?.LogInformation("配置库文件状态 {FileLabel}，存在 False，路径 {FilePath}", label, path);
                 return;
             }
-            using var stream = file.OpenRead();
+            using var stream = OpenFileForState(path);
             var fingerprint = Convert.ToHexString(SHA256.HashData(stream))[..16];
             logger?.LogInformation("配置库文件状态 {FileLabel}，存在 True，大小 {Length} 字节，最后写入 UTC {LastWriteTimeUtc}，SHA256 前缀 {Fingerprint}", label, file.Length, file.LastWriteTimeUtc, fingerprint);
         }
@@ -229,6 +229,14 @@ public sealed class ConfigSnapshotService
             logger?.LogWarning(exception, "读取配置库文件状态失败 {FileLabel} {FilePath}，异常类型 {ExceptionType}，异常消息 {ExceptionMessage}", label, path, exception.GetType().FullName, exception.Message);
         }
     }
+
+    internal static FileStream OpenFileForState(string path) => new(
+        path,
+        FileMode.Open,
+        FileAccess.Read,
+        FileShare.ReadWrite | FileShare.Delete,
+        4096,
+        FileOptions.SequentialScan);
 
     private void LogDatabaseState(ConfigurationDbContext db, string operation)
     {
