@@ -17,7 +17,7 @@ public sealed class ActivityQueryService
     {
         await using var db = CreateContext();
         await ActivityDatabase.InitializeAsync(db, cancellationToken);
-        var events = db.Events.AsNoTracking().OrderByDescending(item => item.Id).AsQueryable();
+        var events = db.Events.AsNoTracking().AsQueryable();
         if (!string.IsNullOrWhiteSpace(query.Status))
         {
             events = query.Status switch
@@ -34,13 +34,14 @@ public sealed class ActivityQueryService
             var search = query.SearchText.Trim();
             events = events.Where(item => item.RequestId.Contains(search) || (item.ProviderId ?? "").Contains(search) || (item.ModelId ?? "").Contains(search) || item.Route.Contains(search));
         }
+        var limit = Math.Clamp(query.Limit, 1, 5000);
         var records = await events
-            .Take(Math.Clamp(query.Limit, 1, 5000))
             .Select(item => new ActivityEventRecord(item.Id, item.CreatedAt, item.RequestId, item.Method, item.IncomingPath, item.Protocol, item.Route, item.ProviderId, item.ModelId, item.StatusCode, item.ElapsedMs, item.ResponseBytes, item.IsStreaming, item.ErrorType))
             .ToListAsync(cancellationToken);
         return records
             .OrderByDescending(item => item.CreatedAt)
             .ThenByDescending(item => item.Id)
+            .Take(limit)
             .ToArray();
     }
 
