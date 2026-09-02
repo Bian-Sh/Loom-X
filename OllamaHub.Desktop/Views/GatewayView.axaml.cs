@@ -22,7 +22,6 @@ public partial class GatewayView : UserControl
     {
         InitializeComponent();
         DataContextChanged += (_, _) => modelPopup.DataContext = DataContext;
-        AddHandler(InputElement.PointerPressedEvent, RouteDrag_OnPointerPressed, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
         AddHandler(InputElement.PointerMovedEvent, RouteDrag_OnPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
         AddHandler(InputElement.PointerReleasedEvent, RouteDrag_OnPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
         AddHandler(InputElement.PointerCaptureLostEvent, RouteDrag_OnPointerCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
@@ -81,10 +80,24 @@ public partial class GatewayView : UserControl
     {
         if (sender is not Border routeBorder || routeBorder.Tag is not GatewayRouteEditorViewModel route) return;
         if (DataContext is not GatewayViewModel viewModel) return;
-        dragItemsControl = routeBorder.FindAncestorOfType<ItemsControl>();
-        dragHost = FindRouteDragHost(dragItemsControl);
-        dragPreview = dragHost is null ? null : FindVisualDescendant<Border>(dragHost, item => item.Classes.Contains("route-drag-preview"));
-        if (dragItemsControl is null || dragHost is null || dragPreview is null) return;
+        var itemsControl = routeBorder.FindAncestorOfType<ItemsControl>();
+        if (itemsControl?.DataContext is not GatewayComboEditorViewModel combo || !combo.CanDragRoutes) return;
+        viewModel.SelectCombo(combo);
+        var host = FindRouteDragHost(itemsControl);
+        if (host is null)
+        {
+            itemsControl.UpdateLayout();
+            host = FindRouteDragHost(itemsControl);
+        }
+        var preview = host is null ? null : FindVisualDescendant<Border>(host, item => item.Classes.Contains("route-drag-preview"));
+        if (host is null || preview is null) return;
+
+        dragItemsControl = itemsControl;
+        dragHost = host;
+        dragPreview = preview;
+
+        var pointerPosition = e.GetPosition(dragHost);
+        var routeTop = routeBorder.TranslatePoint(new Point(0, 0), dragHost)?.Y ?? pointerPosition.Y;
 
         // 先捕获到稳定的视图宿主，再更新 ItemsControl，避免列表重排触发捕获丢失并取消拖拽。
         e.Pointer.Capture(this);
@@ -94,19 +107,9 @@ public partial class GatewayView : UserControl
             return;
         }
 
-        var pointerPosition = e.GetPosition(dragHost);
-        var routeTop = routeBorder.TranslatePoint(new Point(0, 0), dragHost)?.Y ?? pointerPosition.Y;
         dragPointerOffsetY = pointerPosition.Y - routeTop;
         dragPreview.RenderTransform = new TranslateTransform(0, routeTop);
         e.Handled = true;
-    }
-
-    private void RouteDrag_OnPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (e.Handled) return;
-        if (e.Source is not Visual source) return;
-        var handle = FindVisualAncestorOrSelf<Border>(source, item => item.Classes.Contains("drag-handle"));
-        if (handle is not null) RouteHandle_OnPointerPressed(handle, e);
     }
 
     private static Grid? FindRouteDragHost(Visual? start)
@@ -136,17 +139,6 @@ public partial class GatewayView : UserControl
         return null;
     }
 
-    private static T? FindVisualAncestorOrSelf<T>(Visual start, Func<T, bool> predicate)
-        where T : Visual
-    {
-        for (var current = start; current is not null; current = current.GetVisualParent())
-        {
-            if (current is T match && predicate(match)) return match;
-        }
-
-        return null;
-    }
-
     private void RouteDrag_OnPointerMoved(object? sender, PointerEventArgs e)
     {
         if (DataContext is not GatewayViewModel viewModel || !viewModel.IsRouteDragActive || dragItemsControl is null || dragHost is null || dragPreview is null || e.Pointer.Captured != this) return;
@@ -157,7 +149,8 @@ public partial class GatewayView : UserControl
         dragPreview.RenderTransform = new TranslateTransform(0, previewTop);
 
         var rowsBefore = GetRouteRows();
-        var targetSlot = GetInsertionSlot(pointerPosition.Y, rowsBefore);
+        var previewCenterY = previewTop + dragPreview.Bounds.Height / 2;
+        var targetSlot = GetInsertionSlot(previewCenterY, rowsBefore);
         var offsets = rowsBefore.Where(row => row.Route.IsRealRoute).ToDictionary(row => row.Route, row => row.Top);
         if (viewModel.MoveRouteDragPlaceholder(targetSlot))
         {

@@ -18,12 +18,21 @@ public sealed class GatewayViewContractTests
             source.IndexOf("<Border Classes=\"member-footbar\">", StringComparison.Ordinal));
         Assert.Contains("Classes=\"drag-dot\"", source, StringComparison.Ordinal);
         Assert.Contains("<Border Classes=\"icon drag-handle\"", source, StringComparison.Ordinal);
+        Assert.Contains("PointerPressed=\"RouteHandle_OnPointerPressed\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.drag-handle\"", source, StringComparison.Ordinal);
+        Assert.Contains("Property=\"Cursor\" Value=\"SizeAll\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("drag-handle\" Tag=\"{Binding}\" IsEnabled=\"{Binding IsDragEnabled}\" PointerPressed=\"RouteHandle_OnPointerPressed\" ToolTip.Tip=\"拖动调整故障转移顺序\" AutomationProperties.Name=\"拖动调整故障转移顺序\" Cursor=\"SizeAll\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<Button Classes=\"icon\" Tag=\"{Binding}\" PointerPressed=\"RouteHandle_OnPointerPressed\"", source, StringComparison.Ordinal);
         Assert.Contains("drag-placeholder", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("释放到此处", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid Height=\"36\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("BorderThickness\" Value=\"0,1,0,0\"", source, StringComparison.Ordinal);
         Assert.Contains("route-drag-preview", source, StringComparison.Ordinal);
+        Assert.Contains("IsEnabled=\"{Binding IsDragEnabled}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Cursor\" Value=\"No\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding IsPlaceholder}\"", source, StringComparison.Ordinal);
-        Assert.Contains("IsVisible=\"{Binding $parent[UserControl].DataContext.IsRouteDragActive}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsDragPreviewOwner}\"", source, StringComparison.Ordinal);
+        Assert.Contains("DraggingRoute.ModelName", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.member-footbar\"", source, StringComparison.Ordinal);
         Assert.Contains("Property=\"Padding\" Value=\"8,2\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.footbar-add\"", source, StringComparison.Ordinal);
@@ -53,18 +62,28 @@ public sealed class GatewayViewContractTests
         var viewModelSource = ReadDesktopFile("ViewModels", "GatewayViewModel.cs");
 
         Assert.Contains("private void RouteDrag_OnPointerMoved", viewSource, StringComparison.Ordinal);
-        Assert.Contains("if (e.Handled) return;", viewSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("AddHandler(InputElement.PointerPressedEvent", viewSource, StringComparison.Ordinal);
         Assert.Contains("GetInsertionSlot", viewSource, StringComparison.Ordinal);
+        Assert.Contains("previewCenterY", viewSource, StringComparison.Ordinal);
         Assert.Contains("AnimateMovedRows", viewSource, StringComparison.Ordinal);
         Assert.Contains("CompleteRouteDragAsync", viewSource, StringComparison.Ordinal);
+        Assert.True(
+            viewSource.IndexOf("var routeTop", StringComparison.Ordinal) <
+            viewSource.IndexOf("if (!viewModel.BeginRouteDrag", StringComparison.Ordinal));
         Assert.Contains("BeginRouteDrag", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("!SelectedCombo.CanDragRoutes", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("dragOwnerCombo", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("if (dragOwnerCombo is null || dragPlaceholder is null)", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("MoveRouteDragPlaceholder", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("CancelRouteDrag", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("IsDragPreviewOwner", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("public void ToggleModelSortDirection()", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("FilterModels(modelSearchTerm);", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("grouped.OrderByDescending", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("public double ExpandIconAngle => IsExpanded ? 90 : 0;", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("item.MatchesSearch(modelSearchTerm)", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("public bool CanDragRoutes => Routes.Count > 1;", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("IsDragEnabled", viewModelSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -75,6 +94,27 @@ public sealed class GatewayViewContractTests
 
         Assert.False(unrelatedModel.MatchesSearch("deep"));
         Assert.True(matchingModel.MatchesSearch("deep"));
+    }
+
+    [Fact]
+    public void ComboDragAvailabilityFollowsRouteCount()
+    {
+        var combo = new GatewayComboEditorViewModel();
+        var first = new GatewayRouteEditorViewModel();
+        var second = new GatewayRouteEditorViewModel();
+
+        combo.Routes.Add(first);
+        Assert.False(combo.CanDragRoutes);
+        Assert.False(first.IsDragEnabled);
+
+        combo.Routes.Add(second);
+        Assert.True(combo.CanDragRoutes);
+        Assert.True(first.IsDragEnabled);
+        Assert.True(second.IsDragEnabled);
+
+        combo.Routes.Remove(second);
+        Assert.False(combo.CanDragRoutes);
+        Assert.False(first.IsDragEnabled);
     }
 
     [Fact]
