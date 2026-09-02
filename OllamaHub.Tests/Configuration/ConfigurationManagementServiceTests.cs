@@ -1,4 +1,7 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Data.Common;
 using OllamaHub.Configuration;
 using OllamaHub.Desktop.ViewModels;
 using Xunit;
@@ -98,6 +101,85 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal("/", paths.Single(item => item.Key == "ollama").PublicPath);
             Assert.Equal("/azure", paths.Single(item => item.Key == "azure").PublicPath);
             Assert.Equal(3, paths.Select(item => item.PublicPath).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_WhenSchemaIsReady_DoesNotRewriteDatabase()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using (var context = new ConfigurationDbContext(options))
+            {
+                await ConfigurationDatabase.InitializeAsync(context);
+            }
+
+            var beforeBytes = await ReadDatabaseBytesAsync(databasePath);
+            var beforeWriteTime = File.GetLastWriteTimeUtc(databasePath);
+            await Task.Delay(1100);
+
+            await using (var context = new ConfigurationDbContext(options))
+            {
+                await ConfigurationDatabase.InitializeAsync(context);
+            }
+
+            var afterBytes = await ReadDatabaseBytesAsync(databasePath);
+            var afterWriteTime = File.GetLastWriteTimeUtc(databasePath);
+            Assert.Equal(beforeBytes, afterBytes);
+            Assert.Equal(beforeWriteTime, afterWriteTime);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
+    public async Task InitializeAsync_WhenSchemaIsReadyInWalMode_DoesNotRewriteDatabase()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var interceptor = new SqlWriteCommandInterceptor();
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>()
+                .UseSqlite($"Data Source={databasePath}")
+                .AddInterceptors(interceptor)
+                .Options;
+            await using (var context = new ConfigurationDbContext(options))
+            {
+                await ConfigurationDatabase.InitializeAsync(context);
+            }
+
+            await using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+            {
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText = "PRAGMA journal_mode=WAL";
+                Assert.Equal("wal", (await command.ExecuteScalarAsync())?.ToString(), ignoreCase: true);
+            }
+
+            interceptor.Reset();
+
+            var beforeBytes = await ReadDatabaseBytesAsync(databasePath);
+            var beforeWriteTime = File.GetLastWriteTimeUtc(databasePath);
+            await Task.Delay(1100);
+
+            await using (var context = new ConfigurationDbContext(options))
+            {
+                await ConfigurationDatabase.InitializeAsync(context);
+            }
+
+            var afterBytes = await ReadDatabaseBytesAsync(databasePath);
+            var afterWriteTime = File.GetLastWriteTimeUtc(databasePath);
+            Assert.Equal(beforeBytes, afterBytes);
+            Assert.Equal(beforeWriteTime, afterWriteTime);
+            Assert.Empty(interceptor.Commands);
         }
         finally
         {
@@ -566,6 +648,44 @@ public sealed class ConfigurationManagementServiceTests
                 catch (IOException) when (attempt < 4) { Thread.Sleep(50); }
                 catch (IOException) { }
             }
+        }
+    }
+
+    private static async Task<byte[]> ReadDatabaseBytesAsync(string databasePath)
+    {
+        await using var stream = new FileStream(databasePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var memory = new MemoryStream();
+        await stream.CopyToAsync(memory);
+        return memory.ToArray();
+    }
+
+    private sealed class SqlWriteCommandInterceptor : DbCommandInterceptor
+    {
+        public List<string> Commands { get; } = [];
+
+        public void Reset() => Commands.Clear();
+
+        public override InterceptionResult<int> NonQueryExecuting(DbCommand command, CommandEventData eventData, InterceptionResult<int> result)
+        {
+            Record(command);
+            return base.NonQueryExecuting(command, eventData, result);
+        }
+
+        public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(DbCommand command, CommandEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            Record(command);
+            return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        private void Record(DbCommand command)
+        {
+            var sql = command.CommandText.TrimStart();
+            if (sql.StartsWith("CREATE ", StringComparison.OrdinalIgnoreCase)
+                || sql.StartsWith("ALTER ", StringComparison.OrdinalIgnoreCase)
+                || sql.StartsWith("INSERT ", StringComparison.OrdinalIgnoreCase)
+                || sql.StartsWith("UPDATE ", StringComparison.OrdinalIgnoreCase)
+                || sql.StartsWith("DELETE ", StringComparison.OrdinalIgnoreCase))
+                Commands.Add(sql);
         }
     }
 }

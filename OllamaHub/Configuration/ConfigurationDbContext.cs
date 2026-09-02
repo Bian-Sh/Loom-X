@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
+using System.Data.Common;
 
 namespace OllamaHub.Configuration;
 
@@ -206,6 +207,8 @@ public static class ConfigurationDatabase
     {
         using var initializationLock = AcquireInitializationLock();
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
+        if (await IsSchemaReadyAsync(dbContext, cancellationToken)) return;
+
         await EnsureSchemaAsync(dbContext, cancellationToken);
         if (!await dbContext.GatewayConfigurations.AnyAsync(cancellationToken))
         {
@@ -219,6 +222,63 @@ public static class ConfigurationDatabase
             await dbContext.SaveChangesAsync(cancellationToken);
         }
     }
+
+    private static async Task<bool> IsSchemaReadyAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            foreach (var table in new[] { "AppSettings", "GatewayConfigurations", "Providers", "Models", "GatewayEndpoints", "GatewayCombos", "GatewayRoutes" })
+            {
+                await using var tableCommand = connection.CreateCommand();
+                tableCommand.CommandText = $"SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '{table}')";
+                if (Convert.ToInt32(await tableCommand.ExecuteScalarAsync(cancellationToken)) != 1) return false;
+            }
+
+            if (!await HasColumnsAsync(connection, "AppSettings", cancellationToken,
+                    "Id", "Language", "Theme", "ProxyMode", "ProxyHost", "ProxyPort", "ProxyUsername", "ProtectedProxyPassword",
+                    "AutoCheckUpdates", "UpdateChannel", "DiagnosticsEnabled", "LogRetentionDays", "LogStackTrace",
+                    "TransparencyEnabled", "TransparencyOpacity", "BlurAmount", "TransparencyAlgorithm")
+                || await HasColumnAsync(connection, "AppSettings", "OpenControlCenterOnStartup", cancellationToken))
+                return false;
+
+            if (!await HasColumnsAsync(connection, "GatewayConfigurations", cancellationToken, "Id", "ListenUrl")
+                || !await HasColumnsAsync(connection, "Providers", cancellationToken,
+                    "Id", "BusinessId", "DisplayName", "BaseUrl", "ModelListUrl", "ApiMode", "EndpointFormat", "Enabled", "UseProxy", "ProtectedApiKey", "HeadersJson", "SortOrder")
+                || !await HasColumnsAsync(connection, "Models", cancellationToken,
+                    "Id", "ProviderId", "ModelId", "DisplayName", "ConfigId", "Family", "BaseUrl", "ProtectedApiKey", "ApiMode",
+                    "ContextLength", "MaxTokens", "Vision", "Temperature", "TopP", "HeadersJson", "ExtraJson", "Enabled", "SortOrder")
+                || !await HasColumnsAsync(connection, "GatewayEndpoints", cancellationToken, "Key", "DisplayName", "PublicPath", "Enabled")
+                || !await HasColumnsAsync(connection, "GatewayCombos", cancellationToken, "Id", "EndpointKey", "Name", "Enabled", "SortOrder")
+                || !await HasColumnsAsync(connection, "GatewayRoutes", cancellationToken, "Id", "EndpointKey", "ComboId", "ModelId", "Enabled", "SortOrder"))
+                return false;
+        }
+        finally
+        {
+            await dbContext.Database.CloseConnectionAsync();
+        }
+
+        if (!await dbContext.GatewayConfigurations.AsNoTracking().AnyAsync(cancellationToken)
+            || !await dbContext.AppSettings.AsNoTracking().AnyAsync(cancellationToken))
+            return false;
+
+        var endpoints = await dbContext.GatewayEndpoints.AsNoTracking().ToDictionaryAsync(item => item.Key, StringComparer.OrdinalIgnoreCase, cancellationToken);
+        return endpoints.TryGetValue("openai", out var openAi) && openAi.PublicPath == "/openai"
+            && endpoints.TryGetValue("ollama", out var ollama) && ollama.PublicPath == "/"
+            && endpoints.TryGetValue("azure", out var azure) && azure.PublicPath == "/azure";
+    }
+
+    private static async Task<bool> HasColumnsAsync(DbConnection connection, string table, CancellationToken cancellationToken, params string[] columns)
+    {
+        await using var command = connection.CreateCommand();
+        var names = string.Join(", ", columns.Select(column => $"'{column.Replace("'", "''", StringComparison.Ordinal)}'"));
+        command.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name IN ({names})";
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) == columns.Length;
+    }
+
+    private static async Task<bool> HasColumnAsync(DbConnection connection, string table, string column, CancellationToken cancellationToken) =>
+        await HasColumnsAsync(connection, table, cancellationToken, column);
 
 
     private static async Task EnsureSchemaAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
