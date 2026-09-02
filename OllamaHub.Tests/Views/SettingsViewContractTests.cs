@@ -1,4 +1,6 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using OllamaHub.Desktop;
 using System.IO;
@@ -8,6 +10,9 @@ namespace OllamaHub.Tests.Views;
 
 public sealed class SettingsViewContractTests
 {
+    private static readonly object AvaloniaSetupLock = new();
+    private static bool avaloniaSetup;
+
     [Fact]
     public void AppearanceValuesUseIntegerSlidersWithStableReadouts()
     {
@@ -99,6 +104,107 @@ public sealed class SettingsViewContractTests
         Assert.True(AppearanceBrushUpdater.TryApply(resources, "WindowBackgroundBrush", baseColors, 184));
         Assert.Same(brush, resources["WindowBackgroundBrush"]);
         Assert.Equal(Color.FromArgb(184, 213, 228, 233), brush.Color);
+    }
+
+    [Fact]
+    public void TransparencyAlgorithmPrefersTheSelectedMaterialBeforeFallbacks()
+    {
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Blur,
+                WindowTransparencyLevel.Transparent
+            },
+            MainWindow.BuildTransparencyLevels(" acrylic "));
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.Blur,
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Transparent
+            },
+            MainWindow.BuildTransparencyLevels("BLUR"));
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.Mica,
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Blur,
+                WindowTransparencyLevel.Transparent
+            },
+            MainWindow.BuildTransparencyLevels("mica"));
+    }
+
+    [Fact]
+    public void VisualTokenResourcesLoadAsMutableSolidColorBrushes()
+    {
+        EnsureAvaloniaSetup();
+
+        var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
+            new Uri("avares://OllamaHub.Desktop/Styles/VisualTokens.axaml")));
+
+        var brush = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]);
+        var originalColor = brush.Color;
+        brush.Color = Color.FromArgb(12, originalColor.R, originalColor.G, originalColor.B);
+
+        Assert.Equal(12, brush.Color.A);
+    }
+
+    [Fact]
+    public void ApplyAppearanceChangesRuntimeBrushesForDifferentOpacityAndBlurValues()
+    {
+        EnsureAvaloniaSetup();
+        var window = new MainWindow();
+        var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
+            new Uri("avares://OllamaHub.Desktop/Styles/VisualTokens.axaml")));
+        window.Resources.MergedDictionaries.Add(dictionary);
+
+        window.ApplyAppearance(true, 20, 0, "acrylic");
+        var low = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]);
+        var lowAlpha = low.Color.A;
+
+        window.ApplyAppearance(true, 100, 64, "mica");
+        var high = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]);
+
+        Assert.True(high.Color.A > lowAlpha);
+        Assert.Equal(Brushes.Transparent, window.Background);
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.Mica,
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Blur,
+                WindowTransparencyLevel.Transparent
+            },
+            window.TransparencyLevelHint);
+    }
+
+    [Fact]
+    public void ApplyAppearanceResolvesBrushesFromApplicationResources()
+    {
+        EnsureAvaloniaSetup();
+        var app = Assert.IsType<App>(Application.Current);
+        Assert.True(app.TryGetResource("WindowBackgroundBrush", null, out var resource));
+        var brush = Assert.IsType<SolidColorBrush>(resource);
+        var originalAlpha = brush.Color.A;
+
+        var window = new MainWindow();
+        window.ApplyAppearance(true, 20, 0, "acrylic");
+
+        Assert.NotEqual(originalAlpha, brush.Color.A);
+    }
+
+    private static void EnsureAvaloniaSetup()
+    {
+        lock (AvaloniaSetupLock)
+        {
+            if (avaloniaSetup) return;
+            AppBuilder.Configure<App>()
+                .UsePlatformDetect()
+                .SetupWithoutStarting();
+            avaloniaSetup = true;
+        }
     }
 
     private static string ReadDesktopFile(params string[] segments)

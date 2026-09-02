@@ -21,16 +21,16 @@ public partial class App : Application
     private Mutex? singleInstanceMutex;
     private Mutex? shellBootstrapMutex;
     private bool ownsShellBootstrapMutex;
+    private bool allowMultipleInstances;
     public ILoggerFactory? LoggerFactory => loggerFactory;
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var allowMultipleInstances = string.Equals(
-                Environment.GetEnvironmentVariable("OLLAMAHUB_ALLOW_MULTIPLE_INSTANCES"),
-                "1",
-                StringComparison.Ordinal);
+            allowMultipleInstances = InstanceLaunchPolicy.AllowsMultipleInstances(
+                Environment.GetCommandLineArgs(),
+                Environment.GetEnvironmentVariable("OLLAMAHUB_ALLOW_MULTIPLE_INSTANCES"));
             var launchedByOllamaHub = Environment.GetCommandLineArgs()
                 .Skip(1)
                 .Any(argument => string.Equals(argument, SelfLaunchArgument, StringComparison.OrdinalIgnoreCase));
@@ -102,7 +102,7 @@ public partial class App : Application
             LoggingBootstrap.SetIncludeStackTrace(initialSettings.Settings.LogStackTrace);
             gatewayService = new GatewayProcessService();
             var toastService = new ToastService();
-            var mainWindow = new MainWindow(toastService);
+            var mainWindow = new MainWindow(toastService, loggerFactory.CreateLogger<MainWindow>());
             mainWindow.ApplyAppearance(initialSettings.Settings.TransparencyEnabled, initialSettings.Settings.TransparencyOpacity, initialSettings.Settings.BlurAmount, initialSettings.Settings.TransparencyAlgorithm);
             mainWindow.DataContext = new MainWindowViewModel(gatewayService, toastService, loggerFactory, configService, mainWindow.ApplyAppearance);
             desktop.MainWindow = mainWindow;
