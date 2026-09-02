@@ -150,19 +150,18 @@ public partial class MainWindow : Window
         logger.LogInformation("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
         opacity = Math.Clamp(opacity, 0, 100);
         blurAmount = Math.Clamp(blurAmount, 0, 64);
-        var blurFactor = 0.35 + (blurAmount / 64d * 0.65);
-        SetBrushAlpha("WindowBackgroundBrush", ScaleAlpha(230, opacity, blurFactor));
-        SetBrushAlpha("GlassBrush", ScaleAlpha(184, opacity, blurFactor));
-        SetBrushAlpha("GlassStrongBrush", ScaleAlpha(208, opacity, blurFactor));
-        SetBrushAlpha("SurfaceBrush", ScaleAlpha(199, opacity, blurFactor));
-        SetBrushAlpha("SurfaceSubtleBrush", ScaleAlpha(164, opacity, blurFactor));
-        SetBrushAlpha("SurfaceMutedBrush", ScaleAlpha(128, opacity, blurFactor));
-        SetBrushAlpha("NavigationHoverBrush", ScaleAlpha(214, opacity, blurFactor));
+        var appearance = AppearanceProfile.Create(opacity, blurAmount);
+        SetBrushAlpha("WindowBackgroundBrush", appearance.ScaleAlpha(230));
+        SetBrushAlpha("GlassBrush", appearance.ScaleAlpha(184));
+        SetBrushAlpha("GlassStrongBrush", appearance.ScaleAlpha(208));
+        SetBrushAlpha("SurfaceBrush", appearance.ScaleAlpha(199));
+        SetBrushAlpha("SurfaceSubtleBrush", appearance.ScaleAlpha(164));
+        SetBrushAlpha("SurfaceMutedBrush", appearance.ScaleAlpha(128));
+        SetBrushAlpha("NavigationHoverBrush", appearance.ScaleAlpha(214));
 
         TransparencyBackgroundFallback = ResolveBrush("WindowBackgroundBrush");
-        Background = enabled
-            ? Brushes.Transparent
-            : OpaqueCopy(ResolveBrush("WindowBackgroundBrush"));
+        var opaqueBackground = OpaqueCopy(ResolveBrush("WindowBackgroundBrush"));
+        Background = enabled ? Brushes.Transparent : opaqueBackground;
         TransparencyLevelHint = BuildTransparencyLevels(algorithm, opacity);
         logger.LogInformation(
             "透明外观应用完成 {Enabled} {Opacity} {BlurAmount} {Algorithm} {WindowBackgroundType} {GlassType} {ActualTransparencyLevel}",
@@ -213,12 +212,26 @@ public partial class MainWindow : Window
         AppearanceBrushUpdater.Apply(brush, key, baseBrushColors, alpha);
     }
 
-    private static byte ScaleAlpha(byte baseAlpha, int opacity, double blurFactor) =>
-        (byte)Math.Clamp(Math.Round(baseAlpha * (opacity / 86d) * blurFactor), 0, 255);
-
     private static SolidColorBrush OpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
         ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
         : new SolidColorBrush(Color.FromArgb(255, 230, 240, 243));
+}
+
+internal readonly record struct AppearanceProfile(byte SurfaceAlpha, double MaterialOpacity, double TintOpacity)
+{
+    public static AppearanceProfile Create(int opacity, int blurAmount)
+    {
+        var opacityFactor = Math.Clamp(opacity, 0, 100) / 100d;
+        var blurFactor = Math.Clamp(blurAmount, 0, 64) / 64d;
+        var materialOpacity = opacityFactor * blurFactor;
+        return new(
+            (byte)Math.Clamp(Math.Round(255 * materialOpacity), 0, 255),
+            materialOpacity,
+            Math.Clamp(blurFactor, 0, 1));
+    }
+
+    public byte ScaleAlpha(byte baseAlpha) =>
+        (byte)Math.Clamp(Math.Round(255 * MaterialOpacity), 0, 255);
 }
 
 internal static class AppearanceBrushUpdater

@@ -34,7 +34,7 @@ public sealed class SettingsViewContractTests
         var serviceSource = File.ReadAllText(servicePath);
 
         Assert.Contains("Math.Clamp(opacity, 0, 100)", windowSource, StringComparison.Ordinal);
-        Assert.Contains("Math.Clamp(Math.Round(baseAlpha * (opacity / 86d) * blurFactor), 0, 255)", windowSource, StringComparison.Ordinal);
+        Assert.Contains("AppearanceProfile.Create(opacity, blurAmount)", windowSource, StringComparison.Ordinal);
         Assert.Contains("TransparencyOpacity is < 0 or > 100", serviceSource, StringComparison.Ordinal);
     }
 
@@ -48,7 +48,6 @@ public sealed class SettingsViewContractTests
         Assert.Contains("[WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
         Assert.Contains("[WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
         Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
-        Assert.Contains("0.35 + (blurAmount / 64d * 0.65)", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("TransparencyLevelHint = !enabled", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("[WindowTransparencyLevel.None]", windowSource, StringComparison.Ordinal);
     }
@@ -124,6 +123,26 @@ public sealed class SettingsViewContractTests
         brush.Color = Color.FromArgb(12, originalColor.R, originalColor.G, originalColor.B);
 
         Assert.Equal(12, brush.Color.A);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0d, 0d, 0)]
+    [InlineData(100, 64, 1d, 1d, 255)]
+    public void AppearanceProfileMapsSliderEndpointsToContinuousMaterialValues(int opacity, int blur, double materialOpacity, double tintOpacity, int surfaceAlpha)
+    {
+        var profile = AppearanceProfile.Create(opacity, blur);
+
+        Assert.Equal(materialOpacity, profile.MaterialOpacity, 3);
+        Assert.Equal(tintOpacity, profile.TintOpacity, 3);
+        Assert.Equal(surfaceAlpha, profile.SurfaceAlpha);
+        Assert.Equal(surfaceAlpha, profile.ScaleAlpha(230));
+    }
+
+    [Fact]
+    public void AppearanceProfileChangesForEachSlider()
+    {
+        Assert.True(AppearanceProfile.Create(50, 24).MaterialOpacity > AppearanceProfile.Create(50, 0).MaterialOpacity);
+        Assert.True(AppearanceProfile.Create(50, 24).MaterialOpacity > AppearanceProfile.Create(0, 24).MaterialOpacity);
     }
 
     [Fact]
