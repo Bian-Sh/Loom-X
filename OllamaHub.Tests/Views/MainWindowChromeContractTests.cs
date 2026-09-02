@@ -19,9 +19,11 @@ public sealed class MainWindowChromeContractTests
         Assert.Contains("<Setter Property=\"Height\" Value=\"32\" />", baseStyle, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"Background\" Value=\"Transparent\" />", baseStyle, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"BorderBrush\" Value=\"Transparent\" />", baseStyle, StringComparison.Ordinal);
-        Assert.Contains("StrokeThickness=\"1.2\"", source, StringComparison.Ordinal);
-        Assert.Contains("Width=\"14\" Height=\"14\"", source, StringComparison.Ordinal);
-        Assert.Contains("<Border Width=\"14\" Height=\"1\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"VerticalAlignment\" Value=\"Top\" />", baseStyle, StringComparison.Ordinal);
+        Assert.Contains("Height=\"32\" VerticalAlignment=\"Top\"", source, StringComparison.Ordinal);
+        Assert.Contains("StrokeThickness=\"1.1\"", source, StringComparison.Ordinal);
+        Assert.Contains("Width=\"12\" Height=\"12\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Border Width=\"12\" Height=\"1\"", source, StringComparison.Ordinal);
     }
 
     private static string ReadDesktopFile(params string[] segments)

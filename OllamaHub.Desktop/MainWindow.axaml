@@ -50,7 +50,7 @@
       <Setter Property="BorderThickness" Value="0,0,0,1" />
     </Style>
     <Style Selector="Border.window-chrome">
-      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="MinHeight" Value="32" />
       <Setter Property="Padding" Value="16,0,16,0" />
       <Setter Property="Background" Value="Transparent" />
     </Style>
@@ -64,7 +64,7 @@
       <Setter Property="BorderThickness" Value="0" />
       <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
       <Setter Property="CornerRadius" Value="0" />
-      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Top" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
@@ -155,16 +155,16 @@
         </Border>
       </Grid>
       <!-- 标题栏覆盖两列，品牌区与内容区都可拖动；按钮位于同一层避免命中区被遮挡。 -->
-      <Border Grid.ColumnSpan="2" Classes="window-chrome" Height="40" VerticalAlignment="Top" PointerPressed="WindowChrome_OnPointerPressed">
+      <Border Grid.ColumnSpan="2" Classes="window-chrome" Height="32" VerticalAlignment="Top" PointerPressed="WindowChrome_OnPointerPressed">
         <Grid ColumnDefinitions="*,46,46,46" ColumnSpacing="0" Margin="0,0,-16,0">
           <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化">
-            <Border Width="14" Height="1" Background="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0" />
+            <Border Width="12" Height="1" Background="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0" />
           </Button>
           <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="最大化或还原" AutomationProperties.Name="最大化或还原">
-            <Path Data="M 5,5 L 19,5 L 19,19 L 5,19 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.2" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Path Data="M 5,5 L 19,5 L 19,19 L 5,19 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.1" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
           <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="关闭" AutomationProperties.Name="关闭">
-            <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.2" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.1" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
         </Grid>
       </Border>

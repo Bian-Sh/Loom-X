@@ -15,6 +15,7 @@ public partial class App : Application
 {
     private const string SingleInstanceMutexName = @"Local\OllamaHub.Desktop";
     private const string ShellBootstrapMutexName = @"Local\OllamaHub.Desktop.ShellBootstrap";
+    private const string SelfLaunchArgument = "--ollamahub-child";
     private GatewayProcessService? gatewayService;
     private ILoggerFactory? loggerFactory;
     private Mutex? singleInstanceMutex;
@@ -26,50 +27,63 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            shellBootstrapMutex = new Mutex(true, ShellBootstrapMutexName, out var isShellBootstrapOwner);
-            ownsShellBootstrapMutex = isShellBootstrapOwner;
-            if (isShellBootstrapOwner)
+            var allowMultipleInstances = string.Equals(
+                Environment.GetEnvironmentVariable("OLLAMAHUB_ALLOW_MULTIPLE_INSTANCES"),
+                "1",
+                StringComparison.Ordinal);
+            var launchedByOllamaHub = Environment.GetCommandLineArgs()
+                .Skip(1)
+                .Any(argument => string.Equals(argument, SelfLaunchArgument, StringComparison.OrdinalIgnoreCase));
+            if (!allowMultipleInstances && !launchedByOllamaHub)
             {
-                var processPath = Environment.ProcessPath;
-                if (!string.IsNullOrWhiteSpace(processPath))
+                shellBootstrapMutex = new Mutex(true, ShellBootstrapMutexName, out var isShellBootstrapOwner);
+                ownsShellBootstrapMutex = isShellBootstrapOwner;
+                if (isShellBootstrapOwner)
                 {
-                    var shellStartInfo = new ProcessStartInfo
+                    var processPath = Environment.ProcessPath;
+                    if (!string.IsNullOrWhiteSpace(processPath))
                     {
-                        FileName = "explorer.exe",
-                        Arguments = $"\"{processPath}\"",
-                        UseShellExecute = true,
-                        WorkingDirectory = Path.GetDirectoryName(processPath)
-                    };
-                    try
-                    {
-                        Process.Start(shellStartInfo);
-                        desktop.Shutdown(0);
-                        base.OnFrameworkInitializationCompleted();
-                        return;
+                        var shellStartInfo = new ProcessStartInfo
+                        {
+                            FileName = processPath,
+                            UseShellExecute = false,
+                            WorkingDirectory = Path.GetDirectoryName(processPath)
+                        };
+                        shellStartInfo.ArgumentList.Add(SelfLaunchArgument);
+                        try
+                        {
+                            Process.Start(shellStartInfo);
+                            desktop.Shutdown(0);
+                            base.OnFrameworkInitializationCompleted();
+                            return;
+                        }
+                        catch (Exception exception)
+                        {
+                            LoggingBootstrap.Configure();
+                            loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
+                            loggerFactory.CreateLogger<App>().LogWarning(exception, "桌面应用自启动子进程失败，继续当前进程 {ProcessId}", Environment.ProcessId);
+                        }
                     }
-                    catch (Exception exception)
-                    {
-                        LoggingBootstrap.Configure();
-                        loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
-                        loggerFactory.CreateLogger<App>().LogWarning(exception, "通过 Windows Shell 重启桌面应用失败，继续当前进程 {ProcessId}", Environment.ProcessId);
-                    }
+                    shellBootstrapMutex.Dispose();
+                    shellBootstrapMutex = null;
+                    ownsShellBootstrapMutex = false;
                 }
-                shellBootstrapMutex.Dispose();
-                shellBootstrapMutex = null;
-                ownsShellBootstrapMutex = false;
             }
 
-            singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out var isFirstInstance);
-            if (!isFirstInstance)
+            if (!allowMultipleInstances)
             {
-                singleInstanceMutex.Dispose();
-                singleInstanceMutex = null;
-                LoggingBootstrap.Configure();
-                loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
-                loggerFactory.CreateLogger<App>().LogWarning("检测到已有 OllamaHub 桌面实例，当前进程退出以避免并发读取配置库，进程 {ProcessId}", Environment.ProcessId);
-                desktop.Shutdown(0);
-                base.OnFrameworkInitializationCompleted();
-                return;
+                singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out var isFirstInstance);
+                if (!isFirstInstance)
+                {
+                    singleInstanceMutex.Dispose();
+                    singleInstanceMutex = null;
+                    LoggingBootstrap.Configure();
+                    loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
+                    loggerFactory.CreateLogger<App>().LogWarning("检测到已有 OllamaHub 桌面实例，当前进程退出以避免并发读取配置库，进程 {ProcessId}", Environment.ProcessId);
+                    desktop.Shutdown(0);
+                    base.OnFrameworkInitializationCompleted();
+                    return;
+                }
             }
             var launcherWorkingDirectory = Environment.CurrentDirectory;
             var applicationDirectory = Path.GetFullPath(AppContext.BaseDirectory);
@@ -77,6 +91,8 @@ public partial class App : Application
             LoggingBootstrap.Configure();
             loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
             var startupLogger = loggerFactory.CreateLogger<App>();
+            if (allowMultipleInstances)
+                startupLogger.LogWarning("调试启动已允许多个桌面实例，进程 {ProcessId}", Environment.ProcessId);
             startupLogger.LogInformation("桌面应用启动，进程 {ProcessId}，用户 {UserName}，进程路径 {ProcessPath}，基目录 {BaseDirectory}，启动工作目录 {LauncherWorkingDirectory}，规范化工作目录 {CurrentDirectory}", Environment.ProcessId, Environment.UserName, Environment.ProcessPath, AppContext.BaseDirectory, launcherWorkingDirectory, Environment.CurrentDirectory);
             var configService = new ConfigSnapshotService(loggerFactory.CreateLogger<ConfigSnapshotService>());
             var initialSettings = configService.Load();
