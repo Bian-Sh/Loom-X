@@ -48,6 +48,7 @@ public sealed class OverviewRecentRequestsContractTests
         Assert.Contains("Grid.Column=\"0\" Text=\"{Binding Endpoint}\"", source, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"1\" Text=\"{Binding Model}\"", source, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"2\" Text=\"{Binding Time}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"2\" Text=\"{Binding Time}\" HorizontalAlignment=\"Left\" TextAlignment=\"Left\" FlowDirection=\"LeftToRight\" FontFamily=\"Consolas\"", source, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"3\" Text=\"{Binding Latency}\"", source, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"4\" Text=\"{Binding Status}\"", source, StringComparison.Ordinal);
 
