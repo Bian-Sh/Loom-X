@@ -36,7 +36,11 @@ public sealed class WindowAppearanceCoordinator
             NormalizeAlgorithm(algorithm));
 
         var blurFactor = MainWindow.CalculateBlurTintFactor(Current.BlurAmount);
-        SetBrushAlpha("WindowBackgroundBrush", MainWindow.CalculateBrushAlpha(230, Current.Opacity, blurFactor));
+        var windowTintFactor = Math.Clamp(
+            blurFactor * MainWindow.CalculateMaterialTintFactor(Current.Algorithm),
+            0,
+            1);
+        SetBrushAlpha("WindowBackgroundBrush", MainWindow.CalculateBrushAlpha(230, Current.Opacity, windowTintFactor));
         SetBrushAlpha("GlassBrush", MainWindow.CalculateBrushAlpha(184, Current.Opacity, blurFactor));
         SetBrushAlpha("GlassStrongBrush", MainWindow.CalculateBrushAlpha(208, Current.Opacity, blurFactor));
         SetBrushAlpha("SurfaceBrush", MainWindow.CalculateBrushAlpha(199, Current.Opacity, blurFactor));

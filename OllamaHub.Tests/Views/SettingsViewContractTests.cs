@@ -27,6 +27,30 @@ public sealed class SettingsViewContractTests
     }
 
     [Fact]
+    public void LoadingSettingsDoesNotReapplyAppearance()
+    {
+        var source = ReadDesktopFile("ViewModels", "SettingsViewModel.cs");
+        var loadStart = source.IndexOf("private async Task LoadAsync()", StringComparison.Ordinal);
+        var saveStart = source.IndexOf("private async Task SaveAsync", StringComparison.Ordinal);
+
+        Assert.True(loadStart >= 0);
+        Assert.True(saveStart > loadStart);
+        Assert.DoesNotContain("ApplyAppearancePreview();", source[loadStart..saveStart], StringComparison.Ordinal);
+        Assert.Contains("if (!suppressAutoSave) ApplyAppearancePreview();", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindowReusesTheSettingsViewModelAcrossNavigation()
+    {
+        var source = ReadDesktopFile("ViewModels", "MainWindowViewModel.cs");
+
+        Assert.Contains("private readonly SettingsViewModel settingsViewModel;", source, StringComparison.Ordinal);
+        Assert.Contains("settingsViewModel = new SettingsViewModel", source, StringComparison.Ordinal);
+        Assert.Contains("CurrentView = settingsViewModel;", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentView = new SettingsViewModel", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AppearancePipelineUsesAContinuousZeroToHundredOpacityRange()
     {
         var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
@@ -68,9 +92,9 @@ public sealed class SettingsViewContractTests
 
         Assert.Contains("WindowTransparencyLevel.Transparent", windowSource, StringComparison.Ordinal);
         Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(algorithm);", windowSource, StringComparison.Ordinal);
-        Assert.Contains("[WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
-        Assert.Contains("[WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
-        Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.Mica, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
         Assert.Contains("0.35 + (Math.Clamp(blurAmount, 0, 64) / 64d * 0.65)", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("TransparencyLevelHint = !enabled", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("[WindowTransparencyLevel.None]", windowSource, StringComparison.Ordinal);
@@ -113,7 +137,6 @@ public sealed class SettingsViewContractTests
             new[]
             {
                 WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Blur,
                 WindowTransparencyLevel.Transparent
             },
             MainWindow.BuildTransparencyLevels(" acrylic "));
@@ -121,7 +144,6 @@ public sealed class SettingsViewContractTests
             new[]
             {
                 WindowTransparencyLevel.Blur,
-                WindowTransparencyLevel.AcrylicBlur,
                 WindowTransparencyLevel.Transparent
             },
             MainWindow.BuildTransparencyLevels("BLUR"));
@@ -129,10 +151,33 @@ public sealed class SettingsViewContractTests
             new[]
             {
                 WindowTransparencyLevel.Mica,
-                WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Blur,
                 WindowTransparencyLevel.Transparent
             },
+            MainWindow.BuildTransparencyLevels("mica"));
+    }
+
+    [Fact]
+    public void TransparencyAlgorithmsUseIndependentTransparentFallbacks()
+    {
+        Assert.Equal(1, MainWindow.CalculateMaterialTintFactor("acrylic"), 3);
+        Assert.Equal(0.72, MainWindow.CalculateMaterialTintFactor("blur"), 3);
+        Assert.Equal(0.45, MainWindow.CalculateMaterialTintFactor("mica"), 3);
+
+        var acrylicAlpha = MainWindow.CalculateBrushAlpha(
+            230,
+            86,
+            MainWindow.CalculateBlurTintFactor(24) * MainWindow.CalculateMaterialTintFactor("acrylic"));
+        var micaAlpha = MainWindow.CalculateBrushAlpha(
+            230,
+            86,
+            MainWindow.CalculateBlurTintFactor(24) * MainWindow.CalculateMaterialTintFactor("mica"));
+
+        Assert.True(micaAlpha < acrylicAlpha);
+        Assert.DoesNotContain(
+            WindowTransparencyLevel.AcrylicBlur,
+            MainWindow.BuildTransparencyLevels("blur"));
+        Assert.DoesNotContain(
+            WindowTransparencyLevel.Blur,
             MainWindow.BuildTransparencyLevels("mica"));
     }
 
@@ -173,8 +218,6 @@ public sealed class SettingsViewContractTests
             new[]
             {
                 WindowTransparencyLevel.Mica,
-                WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Blur,
                 WindowTransparencyLevel.Transparent
             },
             window.TransparencyLevelHint);

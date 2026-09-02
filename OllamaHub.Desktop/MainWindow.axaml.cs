@@ -182,9 +182,18 @@ public partial class MainWindow : Window
     internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm) =>
         algorithm.Trim().ToLowerInvariant() switch
         {
-            "mica" => [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent],
-            "blur" => [WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent],
-            _ => [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]
+            "mica" => [WindowTransparencyLevel.Mica, WindowTransparencyLevel.Transparent],
+            "blur" => [WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent],
+            _ => [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]
+        };
+
+    internal static double CalculateMaterialTintFactor(string algorithm) =>
+        algorithm.Trim().ToLowerInvariant() switch
+        {
+            // Mica 自带较厚的系统底色，降低窗口遮罩后才能看见材质纹理。
+            "mica" => 0.45,
+            "blur" => 0.72,
+            _ => 1
         };
 
     internal IBrush ResolveAppearanceBrush(string key) => TryResolveAppearanceResource(key, out var value) && value is IBrush brush
