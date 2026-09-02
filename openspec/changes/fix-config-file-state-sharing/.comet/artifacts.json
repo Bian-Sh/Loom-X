@@ -1,0 +1,5 @@
+{
+  "openspec_proposal": "openspec/changes/fix-config-file-state-sharing/proposal.md",
+  "openspec_design": "openspec/changes/fix-config-file-state-sharing/design.md",
+  "openspec_tasks": "openspec/changes/fix-config-file-state-sharing/tasks.md"
+}
