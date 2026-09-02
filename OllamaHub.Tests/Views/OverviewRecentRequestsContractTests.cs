@@ -45,11 +45,18 @@ public sealed class OverviewRecentRequestsContractTests
         Assert.Contains("RecentRequestsEmpty", File.ReadAllText(Path.Combine(Path.GetDirectoryName(path)!, "..", "ViewModels", "MainWindowViewModel.cs")), StringComparison.Ordinal);
         Assert.Contains("Text=\"暂无请求活动\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Status}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Grid.Column=\"0\" Text=\"{Binding Time}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Grid.Column=\"1\" Text=\"{Binding Endpoint}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Grid.Column=\"2\" Text=\"{Binding Model}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Grid.Column=\"3\" Text=\"{Binding Status}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Grid.Column=\"4\" Text=\"{Binding Latency}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"0\" Text=\"{Binding Endpoint}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"1\" Text=\"{Binding Model}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"2\" Text=\"{Binding Time}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"3\" Text=\"{Binding Latency}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"4\" Text=\"{Binding Status}\"", source, StringComparison.Ordinal);
+
+        var endpointIndex = source.IndexOf("Grid.Column=\"0\" Text=\"{Binding Endpoint}\"", StringComparison.Ordinal);
+        var modelIndex = source.IndexOf("Grid.Column=\"1\" Text=\"{Binding Model}\"", StringComparison.Ordinal);
+        var timeIndex = source.IndexOf("Grid.Column=\"2\" Text=\"{Binding Time}\"", StringComparison.Ordinal);
+        var latencyIndex = source.IndexOf("Grid.Column=\"3\" Text=\"{Binding Latency}\"", StringComparison.Ordinal);
+        var statusIndex = source.IndexOf("Grid.Column=\"4\" Text=\"{Binding Status}\"", StringComparison.Ordinal);
+        Assert.True(endpointIndex < modelIndex && modelIndex < timeIndex && timeIndex < latencyIndex && latencyIndex < statusIndex);
     }
 
     [Fact]

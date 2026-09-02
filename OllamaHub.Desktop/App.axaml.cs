@@ -15,6 +15,7 @@ public partial class App : Application
 {
     private const string SingleInstanceMutexName = @"Local\OllamaHub.Desktop";
     private const string ShellBootstrapMutexName = @"Local\OllamaHub.Desktop.ShellBootstrap";
+    private const string SelfLaunchArgument = "--ollamahub-child";
     private GatewayProcessService? gatewayService;
     private ILoggerFactory? loggerFactory;
     private Mutex? singleInstanceMutex;
@@ -30,7 +31,10 @@ public partial class App : Application
             allowMultipleInstances = InstanceLaunchPolicy.AllowsMultipleInstances(
                 Environment.GetCommandLineArgs(),
                 Environment.GetEnvironmentVariable("OLLAMAHUB_ALLOW_MULTIPLE_INSTANCES"));
-            if (!allowMultipleInstances)
+            var launchedByOllamaHub = Environment.GetCommandLineArgs()
+                .Skip(1)
+                .Any(argument => string.Equals(argument, SelfLaunchArgument, StringComparison.OrdinalIgnoreCase));
+            if (!allowMultipleInstances && !launchedByOllamaHub)
             {
                 shellBootstrapMutex = new Mutex(true, ShellBootstrapMutexName, out var isShellBootstrapOwner);
                 ownsShellBootstrapMutex = isShellBootstrapOwner;
@@ -41,11 +45,11 @@ public partial class App : Application
                     {
                         var shellStartInfo = new ProcessStartInfo
                         {
-                            FileName = "explorer.exe",
-                            Arguments = $"\"{processPath}\"",
-                            UseShellExecute = true,
+                            FileName = processPath,
+                            UseShellExecute = false,
                             WorkingDirectory = Path.GetDirectoryName(processPath)
                         };
+                        shellStartInfo.ArgumentList.Add(SelfLaunchArgument);
                         try
                         {
                             Process.Start(shellStartInfo);
@@ -57,14 +61,17 @@ public partial class App : Application
                         {
                             LoggingBootstrap.Configure();
                             loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
-                            loggerFactory.CreateLogger<App>().LogWarning(exception, "通过 Windows Shell 重启桌面应用失败，继续当前进程 {ProcessId}", Environment.ProcessId);
+                            loggerFactory.CreateLogger<App>().LogWarning(exception, "桌面应用自启动子进程失败，继续当前进程 {ProcessId}", Environment.ProcessId);
                         }
                     }
                     shellBootstrapMutex.Dispose();
                     shellBootstrapMutex = null;
                     ownsShellBootstrapMutex = false;
                 }
+            }
 
+            if (!allowMultipleInstances)
+            {
                 singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out var isFirstInstance);
                 if (!isFirstInstance)
                 {
