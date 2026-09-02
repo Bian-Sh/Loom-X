@@ -13,7 +13,6 @@ public partial class MainWindow : Window
     private readonly ToastService toastService;
     private readonly DispatcherTimer toastTimer;
     private readonly Dictionary<string, Color> baseBrushColors = new(StringComparer.Ordinal);
-    private ResourceDictionary? appearanceResources;
 
     public ToastService ToastService => toastService;
 
@@ -163,12 +162,12 @@ public partial class MainWindow : Window
         TransparencyLevelHint = BuildTransparencyLevels(algorithm);
     }
 
-    private static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm) =>
+    internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm) =>
         algorithm.Trim().ToLowerInvariant() switch
         {
-            "mica" => [WindowTransparencyLevel.Transparent, WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur],
-            "blur" => [WindowTransparencyLevel.Transparent, WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur],
-            _ => [WindowTransparencyLevel.Transparent, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur]
+            "mica" => [WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent],
+            "blur" => [WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent],
+            _ => [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]
         };
 
     private IBrush ResolveBrush(string key) => TryGetResource(key, null, out var value) && value is IBrush brush
@@ -177,25 +176,10 @@ public partial class MainWindow : Window
 
     private void SetBrushAlpha(string key, int alpha)
     {
-        if (!TryGetResource(key, null, out var value) || value is not ISolidColorBrush brush)
+        if (!TryGetResource(key, null, out var value) || value is not SolidColorBrush brush)
             return;
 
-        if (!baseBrushColors.TryGetValue(key, out var baseColor))
-        {
-            baseColor = brush.Color;
-            baseBrushColors[key] = baseColor;
-        }
-
-        var replacement = new SolidColorBrush(Color.FromArgb((byte)Math.Clamp(alpha, 0, 255), baseColor.R, baseColor.G, baseColor.B));
-        if (Application.Current?.Resources is { } applicationResources)
-        {
-            appearanceResources ??= new ResourceDictionary();
-            if (!applicationResources.MergedDictionaries.Contains(appearanceResources))
-                applicationResources.MergedDictionaries.Add(appearanceResources);
-            appearanceResources[key] = replacement;
-        }
-        else
-            Resources[key] = replacement;
+        AppearanceBrushUpdater.Apply(brush, key, baseBrushColors, alpha);
     }
 
     private static byte ScaleAlpha(byte baseAlpha, int opacity, double blurFactor) =>
@@ -204,4 +188,39 @@ public partial class MainWindow : Window
     private static SolidColorBrush OpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
         ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
         : new SolidColorBrush(Color.FromArgb(255, 230, 240, 243));
+}
+
+internal static class AppearanceBrushUpdater
+{
+    public static bool TryApply(
+        ResourceDictionary resources,
+        string key,
+        IDictionary<string, Color> baseColors,
+        int alpha)
+    {
+        if (!resources.TryGetValue(key, out var value) || value is not SolidColorBrush brush)
+            return false;
+
+        Apply(brush, key, baseColors, alpha);
+        return true;
+    }
+
+    public static void Apply(
+        SolidColorBrush brush,
+        string key,
+        IDictionary<string, Color> baseColors,
+        int alpha)
+    {
+        if (!baseColors.TryGetValue(key, out var baseColor))
+        {
+            baseColor = brush.Color;
+            baseColors[key] = baseColor;
+        }
+
+        brush.Color = Color.FromArgb(
+            (byte)Math.Clamp(alpha, 0, 255),
+            baseColor.R,
+            baseColor.G,
+            baseColor.B);
+    }
 }

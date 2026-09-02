@@ -1,3 +1,6 @@
+using Avalonia.Controls;
+using Avalonia.Media;
+using OllamaHub.Desktop;
 using System.IO;
 using Xunit;
 
@@ -37,12 +40,58 @@ public sealed class SettingsViewContractTests
 
         Assert.Contains("WindowTransparencyLevel.Transparent", windowSource, StringComparison.Ordinal);
         Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(algorithm);", windowSource, StringComparison.Ordinal);
-        Assert.Contains("[WindowTransparencyLevel.Transparent, WindowTransparencyLevel.Mica", windowSource, StringComparison.Ordinal);
-        Assert.Contains("[WindowTransparencyLevel.Transparent, WindowTransparencyLevel.Blur", windowSource, StringComparison.Ordinal);
-        Assert.Contains("[WindowTransparencyLevel.Transparent, WindowTransparencyLevel.AcrylicBlur", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.Mica, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.Blur, WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Blur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
         Assert.Contains("0.35 + (blurAmount / 64d * 0.65)", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("TransparencyLevelHint = !enabled", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("[WindowTransparencyLevel.None]", windowSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AppearanceBrushUpdatesKeepTheSharedBrushAndUseItsBaseColor()
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(230, 213, 228, 233));
+        var resources = new ResourceDictionary { ["WindowBackgroundBrush"] = brush };
+        var baseColors = new Dictionary<string, Color>(StringComparer.Ordinal);
+
+        Assert.True(AppearanceBrushUpdater.TryApply(resources, "WindowBackgroundBrush", baseColors, 92));
+        Assert.Same(brush, resources["WindowBackgroundBrush"]);
+        Assert.Equal(Color.FromArgb(92, 213, 228, 233), brush.Color);
+
+        Assert.True(AppearanceBrushUpdater.TryApply(resources, "WindowBackgroundBrush", baseColors, 184));
+        Assert.Same(brush, resources["WindowBackgroundBrush"]);
+        Assert.Equal(Color.FromArgb(184, 213, 228, 233), brush.Color);
+    }
+
+    [Fact]
+    public void TransparencyAlgorithmPrefersTheSelectedMaterialBeforeFallbacks()
+    {
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Blur,
+                WindowTransparencyLevel.Transparent
+            },
+            MainWindow.BuildTransparencyLevels(" acrylic "));
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.Blur,
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Transparent
+            },
+            MainWindow.BuildTransparencyLevels("BLUR"));
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.Mica,
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Blur,
+                WindowTransparencyLevel.Transparent
+            },
+            MainWindow.BuildTransparencyLevels("mica"));
     }
 
     private static string ReadDesktopFile(params string[] segments)
