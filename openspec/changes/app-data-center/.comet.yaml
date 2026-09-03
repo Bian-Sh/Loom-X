@@ -14,7 +14,7 @@ base_ref: 0213e0cdc67816f70d4255415b8240102e2d86f5
 design_doc: docs/superpowers/specs/2026-09-03-app-data-center-design.md
 plan: docs/superpowers/plans/2026-09-03-app-data-center.md
 verify_result: pending
-verification_report: null
+verification_report: docs/superpowers/reports/2026-09-03-app-data-center-verify.md
 branch_status: pending
 created_at: 2026-09-03
 verified_at: null
