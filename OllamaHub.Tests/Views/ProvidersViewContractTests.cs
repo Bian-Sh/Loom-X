@@ -67,4 +67,16 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("finally", source, StringComparison.Ordinal);
         Assert.Contains("StopModelSyncAnimation();", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void BaseUrlHelpControlUsesAdjacentQuestionMarkAndHelpCursor()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("<StackPanel Orientation=\"Horizontal\" Spacing=\"4\"><TextBlock Text=\"Base URL\"", source, StringComparison.Ordinal);
+        Assert.Contains("Cursor=\"Help\"", source, StringComparison.Ordinal);
+        Assert.Contains("<TextBlock Text=\"?\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Data=\"M 10,10 A 5,5", source, StringComparison.Ordinal);
+    }
 }
