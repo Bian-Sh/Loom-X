@@ -4,11 +4,8 @@
   </UserControl.Styles>
   <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <Grid RowDefinitions="Auto,Auto" RowSpacing="16">
-    <Border Grid.Row="0" Background="{DynamicResource GraphBackgroundBrush}" BorderBrush="{DynamicResource GraphBorderBrush}" BorderThickness="1" CornerRadius="9" MinHeight="360">
-      <Grid RowDefinitions="Auto,*">
-        <Grid Row="0" ColumnDefinitions="*,Auto" Margin="16,12,16,4"><StackPanel Spacing="2"><TextBlock Text="Endpoint → Model" Foreground="{DynamicResource GraphTextBrush}" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="共享 Model 只显示一次，活跃关系以飞线亮斑呈现" Foreground="{DynamicResource GraphMutedBrush}" FontSize="11"/></StackPanel><TextBlock Grid.Column="1" Text="LIVE" Foreground="{DynamicResource GraphLiveBrush}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
-        <NativeWebView Grid.Row="1" x:Name="GraphWebView" MinHeight="320"/>
-      </Grid>
+    <Border Grid.Row="0" Background="{DynamicResource GraphBackgroundBrush}" BorderBrush="{DynamicResource GraphBorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360">
+        <NativeWebView x:Name="GraphWebView" MinHeight="320"/>
     </Border>
     <Grid Grid.Row="1" ColumnDefinitions="1.15*,0.85*" ColumnSpacing="12">
       <Border Classes="surface-card" Padding="16"><Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="本地网关" FontSize="15" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="{Binding GatewayStatus}" Foreground="{DynamicResource SuccessBrush}" FontWeight="SemiBold"/></Grid><Grid Grid.Row="1" ColumnDefinitions="*,Auto"><TextBlock Text="监听地址" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Grid.Column="1" Text="{Binding Endpoint}"/></Grid><Grid Grid.Row="2" ColumnDefinitions="*,Auto"><TextBlock Text="接口状态" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Grid.Column="1" Text="{Binding Version}"/></Grid><Grid Grid.Row="3" ColumnDefinitions="*,Auto"><TextBlock Text="最后检查" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Grid.Column="1" Text="{Binding LastChecked}"/></Grid><StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" Margin="0,6,0,0"><Button Content="{Binding GatewayActionLabel}" Command="{Binding ToggleGatewayCommand}"/><Button Content="刷新" Command="{Binding RefreshCommand}"/></StackPanel></Grid></Border>

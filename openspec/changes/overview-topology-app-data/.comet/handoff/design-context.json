@@ -1,0 +1,13 @@
+{
+  "change": "overview-topology-app-data",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "5f27300702f0f46f8480f9726fdd29f99b3ed981c03c1cb538aab82ca9b42462",
+  "files": [
+    { "path": "openspec/changes/overview-topology-app-data/proposal.md", "sha256": "982cece21adc21a9a4fb03e38597d607eff83138fc96c4a0f16b6376a43666dc" },
+    { "path": "openspec/changes/overview-topology-app-data/design.md", "sha256": "a25561c79159b065b47d382937495893e5bed10a93461ad6af1c699fd1d30591" },
+    { "path": "openspec/changes/overview-topology-app-data/tasks.md", "sha256": "16eb5a16fcc01b08a3de34a487bea147cc54e901df0039fb551a3ab540ce9525" }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "openspec_proposal": "openspec/changes/overview-topology-app-data/proposal.md",
+  "openspec_design": "openspec/changes/overview-topology-app-data/design.md",
+  "openspec_tasks": "openspec/changes/overview-topology-app-data/tasks.md",
+  "design_document": "docs/superpowers/specs/2026-09-03-overview-topology-app-data-design.md",
+  "build_plan": "docs/superpowers/plans/2026-09-03-overview-topology-app-data.md",
+  "handoff_context": "openspec/changes/overview-topology-app-data/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/overview-topology-app-data/.comet/handoff/design-context.md"
+}

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Net;
 using System.Net.Sockets;
 using Avalonia.Controls;
@@ -17,7 +18,11 @@ public interface IOverviewGraphHost : IDisposable
 
 public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGraphHost> logger) : IOverviewGraphHost
 {
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = null };
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = null,
+        Converters = { new JsonStringEnumConverter() }
+    };
     private OverviewViewModel? viewModel;
     private bool initialized;
     private bool pageReady;

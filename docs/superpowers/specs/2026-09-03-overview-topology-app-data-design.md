@@ -1,3 +1,10 @@
+---
+comet_change: overview-topology-app-data
+role: technical-design
+canonical_spec: openspec
+language: zh-CN
+---
+
 # 概览拓扑与 AppDataStore 实时 Web 交互设计
 
 ## 1. 目标与范围

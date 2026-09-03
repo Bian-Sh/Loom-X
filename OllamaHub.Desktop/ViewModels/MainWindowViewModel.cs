@@ -152,6 +152,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private string graphStatus = "等待网关启动";
     private string gatewayActionLabel = "启动网关";
     private bool gatewayToggleInProgress;
+    private string topologyJson = "{\"endpoints\":[],\"combos\":[],\"providers\":[],\"models\":[],\"edges\":[]}";
     private readonly Dictionary<string, RequestTelemetryEvent> activeRequests = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> activeEdgeCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HashSet<string>> requestEdges = new(StringComparer.Ordinal);
@@ -173,15 +174,12 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public string GraphStatus { get => graphStatus; private set => SetProperty(ref graphStatus, value); }
     public string GatewayActionLabel { get => gatewayActionLabel; private set => SetProperty(ref gatewayActionLabel, value); }
     public ObservableCollection<OverviewEndpointViewModel> Endpoints { get; } = [];
+    public ObservableCollection<OverviewComboViewModel> Combos { get; } = [];
+    public ObservableCollection<OverviewProviderViewModel> Providers { get; } = [];
     public ObservableCollection<OverviewModelViewModel> Models { get; } = [];
     public ObservableCollection<OverviewRecentRequestViewModel> RecentRequests { get; } = [];
     public bool RecentRequestsEmpty => RecentRequests.Count == 0;
-    public string TopologyJson => JsonSerializer.Serialize(new
-    {
-        endpoints = Endpoints.Select(item => new { key = item.Key, displayName = item.DisplayName, publicPath = item.PublicPath, enabled = item.Enabled }),
-        models = Models.Select(item => new { displayName = item.DisplayName, modelId = item.ModelId, providerId = item.ProviderId }),
-        edges = Endpoints.SelectMany(endpoint => endpoint.Routes.Select(route => new { endpointKey = endpoint.Key, modelId = route.ModelId, providerId = route.ProviderId, alias = route.Alias }))
-    });
+    public string TopologyJson => topologyJson;
     public string MetricsJson => JsonSerializer.Serialize(new
     {
         activeRequests = ActiveRequestCount,
@@ -323,19 +321,74 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private void BuildTopology(ResolvedAppConfig config)
     {
         Endpoints.Clear();
+        Combos.Clear();
+        Providers.Clear();
         Models.Clear();
+        foreach (var provider in dataStore.Providers
+                     .GroupBy(item => item.BusinessId, StringComparer.OrdinalIgnoreCase)
+                     .Select(group => group.First()))
+        {
+            Providers.Add(new OverviewProviderViewModel(provider.BusinessId, provider.DisplayName, provider.Enabled, provider.ModelCount));
+        }
         foreach (var model in config.Models.GroupBy(item => $"{item.ProviderId}:{item.ModelId}", StringComparer.OrdinalIgnoreCase).Select(group => group.First()))
             Models.Add(new OverviewModelViewModel(model.DisplayName, model.ModelId, model.ProviderId));
         foreach (var endpoint in config.GatewayEndpoints.OrderBy(item => item.Key))
         {
             var endpointVm = new OverviewEndpointViewModel(endpoint.Key, EndpointLabel(endpoint.Key), endpoint.PublicPath, endpoint.Enabled);
-            foreach (var combo in endpoint.Combos.Where(item => item.Enabled))
+            foreach (var combo in endpoint.Combos.OrderBy(item => item.SortOrder))
+            {
+                var comboVm = new OverviewComboViewModel(ComboId(endpoint.Key, combo.Name), endpoint.Key, combo.Name, combo.Enabled);
+                Combos.Add(comboVm);
                 foreach (var route in combo.Routes.Where(item => item.Enabled))
                     endpointVm.Routes.Add(new OverviewRouteViewModel(combo.Name, route.Model.DisplayName, route.Model.ModelId, route.Model.ProviderId));
+            }
             Endpoints.Add(endpointVm);
         }
+        topologyJson = CreateTopologyJson(config, dataStore.Providers);
         TopologyChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    internal static string CreateTopologyJson(ResolvedAppConfig config, IReadOnlyList<ProviderResponse> providerResponses)
+    {
+        var providers = providerResponses
+            .GroupBy(item => item.BusinessId, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Select(item => new { id = item.BusinessId, displayName = item.DisplayName, enabled = item.Enabled, modelCount = item.ModelCount })
+            .ToArray();
+        var models = config.Models
+            .GroupBy(item => $"{item.ProviderId}:{item.ModelId}", StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.First())
+            .Select(item => new { displayName = item.DisplayName, modelId = item.ModelId, providerId = item.ProviderId })
+            .ToArray();
+        var endpoints = config.GatewayEndpoints.OrderBy(item => item.Key)
+            .Select(item => new { key = item.Key, displayName = EndpointLabel(item.Key), publicPath = item.PublicPath, enabled = item.Enabled })
+            .ToArray();
+        var combos = config.GatewayEndpoints.SelectMany(endpoint => endpoint.Combos.OrderBy(combo => combo.SortOrder)
+            .Select(combo => new { id = ComboId(endpoint.Key, combo.Name), endpointKey = endpoint.Key, displayName = combo.Name, enabled = combo.Enabled }))
+            .ToArray();
+        var edges = new List<object>();
+        var comboProviders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var providerModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var endpoint in config.GatewayEndpoints)
+        foreach (var combo in endpoint.Combos)
+        {
+            var comboId = ComboId(endpoint.Key, combo.Name);
+            edges.Add(new { type = "endpoint-combo", sourceType = "endpoint", sourceId = endpoint.Key, targetType = "combo", targetId = comboId, endpointKey = endpoint.Key, comboId });
+            foreach (var route in combo.Routes)
+            {
+                var providerKey = $"{comboId}|{route.Model.ProviderId}";
+                if (comboProviders.Add(providerKey))
+                    edges.Add(new { type = "combo-provider", sourceType = "combo", sourceId = comboId, targetType = "provider", targetId = route.Model.ProviderId, endpointKey = endpoint.Key, comboId, providerId = route.Model.ProviderId, modelId = route.Model.ModelId });
+                var modelKey = $"{route.Model.ProviderId}|{route.Model.ModelId}";
+                if (providerModels.Add(modelKey))
+                    edges.Add(new { type = "provider-model", sourceType = "provider", sourceId = route.Model.ProviderId, targetType = "model", targetId = modelKey, endpointKey = endpoint.Key, comboId, providerId = route.Model.ProviderId, modelId = route.Model.ModelId });
+                edges.Add(new { type = "route", sourceType = "endpoint", sourceId = endpoint.Key, targetType = "model", targetId = modelKey, endpointKey = endpoint.Key, comboId, providerId = route.Model.ProviderId, modelId = route.Model.ModelId, alias = combo.Name, enabled = combo.Enabled && route.Enabled });
+            }
+        }
+        return JsonSerializer.Serialize(new { endpoints, combos, providers, models, edges });
+    }
+
+    private static string ComboId(string endpointKey, string name) => $"{endpointKey}|{name}";
 
     private string LoadEndpoint()
     {
@@ -448,6 +501,24 @@ public sealed class OverviewEndpointViewModel : NotifyViewModel
     public int ActiveCount => Routes.Count(item => item.IsActive);
     public string Status => !Enabled ? "已停用" : Routes.Count == 0 ? "无路由" : ActiveCount > 0 ? "有请求" : "已就绪";
     public OverviewEndpointViewModel(string key, string displayName, string publicPath, bool enabled) => (Key, DisplayName, PublicPath, Enabled) = (key, displayName, publicPath, enabled);
+}
+
+public sealed class OverviewComboViewModel
+{
+    public string Id { get; }
+    public string EndpointKey { get; }
+    public string DisplayName { get; }
+    public bool Enabled { get; }
+    public OverviewComboViewModel(string id, string endpointKey, string displayName, bool enabled) => (Id, EndpointKey, DisplayName, Enabled) = (id, endpointKey, displayName, enabled);
+}
+
+public sealed class OverviewProviderViewModel
+{
+    public string Id { get; }
+    public string DisplayName { get; }
+    public bool Enabled { get; }
+    public int ModelCount { get; }
+    public OverviewProviderViewModel(string id, string displayName, bool enabled, int modelCount) => (Id, DisplayName, Enabled, ModelCount) = (id, displayName, enabled, modelCount);
 }
 
 public sealed class OverviewRouteViewModel : NotifyViewModel
