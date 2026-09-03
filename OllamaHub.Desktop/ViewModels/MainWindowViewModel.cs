@@ -625,6 +625,9 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private double syncIconAngle;
     private bool suppressAutoSave;
     private bool suppressSelectionInvariant;
+    private readonly object refreshSync = new();
+    private bool refreshRequested;
+    private Task? refreshTask;
     public ObservableCollection<ProviderEditorViewModel> Providers { get; } = [];
     public IReadOnlyList<string> ProviderTypeOptions { get; } = ["openai", "anthropic", "ollama"];
     public ProviderEditorViewModel? SelectedProvider
@@ -690,7 +693,37 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null)
         : this(new AppDataStore(configService, new GatewayProcessService()), toastService, logger) { }
 
-    private async Task RefreshAsync()
+    private Task RefreshAsync()
+    {
+        lock (refreshSync)
+        {
+            refreshRequested = true;
+            if (refreshTask is { IsCompleted: false }) return refreshTask;
+            refreshTask = RefreshLoopAsync();
+            return refreshTask;
+        }
+    }
+
+    private async Task RefreshLoopAsync()
+    {
+        while (true)
+        {
+            lock (refreshSync)
+            {
+                if (!refreshRequested)
+                {
+                    refreshTask = null;
+                    return;
+                }
+
+                refreshRequested = false;
+            }
+
+            await RefreshCoreAsync();
+        }
+    }
+
+    private async Task RefreshCoreAsync()
     {
         try
         {
