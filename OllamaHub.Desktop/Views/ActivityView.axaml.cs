@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Controls.Primitives;
+using Avalonia;
 using OllamaHub.Desktop;
 using OllamaHub.Desktop.Services;
 using OllamaHub.Desktop.ViewModels;
@@ -9,10 +10,24 @@ namespace OllamaHub.Desktop.Views;
 
 public partial class ActivityView : UserControl
 {
+    private ActivityViewModel? observedViewModel;
+
     public ActivityView()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
     }
+
+    private void OnDataContextChanged(object? sender, EventArgs args)
+    {
+        if (observedViewModel is not null)
+            observedViewModel.ScrollToTopRequested -= OnScrollToTopRequested;
+        observedViewModel = DataContext as ActivityViewModel;
+        if (observedViewModel is not null)
+            observedViewModel.ScrollToTopRequested += OnScrollToTopRequested;
+    }
+
+    private void OnScrollToTopRequested(object? sender, EventArgs args) => activityScrollViewer.Offset = new Vector(0, 0);
 
     private void ActivityScrollViewer_OnScrollChanged(object? sender, ScrollChangedEventArgs e)
     {

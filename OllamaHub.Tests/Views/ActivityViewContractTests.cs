@@ -18,5 +18,7 @@ public sealed class ActivityViewContractTests
         Assert.Contains("IsIndeterminate=\"{Binding IsLoadingMore}\"", viewSource, StringComparison.Ordinal);
         Assert.Contains("ScrollChanged=\"ActivityScrollViewer_OnScrollChanged\"", viewSource, StringComparison.Ordinal);
         Assert.Contains("NotifyScrollMetrics", codeSource, StringComparison.Ordinal);
+        Assert.Contains("ScrollToTopRequested", codeSource, StringComparison.Ordinal);
+        Assert.Contains("activityScrollViewer.Offset = new Vector(0, 0)", codeSource, StringComparison.Ordinal);
     }
 }

@@ -33,6 +33,7 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     public ObservableCollection<ActivityItemViewModel> Items { get; } = [];
     public IReadOnlyList<string> StatusOptions { get; } = ["全部状态", "成功", "失败", "警告"];
     public IReadOnlyList<string> ProtocolOptions { get; } = ["全部入口协议", "OpenAI", "Anthropic", "Ollama"];
+    public event EventHandler? ScrollToTopRequested;
     public string SearchText { get => searchText; set { if (SetProperty(ref searchText, value ?? string.Empty)) QueueRefresh(); } }
     public string SelectedStatus { get => selectedStatus; set { if (SetProperty(ref selectedStatus, value ?? "全部状态")) QueueRefresh(); } }
     public string SelectedProtocol { get => selectedProtocol; set { if (SetProperty(ref selectedProtocol, value ?? "全部入口协议")) QueueRefresh(); } }
@@ -85,10 +86,12 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     {
         var version = Interlocked.Increment(ref refreshVersion);
         IsRefreshing = true;
+        SelectedItem = null;
         try
         {
             var page = await dataStore.LoadActivityPageAsync(BuildQuery(), cancellationToken);
             ApplyPage(page);
+            ScrollToTopRequested?.Invoke(this, EventArgs.Empty);
             Status = page.Items.Count == 0 ? "暂无请求活动" : $"已加载 {page.Items.Count} 条活动";
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
@@ -133,6 +136,7 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
             var page = await dataStore.ReturnToLatestAsync(BuildQuery());
             IsHistoryMode = false;
             ApplyPage(page);
+            ScrollToTopRequested?.Invoke(this, EventArgs.Empty);
             Status = page.Items.Count == 0 ? "暂无请求活动" : "已回到最新活动";
         }
         catch (Exception exception)
