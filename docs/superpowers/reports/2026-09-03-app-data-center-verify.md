@@ -15,8 +15,9 @@ design-doc: docs/superpowers/specs/2026-09-03-app-data-center-design.md
 
 ## 验证证据
 
-- `dotnet test OllamaHub.Tests/OllamaHub.Tests.csproj --no-restore`：141/141 通过。
+- `dotnet test OllamaHub.Tests/OllamaHub.Tests.csproj --no-restore`：合并远程 UI 提交后 144/144 通过。
 - `dotnet build OllamaHub.slnx --no-restore`：构建成功，0 个错误。
+- 已执行 `git pull --no-rebase --no-edit`，远程 Gateway/Provider 样式与契约测试通过普通 merge 融合，未发生冲突、未删除他人功能。
 - `node comet-guard.mjs app-data-center build --apply`：build 守卫通过并推进至 verify；Comet 自动构建探测不识别 `.slnx`，已用 `COMET_SKIP_BUILD=1` 跳过重复探测，构建证据以上述显式命令为准。
 - 配置写入挂起回归：`SuccessfulConfigurationWriteReplacesSnapshotAndPublishesChange` 通过；修复了刷新锁未释放问题。
 - 活动行为测试覆盖 500 条淘汰、历史待合并、筛选不匹配、实时/分页去重和 `(CreatedAt, Id)` 游标。
