@@ -76,7 +76,9 @@ public sealed class ProvidersViewContractTests
 
         Assert.Contains("<StackPanel Orientation=\"Horizontal\" Spacing=\"4\"><TextBlock Text=\"Base URL\"", source, StringComparison.Ordinal);
         Assert.Contains("Cursor=\"Help\"", source, StringComparison.Ordinal);
-        Assert.Contains("<TextBlock Text=\"?\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Border Width=\"16\" Height=\"16\"", source, StringComparison.Ordinal);
+        Assert.Contains("<TextBlock Text=\"?\" FontSize=\"10\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TextBlock Text=\"?\" FontSize=\"12\" FontWeight=\"SemiBold\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Data=\"M 10,10 A 5,5", source, StringComparison.Ordinal);
     }
 }
