@@ -28,9 +28,14 @@ public sealed class WindowAppearanceCoordinatorTests
 
         window.ApplyAppearance(true, 20, 0, "blur");
 
+        Assert.Equal(0, Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A);
+        Assert.Equal(0, Assert.IsType<SolidColorBrush>(dictionary["PopupBackgroundBrush"]).Color.A);
+        Assert.Same(Brushes.Transparent, window.Background);
+
+        window.ApplyAppearance(true, 20, 200, "blur");
+
         Assert.InRange(Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A, 1, 254);
         Assert.InRange(Assert.IsType<SolidColorBrush>(dictionary["PopupBackgroundBrush"]).Color.A, 1, 254);
-        Assert.Same(Brushes.Transparent, window.Background);
     }
 
     [Fact]
@@ -42,12 +47,12 @@ public sealed class WindowAppearanceCoordinatorTests
         window.Resources.MergedDictionaries.Add(dictionary);
         var dialog = new GlassDialogWindow();
 
-        window.ApplyAppearance(true, 86, 24, "mica");
+        window.ApplyAppearance(true, 86, 200, "mica");
         window.AppearanceCoordinator.ApplyTo(dialog);
         Assert.Same(Brushes.Transparent, dialog.Background);
         Assert.Equal(WindowTransparencyLevel.AcrylicBlur, dialog.TransparencyLevelHint[0]);
 
-        window.ApplyAppearance(false, 86, 24, "acrylic");
+        window.ApplyAppearance(false, 86, 200, "acrylic");
 
         Assert.Equal(255, Assert.IsType<SolidColorBrush>(dialog.Background).Color.A);
         Assert.Equal(WindowTransparencyLevel.AcrylicBlur, dialog.TransparencyLevelHint[0]);
@@ -66,7 +71,7 @@ public sealed class WindowAppearanceCoordinatorTests
         window.ApplyAppearance(true, -10, 1000, "unknown");
 
         Assert.NotNull(changed);
-        Assert.Equal(new WindowAppearanceSnapshot(true, 0, 64, "acrylic"), changed);
+        Assert.Equal(new WindowAppearanceSnapshot(true, 0, 200, "acrylic"), changed);
         Assert.Equal(changed, window.AppearanceCoordinator.Current);
     }
 

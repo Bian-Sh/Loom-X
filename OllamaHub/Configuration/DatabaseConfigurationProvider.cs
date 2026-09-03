@@ -77,7 +77,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     LogStackTrace = settings.LogStackTrace,
                     TransparencyEnabled = settings.TransparencyEnabled,
                     TransparencyOpacity = settings.TransparencyOpacity,
-                    BlurAmount = settings.BlurAmount,
+                    BlurAmount = AppearanceSettingsLimits.NormalizeBlurAmount(settings.BlurAmount),
                     TransparencyAlgorithm = settings.TransparencyAlgorithm
                 },
                 Providers = resolvedProviders,
