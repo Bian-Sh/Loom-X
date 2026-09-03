@@ -2,6 +2,9 @@
   <UserControl.Styles>
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="FontSize" Value="10"/></Style>
     <Style Selector="Border.panel"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/></Style>
+    <Style Selector="ListBox.provider-list"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderThickness" Value="0"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,1"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:selected"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/></Style>
     <Style Selector="Border.stat"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="16,14"/></Style>
     <Style Selector="Button.icon-button"><Setter Property="Width" Value="36"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/><Setter Property="CornerRadius" Value="10"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
     <Style Selector="Button.small-button"><Setter Property="Padding" Value="11,7"/><Setter Property="MinHeight" Value="34"/></Style>
@@ -34,10 +37,10 @@
             <Border Grid.Row="1" Padding="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
               <TextBox Watermark="搜索 Provider"/>
             </Border>
-            <ListBox Grid.Row="2" ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox Grid.Row="2" Classes="provider-list" ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate>
                 <DataTemplate>
-                  <Border Padding="12" Margin="0,0,0,1" Background="{DynamicResource SurfaceSubtleBrush}">
+                  <Border Padding="14,12" Background="Transparent" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
                     <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
                       <StackPanel Orientation="Horizontal" Spacing="9">
                         <Border Width="30" Height="30" Background="{DynamicResource AccentSoftBrush}" CornerRadius="9"><TextBlock Text="P" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>

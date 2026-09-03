@@ -68,6 +68,18 @@ public sealed class GatewayViewContractTests
     }
 
     [Fact]
+    public void EndpointListUsesThemeResponsiveCellSpacing()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+
+        Assert.Contains("Selector=\"ListBox.endpoint-list\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Property=\"Margin\" Value=\"0,0,0,1\"", source, StringComparison.Ordinal);
+        Assert.Contains("BorderBrush=\"{DynamicResource BorderStrongBrush}\" BorderThickness=\"0,0,0,1\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected\"><Setter Property=\"Background\" Value=\"{DynamicResource AccentSoftBrush}\"/>", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DragAndAlphabeticalSortAreHandledByGatewayInteractions()
     {
         var viewSource = ReadDesktopFile("Views", "GatewayView.axaml.cs");
