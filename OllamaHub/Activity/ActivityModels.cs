@@ -82,6 +82,13 @@ public sealed record ActivityQuery(
     string? Protocol = null,
     int Limit = 500);
 
+public sealed record ActivityCursor(DateTimeOffset CreatedAt, long Id);
+
+public sealed record ActivityPage(
+    IReadOnlyList<ActivityEventRecord> Items,
+    ActivityCursor? NextCursor,
+    bool HasMore);
+
 public static class ActivityDatabase
 {
     public static async Task InitializeAsync(ActivityDbContext dbContext, CancellationToken cancellationToken = default) =>

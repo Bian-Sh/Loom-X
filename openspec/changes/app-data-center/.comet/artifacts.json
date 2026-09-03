@@ -1,0 +1,8 @@
+{
+  "openspec_proposal": "openspec/changes/app-data-center/proposal.md",
+  "openspec_design": "openspec/changes/app-data-center/design.md",
+  "openspec_tasks": "openspec/changes/app-data-center/tasks.md",
+  "design_document": "docs/superpowers/specs/2026-09-03-app-data-center-design.md",
+  "build_plan": "docs/superpowers/plans/2026-09-03-app-data-center.md",
+  "build_tasks_complete": "openspec/changes/app-data-center/tasks.md"
+}

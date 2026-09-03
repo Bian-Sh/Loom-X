@@ -7,19 +7,26 @@ using OllamaHub.Configuration;
 
 namespace OllamaHub.Desktop.Services;
 
-public sealed class ConfigSnapshotService
+public sealed class ConfigSnapshotService : IDisposable
 {
-    private readonly string databasePath = AppDataPaths.DatabasePath;
+    private readonly string databasePath;
     private readonly ILogger<ConfigSnapshotService>? logger;
     private readonly FileSystemWatcher? databaseWatcher;
 
+    public event EventHandler? ExternalChangeDetected;
+
     public ConfigSnapshotService(ILogger<ConfigSnapshotService>? logger = null)
+        : this(AppDataPaths.DatabasePath, logger) { }
+
+    internal ConfigSnapshotService(string databasePath, ILogger<ConfigSnapshotService>? logger = null)
     {
+        this.databasePath = databasePath;
         this.logger = logger;
-        AppDataPaths.EnsureCreated();
+        var directory = Path.GetDirectoryName(databasePath);
+        if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
         if (logger is not null)
         {
-            databaseWatcher = new FileSystemWatcher(AppDataPaths.RootDirectory, Path.GetFileName(databasePath))
+            databaseWatcher = new FileSystemWatcher(Path.GetDirectoryName(databasePath) ?? AppDataPaths.RootDirectory, Path.GetFileName(databasePath))
             {
                 NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
                 EnableRaisingEvents = true
@@ -35,6 +42,7 @@ public sealed class ConfigSnapshotService
     {
         logger?.LogInformation("配置库主文件发生变化，变更类型 {ChangeType}，路径 {FilePath}", args.ChangeType, args.FullPath);
         LogFileState("主库变更后", databasePath);
+        ExternalChangeDetected?.Invoke(this, EventArgs.Empty);
     }
 
     public ResolvedAppConfig Load()
@@ -57,6 +65,13 @@ public sealed class ConfigSnapshotService
             throw;
         }
     }
+
+    public Task<ResolvedAppConfig> LoadAsync(CancellationToken cancellationToken = default) =>
+        Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Load();
+        }, cancellationToken);
 
     public async Task<IReadOnlyList<ProviderResponse>> ListProvidersAsync(CancellationToken cancellationToken = default)
     {
@@ -108,6 +123,7 @@ public sealed class ConfigSnapshotService
     public async Task<IReadOnlyList<GatewayModelSourceResponse>> ListEnabledGatewayModelsAsync(CancellationToken cancellationToken = default)
     {
         await using var db = CreateContext();
+        await ConfigurationDatabase.InitializeAsync(db, cancellationToken);
         return await db.Models.AsNoTracking()
             .Where(model => model.Enabled && model.Provider.Enabled)
             .OrderBy(model => model.Provider.SortOrder)
@@ -127,14 +143,22 @@ public sealed class ConfigSnapshotService
 
     private async Task<TResult> ExecuteManagementAsync<TResult>(Func<ConfigurationManagementService, CancellationToken, Task<TResult>> operation, CancellationToken cancellationToken)
     {
-        await using var probe = CreateContext(CreateReadOnlyOptions());
-        await EnsureDatabaseReadyForReadAsync(probe, cancellationToken);
-        using var initializationLock = ConfigurationDatabase.AcquireInitializationLock();
-        await using var db = CreateContext();
-        var provider = new DatabaseConfigurationProvider(db, CreateProviderLogger());
-        await provider.ReloadAsync(cancellationToken);
-        var service = new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider);
-        return await operation(service, cancellationToken);
+        await using (var initDb = CreateContext())
+            await ConfigurationDatabase.InitializeAsync(initDb, cancellationToken);
+        var initializationLock = ConfigurationDatabase.AcquireInitializationLock();
+        try
+        {
+            await using var db = CreateContext();
+            var provider = new DatabaseConfigurationProvider(db, CreateProviderLogger());
+            await provider.ReloadAsync(cancellationToken);
+            var service = new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider);
+            var result = await operation(service, cancellationToken);
+            return result;
+        }
+        finally
+        {
+            initializationLock.Dispose();
+        }
     }
 
     private ConfigurationDbContext CreateContext(DbContextOptions<ConfigurationDbContext>? options = null) => new(options ?? CreateOptions());

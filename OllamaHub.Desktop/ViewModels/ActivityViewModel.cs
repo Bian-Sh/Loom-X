@@ -9,10 +9,10 @@ namespace OllamaHub.Desktop.ViewModels;
 
 public sealed class ActivityViewModel : NotifyViewModel, IDisposable
 {
-    private readonly ActivityQueryService queryService = new();
-    private readonly GatewayProcessService gatewayService;
+    private readonly AppDataStore dataStore;
     private readonly ILogger<ActivityViewModel> logger;
-    private readonly EventHandler<ActivityEventInput> activityHandler;
+    private readonly EventHandler storeActivityHandler;
+    private CancellationTokenSource? refreshCancellation;
     private string searchText = string.Empty;
     private string selectedStatus = "全部状态";
     private string selectedProtocol = "全部入口协议";
@@ -23,13 +23,19 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     private int failureCount;
     private string p95Latency = "—";
     private bool isRefreshing;
+    private bool isLoadingMore;
+    private bool isHistoryMode;
+    private bool hasMore;
+    private int pendingActivityCount;
+    private double pullDistance;
+    private int refreshVersion;
 
     public ObservableCollection<ActivityItemViewModel> Items { get; } = [];
     public IReadOnlyList<string> StatusOptions { get; } = ["全部状态", "成功", "失败", "警告"];
     public IReadOnlyList<string> ProtocolOptions { get; } = ["全部入口协议", "OpenAI", "Anthropic", "Ollama"];
-    public string SearchText { get => searchText; set { if (SetProperty(ref searchText, value ?? string.Empty)) _ = RefreshAsync(); } }
-    public string SelectedStatus { get => selectedStatus; set { if (SetProperty(ref selectedStatus, value ?? "全部状态")) _ = RefreshAsync(); } }
-    public string SelectedProtocol { get => selectedProtocol; set { if (SetProperty(ref selectedProtocol, value ?? "全部入口协议")) _ = RefreshAsync(); } }
+    public string SearchText { get => searchText; set { if (SetProperty(ref searchText, value ?? string.Empty)) QueueRefresh(); } }
+    public string SelectedStatus { get => selectedStatus; set { if (SetProperty(ref selectedStatus, value ?? "全部状态")) QueueRefresh(); } }
+    public string SelectedProtocol { get => selectedProtocol; set { if (SetProperty(ref selectedProtocol, value ?? "全部入口协议")) QueueRefresh(); } }
     public ActivityItemViewModel? SelectedItem { get => selectedItem; private set => SetProperty(ref selectedItem, value); }
     public string Status { get => status; private set => SetProperty(ref status, value); }
     public string ResultCountLabel => $"显示 {Items.Count} 条活动";
@@ -37,38 +43,136 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     public int ConversionCount { get => conversionCount; private set => SetProperty(ref conversionCount, value); }
     public int FailureCount { get => failureCount; private set => SetProperty(ref failureCount, value); }
     public string P95Latency { get => p95Latency; private set => SetProperty(ref p95Latency, value); }
+    public bool IsRefreshing { get => isRefreshing; private set => SetProperty(ref isRefreshing, value); }
+    public bool IsLoadingMore { get => isLoadingMore; private set => SetProperty(ref isLoadingMore, value); }
+    public bool IsHistoryMode { get => isHistoryMode; private set { if (SetProperty(ref isHistoryMode, value)) OnPropertyChanged(nameof(IsLatestMode)); } }
+    public bool IsLatestMode => !IsHistoryMode;
+    public bool HasMore { get => hasMore; private set => SetProperty(ref hasMore, value); }
+    public int PendingActivityCount { get => pendingActivityCount; private set { if (SetProperty(ref pendingActivityCount, value)) { OnPropertyChanged(nameof(HasPendingActivities)); OnPropertyChanged(nameof(PendingActivityLabel)); } } }
+    public bool HasPendingActivities => PendingActivityCount > 0;
+    public string PendingActivityLabel => PendingActivityCount > 0 ? $"有 {PendingActivityCount} 条新活动，回到最新" : "回到最新";
+    public double PullDistance { get => pullDistance; private set { if (SetProperty(ref pullDistance, value)) OnPropertyChanged(nameof(IsPullToRefreshVisible)); } }
+    public bool IsPullToRefreshVisible => PullDistance >= 24 || IsLoadingMore;
+    public string LoadMoreLabel => IsLoadingMore ? "正在加载历史活动…" : HasMore ? "继续上拉加载更早活动" : "已到活动历史末尾";
     public ICommand SelectCommand { get; }
+    public ICommand LoadMoreCommand { get; }
+    public ICommand ReturnToLatestCommand { get; }
 
-    public ActivityViewModel(GatewayProcessService gatewayService, ILogger<ActivityViewModel>? logger = null)
+    public ActivityViewModel(AppDataStore dataStore, ILogger<ActivityViewModel>? logger = null)
     {
-        this.gatewayService = gatewayService;
+        this.dataStore = dataStore;
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ActivityViewModel>.Instance;
         SelectCommand = new AsyncCommand(parameter => { SelectedItem = parameter as ActivityItemViewModel; return Task.CompletedTask; });
-        activityHandler = (_, input) => Dispatcher.UIThread.Post(() => AddPushedActivity(input));
-        gatewayService.ActivityEnqueued += activityHandler;
+        LoadMoreCommand = new AsyncCommand(_ => LoadMoreAsync());
+        ReturnToLatestCommand = new AsyncCommand(_ => ReturnToLatestAsync());
+        storeActivityHandler = (_, _) => OnStoreActivityChanged();
+        dataStore.ActivityWindowChanged += storeActivityHandler;
         _ = RefreshAsync();
     }
 
-    private async Task RefreshAsync()
+    public ActivityViewModel(GatewayProcessService gatewayService, ILogger<ActivityViewModel>? logger = null)
+        : this(new AppDataStore(new ConfigSnapshotService(), gatewayService), logger) { }
+
+    private void QueueRefresh()
     {
-        if (isRefreshing) return;
-        isRefreshing = true;
+        refreshCancellation?.Cancel();
+        refreshCancellation?.Dispose();
+        refreshCancellation = new CancellationTokenSource();
+        _ = RefreshAsync(refreshCancellation.Token);
+    }
+
+    private async Task RefreshAsync(CancellationToken cancellationToken = default)
+    {
+        var version = Interlocked.Increment(ref refreshVersion);
+        IsRefreshing = true;
         try
         {
-            var selectedId = SelectedItem?.Id;
-            var records = await queryService.QueryAsync(new ActivityQuery(SearchText, ToStatusValue(SelectedStatus), ToProtocolValue(SelectedProtocol)));
-            Items.Clear();
-            foreach (var record in records) Items.Add(ActivityItemViewModel.FromRecord(record));
-            SelectedItem = Items.FirstOrDefault(item => item.Id == selectedId) ?? Items.FirstOrDefault();
-            UpdateSummary(records);
-            Status = records.Count == 0 ? "暂无请求活动" : $"已加载 {records.Count} 条活动";
+            var page = await dataStore.LoadActivityPageAsync(BuildQuery(), cancellationToken);
+            ApplyPage(page);
+            Status = page.Items.Count == 0 ? "暂无请求活动" : $"已加载 {page.Items.Count} 条活动";
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)
         {
             Status = $"活动加载失败：{exception.Message}";
             logger.LogError(exception, "活动加载失败");
         }
-        finally { isRefreshing = false; }
+        finally
+        {
+            if (version == refreshVersion) IsRefreshing = false;
+        }
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        if (IsLoadingMore || !HasMore || IsRefreshing) return;
+        IsLoadingMore = true;
+        try
+        {
+            var page = await dataStore.LoadOlderActivityPageAsync(BuildQuery());
+            IsHistoryMode = true;
+            ApplyPage(page);
+            Status = page.HasMore ? $"已加载 {page.Items.Count} 条活动，可继续查看历史" : $"已加载 {page.Items.Count} 条活动，已到历史末尾";
+        }
+        catch (Exception exception)
+        {
+            Status = $"历史活动加载失败：{exception.Message}";
+            logger.LogError(exception, "历史活动分页失败");
+        }
+        finally
+        {
+            IsLoadingMore = false;
+            OnPropertyChanged(nameof(LoadMoreLabel));
+        }
+    }
+
+    private async Task ReturnToLatestAsync()
+    {
+        try
+        {
+            var page = await dataStore.ReturnToLatestAsync(BuildQuery());
+            IsHistoryMode = false;
+            ApplyPage(page);
+            Status = page.Items.Count == 0 ? "暂无请求活动" : "已回到最新活动";
+        }
+        catch (Exception exception)
+        {
+            Status = $"返回最新活动失败：{exception.Message}";
+            logger.LogError(exception, "返回最新活动失败");
+        }
+    }
+
+    public void NotifyScrollMetrics(double offsetY, double extentHeight, double viewportHeight)
+    {
+        var distanceToBottom = extentHeight - viewportHeight - offsetY;
+        PullDistance = Math.Clamp(Math.Max(0, 80 - distanceToBottom), 0, 80);
+        if (distanceToBottom <= 1 && HasMore && !IsLoadingMore && !IsRefreshing)
+            LoadMoreCommand.Execute(null);
+    }
+
+    private ActivityQuery BuildQuery() => new(SearchText, ToStatusValue(SelectedStatus), ToProtocolValue(SelectedProtocol), AppDataStore.ActivityWindowLimit);
+
+    private void ApplyPage(ActivityPage page)
+    {
+        var selectedId = SelectedItem?.Id;
+        Items.Clear();
+        foreach (var record in page.Items) Items.Add(ActivityItemViewModel.FromRecord(record));
+        SelectedItem = selectedId.HasValue ? Items.FirstOrDefault(item => item.Id == selectedId.Value) : null;
+        HasMore = page.HasMore;
+        PendingActivityCount = dataStore.PendingActivityCount;
+        UpdateSummary(page.Items);
+        OnPropertyChanged(nameof(ResultCountLabel));
+        OnPropertyChanged(nameof(LoadMoreLabel));
+    }
+
+    private void OnStoreActivityChanged()
+    {
+        void Apply()
+        {
+            ApplyPage(new ActivityPage(dataStore.ActivityWindow, null, dataStore.ActivityHasMore));
+            IsHistoryMode = dataStore.ActivityHistoryMode;
+        }
+        if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
     }
 
     private void UpdateSummary(IReadOnlyList<ActivityEventRecord> records)
@@ -78,53 +182,16 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
         FailureCount = records.Count(item => item.StatusCode >= 500);
         var values = records.Select(item => item.ElapsedMs).OrderBy(item => item).ToArray();
         P95Latency = values.Length == 0 ? "—" : $"{values[(int)Math.Ceiling(values.Length * .95) - 1]} ms";
-        OnPropertyChanged(nameof(ResultCountLabel));
     }
 
     private static string? ToStatusValue(string value) => value switch { "成功" => "ok", "失败" => "fail", "警告" => "warn", _ => null };
     private static string? ToProtocolValue(string value) => value is "全部入口协议" ? null : value;
 
-    private void AddPushedActivity(ActivityEventInput input)
-    {
-        var item = ActivityItemViewModel.FromInput(input);
-        if (!MatchesFilters(item)) return;
-        Items.Insert(0, item);
-        while (Items.Count > 500) Items.RemoveAt(Items.Count - 1);
-        UpdateSummaryFromItems();
-        Status = $"已收到新请求 · {Items.Count} 条活动";
-    }
-
-    private bool MatchesFilters(ActivityItemViewModel item)
-    {
-        var statusMatches = SelectedStatus switch
-        {
-            "成功" => item.StatusLabel == "成功",
-            "失败" => item.StatusLabel == "失败",
-            "警告" => item.StatusLabel == "警告",
-            _ => true
-        };
-        if (!statusMatches || (SelectedProtocol is not "全部入口协议" && item.Protocol != SelectedProtocol)) return false;
-        if (string.IsNullOrWhiteSpace(SearchText)) return true;
-        var search = SearchText.Trim();
-        return item.RequestId.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || item.ProviderId.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || item.ModelId.Contains(search, StringComparison.OrdinalIgnoreCase)
-            || item.Route.Contains(search, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private void UpdateSummaryFromItems()
-    {
-        TotalCount = Items.Count;
-        ConversionCount = Items.Count(item => item.Route.Contains('→'));
-        FailureCount = Items.Count(item => item.StatusCode >= 500);
-        var values = Items.Select(item => item.ElapsedMs).OrderBy(item => item).ToArray();
-        P95Latency = values.Length == 0 ? "—" : $"{values[(int)Math.Ceiling(values.Length * .95) - 1]} ms";
-        OnPropertyChanged(nameof(ResultCountLabel));
-    }
-
     public void Dispose()
     {
-        gatewayService.ActivityEnqueued -= activityHandler;
+        dataStore.ActivityWindowChanged -= storeActivityHandler;
+        refreshCancellation?.Cancel();
+        refreshCancellation?.Dispose();
     }
 }
 
@@ -169,5 +236,4 @@ public sealed class ActivityItemViewModel : NotifyViewModel
     public string ErrorType { get; }
     public string LogSummary { get; }
     public static ActivityItemViewModel FromRecord(ActivityEventRecord record) => new(record);
-    public static ActivityItemViewModel FromInput(ActivityEventInput input) => new(new ActivityEventRecord(0, input.CreatedAt, input.RequestId, input.Method, input.IncomingPath, input.Protocol, input.Route, input.ProviderId, input.ModelId, input.StatusCode, input.ElapsedMs, input.ResponseBytes, input.IsStreaming, input.ErrorType));
 }

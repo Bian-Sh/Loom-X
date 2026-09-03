@@ -17,16 +17,17 @@
     <Grid Grid.Row="1" ColumnDefinitions="1.45*,0.75*" ColumnSpacing="14" MinHeight="420">
       <Border Grid.Column="0" Classes="panel">
         <Grid RowDefinitions="Auto,*">
-          <Grid Row="0" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="10">
+          <Grid Row="0" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8" Margin="10">
             <TextBox Classes="filter" Watermark="搜索模型、Provider 或 request ID" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
             <ComboBox Grid.Column="1" Classes="filter" ItemsSource="{Binding StatusOptions}" SelectedItem="{Binding SelectedStatus}"/>
             <ComboBox Grid.Column="2" Classes="filter" ItemsSource="{Binding ProtocolOptions}" SelectedItem="{Binding SelectedProtocol}"/>
+            <Button Grid.Column="3" Classes="outline" Content="{Binding PendingActivityLabel}" Command="{Binding ReturnToLatestCommand}" IsVisible="{Binding IsHistoryMode}"/>
           </Grid>
-          <Grid Grid.Row="1" RowDefinitions="Auto,*">
+          <Grid Grid.Row="1" RowDefinitions="Auto,*,Auto">
             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,1" Padding="12,9">
               <Grid ColumnDefinitions="100,1.15*,1.2*,90,76" ColumnSpacing="8"><TextBlock Text="时间 / request ID" Opacity="0.56" FontSize="10"/><TextBlock Grid.Column="1" Text="模型 / Provider" Opacity="0.56" FontSize="10"/><TextBlock Grid.Column="2" Text="入口与转换路径" Opacity="0.56" FontSize="10"/><TextBlock Grid.Column="3" Text="状态" Opacity="0.56" FontSize="10"/><TextBlock Grid.Column="4" Text="延迟" Opacity="0.56" FontSize="10"/></Grid>
             </Border>
-            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ScrollViewer x:Name="activityScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" ScrollChanged="ActivityScrollViewer_OnScrollChanged">
               <ItemsControl ItemsSource="{Binding Items}">
                 <ItemsControl.ItemContainerTheme>
                   <ControlTheme TargetType="ContentPresenter">
@@ -48,6 +49,12 @@
                 </DataTemplate></ItemsControl.ItemTemplate>
               </ItemsControl>
             </ScrollViewer>
+            <Border Grid.Row="2" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="10,7" IsVisible="{Binding IsPullToRefreshVisible}">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <ProgressBar IsIndeterminate="{Binding IsLoadingMore}" Width="16" Height="16" IsVisible="{Binding IsLoadingMore}"/>
+                <TextBlock Grid.Column="1" Text="{Binding LoadMoreLabel}" Opacity="0.66" FontSize="10" VerticalAlignment="Center"/>
+              </Grid>
+            </Border>
           </Grid>
         </Grid>
       </Border>

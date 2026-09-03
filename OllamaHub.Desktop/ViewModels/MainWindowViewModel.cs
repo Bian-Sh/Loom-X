@@ -18,11 +18,15 @@ namespace OllamaHub.Desktop.ViewModels;
 public sealed class MainWindowViewModel : NotifyViewModel
 {
     private readonly GatewayProcessService gatewayService;
+    private readonly AppDataStore dataStore;
     private readonly ToastService toastService;
     private readonly ILoggerFactory loggerFactory;
-    private readonly ConfigSnapshotService configService;
     private readonly ConsoleViewModel consoleViewModel;
     private readonly SettingsViewModel settingsViewModel;
+    private readonly OverviewViewModel overviewViewModel;
+    private readonly ProvidersViewModel providersViewModel;
+    private readonly GatewayViewModel gatewayViewModel;
+    private readonly ActivityViewModel activityViewModel;
     private readonly Action<bool, int, int, string>? applyAppearance;
     private object currentView = new PlaceholderViewModel("加载中", "正在加载桌面控制中心。");
     private string pageTitle = "概览";
@@ -33,15 +37,20 @@ public sealed class MainWindowViewModel : NotifyViewModel
     public string PageTitle { get => pageTitle; private set => SetProperty(ref pageTitle, value); }
     public string PageDescription { get => pageDescription; private set => SetProperty(ref pageDescription, value); }
 
-    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null, Action<bool, int, int, string>? applyAppearance = null)
+    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null, Action<bool, int, int, string>? applyAppearance = null, AppDataStore? dataStore = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
         this.loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
-        this.configService = configService ?? new ConfigSnapshotService(this.loggerFactory.CreateLogger<ConfigSnapshotService>());
+        var ownedConfigService = configService ?? new ConfigSnapshotService(this.loggerFactory.CreateLogger<ConfigSnapshotService>());
+        this.dataStore = dataStore ?? new AppDataStore(ownedConfigService, gatewayService, this.loggerFactory.CreateLogger<AppDataStore>());
         this.applyAppearance = applyAppearance;
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService);
-        settingsViewModel = new SettingsViewModel(configService: this.configService, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance);
+        overviewViewModel = new OverviewViewModel(gatewayService, this.dataStore, this.loggerFactory.CreateLogger<MainWindowViewModel>());
+        providersViewModel = new ProvidersViewModel(this.dataStore, this.toastService, this.loggerFactory.CreateLogger<ProvidersViewModel>());
+        gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
+        activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
+        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance);
         NavigationItems = new([
             new("概览", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
             new("网关", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
@@ -50,7 +59,9 @@ public sealed class MainWindowViewModel : NotifyViewModel
             new("控制台", "M 5,6 L 27,6 L 27,26 L 5,26 Z M 9,12 L 13,16 L 9,20 M 16,20 L 23,20", () => ShowConsole()),
             new("设置", "M 16,4 L 18,7 L 22,8 L 25,6 L 28,9 L 26,12 L 27,16 L 30,18 L 28,22 L 24,21 L 21,24 L 21,28 L 16,29 L 14,25 L 10,24 L 7,26 L 4,22 L 6,19 L 5,15 L 2,13 L 4,8 L 8,9 L 11,6 L 11,3 Z M 16,12 A 4,4 0 1,0 16,20 A 4,4 0 1,0 16,12 Z", () => ShowSettings())
         ]);
-        ShowOverview();
+        this.dataStore.ConfigurationReady += OnConfigurationReady;
+        this.dataStore.ConfigurationChanged += OnConfigurationChanged;
+        _ = InitializeDataStoreAsync();
     }
 
     private void SetActive(string title)
@@ -58,13 +69,58 @@ public sealed class MainWindowViewModel : NotifyViewModel
         foreach (var item in NavigationItems) item.IsActive = item.Title == title;
     }
 
-    private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = new OverviewViewModel(gatewayService, configService, loggerFactory.CreateLogger<MainWindowViewModel>()); }
-    private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = new ProvidersViewModel(configService, toastService, loggerFactory.CreateLogger<ProvidersViewModel>()); }
-    private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = new GatewayViewModel(configService, toastService); }
+    private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = overviewViewModel; }
+    private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = providersViewModel; }
+    private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = gatewayViewModel; }
     private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = consoleViewModel; }
-    private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = new ActivityViewModel(gatewayService, loggerFactory.CreateLogger<ActivityViewModel>()); }
+    private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = activityViewModel; }
     private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 OllamaHub 的显示、连接、更新与隐私偏好。"; CurrentView = settingsViewModel; }
     private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
+
+    private void OnConfigurationReady(object? sender, EventArgs args)
+    {
+        void Apply()
+        {
+            ShowOverview();
+            if (dataStore.Settings is { } settings)
+                applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
+        }
+        if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
+    }
+
+    private async Task InitializeDataStoreAsync()
+    {
+        try { await dataStore.InitializeAsync(); }
+        catch (Exception exception)
+        {
+            var description = $"数据中心加载失败：{exception.Message}，请通过页面刷新重试。";
+            if (Dispatcher.UIThread.CheckAccess()) ShowPlaceholder("加载失败", description);
+            else Dispatcher.UIThread.Post(() => ShowPlaceholder("加载失败", description));
+        }
+    }
+
+    private void OnConfigurationChanged(object? sender, EventArgs args)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (dataStore.Settings is { } settings)
+                applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
+        });
+    }
+
+    public void Dispose()
+    {
+        dataStore.ConfigurationReady -= OnConfigurationReady;
+        dataStore.ConfigurationChanged -= OnConfigurationChanged;
+        overviewViewModel.Dispose();
+        providersViewModel.Dispose();
+        gatewayViewModel.Dispose();
+        activityViewModel.Dispose();
+        settingsViewModel.Dispose();
+        consoleViewModel.Dispose();
+        dataStore.Dispose();
+    }
 }
 
 public sealed class NavigationItemViewModel : NotifyViewModel
@@ -80,9 +136,9 @@ public sealed class NavigationItemViewModel : NotifyViewModel
 
 public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 {
+    // ActivityQueryService 由 AppDataStore 统一持有，概览只读取数据中心提供的最近活动结果。
     private readonly GatewayProcessService gatewayService;
-    private readonly ConfigSnapshotService configService;
-    private readonly ActivityQueryService activityQueryService = new();
+    private readonly AppDataStore dataStore;
     private readonly ILogger<MainWindowViewModel>? logger;
     private string gatewayStatus = "未运行";
     private string endpoint = "未配置";
@@ -126,18 +182,22 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public ICommand StopCommand { get; }
     public ICommand RefreshCommand { get; }
 
-    public OverviewViewModel(GatewayProcessService gatewayService, ConfigSnapshotService configService, ILogger<MainWindowViewModel>? logger = null)
+    public OverviewViewModel(GatewayProcessService gatewayService, AppDataStore dataStore, ILogger<MainWindowViewModel>? logger = null)
     {
         this.gatewayService = gatewayService;
-        this.configService = configService;
+        this.dataStore = dataStore;
         this.logger = logger;
         StartCommand = new AsyncCommand(StartAsync);
         StopCommand = new AsyncCommand(StopAsync);
         RefreshCommand = new AsyncCommand(RefreshAsync);
         gatewayService.StateChanged += OnGatewayStateChanged;
         gatewayService.TelemetryPublished += OnTelemetryPublished;
+        dataStore.ConfigurationChanged += OnConfigurationChanged;
         _ = RefreshAsync();
     }
+
+    public OverviewViewModel(GatewayProcessService gatewayService, ConfigSnapshotService configService, ILogger<MainWindowViewModel>? logger = null)
+        : this(gatewayService, new AppDataStore(configService, gatewayService), logger) { }
 
     private async Task StartAsync()
     {
@@ -156,7 +216,8 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     {
         try
         {
-            var config = configService.Load();
+            await dataStore.InitializeAsync();
+            var config = dataStore.CurrentConfig;
             Endpoint = config.Server.Urls.Count > 0 ? config.Server.Urls[0] : "http://127.0.0.1:11434";
             ProviderCount = config.Providers.Count;
             ModelCount = config.Models.Count;
@@ -187,8 +248,8 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     {
         try
         {
-            var records = await activityQueryService.QueryAsync(new ActivityQuery(Limit: 8));
-            await Dispatcher.UIThread.InvokeAsync(() => MergeRecentRequests(records.Select(OverviewRecentRequestViewModel.From)));
+            var records = await dataStore.QueryRecentActivitiesAsync(new ActivityQuery(Limit: 8));
+            await Dispatcher.UIThread.InvokeAsync(() => MergeRecentRequests(records.Items.Take(8).Select(OverviewRecentRequestViewModel.From)));
             logger?.LogInformation("概览最近请求回填完成 {RequestCount} 条", RecentRequests.Count);
         }
         catch (Exception exception)
@@ -224,9 +285,11 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 
     private string LoadEndpoint()
     {
-        var config = configService.Load();
+        var config = dataStore.CurrentConfig;
         return config.Server.Urls.Count > 0 ? config.Server.Urls[0] : "http://127.0.0.1:11434";
     }
+
+    private void OnConfigurationChanged(object? sender, EventArgs args) => _ = RefreshAsync();
 
     private void OnGatewayStateChanged(object? sender, EventArgs args) => _ = RefreshAsync();
 
@@ -297,6 +360,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     {
         gatewayService.StateChanged -= OnGatewayStateChanged;
         gatewayService.TelemetryPublished -= OnTelemetryPublished;
+        dataStore.ConfigurationChanged -= OnConfigurationChanged;
         activeRequests.Clear();
         requestEdges.Clear();
         activeEdgeCounts.Clear();
@@ -383,9 +447,9 @@ public sealed class OverviewRecentRequestViewModel
         .ToArray();
 }
 
-public sealed class ProvidersViewModel : NotifyViewModel
+public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 {
-    private readonly ConfigSnapshotService configService;
+    private readonly AppDataStore dataStore;
     private readonly ToastService toastService;
     private readonly ILogger<ProvidersViewModel>? logger;
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
@@ -459,13 +523,17 @@ public sealed class ProvidersViewModel : NotifyViewModel
     public ICommand TestConnectionCommand { get; }
     public ICommand SyncModelsCommand { get; }
 
-    public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null)
+    public ProvidersViewModel(AppDataStore dataStore, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null)
     {
-        this.configService = configService;
+        this.dataStore = dataStore;
         this.toastService = toastService ?? new ToastService();
         this.logger = logger;
+        dataStore.ConfigurationChanged += OnConfigurationChanged;
         RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(DeleteModelAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
     }
+
+    public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null)
+        : this(new AppDataStore(configService, new GatewayProcessService()), toastService, logger) { }
 
     private async Task RefreshAsync()
     {
@@ -475,7 +543,8 @@ public sealed class ProvidersViewModel : NotifyViewModel
             var selectedId = SelectedProvider?.Id;
             suppressSelectionInvariant = true;
             Providers.Clear();
-            foreach (var provider in await configService.ListProvidersAsync()) Providers.Add(ProviderEditorViewModel.FromResponse(provider));
+            await dataStore.InitializeAsync();
+            foreach (var provider in dataStore.Providers) Providers.Add(ProviderEditorViewModel.FromResponse(provider));
             suppressSelectionInvariant = false;
             SelectedProvider = Providers.FirstOrDefault(provider => provider.Id == selectedId) ?? Providers.FirstOrDefault();
             OnPropertyChanged(nameof(HasNoSelectedProvider));
@@ -484,6 +553,19 @@ public sealed class ProvidersViewModel : NotifyViewModel
             logger?.LogInformation("Provider 页面刷新完成，Provider {ProviderCount}，模型 {ModelCount}，启用 Provider {EnabledProviderCount}，健康 Provider {HealthyProviderCount}", Providers.Count, TotalModelCount, EnabledProviderCount, HealthyProviderCount);
         }
         catch (Exception exception) { suppressSelectionInvariant = false; logger?.LogError(exception, "Provider 页面刷新失败"); Status = $"加载失败：{exception.Message}"; }
+    }
+
+    private void OnConfigurationChanged(object? sender, EventArgs args) => _ = RefreshAsync();
+
+    public void Dispose()
+    {
+        dataStore.ConfigurationChanged -= OnConfigurationChanged;
+        autoSaveCancellation?.Cancel();
+        connectionCancellation?.Cancel();
+        modelSyncCancellation?.Cancel();
+        modelSyncAnimationTimer?.Stop();
+        modelSyncAnimationTimer = null;
+        httpClient.Dispose();
     }
 
     private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = "新 Provider", ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); Status = "正在编辑新 Provider"; }
@@ -495,7 +577,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
         try
         {
             var input = provider.ToInput();
-            var response = provider.Id == Guid.Empty ? await configService.CreateProviderAsync(input) : await configService.UpdateProviderAsync(provider.Id, input);
+            var response = provider.Id == Guid.Empty ? await dataStore.CreateProviderAsync(input) : await dataStore.UpdateProviderAsync(provider.Id, input);
             suppressAutoSave = true;
             provider.ApplyResponse(response);
             suppressAutoSave = false;
@@ -519,7 +601,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
     {
         provider ??= SelectedProvider;
         if (provider is null) return;
-        try { if (provider.Id != Guid.Empty) await configService.DeleteProviderAsync(provider.Id); Providers.Remove(provider); if (ReferenceEquals(SelectedProvider, provider)) SelectedProvider = Providers.FirstOrDefault(); UpdateSummary(); Status = "Provider 已删除"; }
+        try { if (provider.Id != Guid.Empty) await dataStore.DeleteProviderAsync(provider.Id); Providers.Remove(provider); if (ReferenceEquals(SelectedProvider, provider)) SelectedProvider = Providers.FirstOrDefault(); UpdateSummary(); Status = "Provider 已删除"; }
         catch (Exception exception) { Status = $"删除失败：{exception.Message}"; }
     }
 
@@ -528,14 +610,14 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private async Task SaveModelAsync()
     {
         if (SelectedProvider is null || SelectedModel is null) return;
-        try { var input = SelectedModel.ToInput(); var response = SelectedModel.Id == Guid.Empty ? await configService.CreateModelAsync(SelectedProvider.Id, input) : await configService.UpdateModelAsync(SelectedModel.Id, input); var index = SelectedProvider.Models.IndexOf(SelectedModel); var updated = ModelEditorViewModel.FromResponse(response); if (index < 0) SelectedProvider.Models.Add(updated); else SelectedProvider.Models[index] = updated; SelectedModel = updated; Status = "模型已保存"; }
+        try { var input = SelectedModel.ToInput(); var response = SelectedModel.Id == Guid.Empty ? await dataStore.CreateModelAsync(SelectedProvider.Id, input) : await dataStore.UpdateModelAsync(SelectedModel.Id, input); var index = SelectedProvider.Models.IndexOf(SelectedModel); var updated = ModelEditorViewModel.FromResponse(response); if (index < 0) SelectedProvider.Models.Add(updated); else SelectedProvider.Models[index] = updated; SelectedModel = updated; Status = "模型已保存"; }
         catch (Exception exception) { Status = $"模型保存失败：{exception.Message}"; }
     }
 
     private async Task DeleteModelAsync()
     {
         if (SelectedModel is null) return;
-        try { if (SelectedModel.Id != Guid.Empty) await configService.DeleteModelAsync(SelectedModel.Id); SelectedProvider?.Models.Remove(SelectedModel); SelectedModel = null; Status = "模型已删除"; }
+        try { if (SelectedModel.Id != Guid.Empty) await dataStore.DeleteModelAsync(SelectedModel.Id); SelectedProvider?.Models.Remove(SelectedModel); SelectedModel = null; Status = "模型已删除"; }
         catch (Exception exception) { Status = $"模型删除失败：{exception.Message}"; }
     }
 
@@ -619,7 +701,7 @@ public sealed class ProvidersViewModel : NotifyViewModel
             foreach (var name in names)
             {
                 if (existing.ContainsKey(name)) continue;
-                var created = await configService.CreateModelAsync(provider.Id, new ModelInput(name, name, null, "unknown", null, provider.ApiMode, 128000, 4096, false, null, null, true, null, false, null, null), token);
+                var created = await dataStore.CreateModelAsync(provider.Id, new ModelInput(name, name, null, "unknown", null, provider.ApiMode, 128000, 4096, false, null, null, true, null, false, null, null), token);
                 provider.Models.Add(ModelEditorViewModel.FromResponse(created));
                 added++;
             }

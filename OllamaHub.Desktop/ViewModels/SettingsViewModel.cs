@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
 using System.Windows.Input;
+using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OllamaHub;
@@ -16,10 +17,10 @@ public sealed record SettingOption(string Value, string DisplayName)
     public override string ToString() => DisplayName;
 }
 
-public sealed class SettingsViewModel : NotifyViewModel
+public sealed class SettingsViewModel : NotifyViewModel, IDisposable
 {
     private const string AcrylicTransparencyAlgorithm = "acrylic";
-    private readonly ConfigSnapshotService configService;
+    private readonly AppDataStore dataStore;
     private readonly ToastService toastService;
     private readonly ILogger<SettingsViewModel> logger;
     private readonly Action<bool, int, int, string>? applyAppearance;
@@ -100,9 +101,9 @@ public sealed class SettingsViewModel : NotifyViewModel
     public ICommand ClearLogsCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
 
-    public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null)
+    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null)
     {
-        this.configService = configService;
+        this.dataStore = dataStore;
         this.logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         this.toastService = toastService ?? new ToastService();
         this.applyAppearance = applyAppearance;
@@ -112,8 +113,12 @@ public sealed class SettingsViewModel : NotifyViewModel
         OpenDataDirectoryCommand = new AsyncCommand(OpenDataDirectoryAsync);
         ClearLogsCommand = new AsyncCommand(ClearLogsAsync);
         ExportDiagnosticsCommand = new AsyncCommand(ExportDiagnosticsAsync);
+        dataStore.ConfigurationChanged += OnConfigurationChanged;
         _ = LoadAsync();
     }
+
+    public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null)
+        : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance) { }
 
     private async Task LoadAsync()
     {
@@ -123,7 +128,8 @@ public sealed class SettingsViewModel : NotifyViewModel
         try
         {
             suppressAutoSave = true;
-            var settings = await configService.GetSettingsAsync();
+            await dataStore.InitializeAsync();
+            var settings = dataStore.Settings ?? throw new InvalidOperationException("设置快照尚未就绪。");
             SelectedLanguage = FindOption(LanguageOptions, settings.Language, LanguageOptions[0]);
             SelectedTheme = FindOption(ThemeOptions, settings.Theme, ThemeOptions[0]);
             SelectedProxyMode = FindOption(ProxyModeOptions, settings.ProxyMode, ProxyModeOptions[0]);
@@ -177,7 +183,7 @@ public sealed class SettingsViewModel : NotifyViewModel
                 TransparencyOpacity,
                 BlurAmount,
                 AcrylicTransparencyAlgorithm);
-            var response = await configService.UpdateSettingsAsync(input, cancellationToken);
+            var response = await dataStore.UpdateSettingsAsync(input, cancellationToken);
             HasProxyPassword = response.HasProxyPassword;
             ProxyPassword = "";
             ClearProxyPassword = false;
@@ -294,4 +300,18 @@ public sealed class SettingsViewModel : NotifyViewModel
     private static SettingOption FindOption(IReadOnlyList<SettingOption> options, string? value, SettingOption fallback) => options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)) ?? fallback;
 
     private void ApplyAppearancePreview() => applyAppearance?.Invoke(TransparencyEnabled, TransparencyOpacity, BlurAmount, AcrylicTransparencyAlgorithm);
+
+    private void OnConfigurationChanged(object? sender, EventArgs args)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) _ = LoadAsync();
+        else Dispatcher.UIThread.Post(() => _ = LoadAsync());
+    }
+
+    public void Dispose()
+    {
+        dataStore.ConfigurationChanged -= OnConfigurationChanged;
+        autoSaveCancellation?.Cancel();
+        autoSaveCancellation?.Dispose();
+        httpClient.Dispose();
+    }
 }

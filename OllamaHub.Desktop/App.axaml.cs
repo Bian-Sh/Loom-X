@@ -17,6 +17,7 @@ public partial class App : Application
     private const string ShellBootstrapMutexName = @"Local\OllamaHub.Desktop.ShellBootstrap";
     private const string SelfLaunchArgument = "--ollamahub-child";
     private GatewayProcessService? gatewayService;
+    private AppDataStore? dataStore;
     private ILoggerFactory? loggerFactory;
     private Mutex? singleInstanceMutex;
     private Mutex? shellBootstrapMutex;
@@ -95,20 +96,18 @@ public partial class App : Application
                 startupLogger.LogWarning("调试启动已允许多个桌面实例，进程 {ProcessId}", Environment.ProcessId);
             startupLogger.LogInformation("桌面应用启动，进程 {ProcessId}，用户 {UserName}，进程路径 {ProcessPath}，基目录 {BaseDirectory}，启动工作目录 {LauncherWorkingDirectory}，规范化工作目录 {CurrentDirectory}", Environment.ProcessId, Environment.UserName, Environment.ProcessPath, AppContext.BaseDirectory, launcherWorkingDirectory, Environment.CurrentDirectory);
             var configService = new ConfigSnapshotService(loggerFactory.CreateLogger<ConfigSnapshotService>());
-            var initialSettings = configService.Load();
-            startupLogger.LogInformation("桌面应用初始配置读取完成，Provider {ProviderCount}，模型 {ModelCount}，Endpoint {EndpointCount}", initialSettings.Providers.Count, initialSettings.Models.Count, initialSettings.GatewayEndpoints.Count);
-            var startupProviders = configService.ListProvidersAsync().GetAwaiter().GetResult();
-            startupLogger.LogInformation("桌面应用启动 Provider 只读探针完成，返回 Provider {ProviderCount}，模型 {ModelCount}", startupProviders.Count, startupProviders.Sum(provider => provider.Models.Count));
-            LoggingBootstrap.SetIncludeStackTrace(initialSettings.Settings.LogStackTrace);
             gatewayService = new GatewayProcessService();
             var toastService = new ToastService();
+            dataStore = new AppDataStore(configService, gatewayService, loggerFactory.CreateLogger<AppDataStore>());
             var mainWindow = new MainWindow(toastService, loggerFactory.CreateLogger<MainWindow>());
-            mainWindow.ApplyAppearance(initialSettings.Settings.TransparencyEnabled, initialSettings.Settings.TransparencyOpacity, initialSettings.Settings.BlurAmount, initialSettings.Settings.TransparencyAlgorithm);
-            mainWindow.DataContext = new MainWindowViewModel(gatewayService, toastService, loggerFactory, configService, mainWindow.ApplyAppearance);
+            mainWindow.DataContext = new MainWindowViewModel(gatewayService, toastService, loggerFactory, configService, mainWindow.ApplyAppearance, dataStore);
             desktop.MainWindow = mainWindow;
             desktop.Exit += async (_, _) =>
             {
                 await gatewayService.StopAsync();
+                if (mainWindow.DataContext is MainWindowViewModel viewModel) viewModel.Dispose();
+                dataStore?.Dispose();
+                dataStore = null;
                 configService.Dispose();
                 loggerFactory?.Dispose();
                 singleInstanceMutex?.ReleaseMutex();

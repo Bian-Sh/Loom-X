@@ -5,9 +5,9 @@ using OllamaHub.Desktop.Services;
 
 namespace OllamaHub.Desktop.ViewModels;
 
-public sealed class GatewayViewModel : NotifyViewModel
+public sealed class GatewayViewModel : NotifyViewModel, IDisposable
 {
-    private readonly ConfigSnapshotService configService;
+    private readonly AppDataStore dataStore;
     private readonly ToastService toastService;
     private GatewayEndpointEditorViewModel? selectedEndpoint;
     private GatewayComboEditorViewModel? selectedCombo;
@@ -46,9 +46,9 @@ public sealed class GatewayViewModel : NotifyViewModel
     public ICommand ToggleRouteCommand { get; }
     public ICommand RemoveRouteCommand { get; }
 
-    public GatewayViewModel(ConfigSnapshotService configService, ToastService? toastService = null)
+    public GatewayViewModel(AppDataStore dataStore, ToastService? toastService = null)
     {
-        this.configService = configService;
+        this.dataStore = dataStore;
         this.toastService = toastService ?? new ToastService();
         AddComboCommand = new AsyncCommand(_ => AddComboAsync());
         ToggleEndpointCommand = new AsyncCommand(parameter => ToggleEndpointAsync(parameter as GatewayEndpointEditorViewModel));
@@ -56,8 +56,12 @@ public sealed class GatewayViewModel : NotifyViewModel
         RemoveComboCommand = new AsyncCommand(parameter => RemoveComboAsync(parameter as GatewayComboEditorViewModel));
         ToggleRouteCommand = new AsyncCommand(parameter => ToggleRouteAsync(parameter as GatewayRouteEditorViewModel));
         RemoveRouteCommand = new AsyncCommand(parameter => RemoveRouteAsync(parameter as GatewayRouteEditorViewModel));
+        dataStore.ConfigurationChanged += OnConfigurationChanged;
         _ = RefreshAsync();
     }
+
+    public GatewayViewModel(ConfigSnapshotService configService, ToastService? toastService = null)
+        : this(new AppDataStore(configService, new GatewayProcessService()), toastService) { }
 
     public void NotifyCopied() => toastService.Show("地址已复制", ToastLevel.Success);
     private async Task RefreshAsync()
@@ -65,10 +69,11 @@ public sealed class GatewayViewModel : NotifyViewModel
         try
         {
             var selectedKey = SelectedEndpoint?.Key;
-            var providers = await configService.ListProvidersAsync();
+            await dataStore.InitializeAsync();
+            var providers = dataStore.Providers;
             await ReloadAvailableModelsAsync();
-            var endpoints = await configService.ListGatewayEndpointsAsync();
-            var baseUrl = configService.Load().Server.Urls.FirstOrDefault() ?? "http://127.0.0.1:11434";
+            var endpoints = dataStore.GatewayEndpoints;
+            var baseUrl = dataStore.CurrentConfig.Server.Urls.FirstOrDefault() ?? "http://127.0.0.1:11434";
             Endpoints.Clear();
             foreach (var endpoint in endpoints) Endpoints.Add(GatewayEndpointEditorViewModel.FromResponse(endpoint, baseUrl));
             SelectedEndpoint = Endpoints.FirstOrDefault(item => item.Key == selectedKey) ?? Endpoints.FirstOrDefault();
@@ -78,6 +83,8 @@ public sealed class GatewayViewModel : NotifyViewModel
         catch (Exception exception) { Status = $"网关加载失败：{exception.Message}"; }
     }
 
+    private void OnConfigurationChanged(object? sender, EventArgs args) => _ = RefreshAsync();
+
     private async Task AddComboAsync()
     {
         if (SelectedEndpoint is null) return;
@@ -85,7 +92,7 @@ public sealed class GatewayViewModel : NotifyViewModel
         {
             var name = "新 Combo"; var index = 2;
             while (SelectedEndpoint.Combos.Any(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))) name = $"新 Combo {index++}";
-            var response = await configService.CreateGatewayComboAsync(SelectedEndpoint.Key, new GatewayComboInput(name, true, SelectedEndpoint.Combos.Count));
+            var response = await dataStore.CreateGatewayComboAsync(SelectedEndpoint.Key, new GatewayComboInput(name, true, SelectedEndpoint.Combos.Count));
             var combo = GatewayComboEditorViewModel.FromResponse(response); combo.IsExpanded = true;
             SelectedEndpoint.Combos.Add(combo); SelectedCombo = combo; Status = "Combo 模型已添加";
         }
@@ -95,7 +102,7 @@ public sealed class GatewayViewModel : NotifyViewModel
     public async Task SaveComboChangesAsync(GatewayComboEditorViewModel? combo)
     {
         if (combo is null) return;
-        try { combo.ApplyResponse(await configService.UpdateGatewayComboAsync(combo.Id, new GatewayComboInput(combo.Name, combo.Enabled, combo.SortOrder))); Status = "Combo 模型已保存"; }
+        try { combo.ApplyResponse(await dataStore.UpdateGatewayComboAsync(combo.Id, new GatewayComboInput(combo.Name, combo.Enabled, combo.SortOrder))); Status = "Combo 模型已保存"; }
         catch (Exception exception) { Status = $"保存 Combo 模型失败：{exception.Message}"; }
     }
     public void SelectCombo(GatewayComboEditorViewModel? combo) => SelectedCombo = combo;
@@ -196,14 +203,14 @@ public sealed class GatewayViewModel : NotifyViewModel
 
     private async Task ReloadAvailableModelsAsync()
     {
-        var models = await configService.ListEnabledGatewayModelsAsync();
+        var models = await dataStore.ListEnabledGatewayModelsAsync();
         AvailableModels.Clear();
         foreach (var model in models) AvailableModels.Add(new GatewayModelOption(model.Id, model.ModelName, model.ProviderName));
     }
     public async Task AddRouteAsync(GatewayModelOption? option)
     {
         if (SelectedCombo is null || option is null) return;
-        try { SelectedCombo.Routes.Add(GatewayRouteEditorViewModel.FromResponse(await configService.CreateGatewayRouteAsync(SelectedCombo.Id, new GatewayRouteInput(option.Id, true, SelectedCombo.Routes.Count)))); Status = "模型已加入 Combo"; }
+        try { SelectedCombo.Routes.Add(GatewayRouteEditorViewModel.FromResponse(await dataStore.CreateGatewayRouteAsync(SelectedCombo.Id, new GatewayRouteInput(option.Id, true, SelectedCombo.Routes.Count)))); Status = "模型已加入 Combo"; }
         catch (Exception exception) { Status = $"加入 Combo 失败：{exception.Message}"; }
     }
     public async Task ToggleModelRouteAsync(GatewayModelOption? option)
@@ -216,21 +223,21 @@ public sealed class GatewayViewModel : NotifyViewModel
     private async Task ToggleEndpointAsync(GatewayEndpointEditorViewModel? endpoint)
     {
         if (endpoint is null) return;
-        try { endpoint.Enabled = (await configService.SetGatewayEndpointEnabledAsync(endpoint.Key, !endpoint.Enabled)).Enabled; Status = $"{endpoint.DisplayName} 已{(endpoint.Enabled ? "启用" : "停用")}"; }
+        try { endpoint.Enabled = (await dataStore.SetGatewayEndpointEnabledAsync(endpoint.Key, !endpoint.Enabled)).Enabled; Status = $"{endpoint.DisplayName} 已{(endpoint.Enabled ? "启用" : "停用")}"; }
         catch (Exception exception) { Status = $"Endpoint 更新失败：{exception.Message}"; }
     }
     private async Task ToggleComboAsync(GatewayComboEditorViewModel? combo) { if (combo is null) return; combo.Enabled = !combo.Enabled; await SaveComboChangesAsync(combo); }
     private async Task RemoveComboAsync(GatewayComboEditorViewModel? combo)
     {
         if (combo is null || SelectedEndpoint is null) return;
-        try { await configService.DeleteGatewayComboAsync(combo.Id); SelectedEndpoint.Combos.Remove(combo); if (SelectedCombo == combo) SelectedCombo = null; Status = "Combo 模型已移除"; }
+        try { await dataStore.DeleteGatewayComboAsync(combo.Id); SelectedEndpoint.Combos.Remove(combo); if (SelectedCombo == combo) SelectedCombo = null; Status = "Combo 模型已移除"; }
         catch (Exception exception) { Status = $"移除 Combo 模型失败：{exception.Message}"; }
     }
     private async Task ToggleRouteAsync(GatewayRouteEditorViewModel? route) { if (route is null) return; route.Enabled = !route.Enabled; await SaveRouteAsync(route); Status = "成员状态已保存"; }
     private async Task RemoveRouteAsync(GatewayRouteEditorViewModel? route)
     {
         if (route is null || SelectedCombo is null) return;
-        try { await configService.DeleteGatewayRouteAsync(route.Id); SelectedCombo.Routes.Remove(route); Renumber(SelectedCombo); Status = "模型已从 Combo 移除"; }
+        try { await dataStore.DeleteGatewayRouteAsync(route.Id); SelectedCombo.Routes.Remove(route); Renumber(SelectedCombo); Status = "模型已从 Combo 移除"; }
         catch (Exception exception) { Status = $"移除成员失败：{exception.Message}"; }
     }
     public async Task MoveRouteAsync(GatewayRouteEditorViewModel? route, GatewayRouteEditorViewModel? target)
@@ -241,7 +248,7 @@ public sealed class GatewayViewModel : NotifyViewModel
         try { foreach (var item in SelectedCombo.Routes) await SaveRouteAsync(item); Status = "故障转移顺序已保存"; }
         catch (Exception exception) { Status = $"保存排序失败：{exception.Message}"; }
     }
-    private Task SaveRouteAsync(GatewayRouteEditorViewModel route) => configService.UpdateGatewayRouteAsync(route.Id, new GatewayRouteInput(route.ModelId, route.Enabled, route.SortOrder));
+    private Task SaveRouteAsync(GatewayRouteEditorViewModel route) => dataStore.UpdateGatewayRouteAsync(route.Id, new GatewayRouteInput(route.ModelId, route.Enabled, route.SortOrder));
     private static void Renumber(GatewayComboEditorViewModel combo) { for (var i = 0; i < combo.Routes.Count; i++) combo.Routes[i].SortOrder = i; }
     public void FilterModels(string? search)
     {
@@ -262,6 +269,8 @@ public sealed class GatewayViewModel : NotifyViewModel
             ModelGroups.Add(new GatewayModelGroup(group.Key, models.ToArray()));
         }
     }
+
+    public void Dispose() => dataStore.ConfigurationChanged -= OnConfigurationChanged;
 }
 
 public sealed class GatewayEndpointEditorViewModel : NotifyViewModel

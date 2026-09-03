@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Controls.Primitives;
 using OllamaHub.Desktop;
 using OllamaHub.Desktop.Services;
 using OllamaHub.Desktop.ViewModels;
@@ -11,7 +12,12 @@ public partial class ActivityView : UserControl
     public ActivityView()
     {
         InitializeComponent();
-        DetachedFromVisualTree += (_, _) => (DataContext as ActivityViewModel)?.Dispose();
+    }
+
+    private void ActivityScrollViewer_OnScrollChanged(object? sender, ScrollChangedEventArgs e)
+    {
+        if (sender is ScrollViewer scrollViewer && DataContext is ActivityViewModel viewModel)
+            viewModel.NotifyScrollMetrics(scrollViewer.Offset.Y, scrollViewer.Extent.Height, scrollViewer.Viewport.Height);
     }
 
     private async void CopyRequestId_OnClick(object? sender, RoutedEventArgs e)

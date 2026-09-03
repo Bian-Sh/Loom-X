@@ -80,6 +80,45 @@ public sealed class ActivityQueryServiceTests
         }
     }
 
+    [Fact]
+    public async Task QueryPageAsyncUsesCreatedAtAndIdCursor()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "OllamaHubTests", Guid.NewGuid().ToString("N"));
+        var databasePath = Path.Combine(directory, "Activity.db");
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var options = new DbContextOptionsBuilder<ActivityDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using (var db = new ActivityDbContext(options))
+            {
+                await db.Database.EnsureCreatedAsync();
+                var timestamp = DateTimeOffset.Parse("2026-09-02T09:00:00+08:00");
+                db.Events.AddRange(
+                    CreateEntity(1, timestamp.ToString("O"), "same-time-low-id"),
+                    CreateEntity(2, timestamp.ToString("O"), "same-time-high-id"),
+                    CreateEntity(3, "2026-09-02T08:59:00+08:00", "older"));
+                await db.SaveChangesAsync();
+            }
+
+            var service = new ActivityQueryService(databasePath);
+            var first = await service.QueryPageAsync(new ActivityQuery(Limit: 2));
+            var second = await service.QueryPageAsync(new ActivityQuery(Limit: 2), first.NextCursor);
+
+            Assert.Equal(["same-time-high-id", "same-time-low-id"], first.Items.Select(item => item.RequestId));
+            Assert.Equal(["older"], second.Items.Select(item => item.RequestId));
+            Assert.False(second.HasMore);
+        }
+        finally
+        {
+            for (var attempt = 0; attempt < 20 && Directory.Exists(directory); attempt++)
+            {
+                try { Directory.Delete(directory, recursive: true); }
+                catch (IOException) { if (attempt < 19) Thread.Sleep(50); }
+                catch (UnauthorizedAccessException) { if (attempt < 19) Thread.Sleep(50); }
+            }
+        }
+    }
+
     private static ActivityEventEntity CreateEntity(long id, string createdAt, string requestId) => new()
     {
         Id = id,
