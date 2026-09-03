@@ -78,7 +78,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     TransparencyEnabled = settings.TransparencyEnabled,
                     TransparencyOpacity = settings.TransparencyOpacity,
                     BlurAmount = AppearanceSettingsLimits.NormalizeBlurAmount(settings.BlurAmount),
-                    TransparencyAlgorithm = settings.TransparencyAlgorithm
+                    TransparencyAlgorithm = "acrylic"
                 },
                 Providers = resolvedProviders,
                 Models = models,

@@ -501,14 +501,17 @@ public sealed class ConfigurationManagementServiceTests
             await using (var legacyContext = new ConfigurationDbContext(options))
             {
                 var legacySettings = await legacyContext.AppSettings.SingleAsync();
-                legacySettings.BlurAmount = -48;
+                legacySettings.BlurAmount = 200;
+                legacySettings.TransparencyAlgorithm = "mica";
                 await legacyContext.SaveChangesAsync();
             }
 
             var normalizedLegacySettings = await service.GetSettingsAsync();
-            Assert.Equal(0, normalizedLegacySettings.BlurAmount);
+            Assert.Equal(64, normalizedLegacySettings.BlurAmount);
+            Assert.Equal("acrylic", normalizedLegacySettings.TransparencyAlgorithm);
             await configurationProvider.ReloadAsync();
-            Assert.Equal(0, configurationProvider.Current.Settings.BlurAmount);
+            Assert.Equal(64, configurationProvider.Current.Settings.BlurAmount);
+            Assert.Equal("acrylic", configurationProvider.Current.Settings.TransparencyAlgorithm);
 
             var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 0, 48, "mica"));
             Assert.Equal("dark", updatedSettings.Theme);
@@ -536,7 +539,7 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal(48, storedSettings.BlurAmount);
             Assert.Equal("acrylic", storedSettings.TransparencyAlgorithm);
 
-            await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 0, -1, "acrylic")));
+            await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 0, 65, "acrylic")));
         }
         finally
         {

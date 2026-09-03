@@ -7,6 +7,7 @@
 - 设置页移除磨砂算法下拉框，只保留透明度和磨砂程度调节。
 - `MainWindow.BuildTransparencyLevels` 固定为 `AcrylicBlur -> Transparent`；旧版调用传入的 Blur/Mica 会被忽略。
 - 配置保存将旧的 Blur/Mica 值归一为 Acrylic，设置页预览和保存始终使用 Acrylic。
+- 磨砂程度滑块与配置校验恢复为 `0` 到 `64`，沿用首轮修复的渐进磨砂映射。
 - 设置页契约测试覆盖控件移除、固定回退链和旧值兼容行为。
 
 ## 验证结果

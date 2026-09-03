@@ -32,12 +32,11 @@ public sealed class WindowAppearanceCoordinator
         Current = new(
             enabled,
             Math.Clamp(opacity, 0, 100),
-            Math.Clamp(blurAmount, MainWindow.MinimumBlurAmount, MainWindow.MaximumBlurAmount),
+            Math.Clamp(blurAmount, 0, 64),
             NormalizeAlgorithm(algorithm));
 
         var blurFactor = MainWindow.CalculateBlurTintFactor(Current.BlurAmount);
-        var windowTintFactor = blurFactor;
-        SetBrushAlpha("WindowBackgroundBrush", MainWindow.CalculateBrushAlpha(230, Current.Opacity, windowTintFactor));
+        SetBrushAlpha("WindowBackgroundBrush", MainWindow.CalculateBrushAlpha(230, Current.Opacity, blurFactor));
         SetBrushAlpha("GlassBrush", MainWindow.CalculateBrushAlpha(184, Current.Opacity, blurFactor));
         SetBrushAlpha("GlassStrongBrush", MainWindow.CalculateBrushAlpha(208, Current.Opacity, blurFactor));
         SetBrushAlpha("SurfaceBrush", MainWindow.CalculateBrushAlpha(199, Current.Opacity, blurFactor));
@@ -72,7 +71,7 @@ public sealed class WindowAppearanceCoordinator
         window.Background = Current.Enabled
             ? Brushes.Transparent
             : MainWindow.CreateOpaqueCopy(owner.ResolveAppearanceBrush("WindowBackgroundBrush"));
-        window.TransparencyLevelHint = MainWindow.BuildTransparencyLevels(Current.BlurAmount);
+        window.TransparencyLevelHint = MainWindow.BuildTransparencyLevels(Current.Algorithm);
     }
 
     private void AttachedWindowOnClosed(object? sender, EventArgs e)
