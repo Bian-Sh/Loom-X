@@ -44,4 +44,27 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("SelectedProvider.IncompleteHeaderCount", source, StringComparison.Ordinal);
         Assert.Contains("补全名称和值后才会保存", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ModelSyncButtonUsesCompactRotatingIcon()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("Classes=\"icon-glyph\" Data=\"M 26,12 A 10,10 0 1,0 23,20", source, StringComparison.Ordinal);
+        Assert.Contains("Width=\"12\" Height=\"12\" RenderTransformOrigin=\"50%,50%\"", source, StringComparison.Ordinal);
+        Assert.Contains("<RotateTransform Angle=\"{Binding SyncIconAngle}\"/>", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModelSyncReportsToastAndStopsAnimationForCurrentRequest()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("toastService.Show(Status, ToastLevel.Success);", source, StringComparison.Ordinal);
+        Assert.Contains("toastService.Show(Status, ToastLevel.Error);", source, StringComparison.Ordinal);
+        Assert.Contains("finally", source, StringComparison.Ordinal);
+        Assert.Contains("StopModelSyncAnimation();", source, StringComparison.Ordinal);
+    }
 }

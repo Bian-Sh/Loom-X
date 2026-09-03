@@ -401,6 +401,9 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private CancellationTokenSource? autoSaveCancellation;
     private CancellationTokenSource? connectionCancellation;
     private CancellationTokenSource? modelSyncCancellation;
+    private DispatcherTimer? modelSyncAnimationTimer;
+    private bool isModelSyncing;
+    private double syncIconAngle;
     private bool suppressAutoSave;
     private bool suppressSelectionInvariant;
     public ObservableCollection<ProviderEditorViewModel> Providers { get; } = [];
@@ -438,6 +441,8 @@ public sealed class ProvidersViewModel : NotifyViewModel
     }
     public bool HasSelectedModel => SelectedModel is not null;
     public string Status { get => status; private set => SetProperty(ref status, value); }
+    public bool IsModelSyncing { get => isModelSyncing; private set => SetProperty(ref isModelSyncing, value); }
+    public double SyncIconAngle { get => syncIconAngle; private set => SetProperty(ref syncIconAngle, value); }
     public string ConnectionStatus { get => connectionStatus; private set => SetProperty(ref connectionStatus, value); }
     public int TotalModelCount { get => totalModelCount; private set => SetProperty(ref totalModelCount, value); }
     public int ProtectedKeyCount { get => protectedKeyCount; private set => SetProperty(ref protectedKeyCount, value); }
@@ -563,23 +568,52 @@ public sealed class ProvidersViewModel : NotifyViewModel
     {
         var provider = SelectedProvider;
         if (provider is null) return;
-        if (provider.Id == Guid.Empty) { Status = "请先保存 Provider，再同步模型"; return; }
-        if (!Uri.TryCreate(BuildModelListEndpoint(provider), UriKind.Absolute, out var endpoint) || endpoint.Scheme is not ("http" or "https")) { Status = "模型列表 URL 必须是 HTTP 或 HTTPS 绝对地址"; return; }
+        if (provider.Id == Guid.Empty)
+        {
+            Status = "请先保存 Provider，再同步模型";
+            toastService.Show(Status, ToastLevel.Warning);
+            return;
+        }
+
+        if (!Uri.TryCreate(BuildModelListEndpoint(provider), UriKind.Absolute, out var endpoint) || endpoint.Scheme is not ("http" or "https"))
+        {
+            Status = "模型列表 URL 必须是 HTTP 或 HTTPS 绝对地址";
+            toastService.Show(Status, ToastLevel.Warning);
+            return;
+        }
 
         modelSyncCancellation?.Cancel();
-        modelSyncCancellation = new CancellationTokenSource();
-        var token = modelSyncCancellation.Token;
+        var requestCancellation = new CancellationTokenSource();
+        modelSyncCancellation = requestCancellation;
+        var token = requestCancellation.Token;
         Status = "正在同步模型…";
+        IsModelSyncing = true;
+        StartModelSyncAnimation();
+        logger?.LogInformation("模型同步开始 {ProviderId}", provider.BusinessId);
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
             if (!string.IsNullOrWhiteSpace(provider.ApiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.ApiKey);
             foreach (var header in ProviderEditorViewModel.ParseDictionary(provider.HeadersJson) ?? []) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
-            if (!response.IsSuccessStatusCode) { Status = $"模型同步失败 · {(int)response.StatusCode} {response.ReasonPhrase}"; return; }
+            if (!response.IsSuccessStatusCode)
+            {
+                Status = $"模型同步失败 · {(int)response.StatusCode} {response.ReasonPhrase}";
+                toastService.Show($"模型同步失败 · {(int)response.StatusCode}", ToastLevel.Error);
+                logger?.LogWarning("模型同步失败 {ProviderId} {StatusCode}", provider.BusinessId, (int)response.StatusCode);
+                return;
+            }
+
             using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync(token));
             var names = ExtractModelNames(document.RootElement).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-            if (names.Length == 0) { Status = "模型同步失败 · 响应中没有可用模型"; return; }
+            if (names.Length == 0)
+            {
+                Status = "模型同步失败 · 响应中没有可用模型";
+                toastService.Show(Status, ToastLevel.Error);
+                logger?.LogWarning("模型同步失败，响应中没有可用模型 {ProviderId}", provider.BusinessId);
+                return;
+            }
+
             var existing = provider.Models.ToDictionary(model => model.ModelId, StringComparer.OrdinalIgnoreCase);
             var added = 0;
             foreach (var name in names)
@@ -590,11 +624,56 @@ public sealed class ProvidersViewModel : NotifyViewModel
                 added++;
             }
             Status = $"模型同步完成 · 发现 {names.Length} 个，新增 {added} 个";
+            toastService.Show(Status, ToastLevel.Success);
+            logger?.LogInformation("模型同步完成 {ProviderId} {DiscoveredCount} {AddedCount}", provider.BusinessId, names.Length, added);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        catch (JsonException) { Status = "模型同步失败 · 响应格式无法解析"; }
-        catch (Exception exception) { Status = $"模型同步失败 · {exception.Message}"; }
+        catch (JsonException exception)
+        {
+            Status = "模型同步失败 · 响应格式无法解析";
+            toastService.Show(Status, ToastLevel.Error);
+            logger?.LogWarning(exception, "模型同步响应格式无法解析 {ProviderId}", provider.BusinessId);
+        }
+        catch (Exception exception)
+        {
+            Status = $"模型同步失败 · {exception.Message}";
+            toastService.Show("模型同步失败", ToastLevel.Error);
+            logger?.LogError(exception, "模型同步异常 {ProviderId}", provider.BusinessId);
+        }
+        finally
+        {
+            if (ReferenceEquals(modelSyncCancellation, requestCancellation))
+            {
+                modelSyncCancellation = null;
+                StopModelSyncAnimation();
+            }
+
+            requestCancellation.Dispose();
+        }
     }
+
+    private void StartModelSyncAnimation()
+    {
+        modelSyncAnimationTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(45) };
+        if (modelSyncAnimationTimer.IsEnabled) return;
+        modelSyncAnimationTimer.Tick += ModelSyncAnimationTimerOnTick;
+        SyncIconAngle = 0;
+        modelSyncAnimationTimer.Start();
+    }
+
+    private void StopModelSyncAnimation()
+    {
+        if (modelSyncAnimationTimer is not null)
+        {
+            modelSyncAnimationTimer.Stop();
+            modelSyncAnimationTimer.Tick -= ModelSyncAnimationTimerOnTick;
+        }
+
+        SyncIconAngle = 0;
+        IsModelSyncing = false;
+    }
+
+    private void ModelSyncAnimationTimerOnTick(object? sender, EventArgs e) => SyncIconAngle = (SyncIconAngle + 18) % 360;
 
     private static string BuildModelListEndpoint(ProviderEditorViewModel provider)
     {
