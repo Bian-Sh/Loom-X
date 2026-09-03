@@ -45,16 +45,19 @@
     </Style>
   </Window.Styles>
   <Border Background="{DynamicResource DialogBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" ClipToBounds="True">
-    <Grid RowDefinitions="32,*,Auto">
-      <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" PointerPressed="TitleBar_OnPointerPressed">
-        <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" HorizontalAlignment="Center" Margin="16,0" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-      </Border>
-      <Border Grid.Row="1" Padding="24,8,24,8">
-        <ContentPresenter x:Name="dialogContentPresenter" HorizontalAlignment="Center" VerticalAlignment="Center" />
-      </Border>
-      <Border Grid.Row="2" Padding="24,0,24,22">
-        <ContentPresenter x:Name="dialogActionsPresenter" HorizontalAlignment="Center" />
-      </Border>
+    <Grid>
+      <Border Background="{DynamicResource BlurOverlayBrush}" IsHitTestVisible="False" />
+      <Grid RowDefinitions="32,*,Auto">
+        <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" PointerPressed="TitleBar_OnPointerPressed">
+          <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}" HorizontalAlignment="Center" Margin="16,0" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </Border>
+        <Border Grid.Row="1" Padding="24,8,24,8">
+          <ContentPresenter x:Name="dialogContentPresenter" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+        <Border Grid.Row="2" Padding="24,0,24,22">
+          <ContentPresenter x:Name="dialogActionsPresenter" HorizontalAlignment="Center" />
+        </Border>
+      </Grid>
     </Grid>
   </Border>
 </Window>

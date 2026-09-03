@@ -35,21 +35,23 @@ public sealed class WindowAppearanceCoordinator
             Math.Clamp(blurAmount, MainWindow.MinimumBlurAmount, MainWindow.MaximumBlurAmount),
             NormalizeAlgorithm(algorithm));
 
-        var blurFactor = MainWindow.CalculateBlurTintFactor(Current.BlurAmount);
-        var windowTintFactor = blurFactor;
-        SetBrushAlpha("WindowBackgroundBrush", MainWindow.CalculateBrushAlpha(230, Current.Opacity, windowTintFactor));
-        SetBrushAlpha("GlassBrush", MainWindow.CalculateBrushAlpha(184, Current.Opacity, blurFactor));
-        SetBrushAlpha("GlassStrongBrush", MainWindow.CalculateBrushAlpha(208, Current.Opacity, blurFactor));
-        SetBrushAlpha("SurfaceBrush", MainWindow.CalculateBrushAlpha(199, Current.Opacity, blurFactor));
-        SetBrushAlpha("SurfaceSubtleBrush", MainWindow.CalculateBrushAlpha(164, Current.Opacity, blurFactor));
-        SetBrushAlpha("SurfaceMutedBrush", MainWindow.CalculateBrushAlpha(128, Current.Opacity, blurFactor));
-        SetBrushAlpha("NavigationHoverBrush", MainWindow.CalculateBrushAlpha(214, Current.Opacity, blurFactor));
+        // 透明度只控制现有表面的 Alpha；Blur 通过独立遮罩表现，避免两个滑块互相压缩。
+        SetBrushAlpha("WindowBackgroundBrush", MainWindow.CalculateBrushAlpha(230, Current.Opacity));
+        SetBrushAlpha("GlassBrush", MainWindow.CalculateBrushAlpha(184, Current.Opacity));
+        SetBrushAlpha("GlassStrongBrush", MainWindow.CalculateBrushAlpha(208, Current.Opacity));
+        SetBrushAlpha("SurfaceBrush", MainWindow.CalculateBrushAlpha(199, Current.Opacity));
+        SetBrushAlpha("SurfaceSubtleBrush", MainWindow.CalculateBrushAlpha(164, Current.Opacity));
+        SetBrushAlpha("SurfaceMutedBrush", MainWindow.CalculateBrushAlpha(128, Current.Opacity));
+        SetBrushAlpha("NavigationHoverBrush", MainWindow.CalculateBrushAlpha(214, Current.Opacity));
+        SetBrushAlpha(
+            "BlurOverlayBrush",
+            Current.Enabled ? MainWindow.CalculateBlurOverlayAlpha(Current.Opacity, Current.BlurAmount) : 0);
 
         var popupAlpha = Current.Enabled
-            ? MainWindow.CalculateBrushAlpha(224, Current.Opacity, blurFactor)
+            ? MainWindow.CalculateBrushAlpha(224, Current.Opacity)
             : (byte)255;
         var dialogAlpha = Current.Enabled
-            ? MainWindow.CalculateBrushAlpha(232, Current.Opacity, blurFactor)
+            ? MainWindow.CalculateBrushAlpha(232, Current.Opacity)
             : (byte)255;
         SetBrushAlpha("PopupBackgroundBrush", popupAlpha);
         SetBrushAlpha("DialogBackgroundBrush", dialogAlpha);

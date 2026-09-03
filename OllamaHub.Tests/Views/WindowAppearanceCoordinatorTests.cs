@@ -28,14 +28,16 @@ public sealed class WindowAppearanceCoordinatorTests
 
         window.ApplyAppearance(true, 20, 0, "blur");
 
-        Assert.Equal(0, Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A);
-        Assert.Equal(0, Assert.IsType<SolidColorBrush>(dictionary["PopupBackgroundBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(232, 20), Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(224, 20), Assert.IsType<SolidColorBrush>(dictionary["PopupBackgroundBrush"]).Color.A);
+        Assert.Equal(0, Assert.IsType<SolidColorBrush>(dictionary["BlurOverlayBrush"]).Color.A);
         Assert.Same(Brushes.Transparent, window.Background);
 
         window.ApplyAppearance(true, 20, 200, "blur");
 
-        Assert.InRange(Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A, 1, 254);
-        Assert.InRange(Assert.IsType<SolidColorBrush>(dictionary["PopupBackgroundBrush"]).Color.A, 1, 254);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(232, 20), Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(224, 20), Assert.IsType<SolidColorBrush>(dictionary["PopupBackgroundBrush"]).Color.A);
+        Assert.True(Assert.IsType<SolidColorBrush>(dictionary["BlurOverlayBrush"]).Color.A > 0);
     }
 
     [Fact]
