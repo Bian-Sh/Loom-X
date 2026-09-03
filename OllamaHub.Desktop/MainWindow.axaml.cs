@@ -13,6 +13,9 @@ public partial class MainWindow : Window
 {
     // 透明度为 0 时保留轻微基底，避免系统材质在 alpha=0 时退化为仅边框。
     private const double MinimumOpacityFactor = 0.16;
+    private const int MinimumBlurAmount = 0;
+    private const int MaximumBlurAmount = 200;
+    private const int TransparentBlurThreshold = 100;
     private readonly ToastService toastService;
     private readonly ILogger<MainWindow> logger;
     private readonly DispatcherTimer toastTimer;
@@ -153,10 +156,9 @@ public partial class MainWindow : Window
         algorithm = "acrylic";
         logger.LogInformation("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
         opacity = Math.Clamp(opacity, 0, 100);
-        blurAmount = Math.Clamp(blurAmount, 0, 64);
+        blurAmount = Math.Clamp(blurAmount, MinimumBlurAmount, MaximumBlurAmount);
         var blurFactor = CalculateBlurTintFactor(blurAmount);
-        var windowTintFactor = blurFactor;
-        SetBrushAlpha("WindowBackgroundBrush", CalculateBrushAlpha(230, opacity, windowTintFactor));
+        SetBrushAlpha("WindowBackgroundBrush", CalculateBrushAlpha(230, opacity, blurFactor));
         SetBrushAlpha("GlassBrush", CalculateBrushAlpha(184, opacity, blurFactor));
         SetBrushAlpha("GlassStrongBrush", CalculateBrushAlpha(208, opacity, blurFactor));
         SetBrushAlpha("SurfaceBrush", CalculateBrushAlpha(199, opacity, blurFactor));
@@ -168,7 +170,7 @@ public partial class MainWindow : Window
         Background = enabled
             ? Brushes.Transparent
             : OpaqueCopy(ResolveBrush("WindowBackgroundBrush"));
-        TransparencyLevelHint = BuildTransparencyLevels(algorithm);
+        TransparencyLevelHint = BuildTransparencyLevels(blurAmount);
         logger.LogInformation(
             "透明外观应用完成 {Enabled} {Opacity} {BlurAmount} {Algorithm} {WindowBackgroundType} {GlassType} {ActualTransparencyLevel}",
             enabled,
@@ -193,6 +195,11 @@ public partial class MainWindow : Window
         return false;
     }
 
+    internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(int blurAmount) =>
+        Math.Clamp(blurAmount, MinimumBlurAmount, MaximumBlurAmount) < TransparentBlurThreshold
+            ? [WindowTransparencyLevel.Transparent, WindowTransparencyLevel.AcrylicBlur]
+            : [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent];
+
     internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm) =>
         [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent];
 
@@ -208,8 +215,8 @@ public partial class MainWindow : Window
         AppearanceBrushUpdater.Apply(brush, key, baseBrushColors, alpha);
     }
 
-    internal static double CalculateBlurTintFactor(int blurAmount) =>
-        0.35 + (Math.Clamp(blurAmount, 0, 64) / 64d * 0.65);
+    internal static double CalculateBlurTintFactor(int blurAmount)
+        => Math.Clamp(blurAmount, MinimumBlurAmount, MaximumBlurAmount) / (double)MaximumBlurAmount;
 
     internal static double CalculateOpacityFactor(int opacity) =>
         MinimumOpacityFactor + ((1 - MinimumOpacityFactor) * (Math.Clamp(opacity, 0, 100) / 100d));

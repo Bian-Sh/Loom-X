@@ -498,6 +498,18 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal(24, defaults.BlurAmount);
             Assert.Equal("acrylic", defaults.TransparencyAlgorithm);
 
+            await using (var legacyContext = new ConfigurationDbContext(options))
+            {
+                var legacySettings = await legacyContext.AppSettings.SingleAsync();
+                legacySettings.BlurAmount = -48;
+                await legacyContext.SaveChangesAsync();
+            }
+
+            var normalizedLegacySettings = await service.GetSettingsAsync();
+            Assert.Equal(0, normalizedLegacySettings.BlurAmount);
+            await configurationProvider.ReloadAsync();
+            Assert.Equal(0, configurationProvider.Current.Settings.BlurAmount);
+
             var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 0, 48, "mica"));
             Assert.Equal("dark", updatedSettings.Theme);
             Assert.True(updatedSettings.HasProxyPassword);
@@ -523,6 +535,8 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal(0, storedSettings.TransparencyOpacity);
             Assert.Equal(48, storedSettings.BlurAmount);
             Assert.Equal("acrylic", storedSettings.TransparencyAlgorithm);
+
+            await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 0, -1, "acrylic")));
         }
         finally
         {
