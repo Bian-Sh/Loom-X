@@ -624,6 +624,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private bool isModelSyncing;
     private double syncIconAngle;
     private bool suppressAutoSave;
+    private bool suppressConfigurationRefresh;
     private bool suppressSelectionInvariant;
     private readonly object refreshSync = new();
     private bool refreshRequested;
@@ -745,6 +746,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     private void OnConfigurationChanged(object? sender, EventArgs args)
     {
+        if (suppressConfigurationRefresh) return;
         if (Dispatcher.UIThread.CheckAccess()) _ = RefreshAsync();
         else Dispatcher.UIThread.Post(() => _ = RefreshAsync());
     }
@@ -766,6 +768,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     {
         var provider = SelectedProvider;
         if (provider is null) return;
+        suppressConfigurationRefresh = true;
         try
         {
             var input = provider.ToInput();
@@ -787,6 +790,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             }
         }
         catch (Exception exception) { suppressAutoSave = false; logger?.LogError(exception, "Provider 保存失败 {ProviderId}", provider.BusinessId); Status = $"保存失败：{exception.Message}"; }
+        finally { suppressAutoSave = false; suppressConfigurationRefresh = false; }
     }
 
     private async Task DeleteProviderAsync(ProviderEditorViewModel? provider = null)
@@ -802,8 +806,10 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private async Task SaveModelAsync()
     {
         if (SelectedProvider is null || SelectedModel is null) return;
+        suppressConfigurationRefresh = true;
         try { var input = SelectedModel.ToInput(); var response = SelectedModel.Id == Guid.Empty ? await dataStore.CreateModelAsync(SelectedProvider.Id, input) : await dataStore.UpdateModelAsync(SelectedModel.Id, input); var index = SelectedProvider.Models.IndexOf(SelectedModel); var updated = ModelEditorViewModel.FromResponse(response); if (index < 0) SelectedProvider.Models.Add(updated); else SelectedProvider.Models[index] = updated; SelectedModel = updated; Status = "模型已保存"; }
         catch (Exception exception) { Status = $"模型保存失败：{exception.Message}"; }
+        finally { suppressConfigurationRefresh = false; }
     }
 
     private async Task DeleteModelAsync()

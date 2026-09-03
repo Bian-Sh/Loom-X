@@ -69,6 +69,19 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
+    public void LocalSavesSuppressConfigurationRefreshThatWouldReplaceEditorControls()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("private bool suppressConfigurationRefresh;", source, StringComparison.Ordinal);
+        Assert.Contains("if (suppressConfigurationRefresh) return;", source, StringComparison.Ordinal);
+        Assert.Contains("suppressConfigurationRefresh = true;", source, StringComparison.Ordinal);
+        Assert.Contains("finally { suppressAutoSave = false; suppressConfigurationRefresh = false; }", source, StringComparison.Ordinal);
+        Assert.Contains("finally { suppressConfigurationRefresh = false; }", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BaseUrlHelpControlUsesAdjacentQuestionMarkAndHelpCursor()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
