@@ -22,7 +22,9 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
     private bool initialized;
     private bool pageReady;
     private bool flushingTopology;
+    private bool flushingMetrics;
     private string? pendingTopology;
+    private string? pendingMetrics;
     private HttpListener? assetServer;
     private CancellationTokenSource? assetServerCancellation;
 
@@ -102,16 +104,20 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
         Detach();
         viewModel = next;
         viewModel.TopologyChanged += OnTopologyChanged;
+        viewModel.GraphMetricsChanged += OnMetricsChanged;
         viewModel.GraphTelemetryPublished += OnTelemetryPublished;
         pendingTopology = viewModel.TopologyJson;
-        logger.LogInformation("概览宿主绑定 ViewModel，拓扑 {TopologyLength} 字节", pendingTopology.Length);
+        pendingMetrics = viewModel.MetricsJson;
+        logger.LogInformation("概览宿主绑定 ViewModel，拓扑 {TopologyLength} 字节，指标 {MetricsLength} 字节", pendingTopology.Length, pendingMetrics.Length);
         _ = FlushPendingAsync();
+        _ = FlushPendingMetricsAsync();
     }
 
     public void Detach()
     {
         if (viewModel is null) return;
         viewModel.TopologyChanged -= OnTopologyChanged;
+        viewModel.GraphMetricsChanged -= OnMetricsChanged;
         viewModel.GraphTelemetryPublished -= OnTelemetryPublished;
         viewModel = null;
     }
@@ -121,6 +127,13 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
         if (viewModel is not null) pendingTopology = viewModel.TopologyJson;
         logger.LogDebug("概览拓扑变更，待发送 {TopologyLength} 字节，页面就绪 {PageReady}", pendingTopology?.Length ?? 0, pageReady);
         _ = FlushPendingAsync();
+    }
+
+    private void OnMetricsChanged(object? sender, EventArgs args)
+    {
+        if (viewModel is not null) pendingMetrics = viewModel.MetricsJson;
+        logger.LogDebug("概览指标变更，待发送 {MetricsLength} 字节，页面就绪 {PageReady}", pendingMetrics?.Length ?? 0, pageReady);
+        _ = FlushPendingMetricsAsync();
     }
 
     private void OnTelemetryPublished(object? sender, RequestTelemetryEvent telemetryEvent)
@@ -157,6 +170,32 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
         }
     }
 
+    private async Task FlushPendingMetricsAsync()
+    {
+        if (!pageReady || flushingMetrics || string.IsNullOrWhiteSpace(pendingMetrics))
+        {
+            logger.LogDebug("概览跳过指标发送，页面就绪 {PageReady}、发送中 {Flushing}、有待发送数据 {HasPending}", pageReady, flushingMetrics, !string.IsNullOrWhiteSpace(pendingMetrics));
+            return;
+        }
+        flushingMetrics = true;
+        var metricsJson = pendingMetrics;
+        var json = JsonSerializer.Serialize(metricsJson, JsonOptions);
+        try
+        {
+            var result = await webView.InvokeScript($"window.applyMetrics({json});");
+            logger.LogInformation("概览指标已发送 {MetricsLength} 字节，脚本返回长度 {ResultLength}", metricsJson.Length, result?.Length ?? 0);
+            if (string.Equals(pendingMetrics, metricsJson, StringComparison.Ordinal)) pendingMetrics = null;
+        }
+        catch (InvalidOperationException exception) { logger.LogWarning(exception, "概览 WebView 当前不可发送指标"); }
+        catch (PlatformNotSupportedException exception) { logger.LogWarning(exception, "概览 WebView 平台不支持指标脚本调用"); }
+        catch (Exception exception) { logger.LogError(exception, "概览 WebView 指标脚本调用失败"); }
+        finally
+        {
+            flushingMetrics = false;
+            if (pageReady && !string.IsNullOrWhiteSpace(pendingMetrics)) _ = FlushPendingMetricsAsync();
+        }
+    }
+
     private void OnWebMessageReceived(object? sender, WebMessageReceivedEventArgs args)
     {
         logger.LogDebug("概览收到网页消息，长度 {BodyLength}", args.Body?.Length ?? 0);
@@ -165,6 +204,7 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
             pageReady = true;
             logger.LogInformation("概览网页报告 graph-ready");
             _ = FlushPendingAsync();
+            _ = FlushPendingMetricsAsync();
             return;
         }
         if (args.Body?.StartsWith("graph-debug:", StringComparison.Ordinal) == true)
@@ -183,6 +223,7 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
         pageReady = true;
         logger.LogInformation("概览 WebView 导航完成，使用导航兜底标记页面就绪");
         _ = FlushPendingAsync();
+        _ = FlushPendingMetricsAsync();
     }
 
     private async Task InvokeAsync(string script)

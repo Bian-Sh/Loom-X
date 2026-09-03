@@ -29,7 +29,8 @@ public sealed class MainWindowChromeContractTests
         Assert.Contains("Height=\"32\" VerticalAlignment=\"Top\"", source, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"*,42,42,42\"", source, StringComparison.Ordinal);
         Assert.Contains("Margin=\"0\"", source, StringComparison.Ordinal);
-        Assert.Contains("StrokeThickness=\"1.1\"", source, StringComparison.Ordinal);
+        Assert.Contains("StrokeThickness=\"0.8\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("StrokeThickness=\"1.1\"", source, StringComparison.Ordinal);
         Assert.Contains("Width=\"12\" Height=\"12\"", source, StringComparison.Ordinal);
         Assert.Contains("<Border Width=\"12\" Height=\"1\"", source, StringComparison.Ordinal);
     }

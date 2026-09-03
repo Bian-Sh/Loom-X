@@ -150,12 +150,15 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private int throughput;
     private string p95Latency = "—";
     private string graphStatus = "等待网关启动";
+    private string gatewayActionLabel = "启动网关";
+    private bool gatewayToggleInProgress;
     private readonly Dictionary<string, RequestTelemetryEvent> activeRequests = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> activeEdgeCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HashSet<string>> requestEdges = new(StringComparer.Ordinal);
     private readonly List<RequestTelemetryEvent> completionWindow = [];
 
     public event EventHandler? TopologyChanged;
+    public event EventHandler? GraphMetricsChanged;
     public event EventHandler<RequestTelemetryEvent>? GraphTelemetryPublished;
 
     public string GatewayStatus { get => gatewayStatus; private set => SetProperty(ref gatewayStatus, value); }
@@ -168,6 +171,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public int Throughput { get => throughput; private set => SetProperty(ref throughput, value); }
     public string P95Latency { get => p95Latency; private set => SetProperty(ref p95Latency, value); }
     public string GraphStatus { get => graphStatus; private set => SetProperty(ref graphStatus, value); }
+    public string GatewayActionLabel { get => gatewayActionLabel; private set => SetProperty(ref gatewayActionLabel, value); }
     public ObservableCollection<OverviewEndpointViewModel> Endpoints { get; } = [];
     public ObservableCollection<OverviewModelViewModel> Models { get; } = [];
     public ObservableCollection<OverviewRecentRequestViewModel> RecentRequests { get; } = [];
@@ -178,8 +182,15 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         models = Models.Select(item => new { displayName = item.DisplayName, modelId = item.ModelId, providerId = item.ProviderId }),
         edges = Endpoints.SelectMany(endpoint => endpoint.Routes.Select(route => new { endpointKey = endpoint.Key, modelId = route.ModelId, providerId = route.ProviderId, alias = route.Alias }))
     });
+    public string MetricsJson => JsonSerializer.Serialize(new
+    {
+        activeRequests = ActiveRequestCount,
+        throughput = Throughput,
+        p95Latency = P95Latency
+    });
     public ICommand StartCommand { get; }
     public ICommand StopCommand { get; }
+    public ICommand ToggleGatewayCommand { get; }
     public ICommand RefreshCommand { get; }
 
     public OverviewViewModel(GatewayProcessService gatewayService, AppDataStore dataStore, ILogger<MainWindowViewModel>? logger = null)
@@ -189,6 +200,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         this.logger = logger;
         StartCommand = new AsyncCommand(StartAsync);
         StopCommand = new AsyncCommand(StopAsync);
+        ToggleGatewayCommand = new AsyncCommand(ToggleGatewayAsync, CanToggleGateway);
         RefreshCommand = new AsyncCommand(RefreshAsync);
         gatewayService.StateChanged += OnGatewayStateChanged;
         gatewayService.TelemetryPublished += OnTelemetryPublished;
@@ -210,6 +222,46 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     {
         await gatewayService.StopAsync();
         await RefreshAsync();
+    }
+
+    private async Task ToggleGatewayAsync()
+    {
+        if (!CanToggleGateway()) return;
+        gatewayToggleInProgress = true;
+        UpdateGatewayControls();
+        try
+        {
+            if (gatewayService.State == GatewayState.Running)
+            {
+                await gatewayService.StopAsync();
+                logger?.LogInformation("概览网关切换完成，操作 {Action}", "停止");
+            }
+            else
+            {
+                await gatewayService.StartAsync(LoadEndpoint());
+                logger?.LogInformation("概览网关切换完成，操作 {Action}", "启动");
+            }
+        }
+        finally
+        {
+            gatewayToggleInProgress = false;
+            await RefreshAsync();
+        }
+    }
+
+    private bool CanToggleGateway() => !gatewayToggleInProgress && gatewayService.State is not (GatewayState.Starting or GatewayState.Stopping);
+
+    private void UpdateGatewayControls()
+    {
+        GatewayActionLabel = gatewayToggleInProgress
+            ? gatewayService.State == GatewayState.Running ? "停止中" : "启动中"
+            : gatewayService.State == GatewayState.Running ? "停止网关" : gatewayService.State switch
+            {
+                GatewayState.Starting => "启动中",
+                GatewayState.Stopping => "停止中",
+                _ => "启动网关"
+            };
+        (ToggleGatewayCommand as AsyncCommand)?.RaiseCanExecuteChanged();
     }
 
     private async Task RefreshAsync()
@@ -234,6 +286,8 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "尚未检查";
             Version = gatewayService.State == GatewayState.Running ? "OllamaHub API 在线" : "未连接";
             GraphStatus = gatewayService.State == GatewayState.Running ? "实时拓扑已连接" : "等待网关启动";
+            UpdateGatewayControls();
+            GraphMetricsChanged?.Invoke(this, EventArgs.Empty);
             logger?.LogInformation("概览刷新完成 {ProviderCount} 个 Provider、{ModelCount} 个模型、{EndpointCount} 个 Endpoint、{RouteCount} 条路由，网关状态 {GatewayState}，配置库 {DatabasePath}，进程 {ProcessId}", ProviderCount, ModelCount, Endpoints.Count, Endpoints.Sum(item => item.Routes.Count), gatewayService.State, AppDataPaths.DatabasePath, Environment.ProcessId);
         }
         catch (Exception exception)
@@ -314,6 +368,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             activeRequests[telemetryEvent.RequestId] = telemetryEvent;
             requestEdges.TryAdd(telemetryEvent.RequestId, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
             ActiveRequestCount = activeRequests.Count;
+            GraphMetricsChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
         if (telemetryEvent.Kind == TelemetryEventKind.EdgeAttemptStarted)
@@ -344,6 +399,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             OnPropertyChanged(nameof(RecentRequestsEmpty));
         }
         P95Latency = completionWindow.Count == 0 ? "—" : $"{completionWindow.Select(item => item.ElapsedMs).OrderBy(item => item).ElementAt(Math.Max(0, (int)Math.Ceiling(completionWindow.Count * .95) - 1))} ms";
+        GraphMetricsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void SetRouteActive(string edgeKey, bool active)
@@ -1016,9 +1072,19 @@ public sealed class DelegateCommand : ICommand
 public sealed class AsyncCommand : ICommand
 {
     private readonly Func<object?, Task> action;
-    public event EventHandler? CanExecuteChanged { add { } remove { } }
-    public AsyncCommand(Func<Task> action) => this.action = _ => action();
-    public AsyncCommand(Func<object?, Task> action) => this.action = action;
-    public bool CanExecute(object? parameter) => true;
+    private readonly Func<object?, bool> canExecute;
+    public event EventHandler? CanExecuteChanged;
+    public AsyncCommand(Func<Task> action, Func<bool>? canExecute = null)
+    {
+        this.action = _ => action();
+        this.canExecute = _ => canExecute?.Invoke() ?? true;
+    }
+    public AsyncCommand(Func<object?, Task> action, Func<object?, bool>? canExecute = null)
+    {
+        this.action = action;
+        this.canExecute = parameter => canExecute?.Invoke(parameter) ?? true;
+    }
+    public bool CanExecute(object? parameter) => canExecute(parameter);
+    public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     public async void Execute(object? parameter) => await action(parameter);
 }

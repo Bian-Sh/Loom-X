@@ -27,4 +27,37 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("webView.Navigate(pageUri)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("webView.Source =", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void OverviewLayoutUsesExpandedGraphAndSingleGatewayToggle()
+    {
+        var source = ReadDesktopFile("Views", "OverviewView.axaml");
+
+        Assert.DoesNotContain("网关实时拓扑", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("metric-card", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("StartCommand", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("StopCommand", source, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"360\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{Binding GatewayActionLabel}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding ToggleGatewayCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"刷新\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OverviewWebHudContainsMetricsWithoutActiveEdgeLegend()
+    {
+        var source = ReadDesktopFile("Assets", "Overview", "index.html");
+
+        Assert.Contains("id=\"active\"", source, StringComparison.Ordinal);
+        Assert.Contains("id=\"throughput\"", source, StringComparison.Ordinal);
+        Assert.Contains("id=\"p95\"", source, StringComparison.Ordinal);
+        Assert.Contains("window.applyMetrics", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("活跃边", source, StringComparison.Ordinal);
+    }
+
+    private static string ReadDesktopFile(params string[] segments)
+    {
+        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", .. segments]);
+        return File.ReadAllText(path);
+    }
 }
