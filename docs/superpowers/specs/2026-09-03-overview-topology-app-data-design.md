@@ -95,11 +95,11 @@ Three.js 场景状态与 DOM 指标直接更新
 
 - Endpoint 位于左侧列；
 - Combo 位于中间列，并按 Endpoint 分组；
-- Provider 位于右侧独立网格，按真实数量自动分行/分列；
-- Model 位于对应 Provider 区域内，保持稳定垂直间距；
-- 没有 Model 的 Provider 仍显示独立节点；
+- Provider 使用包围模型的容器表达，容器标题显示 Provider；多个容器按真实数量自动分行/分列；
+- Model 位于对应 Provider 容器内，保持稳定垂直间距；
+- 没有 Model 的 Provider 仍显示独立容器；
 - 标签使用稳定布局，避免多个 Provider 或 Combo 挤在同一位置；
-- 结构边与遥测高亮状态分离，刷新拓扑时保留可匹配的活动状态。
+- 结构边与遥测高亮状态分离，刷新拓扑时保留可匹配的活动状态；`Endpoint → Model` 的 route 边仅作为遥测归属元数据，不绘制为可见直连线，活动请求高亮对应的 Endpoint → Combo → Provider 容器 → Model 结构链。
 
 ## 6. 标签与相机
 

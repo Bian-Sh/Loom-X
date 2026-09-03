@@ -68,6 +68,11 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("comboId:edge.comboId", source, StringComparison.Ordinal);
         Assert.Contains("function escapeHtml", source, StringComparison.Ordinal);
         Assert.Contains("getBoundingClientRect", source, StringComparison.Ordinal);
+        Assert.Contains("routeBindings", source, StringComparison.Ordinal);
+        Assert.Contains("if(edge.type==='route')", source, StringComparison.Ordinal);
+        Assert.Contains("function providerContainer", source, StringComparison.Ordinal);
+        Assert.Contains("new THREE.EdgesGeometry(new THREE.BoxGeometry", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("makeEdge(edge,from,to,key)", source, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -23,6 +23,14 @@
 
 本次修复后的发布包以 `--allow-multiple-instances` 启动并按进程路径校验（进程 46300）。当前本机配置库当时 Provider 为 0，Web 仍完成 `moduleLoaded=true`、`rendererReady=true`、`topologyApplied=1`、`metricsApplied=1`，且 5 秒观察窗口仅出现两次概览刷新，无递归刷新；此前 Provider 4 的拓扑实证仍覆盖完整数据投影。
 
+## 直连线与 Provider 容器调整
+
+- 移除可见的 `Endpoint → Model` route 直连线；route 仅保留为遥测映射元数据。
+- Provider 改为包围其 Model 的容器框，Provider 标题显示在容器边界上；无 Model Provider 仍保留空容器。
+- 活动请求改为高亮 Endpoint → Combo → Provider 容器 → Model 结构链。
+- 契约测试 5/5、全量测试 146/146、构建及模块脚本检查均通过。
+- 最新 standalone 发布包：`outputs/20260903-174801/`；Shell 启动诊断 `moduleLoaded=true`、`rendererReady=true`、`topologyApplied=1`、`metricsApplied=1`、`lastError=null`。
+
 ## 已知警告
 
 构建保留既有 `SQLitePCLRaw.lib.e_sqlite3` NU1903 漏洞警告及 Anthropic 流读取 CA2024、测试 CS8602 警告；本变更未引入新的失败。

@@ -12,9 +12,10 @@
 
 - HUD 固定左上，仅显示三项标题和数值。
 - 删除 Web 旧标题、说明与“活跃边”图例文字，但保留真实高亮动画。
-- Endpoint、Combo、Provider、Model 使用稳定分列/网格布局。
+- Endpoint、Combo 使用稳定分列布局，Provider 使用包围 Model 的容器表达并按真实数量自动网格排列。
 - 标签按相机距离缩放并限制最小/最大尺寸；初始、适配和重置共享相机状态，滚轮只改距离。
 - 原生宿主 Border 与 HTML 根容器同时裁剪圆角。
+- `Endpoint → Model` 的 route 边仅作为遥测归属元数据，不绘制为可见直连线；活动请求高亮对应的 Endpoint → Combo → Provider 容器 → Model 结构链。
 
 ## 兼容与错误处理
 
