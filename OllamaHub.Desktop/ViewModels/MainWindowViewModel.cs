@@ -617,13 +617,11 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private int healthyProviderCount;
     private int enabledProviderCount;
     private int activeTabIndex;
-    private CancellationTokenSource? autoSaveCancellation;
     private CancellationTokenSource? connectionCancellation;
     private CancellationTokenSource? modelSyncCancellation;
     private DispatcherTimer? modelSyncAnimationTimer;
     private bool isModelSyncing;
     private double syncIconAngle;
-    private bool suppressAutoSave;
     private bool suppressConfigurationRefresh;
     private bool suppressSelectionInvariant;
     private readonly object refreshSync = new();
@@ -754,7 +752,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public void Dispose()
     {
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
-        autoSaveCancellation?.Cancel();
         connectionCancellation?.Cancel();
         modelSyncCancellation?.Cancel();
         modelSyncAnimationTimer?.Stop();
@@ -773,9 +770,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         {
             var input = provider.ToInput();
             var response = provider.Id == Guid.Empty ? await dataStore.CreateProviderAsync(input) : await dataStore.UpdateProviderAsync(provider.Id, input);
-            suppressAutoSave = true;
             provider.ApplyResponse(response);
-            suppressAutoSave = false;
             UpdateSummary();
             if (provider.IncompleteHeaderCount > 0)
             {
@@ -789,8 +784,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
                 logger?.LogInformation("Provider 保存完成 {ProviderId}", provider.BusinessId);
             }
         }
-        catch (Exception exception) { suppressAutoSave = false; logger?.LogError(exception, "Provider 保存失败 {ProviderId}", provider.BusinessId); Status = $"保存失败：{exception.Message}"; }
-        finally { suppressAutoSave = false; suppressConfigurationRefresh = false; }
+        catch (Exception exception) { logger?.LogError(exception, "Provider 保存失败 {ProviderId}", provider.BusinessId); Status = $"保存失败：{exception.Message}"; }
+        finally { suppressConfigurationRefresh = false; }
     }
 
     private async Task DeleteProviderAsync(ProviderEditorViewModel? provider = null)
@@ -1000,8 +995,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private void ProviderChanged(object? sender, PropertyChangedEventArgs args)
     {
         UpdateSummary();
-        if (!suppressAutoSave && args.PropertyName is not (nameof(ProviderEditorViewModel.IncompleteHeaderCount) or nameof(ProviderEditorViewModel.HasIncompleteHeaders)))
-            ScheduleAutoSave();
     }
     private void ModelsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
@@ -1016,7 +1009,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     {
         if (sender is ModelEditorViewModel model && !ReferenceEquals(SelectedModel, model))
             SelectedModel = model;
-        ScheduleModelAutoSave();
     }
 
     private void UpdateSummary()
@@ -1027,33 +1019,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         HealthyProviderCount = Providers.Count(provider => provider.Enabled && !string.IsNullOrWhiteSpace(provider.BaseUrl));
     }
 
-    private void ScheduleAutoSave()
-    {
-        autoSaveCancellation?.Cancel();
-        autoSaveCancellation = new CancellationTokenSource();
-        var token = autoSaveCancellation.Token;
-        _ = SaveProviderAfterDelayAsync(token);
-    }
-
-    private void ScheduleModelAutoSave()
-    {
-        autoSaveCancellation?.Cancel();
-        autoSaveCancellation = new CancellationTokenSource();
-        var token = autoSaveCancellation.Token;
-        _ = SaveModelAfterDelayAsync(token);
-    }
-
-    private async Task SaveProviderAfterDelayAsync(CancellationToken token)
-    {
-        try { await Task.Delay(500, token); if (!token.IsCancellationRequested) await SaveProviderAsync(); }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-    }
-
-    private async Task SaveModelAfterDelayAsync(CancellationToken token)
-    {
-        try { await Task.Delay(500, token); if (!token.IsCancellationRequested) await SaveModelAsync(); }
-        catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-    }
 }
 
 public sealed class ProviderEditorViewModel : NotifyViewModel

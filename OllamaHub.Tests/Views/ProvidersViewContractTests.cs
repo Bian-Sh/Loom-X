@@ -77,8 +77,28 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("private bool suppressConfigurationRefresh;", source, StringComparison.Ordinal);
         Assert.Contains("if (suppressConfigurationRefresh) return;", source, StringComparison.Ordinal);
         Assert.Contains("suppressConfigurationRefresh = true;", source, StringComparison.Ordinal);
-        Assert.Contains("finally { suppressAutoSave = false; suppressConfigurationRefresh = false; }", source, StringComparison.Ordinal);
         Assert.Contains("finally { suppressConfigurationRefresh = false; }", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProviderEditorUsesControlEventsInsteadOfPerCharacterTimerSaves()
+    {
+        var viewModelPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var viewPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var codeBehindPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml.cs");
+        var viewModelSource = File.ReadAllText(viewModelPath);
+        var viewSource = File.ReadAllText(viewPath);
+        var codeBehindSource = File.ReadAllText(codeBehindPath);
+
+        Assert.DoesNotContain("ScheduleAutoSave", viewModelSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ScheduleModelAutoSave", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("LostFocus=\"ProviderEditorField_OnLostFocus\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("Click=\"ProviderEditorToggle_OnClick\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("SelectionChanged=\"ProviderEditorSelectionChanged\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("LostFocus=\"ModelEditorField_OnLostFocus\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("Click=\"ModelEditorToggle_OnClick\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("SaveProviderCommand.Execute(null)", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("SaveModelCommand.Execute(null)", codeBehindSource, StringComparison.Ordinal);
     }
 
     [Fact]
