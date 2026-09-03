@@ -67,4 +67,32 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("finally", source, StringComparison.Ordinal);
         Assert.Contains("StopModelSyncAnimation();", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void BaseUrlHelpControlUsesAdjacentQuestionMarkAndHelpCursor()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("<StackPanel Orientation=\"Horizontal\" Spacing=\"4\"><TextBlock Text=\"Base URL\"", source, StringComparison.Ordinal);
+        Assert.Contains("Cursor=\"Help\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Border Width=\"16\" Height=\"16\"", source, StringComparison.Ordinal);
+        Assert.Contains("<TextBlock Text=\"?\" FontSize=\"10\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TextBlock Text=\"?\" FontSize=\"12\" FontWeight=\"SemiBold\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Data=\"M 10,10 A 5,5", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProviderDirectoryMatchesEndpointListSurfaceContract()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("Classes=\"provider-list\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.provider-list\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.provider-list ListBoxItem\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.provider-list ListBoxItem:selected\"><Setter Property=\"Background\" Value=\"{DynamicResource AccentSoftBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Property=\"Margin\" Value=\"0,0,0,1\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Border Padding=\"14,12\" Background=\"Transparent\" BorderBrush=\"{DynamicResource BorderStrongBrush}\" BorderThickness=\"0,0,0,1\">", source, StringComparison.Ordinal);
+    }
 }
