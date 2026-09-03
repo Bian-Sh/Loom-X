@@ -29,4 +29,60 @@ public sealed class ProviderEditorViewModelTests
 
         Assert.True(viewModel.Enabled);
     }
+
+    [Fact]
+    public void ToInput_ExcludesIncompleteHeaders()
+    {
+        var viewModel = new ProviderEditorViewModel();
+        viewModel.AddHeader();
+        viewModel.Headers[0].Name = "X-Incomplete";
+        viewModel.AddHeader();
+        viewModel.Headers[1].Name = "X-Complete";
+        viewModel.Headers[1].Value = "ready";
+
+        var input = viewModel.ToInput();
+
+        Assert.NotNull(input.Headers);
+        Assert.DoesNotContain("X-Incomplete", input.Headers!.Keys, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("ready", input.Headers["X-Complete"]);
+        Assert.Equal(1, viewModel.IncompleteHeaderCount);
+    }
+
+    [Fact]
+    public void ApplyResponse_PreservesIncompleteHeaderDrafts()
+    {
+        var viewModel = new ProviderEditorViewModel();
+        viewModel.AddHeader();
+        viewModel.Headers[0].Name = "X-Draft";
+
+        viewModel.ApplyResponse(new ProviderResponse(
+            Guid.NewGuid(),
+            "provider",
+            "Provider",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{\"X-Saved\":\"yes\"}",
+            []));
+
+        Assert.Equal(2, viewModel.Headers.Count);
+        Assert.Contains(viewModel.Headers, header => header.Name == "X-Draft" && header.Value == "");
+        Assert.Contains(viewModel.Headers, header => header.Name == "X-Saved" && header.Value == "yes");
+    }
+
+    [Fact]
+    public void AddingHeaderRaisesProviderChangeEvenWhenPersistedDictionaryIsUnchanged()
+    {
+        var viewModel = new ProviderEditorViewModel();
+        var changedProperties = new List<string?>();
+        viewModel.PropertyChanged += (_, args) => changedProperties.Add(args.PropertyName);
+
+        viewModel.AddHeader();
+
+        Assert.Contains(nameof(viewModel.Headers), changedProperties);
+        Assert.True(viewModel.HasIncompleteHeaders);
+    }
 }

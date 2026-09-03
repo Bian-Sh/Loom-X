@@ -104,6 +104,9 @@
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
+                          <Border IsVisible="{Binding SelectedProvider.HasIncompleteHeaders}" Background="{DynamicResource WarningSoftBrush}" BorderBrush="{DynamicResource WarningBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="10,8">
+                            <TextBlock Text="{Binding SelectedProvider.IncompleteHeaderCount, StringFormat='有 {0} 个请求头未完成，补全名称和值后才会保存。'}" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap"/>
+                          </Border>
                           <TextBlock Text="尚未添加自定义请求头" Classes="muted" IsVisible="{Binding SelectedProvider.HasNoHeaders}"/>
                         </StackPanel>
                           <Border Background="{DynamicResource SuccessSoftBrush}" BorderBrush="{DynamicResource SuccessBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="11">

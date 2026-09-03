@@ -485,19 +485,29 @@ public sealed class ProvidersViewModel : NotifyViewModel
 
     private async Task SaveProviderAsync()
     {
-        if (SelectedProvider is null) return;
+        var provider = SelectedProvider;
+        if (provider is null) return;
         try
         {
-            var provider = SelectedProvider;
             var input = provider.ToInput();
             var response = provider.Id == Guid.Empty ? await configService.CreateProviderAsync(input) : await configService.UpdateProviderAsync(provider.Id, input);
             suppressAutoSave = true;
             provider.ApplyResponse(response);
             suppressAutoSave = false;
             UpdateSummary();
-            Status = "Provider 已保存";
+            if (provider.IncompleteHeaderCount > 0)
+            {
+                Status = $"Provider 已保存 · {provider.IncompleteHeaderCount} 个请求头待补全";
+                toastService.Show($"请补全 {provider.IncompleteHeaderCount} 个自定义请求头", ToastLevel.Warning);
+                logger?.LogWarning("Provider 保存完成但存在未完成请求头 {ProviderId} {IncompleteHeaderCount}", provider.BusinessId, provider.IncompleteHeaderCount);
+            }
+            else
+            {
+                Status = "Provider 已保存";
+                logger?.LogInformation("Provider 保存完成 {ProviderId}", provider.BusinessId);
+            }
         }
-        catch (Exception exception) { suppressAutoSave = false; Status = $"保存失败：{exception.Message}"; }
+        catch (Exception exception) { suppressAutoSave = false; logger?.LogError(exception, "Provider 保存失败 {ProviderId}", provider.BusinessId); Status = $"保存失败：{exception.Message}"; }
     }
 
     private async Task DeleteProviderAsync(ProviderEditorViewModel? provider = null)
@@ -631,7 +641,8 @@ public sealed class ProvidersViewModel : NotifyViewModel
     private void ProviderChanged(object? sender, PropertyChangedEventArgs args)
     {
         UpdateSummary();
-        if (!suppressAutoSave) ScheduleAutoSave();
+        if (!suppressAutoSave && args.PropertyName is not (nameof(ProviderEditorViewModel.IncompleteHeaderCount) or nameof(ProviderEditorViewModel.HasIncompleteHeaders)))
+            ScheduleAutoSave();
     }
     private void ModelsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
@@ -700,6 +711,9 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public ObservableCollection<ModelEditorViewModel> Models { get; } = [];
     public ObservableCollection<HeaderEditorViewModel> Headers { get; } = [];
     public bool HasNoHeaders => Headers.Count == 0;
+    public int IncompleteHeaderCount => Headers.Count(IsIncomplete);
+    public bool HasIncompleteHeaders => IncompleteHeaderCount > 0;
+    public ProviderEditorViewModel() => Headers.CollectionChanged += HeadersChanged;
     public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel(); value.ApplyResponse(response); foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
     public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, apiKeyEdited ? ApiKey : null, false, ToHeaderDictionary(), UseProxy, string.IsNullOrWhiteSpace(ModelListUrl) ? null : ModelListUrl, EndpointFormat);
     public void ApplyResponse(ProviderResponse response)
@@ -721,17 +735,30 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     }
     private void SetHeadersFromJson(string json)
     {
+        var incompleteHeaders = Headers.Where(IsIncomplete).ToArray();
         Headers.CollectionChanged -= HeadersChanged;
         foreach (var header in Headers) header.PropertyChanged -= HeaderChanged;
         Headers.Clear();
+        var incompleteNames = incompleteHeaders
+            .Where(header => !string.IsNullOrWhiteSpace(header.Name))
+            .Select(header => header.Name.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in ParseDictionary(json) ?? [])
         {
+            if (incompleteNames.Contains(pair.Key.Trim())) continue;
             var header = new HeaderEditorViewModel { Name = pair.Key, Value = pair.Value };
+            header.PropertyChanged += HeaderChanged;
+            Headers.Add(header);
+        }
+        foreach (var header in incompleteHeaders)
+        {
             header.PropertyChanged += HeaderChanged;
             Headers.Add(header);
         }
         Headers.CollectionChanged += HeadersChanged;
         OnPropertyChanged(nameof(HasNoHeaders));
+        OnPropertyChanged(nameof(IncompleteHeaderCount));
+        OnPropertyChanged(nameof(HasIncompleteHeaders));
         HeadersJson = JsonSerializer.Serialize(ToHeaderDictionary());
     }
     private void HeadersChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
@@ -739,16 +766,25 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
         if (args.NewItems is not null) foreach (HeaderEditorViewModel header in args.NewItems) header.PropertyChanged += HeaderChanged;
         if (args.OldItems is not null) foreach (HeaderEditorViewModel header in args.OldItems) header.PropertyChanged -= HeaderChanged;
         OnPropertyChanged(nameof(HasNoHeaders));
+        OnPropertyChanged(nameof(IncompleteHeaderCount));
+        OnPropertyChanged(nameof(HasIncompleteHeaders));
+        HeadersJson = JsonSerializer.Serialize(ToHeaderDictionary());
+        OnPropertyChanged(nameof(Headers));
+    }
+    private void HeaderChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        OnPropertyChanged(nameof(IncompleteHeaderCount));
+        OnPropertyChanged(nameof(HasIncompleteHeaders));
         HeadersJson = JsonSerializer.Serialize(ToHeaderDictionary());
     }
-    private void HeaderChanged(object? sender, PropertyChangedEventArgs args) => HeadersJson = JsonSerializer.Serialize(ToHeaderDictionary());
     private Dictionary<string, string> ToHeaderDictionary()
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var header in Headers)
-            if (!string.IsNullOrWhiteSpace(header.Name)) result[header.Name.Trim()] = header.Value;
+            if (!string.IsNullOrWhiteSpace(header.Name) && !string.IsNullOrWhiteSpace(header.Value)) result[header.Name.Trim()] = header.Value;
         return result;
     }
+    private static bool IsIncomplete(HeaderEditorViewModel header) => string.IsNullOrWhiteSpace(header.Name) || string.IsNullOrWhiteSpace(header.Value);
     internal static Dictionary<string, string>? ParseDictionary(string json) => string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(json);
 }
 

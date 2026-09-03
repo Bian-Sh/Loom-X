@@ -33,4 +33,15 @@ public sealed class ProvidersViewContractTests
         Assert.Equal(2, source.Split("ColumnDefinitions=\"1.5*,*,80,100,56\"", StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("M 6,8 L 11,8 M 6,16 L 11,16", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void IncompleteHeadersShowPersistentWarning()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("SelectedProvider.HasIncompleteHeaders", source, StringComparison.Ordinal);
+        Assert.Contains("SelectedProvider.IncompleteHeaderCount", source, StringComparison.Ordinal);
+        Assert.Contains("补全名称和值后才会保存", source, StringComparison.Ordinal);
+    }
 }
