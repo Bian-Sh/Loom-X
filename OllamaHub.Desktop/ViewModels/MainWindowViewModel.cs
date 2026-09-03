@@ -152,6 +152,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private string graphStatus = "等待网关启动";
     private string gatewayActionLabel = "启动网关";
     private bool gatewayToggleInProgress;
+    private bool refreshInProgress;
     private string topologyJson = "{\"endpoints\":[],\"combos\":[],\"providers\":[],\"models\":[],\"edges\":[]}";
     private readonly Dictionary<string, RequestTelemetryEvent> activeRequests = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> activeEdgeCounts = new(StringComparer.OrdinalIgnoreCase);
@@ -264,9 +265,11 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 
     private async Task RefreshAsync()
     {
+        if (refreshInProgress) return;
+        refreshInProgress = true;
         try
         {
-            await dataStore.InitializeAsync();
+            await dataStore.RefreshAsync();
             var config = dataStore.CurrentConfig;
             Endpoint = config.Server.Urls.Count > 0 ? config.Server.Urls[0] : "http://127.0.0.1:11434";
             ProviderCount = config.Providers.Count;
@@ -293,7 +296,10 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             logger?.LogError(exception, "概览刷新失败");
             GraphStatus = "概览加载失败";
         }
-        await Task.CompletedTask;
+        finally
+        {
+            refreshInProgress = false;
+        }
     }
 
     private async Task RefreshRecentRequestsAsync()
@@ -340,7 +346,13 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
                 var comboVm = new OverviewComboViewModel(ComboId(endpoint.Key, combo.Name), endpoint.Key, combo.Name, combo.Enabled);
                 Combos.Add(comboVm);
                 foreach (var route in combo.Routes.Where(item => item.Enabled))
-                    endpointVm.Routes.Add(new OverviewRouteViewModel(combo.Name, route.Model.DisplayName, route.Model.ModelId, route.Model.ProviderId));
+                {
+                    var routeVm = new OverviewRouteViewModel(combo.Name, route.Model.DisplayName, route.Model.ModelId, route.Model.ProviderId)
+                    {
+                        IsActive = activeEdgeCounts.ContainsKey(EdgeKey(endpoint.Key, route.Model.ProviderId, route.Model.ModelId))
+                    };
+                    endpointVm.Routes.Add(routeVm);
+                }
             }
             Endpoints.Add(endpointVm);
         }
@@ -369,6 +381,12 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         var edges = new List<object>();
         var comboProviders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var providerModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var model in config.Models)
+        {
+            var modelKey = $"{model.ProviderId}|{model.ModelId}";
+            if (providerModels.Add(modelKey))
+                edges.Add(new { type = "provider-model", sourceType = "provider", sourceId = model.ProviderId, targetType = "model", targetId = modelKey, endpointKey = "", comboId = "", providerId = model.ProviderId, modelId = model.ModelId });
+        }
         foreach (var endpoint in config.GatewayEndpoints)
         foreach (var combo in endpoint.Combos)
         {
@@ -398,14 +416,16 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 
     private void OnConfigurationChanged(object? sender, EventArgs args)
     {
+        if (refreshInProgress) return;
         if (Dispatcher.UIThread.CheckAccess()) _ = RefreshAsync();
-        else Dispatcher.UIThread.Post(() => _ = RefreshAsync());
+        else Dispatcher.UIThread.Post(() => { if (!refreshInProgress) _ = RefreshAsync(); });
     }
 
     private void OnGatewayStateChanged(object? sender, EventArgs args)
     {
+        if (refreshInProgress) return;
         if (Dispatcher.UIThread.CheckAccess()) _ = RefreshAsync();
-        else Dispatcher.UIThread.Post(() => _ = RefreshAsync());
+        else Dispatcher.UIThread.Post(() => { if (!refreshInProgress) _ = RefreshAsync(); });
     }
 
     private void OnTelemetryPublished(object? sender, RequestTelemetryEvent telemetryEvent) => Dispatcher.UIThread.Post(() =>

@@ -18,6 +18,7 @@ public interface IOverviewGraphHost : IDisposable
 
 public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGraphHost> logger) : IOverviewGraphHost
 {
+    private const int PendingTelemetryLimit = 256;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = null,
@@ -28,8 +29,14 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
     private bool pageReady;
     private bool flushingTopology;
     private bool flushingMetrics;
+    private bool flushingTelemetry;
+    private int topologyRetryDelayMs = 250;
+    private int metricsRetryDelayMs = 250;
+    private int telemetryRetryDelayMs = 250;
     private string? pendingTopology;
     private string? pendingMetrics;
+    private readonly object telemetryGate = new();
+    private readonly LinkedList<RequestTelemetryEvent> pendingTelemetry = new();
     private HttpListener? assetServer;
     private CancellationTokenSource? assetServerCancellation;
 
@@ -120,11 +127,14 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
 
     public void Detach()
     {
-        if (viewModel is null) return;
-        viewModel.TopologyChanged -= OnTopologyChanged;
-        viewModel.GraphMetricsChanged -= OnMetricsChanged;
-        viewModel.GraphTelemetryPublished -= OnTelemetryPublished;
-        viewModel = null;
+        if (viewModel is not null)
+        {
+            viewModel.TopologyChanged -= OnTopologyChanged;
+            viewModel.GraphMetricsChanged -= OnMetricsChanged;
+            viewModel.GraphTelemetryPublished -= OnTelemetryPublished;
+            viewModel = null;
+        }
+        lock (telemetryGate) pendingTelemetry.Clear();
     }
 
     private void OnTopologyChanged(object? sender, EventArgs args)
@@ -144,8 +154,16 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
     private void OnTelemetryPublished(object? sender, RequestTelemetryEvent telemetryEvent)
     {
         logger.LogDebug("概览收到遥测 {Kind} {RequestId} {EndpointKey}/{ProviderId}/{ModelId}，页面就绪 {PageReady}", telemetryEvent.Kind, telemetryEvent.RequestId, telemetryEvent.EndpointKey, telemetryEvent.ProviderId, telemetryEvent.ModelId, pageReady);
-        if (!pageReady) return;
-        _ = InvokeAsync($"window.receiveTelemetry({JsonSerializer.Serialize(telemetryEvent, JsonOptions)});");
+        lock (telemetryGate)
+        {
+            if (pendingTelemetry.Count >= PendingTelemetryLimit)
+            {
+                pendingTelemetry.RemoveFirst();
+                logger.LogWarning("概览遥测待发送队列已满，丢弃最早事件，容量 {Capacity}", PendingTelemetryLimit);
+            }
+            pendingTelemetry.AddLast(telemetryEvent);
+        }
+        if (pageReady) _ = FlushPendingTelemetryAsync();
     }
 
     private async Task FlushPendingAsync()
@@ -162,16 +180,16 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
         {
             var result = await webView.InvokeScript($"window.applyTopology({json});");
             logger.LogInformation("概览拓扑已发送 {TopologyLength} 字节，脚本返回长度 {ResultLength}", topologyJson.Length, result?.Length ?? 0);
+            topologyRetryDelayMs = 250;
             await LogPageDiagnosticsAsync("拓扑发送后");
             if (string.Equals(pendingTopology, topologyJson, StringComparison.Ordinal)) pendingTopology = null;
         }
-        catch (InvalidOperationException exception) { logger.LogWarning(exception, "概览 WebView 当前不可调用脚本"); }
-        catch (PlatformNotSupportedException exception) { logger.LogWarning(exception, "概览 WebView 平台不支持脚本调用"); }
-        catch (Exception exception) { logger.LogError(exception, "概览 WebView 拓扑脚本调用失败"); }
+        catch (InvalidOperationException exception) { logger.LogWarning(exception, "概览 WebView 当前不可调用脚本"); ScheduleTopologyRetry(); }
+        catch (PlatformNotSupportedException exception) { logger.LogWarning(exception, "概览 WebView 平台不支持脚本调用"); ScheduleTopologyRetry(); }
+        catch (Exception exception) { logger.LogError(exception, "概览 WebView 拓扑脚本调用失败"); ScheduleTopologyRetry(); }
         finally
         {
             flushingTopology = false;
-            if (pageReady && !string.IsNullOrWhiteSpace(pendingTopology)) _ = FlushPendingAsync();
         }
     }
 
@@ -189,16 +207,105 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
         {
             var result = await webView.InvokeScript($"window.applyMetrics({json});");
             logger.LogInformation("概览指标已发送 {MetricsLength} 字节，脚本返回长度 {ResultLength}", metricsJson.Length, result?.Length ?? 0);
+            metricsRetryDelayMs = 250;
             if (string.Equals(pendingMetrics, metricsJson, StringComparison.Ordinal)) pendingMetrics = null;
         }
-        catch (InvalidOperationException exception) { logger.LogWarning(exception, "概览 WebView 当前不可发送指标"); }
-        catch (PlatformNotSupportedException exception) { logger.LogWarning(exception, "概览 WebView 平台不支持指标脚本调用"); }
-        catch (Exception exception) { logger.LogError(exception, "概览 WebView 指标脚本调用失败"); }
+        catch (InvalidOperationException exception) { logger.LogWarning(exception, "概览 WebView 当前不可发送指标"); ScheduleMetricsRetry(); }
+        catch (PlatformNotSupportedException exception) { logger.LogWarning(exception, "概览 WebView 平台不支持指标脚本调用"); ScheduleMetricsRetry(); }
+        catch (Exception exception) { logger.LogError(exception, "概览 WebView 指标脚本调用失败"); ScheduleMetricsRetry(); }
         finally
         {
             flushingMetrics = false;
-            if (pageReady && !string.IsNullOrWhiteSpace(pendingMetrics)) _ = FlushPendingMetricsAsync();
         }
+    }
+
+    private async Task FlushPendingTelemetryAsync()
+    {
+        if (!pageReady) return;
+        lock (telemetryGate)
+        {
+            if (flushingTelemetry || pendingTelemetry.Count == 0) return;
+            flushingTelemetry = true;
+        }
+        try
+        {
+            while (pageReady)
+            {
+                RequestTelemetryEvent telemetryEvent;
+                lock (telemetryGate)
+                {
+                    if (pendingTelemetry.First is not { } node) break;
+                    telemetryEvent = node.Value;
+                    pendingTelemetry.RemoveFirst();
+                }
+                try
+                {
+                    await webView.InvokeScript($"window.receiveTelemetry({JsonSerializer.Serialize(telemetryEvent, JsonOptions)});");
+                    telemetryRetryDelayMs = 250;
+                }
+                catch (InvalidOperationException exception) { RequeueTelemetry(telemetryEvent); logger.LogWarning(exception, "概览 WebView 当前不可发送遥测"); ScheduleTelemetryRetry(); break; }
+                catch (PlatformNotSupportedException exception) { RequeueTelemetry(telemetryEvent); logger.LogWarning(exception, "概览 WebView 平台不支持遥测脚本调用"); ScheduleTelemetryRetry(); break; }
+                catch (Exception exception) { RequeueTelemetry(telemetryEvent); logger.LogError(exception, "概览 WebView 遥测脚本调用失败"); ScheduleTelemetryRetry(); break; }
+            }
+        }
+        finally
+        {
+            lock (telemetryGate) flushingTelemetry = false;
+        }
+    }
+
+    private void RequeueTelemetry(RequestTelemetryEvent telemetryEvent)
+    {
+        lock (telemetryGate)
+        {
+            if (pendingTelemetry.Count >= PendingTelemetryLimit) pendingTelemetry.RemoveLast();
+            pendingTelemetry.AddFirst(telemetryEvent);
+        }
+    }
+
+    private void ScheduleTopologyRetry()
+    {
+        if (!pageReady || string.IsNullOrWhiteSpace(pendingTopology)) return;
+        var delay = topologyRetryDelayMs;
+        topologyRetryDelayMs = Math.Min(topologyRetryDelayMs * 2, 5000);
+        _ = RetryTopologyAsync(delay);
+    }
+
+    private void ScheduleMetricsRetry()
+    {
+        if (!pageReady || string.IsNullOrWhiteSpace(pendingMetrics)) return;
+        var delay = metricsRetryDelayMs;
+        metricsRetryDelayMs = Math.Min(metricsRetryDelayMs * 2, 5000);
+        _ = RetryMetricsAsync(delay);
+    }
+
+    private void ScheduleTelemetryRetry()
+    {
+        lock (telemetryGate)
+        {
+            if (!pageReady || pendingTelemetry.Count == 0) return;
+        }
+        var delay = telemetryRetryDelayMs;
+        telemetryRetryDelayMs = Math.Min(telemetryRetryDelayMs * 2, 5000);
+        _ = RetryTelemetryAsync(delay);
+    }
+
+    private async Task RetryTopologyAsync(int delay)
+    {
+        await Task.Delay(delay);
+        if (pageReady) await FlushPendingAsync();
+    }
+
+    private async Task RetryMetricsAsync(int delay)
+    {
+        await Task.Delay(delay);
+        if (pageReady) await FlushPendingMetricsAsync();
+    }
+
+    private async Task RetryTelemetryAsync(int delay)
+    {
+        await Task.Delay(delay);
+        if (pageReady) await FlushPendingTelemetryAsync();
     }
 
     private void OnWebMessageReceived(object? sender, WebMessageReceivedEventArgs args)
@@ -210,6 +317,7 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
             logger.LogInformation("概览网页报告 graph-ready");
             _ = FlushPendingAsync();
             _ = FlushPendingMetricsAsync();
+            _ = FlushPendingTelemetryAsync();
             return;
         }
         if (args.Body?.StartsWith("graph-debug:", StringComparison.Ordinal) == true)
@@ -224,19 +332,19 @@ public sealed class OverviewGraphHost(NativeWebView webView, ILogger<OverviewGra
 
     private void OnNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs args)
     {
+        var successProperty = args.GetType().GetProperty("IsSuccess");
+        if (successProperty?.PropertyType == typeof(bool) && successProperty.GetValue(args) is false)
+        {
+            pageReady = false;
+            logger.LogWarning("概览 WebView 导航失败，等待后续重试");
+            return;
+        }
         // WebView2 某些版本不转发网页消息，导航完成后仍需刷新首个快照。
         pageReady = true;
         logger.LogInformation("概览 WebView 导航完成，使用导航兜底标记页面就绪");
         _ = FlushPendingAsync();
         _ = FlushPendingMetricsAsync();
-    }
-
-    private async Task InvokeAsync(string script)
-    {
-        try { await webView.InvokeScript(script); }
-        catch (InvalidOperationException exception) { logger.LogWarning(exception, "概览 WebView 遥测脚本调用失败"); }
-        catch (PlatformNotSupportedException exception) { logger.LogWarning(exception, "概览 WebView 平台不支持遥测脚本调用"); }
-        catch (Exception exception) { logger.LogError(exception, "概览 WebView 遥测脚本调用异常"); }
+        _ = FlushPendingTelemetryAsync();
     }
 
     private async Task LogPageDiagnosticsAsync(string reason)

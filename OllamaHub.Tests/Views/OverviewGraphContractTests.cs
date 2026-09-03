@@ -28,6 +28,9 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("assetServer.Prefixes.Add($\"http://127.0.0.1:{port}/\")", source, StringComparison.Ordinal);
         Assert.Contains("webView.Navigate(pageUri)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("webView.Source =", source, StringComparison.Ordinal);
+        Assert.Contains("PendingTelemetryLimit", source, StringComparison.Ordinal);
+        Assert.Contains("pendingTelemetry", source, StringComparison.Ordinal);
+        Assert.Contains("FlushPendingTelemetryAsync", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -62,6 +65,9 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("cameraDistance+e.deltaY*.012", source, StringComparison.Ordinal);
         Assert.Contains("combos", source, StringComparison.Ordinal);
         Assert.Contains("providers", source, StringComparison.Ordinal);
+        Assert.Contains("comboId:edge.comboId", source, StringComparison.Ordinal);
+        Assert.Contains("function escapeHtml", source, StringComparison.Ordinal);
+        Assert.Contains("getBoundingClientRect", source, StringComparison.Ordinal);
     }
 
     [Fact]
