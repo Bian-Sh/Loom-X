@@ -1,8 +1,8 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <!-- 透明度只修改现有表面 Alpha，Blur 使用独立遮罩，两个参数互不覆盖。 -->
+  <!-- 玻璃拟态配置：调整透明度时优先修改 Alpha 通道，保持色相与层级不变。 -->
+  <!-- 透明度基线：Glass 72%，GlassStrong 82%，Surface 78%，SurfaceSubtle 64%。 -->
   <!-- 磨砂方案：窗口使用 AcrylicBlur，下面的 fallback 色保证不支持 Acrylic 的环境仍有冷灰蓝材质。 -->
   <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#E6D5E4E9" />
-  <SolidColorBrush x:Key="BlurOverlayBrush" Color="#008EA1AA" />
   <SolidColorBrush x:Key="GlassBrush" Color="#B8DCE7EC" />
   <SolidColorBrush x:Key="GlassStrongBrush" Color="#D0F2F7F8" />
   <SolidColorBrush x:Key="SurfaceBrush" Color="#C7F8FAFB" />

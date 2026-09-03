@@ -17,11 +17,11 @@ public sealed class SettingsViewContractTests
         var source = ReadDesktopFile("Views", "SettingsView.axaml");
 
         Assert.Contains("<Slider Value=\"{Binding TransparencyOpacity, Mode=TwoWay}\" Minimum=\"0\" Maximum=\"100\" TickFrequency=\"1\" IsSnapToTickEnabled=\"True\"", source, StringComparison.Ordinal);
-        Assert.Contains("<Slider Value=\"{Binding BlurAmount, Mode=TwoWay}\" Minimum=\"0\" Maximum=\"200\" TickFrequency=\"1\" IsSnapToTickEnabled=\"True\"", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"透明度\"", source, StringComparison.Ordinal);
-        Assert.Contains("数值越低越透明，数值越高越不透明。", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"颗粒晕开度（Blur）\"", source, StringComparison.Ordinal);
-        Assert.Contains("数值越低越通透，数值越高越模糊（0 到 200）。", source, StringComparison.Ordinal);
+        Assert.Contains("<Slider Value=\"{Binding BlurAmount, Mode=TwoWay}\" Minimum=\"0\" Maximum=\"64\" TickFrequency=\"1\" IsSnapToTickEnabled=\"True\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"透明程度\"", source, StringComparison.Ordinal);
+        Assert.Contains("数值越高，内容区域越不透明。", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"磨砂程度\"", source, StringComparison.Ordinal);
+        Assert.Contains("控制材质的系统模糊强度（0-64）。", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding TransparencyOpacity, StringFormat='{}{0}%'}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding BlurAmount}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<NumericUpDown Grid.Column=\"1\" Value=\"{Binding TransparencyOpacity}\"", source, StringComparison.Ordinal);
@@ -43,32 +43,32 @@ public sealed class SettingsViewContractTests
         Assert.Contains("Math.Clamp(opacity, 0, 100)", windowSource, StringComparison.Ordinal);
         Assert.Contains("TransparencyOpacity is < 0 or > 100", serviceSource, StringComparison.Ordinal);
 
-        var alphaAtZero = MainWindow.CalculateBrushAlpha(230, 0);
-        var alphaAtOne = MainWindow.CalculateBrushAlpha(230, 1);
-        var alphaAtFour = MainWindow.CalculateBrushAlpha(230, 4);
-        var alphaAtTen = MainWindow.CalculateBrushAlpha(230, 10);
-        var alphaAtHundred = MainWindow.CalculateBrushAlpha(230, 100);
+        var tint = MainWindow.CalculateBlurTintFactor(24);
+        var alphaAtZero = MainWindow.CalculateBrushAlpha(230, 0, tint);
+        var alphaAtOne = MainWindow.CalculateBrushAlpha(230, 1, tint);
+        var alphaAtFour = MainWindow.CalculateBrushAlpha(230, 4, tint);
+        var alphaAtHundred = MainWindow.CalculateBrushAlpha(230, 100, tint);
 
-        Assert.Equal(0, alphaAtZero);
+        Assert.True(alphaAtZero > 0);
         Assert.True(alphaAtOne > alphaAtZero);
         Assert.True(alphaAtFour > alphaAtOne);
-        Assert.True(alphaAtTen > alphaAtFour);
-        Assert.True(alphaAtHundred > alphaAtTen);
-        Assert.Equal(0, MainWindow.CalculateOpacityFactor(0), 3);
+        Assert.True(alphaAtHundred > alphaAtFour);
+        Assert.Equal(0.16, MainWindow.CalculateOpacityFactor(0), 3);
         Assert.Equal(1, MainWindow.CalculateOpacityFactor(100), 3);
     }
 
     [Fact]
-    public void TransparencyOpacityControlsSurfaceAlphaWithoutDependingOnBlur()
+    public void BlurTintChangesSmoothlyWithoutChangingTheOpacityScale()
     {
         var lowBlur = MainWindow.CalculateBlurTintFactor(0);
-        var highBlur = MainWindow.CalculateBlurTintFactor(200);
+        var highBlur = MainWindow.CalculateBlurTintFactor(64);
 
-        Assert.Equal(0, MainWindow.CalculateBrushAlpha(230, 0, lowBlur));
-        Assert.Equal(230, MainWindow.CalculateBrushAlpha(230, 100, lowBlur));
-        Assert.Equal(
-            MainWindow.CalculateBrushAlpha(230, 50, lowBlur),
-            MainWindow.CalculateBrushAlpha(230, 50, highBlur));
+        Assert.Equal(0.35, lowBlur, 3);
+        Assert.Equal(1, highBlur, 3);
+        Assert.True(highBlur > lowBlur);
+        Assert.True(
+            MainWindow.CalculateBrushAlpha(230, 86, highBlur)
+            > MainWindow.CalculateBrushAlpha(230, 86, lowBlur));
     }
 
     [Fact]
@@ -77,61 +77,25 @@ public sealed class SettingsViewContractTests
         var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
 
         Assert.Contains("WindowTransparencyLevel.Transparent", windowSource, StringComparison.Ordinal);
-        Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(blurAmount);", windowSource, StringComparison.Ordinal);
-        Assert.Contains("Math.Clamp(blurAmount, MinimumBlurAmount, MaximumBlurAmount)", windowSource, StringComparison.Ordinal);
-        Assert.Contains("Math.Clamp(blurAmount, MinimumBlurAmount, MaximumBlurAmount) / (double)MaximumBlurAmount", windowSource, StringComparison.Ordinal);
+        Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(algorithm);", windowSource, StringComparison.Ordinal);
         Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("TransparentBlurThreshold", windowSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("[WindowTransparencyLevel.Transparent, WindowTransparencyLevel.AcrylicBlur]", windowSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("WindowTransparencyLevel.Mica", windowSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("WindowTransparencyLevel.Blur", windowSource, StringComparison.Ordinal);
+        Assert.Contains("0.35 + (Math.Clamp(blurAmount, 0, 64) / 64d * 0.65)", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("TransparencyLevelHint = !enabled", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("[WindowTransparencyLevel.None]", windowSource, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void BlurOverlayChangesContinuouslyWithoutChangingMaterialPriority()
+    public void TransparencyAlgorithmAlwaysUsesAcrylicMaterial()
     {
-        var lowBlur = MainWindow.CalculateBlurTintFactor(0);
-        var baselineBlur = MainWindow.CalculateBlurTintFactor(100);
-        var highBlur = MainWindow.CalculateBlurTintFactor(200);
+        var expected = new[]
+        {
+            WindowTransparencyLevel.AcrylicBlur,
+            WindowTransparencyLevel.Transparent
+        };
 
-        Assert.Equal(0, lowBlur, 3);
-        Assert.Equal(0.5, baselineBlur, 3);
-        Assert.Equal(1, highBlur, 3);
-        Assert.True(baselineBlur > lowBlur);
-        Assert.True(highBlur > baselineBlur);
-        Assert.Equal(
-            new[]
-            {
-                WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Transparent
-            },
-            MainWindow.BuildTransparencyLevels(0));
-        Assert.Equal(
-            new[]
-            {
-                WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Transparent
-            },
-            MainWindow.BuildTransparencyLevels(200));
-        Assert.Equal(
-            new[]
-            {
-                WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Transparent
-            },
-            MainWindow.BuildTransparencyLevels(99));
-        Assert.Equal(
-            new[]
-            {
-                WindowTransparencyLevel.AcrylicBlur,
-                WindowTransparencyLevel.Transparent
-            },
-            MainWindow.BuildTransparencyLevels(100));
-        Assert.Equal(0, MainWindow.CalculateBlurOverlayAlpha(86, 0));
-        Assert.True(MainWindow.CalculateBlurOverlayAlpha(86, 100) > MainWindow.CalculateBlurOverlayAlpha(86, 0));
-        Assert.True(MainWindow.CalculateBlurOverlayAlpha(86, 200) > MainWindow.CalculateBlurOverlayAlpha(86, 100));
+        Assert.Equal(expected, MainWindow.BuildTransparencyLevels("acrylic"));
+        Assert.Equal(expected, MainWindow.BuildTransparencyLevels("blur"));
+        Assert.Equal(expected, MainWindow.BuildTransparencyLevels("mica"));
     }
 
     [Fact]
@@ -202,7 +166,6 @@ public sealed class SettingsViewContractTests
             new Uri("avares://OllamaHub.Desktop/Styles/VisualTokens.axaml")));
 
         var brush = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]);
-        Assert.IsType<SolidColorBrush>(dictionary["BlurOverlayBrush"]);
         var originalColor = brush.Color;
         brush.Color = Color.FromArgb(12, originalColor.R, originalColor.G, originalColor.B);
 
@@ -218,22 +181,16 @@ public sealed class SettingsViewContractTests
             new Uri("avares://OllamaHub.Desktop/Styles/VisualTokens.axaml")));
         window.Resources.MergedDictionaries.Add(dictionary);
 
-        window.ApplyAppearance(true, 0, 200, "acrylic");
-        var transparentSurfaceAlpha = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]).Color.A;
-        var transparentBlurAlpha = Assert.IsType<SolidColorBrush>(dictionary["BlurOverlayBrush"]).Color.A;
+        window.ApplyAppearance(true, 0, 64, "acrylic");
+        var highBlurSurfaceAlpha = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]).Color.A;
 
         window.ApplyAppearance(true, 100, 0, "mica");
-        var opaqueSurfaceAlpha = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]).Color.A;
-        var clearBlurAlpha = Assert.IsType<SolidColorBrush>(dictionary["BlurOverlayBrush"]).Color.A;
+        var lowBlurSurfaceAlpha = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]).Color.A;
 
-        Assert.Equal(0, transparentSurfaceAlpha);
-        Assert.Equal(0, transparentBlurAlpha);
-        Assert.Equal(230, opaqueSurfaceAlpha);
-        Assert.Equal(0, clearBlurAlpha);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(230, 0, MainWindow.CalculateBlurTintFactor(64)), highBlurSurfaceAlpha);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(230, 100, MainWindow.CalculateBlurTintFactor(0)), lowBlurSurfaceAlpha);
+        Assert.True(lowBlurSurfaceAlpha > highBlurSurfaceAlpha);
 
-        window.ApplyAppearance(true, 100, 200, "acrylic");
-
-        Assert.True(Assert.IsType<SolidColorBrush>(dictionary["BlurOverlayBrush"]).Color.A > clearBlurAlpha);
         Assert.Equal(Brushes.Transparent, window.Background);
         Assert.Equal(
             new[]

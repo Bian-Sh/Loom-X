@@ -21,7 +21,7 @@ public sealed record GatewayEndpointToggleInput(bool Enabled);
 internal static class AppearanceSettingsLimits
 {
     public const int MinimumBlurAmount = 0;
-    public const int MaximumBlurAmount = 200;
+    public const int MaximumBlurAmount = 64;
 
     public static int NormalizeBlurAmount(int value) => Math.Clamp(value, MinimumBlurAmount, MaximumBlurAmount);
 }
@@ -254,7 +254,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         if (proxyMode == "custom" && (!Uri.TryCreate(input.ProxyHost?.Trim(), UriKind.Absolute, out var proxyUri) || proxyUri.Scheme is not ("http" or "https"))) throw new ArgumentException("自定义代理地址必须是 HTTP 或 HTTPS 地址。");
         if (input.LogRetentionDays is < 1 or > 3650) throw new ArgumentException("日志保留天数必须在 1 到 3650 之间。");
         if (input.TransparencyOpacity is < 0 or > 100) throw new ArgumentException("透明程度必须在 0 到 100 之间。");
-        if (input.BlurAmount is < AppearanceSettingsLimits.MinimumBlurAmount or > AppearanceSettingsLimits.MaximumBlurAmount) throw new ArgumentException("磨砂程度必须在 0 到 200 之间。");
+        if (input.BlurAmount is < AppearanceSettingsLimits.MinimumBlurAmount or > AppearanceSettingsLimits.MaximumBlurAmount) throw new ArgumentException("磨砂程度必须在 0 到 64 之间。");
         _ = NormalizeTransparencyAlgorithm(input.TransparencyAlgorithm);
     }
 
@@ -292,7 +292,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     private static void ApplyApiKey(ProviderEntity entity, string? value, bool clear) { if (clear || value is not null) entity.ProtectedApiKey = ProtectApiKey(value); }
     private static void ApplyApiKey(ModelEntity entity, string? value, bool clear) { if (clear) entity.ProtectedApiKey = null; else if (!string.IsNullOrWhiteSpace(value)) entity.ProtectedApiKey = ProtectApiKey(value); }
     private static ProviderResponse ToResponse(ProviderEntity provider) => new(provider.Id, provider.BusinessId, provider.DisplayName, provider.BaseUrl, provider.ApiMode, provider.Enabled, provider.UseProxy, !string.IsNullOrWhiteSpace(provider.ProtectedApiKey), provider.Models.Count, provider.HeadersJson, provider.Models.OrderBy(model => model.SortOrder).Select(model => ToResponse(provider, model)).ToArray(), provider.ModelListUrl, provider.EndpointFormat, ReadApiKey(provider.ProtectedApiKey));
-    private static AppSettingsResponse ToResponse(AppSettingsEntity settings) => new(settings.Id, settings.Language, settings.Theme, settings.ProxyMode, settings.ProxyHost, settings.ProxyPort, settings.ProxyUsername, !string.IsNullOrWhiteSpace(settings.ProtectedProxyPassword), settings.AutoCheckUpdates, settings.UpdateChannel, settings.DiagnosticsEnabled, settings.LogRetentionDays, settings.LogStackTrace, settings.TransparencyEnabled, settings.TransparencyOpacity, AppearanceSettingsLimits.NormalizeBlurAmount(settings.BlurAmount), settings.TransparencyAlgorithm);
+    private static AppSettingsResponse ToResponse(AppSettingsEntity settings) => new(settings.Id, settings.Language, settings.Theme, settings.ProxyMode, settings.ProxyHost, settings.ProxyPort, settings.ProxyUsername, !string.IsNullOrWhiteSpace(settings.ProtectedProxyPassword), settings.AutoCheckUpdates, settings.UpdateChannel, settings.DiagnosticsEnabled, settings.LogRetentionDays, settings.LogStackTrace, settings.TransparencyEnabled, settings.TransparencyOpacity, AppearanceSettingsLimits.NormalizeBlurAmount(settings.BlurAmount), "acrylic");
     private static ModelResponse ToResponse(ProviderEntity provider, ModelEntity model) => new(model.Id, provider.BusinessId, model.ModelId, model.DisplayName, model.ConfigId, model.Family, model.BaseUrl, model.ApiMode, model.ContextLength, model.MaxTokens, model.Vision, model.Temperature, model.TopP, model.Enabled, !string.IsNullOrWhiteSpace(model.ProtectedApiKey), model.HeadersJson, model.ExtraJson);
     private static string? ReadApiKey(string? protectedValue) => string.IsNullOrWhiteSpace(protectedValue) || !ProtectedApiKeyStore.TryUnprotect(protectedValue, out var plainText) ? null : plainText;
 }

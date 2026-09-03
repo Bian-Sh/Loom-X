@@ -11,8 +11,8 @@ using OllamaHub.Desktop.Services;
 namespace OllamaHub.Desktop;
 public partial class MainWindow : Window
 {
-    internal const int MinimumBlurAmount = 0;
-    internal const int MaximumBlurAmount = 200;
+    // 透明度为 0 时保留轻微基底，避免系统材质在 alpha=0 时退化为仅边框。
+    private const double MinimumOpacityFactor = 0.16;
     private readonly ToastService toastService;
     private readonly ILogger<MainWindow> logger;
     private readonly DispatcherTimer toastTimer;
@@ -29,7 +29,7 @@ public partial class MainWindow : Window
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MainWindow>.Instance;
         InitializeComponent();
         appearanceCoordinator = new WindowAppearanceCoordinator(this);
-        TransparencyLevelHint = BuildTransparencyLevels(appearanceCoordinator.Current.BlurAmount);
+        TransparencyLevelHint = BuildTransparencyLevels("acrylic");
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerMovedEvent, Window_OnPointerMoved, RoutingStrategies.Tunnel);
         toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
@@ -155,10 +155,10 @@ public partial class MainWindow : Window
         algorithm = "acrylic";
         logger.LogInformation("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
         opacity = Math.Clamp(opacity, 0, 100);
-        blurAmount = Math.Clamp(blurAmount, MinimumBlurAmount, MaximumBlurAmount);
+        blurAmount = Math.Clamp(blurAmount, 0, 64);
         appearanceCoordinator.Apply(enabled, opacity, blurAmount, algorithm);
         // 保留主窗口入口的显式材质赋值，兼容现有外观契约和运行时诊断。
-        TransparencyLevelHint = BuildTransparencyLevels(blurAmount);
+        TransparencyLevelHint = BuildTransparencyLevels(algorithm);
         logger.LogInformation(
             "透明外观应用完成 {Enabled} {Opacity} {BlurAmount} {Algorithm} {WindowBackgroundType} {GlassType} {ActualTransparencyLevel}",
             enabled,
@@ -183,9 +183,6 @@ public partial class MainWindow : Window
         return false;
     }
 
-    internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(int blurAmount) =>
-        [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent];
-
     internal static IReadOnlyList<WindowTransparencyLevel> BuildTransparencyLevels(string algorithm) =>
         [WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent];
 
@@ -193,23 +190,14 @@ public partial class MainWindow : Window
         ? brush
         : Brushes.Transparent;
 
-    internal static double CalculateBlurTintFactor(int blurAmount)
-        => Math.Clamp(blurAmount, MinimumBlurAmount, MaximumBlurAmount) / (double)MaximumBlurAmount;
+    internal static double CalculateBlurTintFactor(int blurAmount) =>
+        0.35 + (Math.Clamp(blurAmount, 0, 64) / 64d * 0.65);
 
-    internal static double CalculateOpacityFactor(int opacity) => Math.Clamp(opacity, 0, 100) / 100d;
+    internal static double CalculateOpacityFactor(int opacity) =>
+        MinimumOpacityFactor + ((1 - MinimumOpacityFactor) * (Math.Clamp(opacity, 0, 100) / 100d));
 
-    internal static byte CalculateBrushAlpha(byte baseAlpha, int opacity) =>
-        (byte)Math.Clamp(Math.Round(baseAlpha * CalculateOpacityFactor(opacity)), 0, 255);
-
-    // 保留旧签名，避免旧调用方失效；Blur 只作用于独立的磨砂遮罩，不再参与表面 Alpha。
-    internal static byte CalculateBrushAlpha(byte baseAlpha, int opacity, double _) => CalculateBrushAlpha(baseAlpha, opacity);
-
-    internal static byte CalculateBlurOverlayAlpha(int opacity, int blurAmount)
-    {
-        const byte maximumOverlayAlpha = 132;
-        var blurFactor = CalculateBlurTintFactor(blurAmount);
-        return (byte)Math.Clamp(Math.Round(maximumOverlayAlpha * blurFactor * CalculateOpacityFactor(opacity)), 0, 255);
-    }
+    internal static byte CalculateBrushAlpha(byte baseAlpha, int opacity, double blurTintFactor) =>
+        (byte)Math.Clamp(Math.Round(baseAlpha * CalculateOpacityFactor(opacity) * Math.Clamp(blurTintFactor, 0, 1)), 0, 255);
 
     internal static SolidColorBrush CreateOpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
         ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
