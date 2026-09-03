@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using Avalonia.Threading;
 using OllamaHub.Configuration;
 using OllamaHub.Desktop.Services;
 
@@ -83,7 +84,11 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         catch (Exception exception) { Status = $"网关加载失败：{exception.Message}"; }
     }
 
-    private void OnConfigurationChanged(object? sender, EventArgs args) => _ = RefreshAsync();
+    private void OnConfigurationChanged(object? sender, EventArgs args)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) _ = RefreshAsync();
+        else Dispatcher.UIThread.Post(() => _ = RefreshAsync());
+    }
 
     private async Task AddComboAsync()
     {

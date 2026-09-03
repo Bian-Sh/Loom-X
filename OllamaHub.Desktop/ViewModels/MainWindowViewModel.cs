@@ -101,12 +101,12 @@ public sealed class MainWindowViewModel : NotifyViewModel
 
     private void OnConfigurationChanged(object? sender, EventArgs args)
     {
-        if (Dispatcher.UIThread.CheckAccess()) return;
-        Dispatcher.UIThread.Post(() =>
+        void Apply()
         {
             if (dataStore.Settings is { } settings)
                 applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
-        });
+        }
+        if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
     }
 
     public void Dispose()
@@ -289,9 +289,17 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         return config.Server.Urls.Count > 0 ? config.Server.Urls[0] : "http://127.0.0.1:11434";
     }
 
-    private void OnConfigurationChanged(object? sender, EventArgs args) => _ = RefreshAsync();
+    private void OnConfigurationChanged(object? sender, EventArgs args)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) _ = RefreshAsync();
+        else Dispatcher.UIThread.Post(() => _ = RefreshAsync());
+    }
 
-    private void OnGatewayStateChanged(object? sender, EventArgs args) => _ = RefreshAsync();
+    private void OnGatewayStateChanged(object? sender, EventArgs args)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) _ = RefreshAsync();
+        else Dispatcher.UIThread.Post(() => _ = RefreshAsync());
+    }
 
     private void OnTelemetryPublished(object? sender, RequestTelemetryEvent telemetryEvent) => Dispatcher.UIThread.Post(() =>
     {
@@ -555,7 +563,11 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         catch (Exception exception) { suppressSelectionInvariant = false; logger?.LogError(exception, "Provider 页面刷新失败"); Status = $"加载失败：{exception.Message}"; }
     }
 
-    private void OnConfigurationChanged(object? sender, EventArgs args) => _ = RefreshAsync();
+    private void OnConfigurationChanged(object? sender, EventArgs args)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) _ = RefreshAsync();
+        else Dispatcher.UIThread.Post(() => _ = RefreshAsync());
+    }
 
     public void Dispose()
     {

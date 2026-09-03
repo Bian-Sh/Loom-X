@@ -37,5 +37,6 @@ public sealed class MainWindowNavigationContractTests
         Assert.Contains("CurrentView = settingsViewModel", source, StringComparison.Ordinal);
         Assert.DoesNotContain("CurrentView = new OverviewViewModel", source, StringComparison.Ordinal);
         Assert.DoesNotContain("CurrentView = new ProvidersViewModel", source, StringComparison.Ordinal);
+        Assert.Contains("Dispatcher.UIThread.Post(() => _ = RefreshAsync())", source, StringComparison.Ordinal);
     }
 }

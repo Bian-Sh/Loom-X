@@ -91,7 +91,7 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
         {
             var page = await dataStore.LoadActivityPageAsync(BuildQuery(), cancellationToken);
             ApplyPage(page);
-            ScrollToTopRequested?.Invoke(this, EventArgs.Empty);
+            RequestScrollToTop();
             Status = page.Items.Count == 0 ? "暂无请求活动" : $"已加载 {page.Items.Count} 条活动";
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
@@ -136,7 +136,7 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
             var page = await dataStore.ReturnToLatestAsync(BuildQuery());
             IsHistoryMode = false;
             ApplyPage(page);
-            ScrollToTopRequested?.Invoke(this, EventArgs.Empty);
+            RequestScrollToTop();
             Status = page.Items.Count == 0 ? "暂无请求活动" : "已回到最新活动";
         }
         catch (Exception exception)
@@ -177,6 +177,12 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
             IsHistoryMode = dataStore.ActivityHistoryMode;
         }
         if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
+    }
+
+    private void RequestScrollToTop()
+    {
+        if (Dispatcher.UIThread.CheckAccess()) ScrollToTopRequested?.Invoke(this, EventArgs.Empty);
+        else Dispatcher.UIThread.Post(() => ScrollToTopRequested?.Invoke(this, EventArgs.Empty));
     }
 
     private void UpdateSummary(IReadOnlyList<ActivityEventRecord> records)
