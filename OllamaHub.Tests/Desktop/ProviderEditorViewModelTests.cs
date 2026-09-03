@@ -7,6 +7,14 @@ namespace OllamaHub.Tests.Desktop;
 public sealed class ProviderEditorViewModelTests
 {
     [Fact]
+    public void ExplicitModelListUrlPreservesTrailingSlashForSync()
+    {
+        var provider = new ProviderEditorViewModel { ModelListUrl = "https://www.baidu.com/" };
+
+        Assert.Equal("https://www.baidu.com/", ProvidersViewModel.BuildModelListEndpoint(provider));
+    }
+
+    [Fact]
     public void FromResponse_PreservesProviderEnabledState()
     {
         var response = new ProviderResponse(

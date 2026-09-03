@@ -590,6 +590,32 @@ public sealed class ConfigurationManagementServiceTests
     }
 
     [Fact]
+    public async Task ModelListUrl_PreservesTrailingSlash()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+
+            var provider = await service.CreateProviderAsync(new ProviderInput("slash-url", "斜杠 URL", "https://example.com", "openai", true, null, false, null, false, "https://www.baidu.com/"));
+
+            Assert.Equal("https://www.baidu.com/", provider.ModelListUrl);
+            await using var verifyContext = new ConfigurationDbContext(options);
+            var storedProvider = await verifyContext.Providers.SingleAsync(item => item.Id == provider.Id);
+            Assert.Equal("https://www.baidu.com/", storedProvider.ModelListUrl);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
     public async Task EmptyProviderApiKey_ClearsStoredKey()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");

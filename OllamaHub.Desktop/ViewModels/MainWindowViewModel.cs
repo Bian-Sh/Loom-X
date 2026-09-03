@@ -949,9 +949,9 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     private void ModelSyncAnimationTimerOnTick(object? sender, EventArgs e) => SyncIconAngle = (SyncIconAngle + 18) % 360;
 
-    private static string BuildModelListEndpoint(ProviderEditorViewModel provider)
+    internal static string BuildModelListEndpoint(ProviderEditorViewModel provider)
     {
-        if (!string.IsNullOrWhiteSpace(provider.ModelListUrl)) return provider.ModelListUrl.TrimEnd('/');
+        if (!string.IsNullOrWhiteSpace(provider.ModelListUrl)) return provider.ModelListUrl.Trim();
         var baseUrl = provider.BaseUrl.TrimEnd('/');
         return $"{baseUrl}/models";
     }
