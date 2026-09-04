@@ -18,7 +18,7 @@ verification_report: docs/superpowers/reports/2026-09-04-stop-config-reload-poll
 branch_status: handled
 created_at: 2026-09-04
 verified_at: 2026-09-04
-archived: false
+archived: true
 direct_override: null
 handoff_context: null
 handoff_hash: null
