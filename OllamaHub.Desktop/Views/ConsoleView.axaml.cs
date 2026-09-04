@@ -3,6 +3,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using System.Collections.Specialized;
 using OllamaHub.Desktop.ViewModels;
 
@@ -15,13 +16,14 @@ public partial class ConsoleView : UserControl
     private bool isAttached;
     private bool restoringScroll;
     private double lastOffsetY;
+    private ScrollViewer? logScroll;
     private ConsoleViewModel? observedModel;
     public ConsoleView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
-        AttachedToVisualTree += (_, _) => { isAttached = true; SubscribeObservedModel(); RestoreScrollPosition(); };
-        DetachedFromVisualTree += (_, _) => { SaveScrollState(); UnsubscribeObservedModel(); isAttached = false; };
+        AttachedToVisualTree += (_, _) => { isAttached = true; SubscribeObservedModel(); AttachLogScroll(); };
+        DetachedFromVisualTree += (_, _) => { SaveScrollState(); UnsubscribeObservedModel(); DetachLogScroll(); isAttached = false; };
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -29,7 +31,7 @@ public partial class ConsoleView : UserControl
         UnsubscribeObservedModel();
         observedModel = (sender as ConsoleView)?.DataContext as ConsoleViewModel;
         if (isAttached) SubscribeObservedModel();
-        if (isAttached) RestoreScrollPosition();
+        if (isAttached) AttachLogScroll();
     }
 
     private void SubscribeObservedModel()
@@ -42,6 +44,37 @@ public partial class ConsoleView : UserControl
         if (observedModel is not null) observedModel.VisibleLogs.CollectionChanged -= LogsChanged;
     }
 
+    private void AttachLogScroll()
+    {
+        if (!isAttached) return;
+        if (logScroll is null)
+            logScroll = FindDescendant<ScrollViewer>(LogList);
+        if (logScroll is null)
+        {
+            Dispatcher.UIThread.Post(AttachLogScroll, DispatcherPriority.Render);
+            return;
+        }
+        logScroll.ScrollChanged -= LogScroll_OnScroll;
+        logScroll.ScrollChanged += LogScroll_OnScroll;
+        RestoreScrollPosition();
+    }
+
+    private void DetachLogScroll()
+    {
+        if (logScroll is not null) logScroll.ScrollChanged -= LogScroll_OnScroll;
+        logScroll = null;
+    }
+
+    private static T? FindDescendant<T>(Visual root) where T : Visual
+    {
+        foreach (var child in root.GetVisualChildren())
+        {
+            if (child is T match) return match;
+            if (child is Visual visual && FindDescendant<T>(visual) is { } nested) return nested;
+        }
+        return null;
+    }
+
     private void LogsChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         if (following) ScrollToLatest(force: true);
@@ -52,10 +85,11 @@ public partial class ConsoleView : UserControl
         Dispatcher.UIThread.Post(() =>
         {
             if (!force && !following) return;
+            if (logScroll is null) return;
             SetScrollToBottom();
             following = true;
             JumpButton.IsVisible = false;
-            observedModel?.UpdateScrollState(LogScroll.Offset.Y, shouldFollowTail: true);
+            observedModel?.UpdateScrollState(logScroll.Offset.Y, shouldFollowTail: true);
         }, DispatcherPriority.Render);
     }
 
@@ -65,6 +99,11 @@ public partial class ConsoleView : UserControl
         Dispatcher.UIThread.Post(() =>
         {
             var model = observedModel ?? DataContext as ConsoleViewModel;
+            if (logScroll is null)
+            {
+                restoringScroll = false;
+                return;
+            }
             if (model?.FollowTail != false)
             {
                 following = true;
@@ -75,26 +114,27 @@ public partial class ConsoleView : UserControl
             {
                 following = false;
                 var maxOffset = MaxScrollOffset();
-                LogScroll.Offset = new Vector(LogScroll.Offset.X, Math.Min(model.ScrollOffsetY, maxOffset));
+                logScroll.Offset = new Vector(logScroll.Offset.X, Math.Min(model.ScrollOffsetY, maxOffset));
                 JumpButton.IsVisible = true;
             }
-            lastOffsetY = LogScroll.Offset.Y;
+            lastOffsetY = logScroll.Offset.Y;
             restoringScroll = false;
-            model?.UpdateScrollState(LogScroll.Offset.Y, following);
+            model?.UpdateScrollState(logScroll.Offset.Y, following);
         }, DispatcherPriority.Render);
     }
 
-    private double MaxScrollOffset() => Math.Max(0, LogScroll.Extent.Height - LogScroll.Viewport.Height);
+    private double MaxScrollOffset() => logScroll is null ? 0 : Math.Max(0, logScroll.Extent.Height - logScroll.Viewport.Height);
 
     private void SetScrollToBottom()
     {
-        LogScroll.Offset = new Vector(LogScroll.Offset.X, MaxScrollOffset());
-        lastOffsetY = LogScroll.Offset.Y;
+        if (logScroll is null) return;
+        logScroll.Offset = new Vector(logScroll.Offset.X, MaxScrollOffset());
+        lastOffsetY = logScroll.Offset.Y;
     }
 
     private void SaveScrollState()
     {
-        observedModel?.UpdateScrollState(LogScroll.Offset.Y, following);
+        observedModel?.UpdateScrollState(logScroll?.Offset.Y ?? 0, following);
     }
 
     private void LogScroll_OnScroll(object? sender, ScrollChangedEventArgs e)
@@ -117,7 +157,7 @@ public partial class ConsoleView : UserControl
         SetScrollToBottom();
         following = true;
         JumpButton.IsVisible = false;
-        observedModel?.UpdateScrollState(LogScroll.Offset.Y, shouldFollowTail: true);
+        observedModel?.UpdateScrollState(logScroll?.Offset.Y ?? 0, shouldFollowTail: true);
     }
 
     private async void CopyLog_OnClick(object? sender, RoutedEventArgs e)

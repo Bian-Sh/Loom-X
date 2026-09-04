@@ -16,9 +16,10 @@ public sealed class ActivityViewContractTests
         Assert.Contains("Command=\"{Binding ReturnToLatestCommand}\"", viewSource, StringComparison.Ordinal);
         Assert.Contains("Content=\"{Binding PendingActivityLabel}\"", viewSource, StringComparison.Ordinal);
         Assert.Contains("IsIndeterminate=\"{Binding IsLoadingMore}\"", viewSource, StringComparison.Ordinal);
-        Assert.Contains("ScrollChanged=\"ActivityScrollViewer_OnScrollChanged\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"activity-list\"", viewSource, StringComparison.Ordinal);
         Assert.Contains("NotifyScrollMetrics", codeSource, StringComparison.Ordinal);
         Assert.Contains("ScrollToTopRequested", codeSource, StringComparison.Ordinal);
         Assert.Contains("activityScrollViewer.Offset = new Vector(0, 0)", codeSource, StringComparison.Ordinal);
+        Assert.Contains("activityScrollViewer.ScrollChanged += ActivityScrollViewer_OnScrollChanged", codeSource, StringComparison.Ordinal);
     }
 }

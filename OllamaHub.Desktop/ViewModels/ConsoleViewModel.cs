@@ -26,6 +26,9 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
     private bool showInfo = true;
     private bool showWarning = true;
     private bool showError = true;
+    private int infoCount;
+    private int warningCount;
+    private int errorCount;
     private double scrollOffsetY;
     private bool followTail = true;
 
@@ -37,9 +40,9 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
     public bool ShowError { get => showError; set { if (SetProperty(ref showError, value)) ApplyFilter(); } }
     public double ScrollOffsetY => scrollOffsetY;
     public bool FollowTail => followTail;
-    public int InfoCount => allLogs.Count(IsInfo);
-    public int WarningCount => allLogs.Count(item => item.LevelLabel == "Warning");
-    public int ErrorCount => allLogs.Count(item => item.LevelLabel == "Error");
+    public int InfoCount => infoCount;
+    public int WarningCount => warningCount;
+    public int ErrorCount => errorCount;
     public string CountLabel => $"共 {VisibleLogs.Count} 条";
     public bool HasLogs => VisibleLogs.Count > 0;
     public ICommand ClearCommand { get; }
@@ -53,7 +56,12 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
         this.buffer.EntryAdded += entryHandler;
         ClearCommand = new DelegateCommand(Clear);
         ClearSearchCommand = new DelegateCommand(() => SearchText = "");
-        foreach (var entry in this.buffer.Snapshot()) allLogs.Add(FromRuntime(entry));
+        foreach (var entry in this.buffer.Snapshot())
+        {
+            var log = FromRuntime(entry);
+            allLogs.Add(log);
+            UpdateCounts(log, 1);
+        }
         ApplyFilter();
     }
 
@@ -85,27 +93,58 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
         return true;
     }
 
-    private void AddEntry(RuntimeLogEntry runtimeEntry)
+    internal void AddEntry(RuntimeLogEntry runtimeEntry)
     {
-        allLogs.Add(FromRuntime(runtimeEntry));
-        while (allLogs.Count > 5000) allLogs.RemoveAt(0);
-        ApplyFilter();
+        var entry = FromRuntime(runtimeEntry);
+        allLogs.Add(entry);
+        UpdateCounts(entry, 1);
+        while (allLogs.Count > 5000)
+        {
+            var removed = allLogs[0];
+            allLogs.RemoveAt(0);
+            VisibleLogs.Remove(removed);
+            UpdateCounts(removed, -1);
+        }
+        if (MatchesFilter(entry)) VisibleLogs.Add(entry);
+        NotifyCollectionSummaryChanged();
     }
 
     private void Clear()
     {
         allLogs.Clear();
+        infoCount = warningCount = errorCount = 0;
         ApplyFilter();
     }
 
     private void ApplyFilter()
     {
         var query = SearchText.Trim();
-        var filtered = allLogs.Where(item =>
-            ((ShowInfo && IsInfo(item)) || (ShowWarning && item.LevelLabel == "Warning") || (ShowError && item.LevelLabel == "Error")) &&
-            (query.Length == 0 || $"{item.Time}\t{item.LevelLabel}\t{item.Module}\t{item.Message}".Contains(query, StringComparison.OrdinalIgnoreCase)));
+        var filtered = allLogs.Where(item => MatchesFilter(item, query));
         VisibleLogs.Clear();
         foreach (var item in filtered) VisibleLogs.Add(item);
+        NotifyCollectionSummaryChanged();
+    }
+
+    private bool MatchesFilter(ConsoleLogEntry item)
+    {
+        return MatchesFilter(item, SearchText.Trim());
+    }
+
+    private bool MatchesFilter(ConsoleLogEntry item, string query)
+    {
+        return ((ShowInfo && IsInfo(item)) || (ShowWarning && item.LevelLabel == "Warning") || (ShowError && item.LevelLabel == "Error")) &&
+            (query.Length == 0 || $"{item.Time}\t{item.LevelLabel}\t{item.Module}\t{item.Message}".Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void UpdateCounts(ConsoleLogEntry item, int delta)
+    {
+        if (IsInfo(item)) infoCount += delta;
+        else if (item.LevelLabel == "Warning") warningCount += delta;
+        else if (item.LevelLabel == "Error") errorCount += delta;
+    }
+
+    private void NotifyCollectionSummaryChanged()
+    {
         OnPropertyChanged(nameof(InfoCount));
         OnPropertyChanged(nameof(WarningCount));
         OnPropertyChanged(nameof(ErrorCount));

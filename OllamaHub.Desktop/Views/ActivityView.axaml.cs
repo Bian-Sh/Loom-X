@@ -2,6 +2,8 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Controls.Primitives;
 using Avalonia;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using OllamaHub.Desktop;
 using OllamaHub.Desktop.Services;
 using OllamaHub.Desktop.ViewModels;
@@ -11,11 +13,15 @@ namespace OllamaHub.Desktop.Views;
 public partial class ActivityView : UserControl
 {
     private ActivityViewModel? observedViewModel;
+    private ScrollViewer? activityScrollViewer;
+    private bool isAttached;
 
     public ActivityView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        AttachedToVisualTree += (_, _) => { isAttached = true; AttachScrollViewer(); };
+        DetachedFromVisualTree += (_, _) => { DetachScrollViewer(); isAttached = false; };
     }
 
     private void OnDataContextChanged(object? sender, EventArgs args)
@@ -25,9 +31,43 @@ public partial class ActivityView : UserControl
         observedViewModel = DataContext as ActivityViewModel;
         if (observedViewModel is not null)
             observedViewModel.ScrollToTopRequested += OnScrollToTopRequested;
+        if (isAttached) AttachScrollViewer();
     }
 
-    private void OnScrollToTopRequested(object? sender, EventArgs args) => activityScrollViewer.Offset = new Vector(0, 0);
+    private void AttachScrollViewer()
+    {
+        if (!isAttached) return;
+        if (activityScrollViewer is null)
+            activityScrollViewer = FindDescendant<ScrollViewer>(activityList);
+        if (activityScrollViewer is null)
+        {
+            Dispatcher.UIThread.Post(AttachScrollViewer, DispatcherPriority.Render);
+            return;
+        }
+        activityScrollViewer.ScrollChanged -= ActivityScrollViewer_OnScrollChanged;
+        activityScrollViewer.ScrollChanged += ActivityScrollViewer_OnScrollChanged;
+    }
+
+    private void DetachScrollViewer()
+    {
+        if (activityScrollViewer is not null) activityScrollViewer.ScrollChanged -= ActivityScrollViewer_OnScrollChanged;
+        activityScrollViewer = null;
+    }
+
+    private static T? FindDescendant<T>(Visual root) where T : Visual
+    {
+        foreach (var child in root.GetVisualChildren())
+        {
+            if (child is T match) return match;
+            if (child is Visual visual && FindDescendant<T>(visual) is { } nested) return nested;
+        }
+        return null;
+    }
+
+    private void OnScrollToTopRequested(object? sender, EventArgs args)
+    {
+        if (activityScrollViewer is not null) activityScrollViewer.Offset = new Vector(0, 0);
+    }
 
     private void ActivityScrollViewer_OnScrollChanged(object? sender, ScrollChangedEventArgs e)
     {

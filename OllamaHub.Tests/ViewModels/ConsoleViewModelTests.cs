@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using System.Collections.Specialized;
 using OllamaHub.Desktop.ViewModels;
 using OllamaHub.Logging;
 using Xunit;
@@ -74,5 +75,34 @@ public sealed class ConsoleViewModelTests
         using var viewModel = new ConsoleViewModel(buffer);
 
         Assert.Equal("共 2 条", viewModel.CountLabel);
+    }
+
+    [Fact]
+    public void AppendedLogUpdatesVisibleCollectionIncrementally()
+    {
+        var buffer = new RuntimeLogBuffer();
+        buffer.Append(LogLevel.Information, "Info", "已有");
+        using var viewModel = new ConsoleViewModel(buffer);
+        NotifyCollectionChangedAction? action = null;
+        viewModel.VisibleLogs.CollectionChanged += (_, args) => action ??= args.Action;
+
+        viewModel.AddEntry(new RuntimeLogEntry(DateTimeOffset.Now, LogLevel.Information, "Info", "新增"));
+
+        Assert.Equal(NotifyCollectionChangedAction.Add, action);
+        Assert.Equal(2, viewModel.VisibleLogs.Count);
+    }
+
+    [Fact]
+    public void LargeLogStreamStaysBoundedWithoutResetNotifications()
+    {
+        using var viewModel = new ConsoleViewModel(new RuntimeLogBuffer());
+        var actions = new List<NotifyCollectionChangedAction>();
+        viewModel.VisibleLogs.CollectionChanged += (_, args) => actions.Add(args.Action);
+
+        for (var index = 0; index < 5001; index++)
+            viewModel.AddEntry(new RuntimeLogEntry(DateTimeOffset.Now, LogLevel.Information, "Info", $"日志 {index}"));
+
+        Assert.Equal(5000, viewModel.VisibleLogs.Count);
+        Assert.DoesNotContain(NotifyCollectionChangedAction.Reset, actions);
     }
 }
