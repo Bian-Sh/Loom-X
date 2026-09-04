@@ -1,6 +1,6 @@
 workflow: hotfix
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: 03f642e63acac85210641d9dfa4bd5fdc9077625
 design_doc: null
 plan: null
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-09-04-optimize-desktop-tab-navigation-verify.md
-branch_status: pending
+branch_status: handled
 created_at: 2026-09-04
-verified_at: null
+verified_at: 2026-09-04
 archived: false
 direct_override: null
 handoff_context: null
