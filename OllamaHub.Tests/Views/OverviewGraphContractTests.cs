@@ -38,6 +38,9 @@ public sealed class OverviewGraphContractTests
     {
         var source = ReadDesktopFile("Views", "OverviewView.axaml");
 
+        Assert.Contains("<Grid RowDefinitions=\"*,Auto\" RowSpacing=\"16\">", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ScrollViewer VerticalScrollBarVisibility=\"Auto\" HorizontalScrollBarVisibility=\"Disabled\">", source, StringComparison.Ordinal);
+        Assert.Contains("VerticalAlignment=\"Stretch\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("网关实时拓扑", source, StringComparison.Ordinal);
         Assert.DoesNotContain("metric-card", source, StringComparison.Ordinal);
         Assert.DoesNotContain("StartCommand", source, StringComparison.Ordinal);

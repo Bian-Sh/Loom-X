@@ -2,15 +2,13 @@
   <UserControl.Styles>
     <Style Selector="Border.surface-card"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/></Style>
   </UserControl.Styles>
-  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <Grid RowDefinitions="Auto,Auto" RowSpacing="16">
-    <Border Grid.Row="0" Background="{DynamicResource GraphBackgroundBrush}" BorderBrush="{DynamicResource GraphBorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360">
-        <NativeWebView x:Name="GraphWebView" MinHeight="320"/>
+  <Grid RowDefinitions="*,Auto" RowSpacing="16">
+    <Border Grid.Row="0" Background="{DynamicResource GraphBackgroundBrush}" BorderBrush="{DynamicResource GraphBorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360" VerticalAlignment="Stretch">
+        <NativeWebView x:Name="GraphWebView" MinHeight="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
     </Border>
     <Grid Grid.Row="1" ColumnDefinitions="1.15*,0.85*" ColumnSpacing="12">
       <Border Classes="surface-card" Padding="16"><Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="本地网关" FontSize="15" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="{Binding GatewayStatus}" Foreground="{DynamicResource SuccessBrush}" FontWeight="SemiBold"/></Grid><Grid Grid.Row="1" ColumnDefinitions="*,Auto"><TextBlock Text="监听地址" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Grid.Column="1" Text="{Binding Endpoint}"/></Grid><Grid Grid.Row="2" ColumnDefinitions="*,Auto"><TextBlock Text="接口状态" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Grid.Column="1" Text="{Binding Version}"/></Grid><Grid Grid.Row="3" ColumnDefinitions="*,Auto"><TextBlock Text="最后检查" Foreground="{DynamicResource TextSecondaryBrush}"/><TextBlock Grid.Column="1" Text="{Binding LastChecked}"/></Grid><StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" Margin="0,6,0,0"><Button Content="{Binding GatewayActionLabel}" Command="{Binding ToggleGatewayCommand}"/><Button Content="刷新" Command="{Binding RefreshCommand}"/></StackPanel></Grid></Border>
       <Border Grid.Column="1" Classes="surface-card" Padding="16"><Grid RowDefinitions="Auto,*"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="最近请求" FontSize="15" FontWeight="SemiBold"/><TextBlock Grid.Column="1" Text="{Binding RecentRequests.Count, StringFormat=最近 {0} 条}" Foreground="{DynamicResource TextSecondaryBrush}"/></Grid><TextBlock Grid.Row="1" Text="暂无请求活动" IsVisible="{Binding RecentRequestsEmpty}" Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,8,0,0"/><ItemsControl Grid.Row="1" ItemsSource="{Binding RecentRequests}" Margin="0,8,0,0"><ItemsControl.ItemTemplate><DataTemplate><Grid ColumnDefinitions="58,*,64,Auto,Auto" ColumnSpacing="7" Margin="0,3"><TextBlock Grid.Column="0" Text="{Binding Endpoint}" FontSize="10"/><TextBlock Grid.Column="1" Text="{Binding Model}" TextTrimming="CharacterEllipsis" FontSize="10"/><TextBlock Grid.Column="2" Text="{Binding Time}" HorizontalAlignment="Left" TextAlignment="Left" FlowDirection="LeftToRight" FontFamily="Consolas" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="10"/><TextBlock Grid.Column="3" Text="{Binding Latency}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="10"/><TextBlock Grid.Column="4" Text="{Binding Status}" FontSize="10"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></Grid></Border>
     </Grid>
   </Grid>
-  </ScrollViewer>
 </UserControl>
