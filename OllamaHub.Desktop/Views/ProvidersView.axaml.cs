@@ -8,46 +8,16 @@ public partial class ProvidersView : UserControl
 {
     public ProvidersView() => InitializeComponent();
 
-    private void ProviderEditorField_OnLostFocus(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is ProvidersViewModel viewModel && viewModel.SelectedProvider is not null)
-            viewModel.SaveProviderCommand.Execute(null);
-    }
-
-    private void ProviderEditorSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (DataContext is ProvidersViewModel viewModel && viewModel.SelectedProvider is not null)
-            viewModel.SaveProviderCommand.Execute(null);
-    }
-
-    private void ProviderEditorToggle_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is ProvidersViewModel viewModel && viewModel.SelectedProvider is not null)
-            viewModel.SaveProviderCommand.Execute(null);
-    }
-
-    private void ModelEditorField_OnLostFocus(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is ProvidersViewModel viewModel && viewModel.SelectedModel is not null)
-            viewModel.SaveModelCommand.Execute(null);
-    }
-
-    private void ModelEditorToggle_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is ProvidersViewModel viewModel && viewModel.SelectedModel is not null)
-            viewModel.SaveModelCommand.Execute(null);
-    }
-
     private void AddHeaderButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is ProvidersViewModel viewModel && viewModel.SelectedProvider is not null)
-            viewModel.SelectedProvider.AddHeader();
+        if (DataContext is not ProvidersViewModel viewModel || viewModel.SelectedProvider is null) return;
+        viewModel.SelectedProvider.AddHeader();
     }
 
     private void RemoveHeaderButton_OnClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button { DataContext: HeaderEditorViewModel header } && DataContext is ProvidersViewModel viewModel && viewModel.SelectedProvider is not null)
-            viewModel.SelectedProvider.RemoveHeader(header);
+        if (sender is not Button { DataContext: HeaderEditorViewModel header } || DataContext is not ProvidersViewModel viewModel || viewModel.SelectedProvider is null) return;
+        viewModel.SelectedProvider.RemoveHeader(header);
     }
 
     private void ToggleApiKeyVisibilityButton_OnClick(object? sender, RoutedEventArgs e)

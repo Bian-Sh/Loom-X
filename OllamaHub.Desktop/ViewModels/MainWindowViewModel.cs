@@ -622,6 +622,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private DispatcherTimer? modelSyncAnimationTimer;
     private bool isModelSyncing;
     private double syncIconAngle;
+    private CancellationTokenSource? providerAutoSaveCancellation;
+    private CancellationTokenSource? modelAutoSaveCancellation;
     private bool suppressConfigurationRefresh;
     private bool suppressSelectionInvariant;
     private readonly object refreshSync = new();
@@ -752,6 +754,10 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public void Dispose()
     {
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
+        providerAutoSaveCancellation?.Cancel();
+        providerAutoSaveCancellation?.Dispose();
+        modelAutoSaveCancellation?.Cancel();
+        modelAutoSaveCancellation?.Dispose();
         connectionCancellation?.Cancel();
         modelSyncCancellation?.Cancel();
         modelSyncAnimationTimer?.Stop();
@@ -761,9 +767,47 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = "新 Provider", ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); Status = "正在编辑新 Provider"; }
 
-    private async Task SaveProviderAsync()
+    internal void QueueProviderAutoSave(ProviderEditorViewModel provider)
     {
-        var provider = SelectedProvider;
+        providerAutoSaveCancellation?.Cancel();
+        providerAutoSaveCancellation?.Dispose();
+        providerAutoSaveCancellation = new CancellationTokenSource();
+        _ = AutoSaveProviderAfterDelayAsync(provider, providerAutoSaveCancellation.Token);
+    }
+
+    private async Task AutoSaveProviderAfterDelayAsync(ProviderEditorViewModel provider, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(350), cancellationToken);
+            await SaveProviderAsync(provider);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    internal void QueueModelAutoSave(ProviderEditorViewModel provider, ModelEditorViewModel model)
+    {
+        modelAutoSaveCancellation?.Cancel();
+        modelAutoSaveCancellation?.Dispose();
+        modelAutoSaveCancellation = new CancellationTokenSource();
+        _ = AutoSaveModelAfterDelayAsync(provider, model, modelAutoSaveCancellation.Token);
+    }
+
+    private async Task AutoSaveModelAfterDelayAsync(ProviderEditorViewModel provider, ModelEditorViewModel model, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(350), cancellationToken);
+            await SaveModelAsync(provider, model);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+    }
+
+    private Task SaveProviderAsync() => SaveProviderAsync(SelectedProvider);
+
+    private async Task SaveProviderAsync(ProviderEditorViewModel? target)
+    {
+        var provider = target;
         if (provider is null) return;
         if (!provider.HasUnsavedChanges) return;
         suppressConfigurationRefresh = true;
@@ -799,12 +843,14 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     private void NewModel() { if (SelectedProvider is null || SelectedProvider.Id == Guid.Empty) { Status = "请先保存 Provider，再添加模型"; return; } SelectedModel = new ModelEditorViewModel { ProviderId = SelectedProvider.BusinessId }; Status = "正在编辑新模型"; }
 
-    private async Task SaveModelAsync()
+    private Task SaveModelAsync() => SaveModelAsync(SelectedProvider, SelectedModel);
+
+    private async Task SaveModelAsync(ProviderEditorViewModel? provider, ModelEditorViewModel? model)
     {
-        if (SelectedProvider is null || SelectedModel is null) return;
-        if (!SelectedModel.HasUnsavedChanges) return;
+        if (provider is null || model is null) return;
+        if (!model.HasUnsavedChanges) return;
         suppressConfigurationRefresh = true;
-        try { var input = SelectedModel.ToInput(); var response = SelectedModel.Id == Guid.Empty ? await dataStore.CreateModelAsync(SelectedProvider.Id, input) : await dataStore.UpdateModelAsync(SelectedModel.Id, input); var index = SelectedProvider.Models.IndexOf(SelectedModel); var updated = ModelEditorViewModel.FromResponse(response); if (index < 0) SelectedProvider.Models.Add(updated); else SelectedProvider.Models[index] = updated; SelectedModel = updated; Status = "模型已保存"; }
+        try { var input = model.ToInput(); var response = model.Id == Guid.Empty ? await dataStore.CreateModelAsync(provider.Id, input) : await dataStore.UpdateModelAsync(model.Id, input); var index = provider.Models.IndexOf(model); var updated = ModelEditorViewModel.FromResponse(response); if (index < 0) provider.Models.Add(updated); else provider.Models[index] = updated; if (ReferenceEquals(SelectedModel, model)) SelectedModel = updated; Status = "模型已保存"; }
         catch (Exception exception) { Status = $"模型保存失败：{exception.Message}"; }
         finally { suppressConfigurationRefresh = false; }
     }
@@ -997,6 +1043,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private void ProviderChanged(object? sender, PropertyChangedEventArgs args)
     {
         UpdateSummary();
+        if (!suppressConfigurationRefresh && sender is ProviderEditorViewModel provider && provider.HasUnsavedChanges)
+            QueueProviderAutoSave(provider);
     }
     private void ModelsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
@@ -1009,8 +1057,11 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private void DetachModel(ModelEditorViewModel? model) { if (model is not null) model.PropertyChanged -= ModelChanged; }
     private void ModelChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (sender is ModelEditorViewModel model && !ReferenceEquals(SelectedModel, model))
+        if (sender is not ModelEditorViewModel model) return;
+        if (!ReferenceEquals(SelectedModel, model))
             SelectedModel = model;
+        if (!suppressConfigurationRefresh && SelectedProvider is { } provider && model.HasUnsavedChanges)
+            QueueModelAutoSave(provider, model);
     }
 
     private void UpdateSummary()

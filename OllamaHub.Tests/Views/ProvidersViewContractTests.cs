@@ -6,7 +6,7 @@ namespace OllamaHub.Tests.Views;
 public sealed class ProvidersViewContractTests
 {
     [Fact]
-    public void ModelListBindsSelectedModelForAutomaticToggleSave()
+    public void ModelListBindsSelectedModelForAutomaticModelSave()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
@@ -20,7 +20,8 @@ public sealed class ProvidersViewContractTests
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
         var source = File.ReadAllText(path);
 
-        Assert.Contains("if (sender is ModelEditorViewModel model && !ReferenceEquals(SelectedModel, model))", source, StringComparison.Ordinal);
+        Assert.Contains("if (sender is not ModelEditorViewModel model) return;", source, StringComparison.Ordinal);
+        Assert.Contains("if (!ReferenceEquals(SelectedModel, model))", source, StringComparison.Ordinal);
         Assert.Contains("SelectedModel = model;", source, StringComparison.Ordinal);
     }
 
@@ -88,11 +89,11 @@ public sealed class ProvidersViewContractTests
 
         Assert.Contains("public bool HasUnsavedChanges => Id == Guid.Empty || isDirty;", source, StringComparison.Ordinal);
         Assert.Contains("if (!provider.HasUnsavedChanges) return;", source, StringComparison.Ordinal);
-        Assert.Contains("if (!SelectedModel.HasUnsavedChanges) return;", source, StringComparison.Ordinal);
+        Assert.Contains("if (!model.HasUnsavedChanges) return;", source, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void ProviderEditorUsesControlEventsInsteadOfPerCharacterTimerSaves()
+    public void ProviderEditorUsesViewModelChangesInsteadOfFocusSaves()
     {
         var viewModelPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
         var viewPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
@@ -103,13 +104,16 @@ public sealed class ProvidersViewContractTests
 
         Assert.DoesNotContain("ScheduleAutoSave", viewModelSource, StringComparison.Ordinal);
         Assert.DoesNotContain("ScheduleModelAutoSave", viewModelSource, StringComparison.Ordinal);
-        Assert.Contains("LostFocus=\"ProviderEditorField_OnLostFocus\"", viewSource, StringComparison.Ordinal);
-        Assert.Contains("Click=\"ProviderEditorToggle_OnClick\"", viewSource, StringComparison.Ordinal);
-        Assert.Contains("SelectionChanged=\"ProviderEditorSelectionChanged\"", viewSource, StringComparison.Ordinal);
-        Assert.Contains("LostFocus=\"ModelEditorField_OnLostFocus\"", viewSource, StringComparison.Ordinal);
-        Assert.Contains("Click=\"ModelEditorToggle_OnClick\"", viewSource, StringComparison.Ordinal);
-        Assert.Contains("SaveProviderCommand.Execute(null)", codeBehindSource, StringComparison.Ordinal);
-        Assert.Contains("SaveModelCommand.Execute(null)", codeBehindSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("LostFocus=", viewSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderEditorField_OnLostFocus", codeBehindSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ModelEditorField_OnLostFocus", codeBehindSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProviderEditorSelectionChanged", codeBehindSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ModelEditorToggle_OnClick", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("provider.PropertyChanged += ProviderChanged;", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("model.PropertyChanged += ModelChanged;", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("Task.Delay(TimeSpan.FromMilliseconds(350), cancellationToken)", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("QueueProviderAutoSave(provider)", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("QueueModelAutoSave(provider, model)", viewModelSource, StringComparison.Ordinal);
     }
 
     [Fact]

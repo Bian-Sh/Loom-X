@@ -2,17 +2,19 @@
 
 ## 问题
 
-服务端通过 `ConfigurationRefreshService` 每 2 秒无条件重载配置数据库，桌面端 `ConfigSnapshotService` 又监听配置库文件变化并触发重载。Provider 页面控件绑定初始化或失焦时会调用保存命令，即使值没有变化也会写 SQLite；写入产生文件变更后再次触发桌面刷新，形成高频日志和重复读写。清空控制台后切换页面，期间积累的重载、保存和刷新日志会集中出现。
+服务端通过 `ConfigurationRefreshService` 每 2 秒无条件重载配置数据库，桌面端 `ConfigSnapshotService` 又监听配置库文件变化并触发重载。Provider 页面控件绑定初始化或失焦时会调用保存命令，即使值没有变化也会写 SQLite；写入产生文件变更后再次触发桌面刷新，形成高频日志和重复读写。清空控制台后切换页面，期间积累的重载、保存和刷新日志会集中出现。`LostFocus` 也不是“编辑完成”语义，控件重建、页面切换和焦点管理都可能触发它。
 
 ## 根因
 
 - `ConfigurationRefreshService` 的周期定时器不区分配置是否变化。
 - `ConfigSnapshotService` 的文件监听与单实例应用约定不一致，并会放大应用自身写入造成的刷新链。
 - Provider/Model 的事件驱动保存没有变化检测，初始化事件也会进入 `SaveChangesAsync`。
+- Provider/Model 使用 `LostFocus`、自动保存 `Click` 等生命周期事件作为提交信号，无法区分用户编辑与框架状态变化。
 
 ## 修复目标
 
 - 配置只在启动初始化或应用实际完成配置修改后重载。
 - 单实例桌面端不再监听配置数据库文件变化，也不再因外部文件事件自动刷新。
 - Provider/Model 值未变化时保存命令直接返回，不执行数据库写入或配置重载。
+- Provider/Model 继续自动保存，但仅由值变化、开关状态变化、下拉选择变化和 Header 增删操作触发，并通过短暂防抖合并连续输入；不再使用 `LostFocus`。
 - 增加回归测试，确保不存在周期重载和无变化保存反馈环。
