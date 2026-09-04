@@ -3,7 +3,6 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using OllamaHub.Logging;
-using Microsoft.Extensions.Hosting;
 
 namespace OllamaHub.Configuration;
 
@@ -163,18 +162,4 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
 
     internal static Dictionary<string, JsonNode?> ReadJson(string json) =>
         JsonSerializer.Deserialize<Dictionary<string, JsonNode?>>(json) ?? new(StringComparer.OrdinalIgnoreCase);
-}
-
-public sealed class ConfigurationRefreshService(IDatabaseConfigurationProvider configurationProvider, ILogger<ConfigurationRefreshService> logger) : BackgroundService
-{
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
-        while (await timer.WaitForNextTickAsync(stoppingToken))
-        {
-            try { await configurationProvider.ReloadAsync(stoppingToken); }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
-            catch (Exception exception) { logger.LogWarning(exception, "刷新 SQLite 配置快照失败"); }
-        }
-    }
 }

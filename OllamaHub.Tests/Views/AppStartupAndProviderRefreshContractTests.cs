@@ -37,4 +37,19 @@ public sealed class AppStartupAndProviderRefreshContractTests
         Assert.Contains("private async Task RefreshLoopAsync()", source, StringComparison.Ordinal);
         Assert.Contains("refreshRequested = true", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ConfigurationReloadIsExplicitInsteadOfPeriodicOrFileDriven()
+    {
+        var hostPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub", "OllamaHubHost.cs");
+        var providerPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub", "Configuration", "DatabaseConfigurationProvider.cs");
+        var snapshotPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Services", "ConfigSnapshotService.cs");
+        var storePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Services", "AppDataStore.cs");
+
+        Assert.DoesNotContain("ConfigurationRefreshService", File.ReadAllText(hostPath), StringComparison.Ordinal);
+        Assert.DoesNotContain("PeriodicTimer", File.ReadAllText(providerPath), StringComparison.Ordinal);
+        Assert.DoesNotContain("FileSystemWatcher", File.ReadAllText(snapshotPath), StringComparison.Ordinal);
+        Assert.DoesNotContain("ExternalChangeDetected", File.ReadAllText(snapshotPath), StringComparison.Ordinal);
+        Assert.DoesNotContain("ExternalChangeDetected", File.ReadAllText(storePath), StringComparison.Ordinal);
+    }
 }

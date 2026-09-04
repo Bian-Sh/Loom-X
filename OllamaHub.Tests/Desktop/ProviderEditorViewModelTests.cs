@@ -93,4 +93,54 @@ public sealed class ProviderEditorViewModelTests
         Assert.Contains(nameof(viewModel.Headers), changedProperties);
         Assert.True(viewModel.HasIncompleteHeaders);
     }
+
+    [Fact]
+    public void ProviderEditorTracksOnlyUserChangesAsUnsaved()
+    {
+        var viewModel = ProviderEditorViewModel.FromResponse(new ProviderResponse(
+            Guid.NewGuid(),
+            "provider",
+            "Provider",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []));
+
+        Assert.False(viewModel.HasUnsavedChanges);
+        viewModel.DisplayName = "Provider";
+        Assert.False(viewModel.HasUnsavedChanges);
+        viewModel.DisplayName = "已修改";
+        Assert.True(viewModel.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public void ModelEditorFromResponseStartsCleanAndTracksChanges()
+    {
+        var viewModel = ModelEditorViewModel.FromResponse(new ModelResponse(
+            Guid.NewGuid(),
+            "provider",
+            "model",
+            "模型",
+            null,
+            "unknown",
+            null,
+            null,
+            128000,
+            4096,
+            false,
+            null,
+            null,
+            true,
+            false,
+            "{}",
+            "{}"));
+
+        Assert.False(viewModel.HasUnsavedChanges);
+        viewModel.Enabled = false;
+        Assert.True(viewModel.HasUnsavedChanges);
+    }
 }

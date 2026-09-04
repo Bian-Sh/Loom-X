@@ -16,7 +16,6 @@ public sealed class AppDataStore : IDisposable
     private readonly object initializationGate = new();
     private readonly List<ActivityEventRecord> activityWindow = [];
     private readonly List<ActivityEventRecord> pendingActivities = [];
-    private CancellationTokenSource? externalReloadCancellation;
     private Task? initializationTask;
     private bool disposed;
     private bool isLoading;
@@ -53,7 +52,6 @@ public sealed class AppDataStore : IDisposable
         this.gatewayService = gatewayService;
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<AppDataStore>.Instance;
         this.activityQueryService = activityQueryService ?? new ActivityQueryService();
-        configService.ExternalChangeDetected += OnExternalChangeDetected;
         gatewayService.ActivityEnqueued += OnActivityEnqueued;
     }
 
@@ -322,26 +320,6 @@ public sealed class AppDataStore : IDisposable
         }
     }
 
-    private void OnExternalChangeDetected(object? sender, EventArgs args)
-    {
-        if (!IsInitialized || disposed) return;
-        externalReloadCancellation?.Cancel();
-        externalReloadCancellation?.Dispose();
-        externalReloadCancellation = new CancellationTokenSource();
-        _ = ReloadAfterDelayAsync(externalReloadCancellation.Token);
-    }
-
-    private async Task ReloadAfterDelayAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await Task.Delay(250, cancellationToken);
-            await RefreshAsync(cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception exception) { logger.LogWarning(exception, "外部配置变更重载失败"); }
-    }
-
     private void OnActivityEnqueued(object? sender, ActivityEventInput input) => _ = HandleActivityEnqueuedAsync(input);
 
     internal async Task HandleActivityEnqueuedAsync(ActivityEventInput input)
@@ -417,10 +395,7 @@ public sealed class AppDataStore : IDisposable
     {
         if (disposed) return;
         disposed = true;
-        configService.ExternalChangeDetected -= OnExternalChangeDetected;
         gatewayService.ActivityEnqueued -= OnActivityEnqueued;
-        externalReloadCancellation?.Cancel();
-        externalReloadCancellation?.Dispose();
         stateLock.Dispose();
     }
 }

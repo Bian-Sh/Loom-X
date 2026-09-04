@@ -36,7 +36,6 @@ public static class OllamaHubHost
         builder.Services.AddDbContextFactory<ConfigurationDbContext>(options => options.UseSqlite(CreateConnectionString(databasePath)));
         builder.Services.AddSingleton<IDatabaseConfigurationProvider>(startupConfiguration);
         builder.Services.AddSingleton<ConfigurationManagementService>();
-        builder.Services.AddHostedService<ConfigurationRefreshService>();
         builder.Services.AddSingleton<IAnthropicRequestFactory, AnthropicRequestFactory>();
         builder.Services.AddSingleton<IAnthropicResponseMapper, AnthropicResponseMapper>();
         builder.Services.AddHttpClient<IAnthropicProxyClient, AnthropicProxyClient>();

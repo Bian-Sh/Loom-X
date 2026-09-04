@@ -81,6 +81,17 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
+    public void AutomaticSavesSkipUnchangedEditors()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("public bool HasUnsavedChanges => Id == Guid.Empty || isDirty;", source, StringComparison.Ordinal);
+        Assert.Contains("if (!provider.HasUnsavedChanges) return;", source, StringComparison.Ordinal);
+        Assert.Contains("if (!SelectedModel.HasUnsavedChanges) return;", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProviderEditorUsesControlEventsInsteadOfPerCharacterTimerSaves()
     {
         var viewModelPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");

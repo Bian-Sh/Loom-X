@@ -11,9 +11,6 @@ public sealed class ConfigSnapshotService : IDisposable
 {
     private readonly string databasePath;
     private readonly ILogger<ConfigSnapshotService>? logger;
-    private readonly FileSystemWatcher? databaseWatcher;
-
-    public event EventHandler? ExternalChangeDetected;
 
     public ConfigSnapshotService(ILogger<ConfigSnapshotService>? logger = null)
         : this(AppDataPaths.DatabasePath, logger) { }
@@ -24,25 +21,7 @@ public sealed class ConfigSnapshotService : IDisposable
         this.logger = logger;
         var directory = Path.GetDirectoryName(databasePath);
         if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
-        if (logger is not null)
-        {
-            databaseWatcher = new FileSystemWatcher(Path.GetDirectoryName(databasePath) ?? AppDataPaths.RootDirectory, Path.GetFileName(databasePath))
-            {
-                NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
-                EnableRaisingEvents = true
-            };
-            databaseWatcher.Changed += OnDatabaseFileChanged;
-            databaseWatcher.Created += OnDatabaseFileChanged;
-            databaseWatcher.Renamed += OnDatabaseFileChanged;
-        }
         LogRuntimeContext("配置服务创建");
-    }
-
-    private void OnDatabaseFileChanged(object sender, FileSystemEventArgs args)
-    {
-        logger?.LogInformation("配置库主文件发生变化，变更类型 {ChangeType}，路径 {FilePath}", args.ChangeType, args.FullPath);
-        LogFileState("主库变更后", databasePath);
-        ExternalChangeDetected?.Invoke(this, EventArgs.Empty);
     }
 
     public ResolvedAppConfig Load()
@@ -296,12 +275,6 @@ public sealed class ConfigSnapshotService : IDisposable
 
     public void Dispose()
     {
-        if (databaseWatcher is null) return;
-        databaseWatcher.EnableRaisingEvents = false;
-        databaseWatcher.Changed -= OnDatabaseFileChanged;
-        databaseWatcher.Created -= OnDatabaseFileChanged;
-        databaseWatcher.Renamed -= OnDatabaseFileChanged;
-        databaseWatcher.Dispose();
     }
 }
 
