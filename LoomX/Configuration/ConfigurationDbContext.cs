@@ -30,6 +30,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.Property(item => item.ProxyHost).HasMaxLength(2048).IsRequired();
             entity.Property(item => item.ProxyUsername).HasMaxLength(256);
             entity.Property(item => item.UpdateChannel).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.UseProxyForUpdates).HasDefaultValue(true);
         });
         modelBuilder.Entity<ProviderEntity>(entity =>
         {
@@ -94,6 +95,7 @@ public sealed class AppSettingsEntity
     public string? ProtectedProxyPassword { get; set; }
     public bool AutoCheckUpdates { get; set; } = true;
     public string UpdateChannel { get; set; } = "stable";
+    public bool UseProxyForUpdates { get; set; } = true;
     public bool DiagnosticsEnabled { get; set; }
     public int LogRetentionDays { get; set; } = 30;
     public bool LogStackTrace { get; set; }
@@ -237,7 +239,7 @@ public static class ConfigurationDatabase
             if (!await HasColumnsAsync(connection, "AppSettings", cancellationToken,
                     "Id", "Language", "Theme", "ProxyMode", "ProxyHost", "ProxyPort", "ProxyUsername", "ProtectedProxyPassword",
                     "AutoCheckUpdates", "UpdateChannel", "DiagnosticsEnabled", "LogRetentionDays", "LogStackTrace",
-                    "TransparencyEnabled", "TransparencyOpacity", "BlurAmount", "TransparencyAlgorithm")
+                    "TransparencyEnabled", "TransparencyOpacity", "BlurAmount", "TransparencyAlgorithm", "UseProxyForUpdates")
                 || await HasColumnAsync(connection, "AppSettings", "OpenControlCenterOnStartup", cancellationToken))
                 return false;
 
@@ -293,6 +295,7 @@ public static class ConfigurationDatabase
                 ProtectedProxyPassword TEXT NULL,
                 AutoCheckUpdates INTEGER NOT NULL,
                 UpdateChannel TEXT NOT NULL,
+                UseProxyForUpdates INTEGER NOT NULL DEFAULT 1,
                 DiagnosticsEnabled INTEGER NOT NULL,
                 LogRetentionDays INTEGER NOT NULL,
                 LogStackTrace INTEGER NOT NULL DEFAULT 0,
@@ -334,6 +337,14 @@ public static class ConfigurationDatabase
             catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
             {
             }
+        }
+
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE AppSettings ADD COLUMN UseProxyForUpdates INTEGER NOT NULL DEFAULT 1", cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
         }
 
         try

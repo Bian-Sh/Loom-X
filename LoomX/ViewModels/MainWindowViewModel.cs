@@ -27,6 +27,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private readonly ProvidersViewModel providersViewModel;
     private readonly GatewayViewModel gatewayViewModel;
     private readonly ActivityViewModel activityViewModel;
+    private readonly UpdateCoordinator updateCoordinator;
     private readonly Action<bool, int, int, string>? applyAppearance;
     private object currentView = new PlaceholderViewModel("加载中", "正在加载桌面控制中心。");
     private string pageTitle = "概览";
@@ -36,6 +37,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     public object CurrentView { get => currentView; private set => SetProperty(ref currentView, value); }
     public string PageTitle { get => pageTitle; private set => SetProperty(ref pageTitle, value); }
     public string PageDescription { get => pageDescription; private set => SetProperty(ref pageDescription, value); }
+    public UpdateCoordinator Update => updateCoordinator;
 
     public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null, Action<bool, int, int, string>? applyAppearance = null, AppDataStore? dataStore = null)
     {
@@ -50,7 +52,8 @@ public sealed class MainWindowViewModel : NotifyViewModel
         providersViewModel = new ProvidersViewModel(this.dataStore, this.toastService, this.loggerFactory.CreateLogger<ProvidersViewModel>());
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
         activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
-        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance);
+        updateCoordinator = new UpdateCoordinator(this.dataStore, logger: this.loggerFactory.CreateLogger<UpdateCoordinator>());
+        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator);
         NavigationItems = new([
             new("概览", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
             new("网关", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
@@ -82,6 +85,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
         void Apply()
         {
             ShowOverview();
+            updateCoordinator.Start();
             if (dataStore.Settings is { } settings)
                 applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
         }
@@ -118,6 +122,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
         gatewayViewModel.Dispose();
         activityViewModel.Dispose();
         settingsViewModel.Dispose();
+        updateCoordinator.Dispose();
         consoleViewModel.Dispose();
         dataStore.Dispose();
     }

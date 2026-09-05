@@ -70,6 +70,7 @@ public sealed class ResolvedAppSettings
     public bool HasProxyPassword { get; init; }
     public bool AutoCheckUpdates { get; init; } = true;
     public string UpdateChannel { get; init; } = "stable";
+    public bool UseProxyForUpdates { get; init; } = true;
     public bool DiagnosticsEnabled { get; init; }
     public int LogRetentionDays { get; init; } = 30;
     public bool LogStackTrace { get; init; }

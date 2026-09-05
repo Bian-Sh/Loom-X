@@ -169,6 +169,40 @@
         </Grid>
       </Border>
     </Grid>
+    <Border IsVisible="{Binding Update.CardVisible}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Width="330" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="16" BoxShadow="0 8 24 #40000000">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+          <PathIcon Data="M 12,2 L 12,14 M 7,9 L 12,14 L 17,9 M 4,16 L 20,16 L 20,20 L 4,20 Z" Foreground="{DynamicResource AccentBrush}" Width="18" Height="18" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="1" Text="发现新版本" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button Grid.Column="2" Content="×" Command="{Binding Update.LaterCommand}" Padding="5,0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="稍后处理" />
+        </Grid>
+        <TextBlock Text="{Binding Update.VersionComparison}" Foreground="{DynamicResource TextSecondaryBrush}" />
+        <Button Content="更新日志" Command="{Binding Update.OpenReleaseNotesCommand}" HorizontalAlignment="Left" Padding="0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" Foreground="{DynamicResource AccentBrush}" />
+        <ProgressBar IsVisible="{Binding Update.IsBusy}" Value="{Binding Update.DownloadPercent}" Minimum="0" Maximum="100" Height="6" />
+        <Grid IsVisible="{Binding Update.IsBusy}" ColumnDefinitions="*,*" ColumnSpacing="8">
+          <TextBlock Text="{Binding Update.ProgressText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
+          <TextBlock Grid.Column="1" Text="{Binding Update.SpeedText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" HorizontalAlignment="Right" />
+        </Grid>
+        <TextBlock IsVisible="{Binding Update.CanRetry}" Text="{Binding Update.ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap" FontSize="11" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <Button Content="稍后" Command="{Binding Update.LaterCommand}" />
+          <Button Grid.Column="1" Content="立即下载" Command="{Binding Update.DownloadCommand}" IsEnabled="{Binding Update.CanDownload}" Classes="primary" />
+        </Grid>
+      </StackPanel>
+    </Border>
+    <Border IsVisible="{Binding Update.ReleaseNotesVisible}" Background="#99000000" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="40">
+      <Border Width="650" MaxHeight="620" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
+        <Grid RowDefinitions="Auto,*" RowSpacing="14">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="更新日志" FontSize="18" FontWeight="SemiBold" />
+            <Button Grid.Column="1" Content="×" Command="{Binding Update.CloseReleaseNotesCommand}" Padding="6,0" MinHeight="28" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="关闭" />
+          </Grid>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <TextBlock Text="{Binding Update.ReleaseNotes}" TextWrapping="Wrap" LineHeight="22" />
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Border>
     <Border x:Name="toastBorder" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Background="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="14,11" MaxWidth="420">
       <TextBlock x:Name="toastText" Foreground="White" TextWrapping="Wrap" />
     </Border>

@@ -81,6 +81,12 @@ public sealed class AppDataStore : IDisposable
         return Settings;
     }
 
+    public async Task<UpdateProxySettings> GetUpdateProxySettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        return await configService.GetUpdateProxySettingsAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<GatewayEndpointResponse>> ListGatewayEndpointsAsync(CancellationToken cancellationToken = default)
     {
         await InitializeAsync(cancellationToken);

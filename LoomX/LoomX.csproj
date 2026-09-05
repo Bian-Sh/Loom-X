@@ -6,6 +6,7 @@
     <AssemblyTitle>Loom-x</AssemblyTitle>
     <Product>Loom-x</Product>
     <Description>Loom-x 本地 Ollama 与 OpenAI 兼容代理</Description>
+    <Version>0.12.6</Version>
     <TargetFramework>net10.0</TargetFramework>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Nullable>enable</Nullable>

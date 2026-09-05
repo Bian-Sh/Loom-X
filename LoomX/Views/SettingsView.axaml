@@ -57,8 +57,8 @@
             <Border Classes="panel" Padding="18">
               <StackPanel Spacing="14">
                 <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="3"><TextBlock Text="当前版本" FontWeight="SemiBold"/><TextBlock Text="本地桌面端版本信息。" Classes="hint"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding VersionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
-                <CheckBox Content="自动检查更新" IsChecked="{Binding AutoCheckUpdates}"/><TextBlock Text="每 24 小时检查一次，不会自动安装。" Classes="hint" Margin="24,-10,0,0"/>
-                <StackPanel Spacing="4"><TextBlock Text="更新渠道" FontWeight="SemiBold"/><TextBlock Text="稳定版经过完整验证；预览版可提前体验新功能。" Classes="hint"/><ComboBox ItemsSource="{Binding UpdateChannelOptions}" SelectedItem="{Binding SelectedUpdateChannel, Mode=TwoWay}"/></StackPanel>
+                <CheckBox Content="自动检查更新" IsChecked="{Binding AutoCheckUpdates}"/><TextBlock Text="启动后检查，并在应用运行期间每 24 小时检查一次；不会自动安装。" Classes="hint" Margin="24,-10,0,0"/>
+                <CheckBox Content="更新时使用代理" IsChecked="{Binding UseProxyForUpdates}"/><TextBlock Text="默认跟随上方代理模式；关闭后更新请求直连。" Classes="hint" Margin="24,-10,0,0"/>
                 <Button Content="检查更新" Command="{Binding CheckUpdateCommand}" Classes="outline" HorizontalAlignment="Left" IsEnabled="{Binding IsNotBusy}"/>
               </StackPanel>
             </Border>

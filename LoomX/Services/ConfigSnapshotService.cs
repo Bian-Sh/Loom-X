@@ -91,6 +91,28 @@ public sealed class ConfigSnapshotService : IDisposable
         return await new ConfigurationManagementService(new DesktopDbContextFactory(CreateReadOnlyOptions()), provider).GetSettingsAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// 读取更新请求使用的代理设置。密码只在内存中解密，调用方不得持久化或记录。
+    /// </summary>
+    public async Task<UpdateProxySettings> GetUpdateProxySettingsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = CreateContext(CreateReadOnlyOptions());
+        await EnsureDatabaseReadyForReadAsync(db, cancellationToken);
+        var settings = await db.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
+        string? password = null;
+        if (!string.IsNullOrWhiteSpace(settings.ProtectedProxyPassword)
+            && ProtectedApiKeyStore.TryUnprotect(settings.ProtectedProxyPassword, out var plainText))
+            password = plainText;
+
+        return new UpdateProxySettings(
+            settings.UseProxyForUpdates,
+            settings.ProxyMode,
+            settings.ProxyHost,
+            settings.ProxyPort,
+            settings.ProxyUsername,
+            password);
+    }
+
     public Task<AppSettingsResponse> UpdateSettingsAsync(AppSettingsInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateSettingsAsync(input, token), cancellationToken);
 
     public Task<ProviderResponse> CreateProviderAsync(ProviderInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateProviderAsync(input, token), cancellationToken);
@@ -185,12 +207,12 @@ public sealed class ConfigSnapshotService : IDisposable
             command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('AppSettings', 'GatewayConfigurations', 'Providers', 'Models')";
             var tableCount = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
             await using var columnCommand = db.Database.GetDbConnection().CreateCommand();
-            columnCommand.CommandText = "SELECT COUNT(*) FROM pragma_table_info('AppSettings') WHERE name IN ('TransparencyEnabled', 'TransparencyOpacity', 'BlurAmount', 'TransparencyAlgorithm')";
+            columnCommand.CommandText = "SELECT COUNT(*) FROM pragma_table_info('AppSettings') WHERE name IN ('TransparencyEnabled', 'TransparencyOpacity', 'BlurAmount', 'TransparencyAlgorithm', 'UseProxyForUpdates')";
             var appearanceColumnCount = Convert.ToInt32(await columnCommand.ExecuteScalarAsync(cancellationToken));
-            logger?.LogInformation("配置库只读预检完成，必要表 {RequiredTableCount}/4，外观字段 {AppearanceColumnCount}/4", tableCount, appearanceColumnCount);
-            if (tableCount < 4 || appearanceColumnCount < 4)
+            logger?.LogInformation("配置库只读预检完成，必要表 {RequiredTableCount}/4，更新与外观字段 {AppearanceColumnCount}/5", tableCount, appearanceColumnCount);
+            if (tableCount < 4 || appearanceColumnCount < 5)
             {
-                logger?.LogWarning("配置库需要结构迁移，必要表 {RequiredTableCount}/4，外观字段 {AppearanceColumnCount}/4，执行初始化 {DatabasePath}", tableCount, appearanceColumnCount, databasePath);
+                logger?.LogWarning("配置库需要结构迁移，必要表 {RequiredTableCount}/4，更新与外观字段 {AppearanceColumnCount}/5，执行初始化 {DatabasePath}", tableCount, appearanceColumnCount, databasePath);
                 await db.Database.CloseConnectionAsync();
                 await using var writableDb = new ConfigurationDbContext(CreateOptions());
                 await ConfigurationDatabase.InitializeAsync(writableDb, cancellationToken);

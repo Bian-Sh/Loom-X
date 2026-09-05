@@ -33,7 +33,7 @@ UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\LoomX.exe
 SetupLogging=yes
 CloseApplications=yes
-RestartApplications=no
+RestartApplications=yes
 
 [Tasks]
 Name: "startmenuicon"; Description: "创建开始菜单快捷方式"
@@ -47,4 +47,4 @@ Name: "{autoprograms}\LoomX"; Filename: "{app}\LoomX.exe"; WorkingDir: "{app}"; 
 Name: "{autodesktop}\LoomX"; Filename: "{app}\LoomX.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\LoomX.exe"; Description: "启动 LoomX"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\LoomX.exe"; Description: "启动 LoomX"; WorkingDir: "{app}"; Flags: nowait postinstall
