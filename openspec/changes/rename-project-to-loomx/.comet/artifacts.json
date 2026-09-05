@@ -1,0 +1,8 @@
+{
+  "openspec_proposal": "openspec/changes/rename-project-to-loomx/proposal.md",
+  "openspec_design": "openspec/changes/rename-project-to-loomx/design.md",
+  "openspec_tasks": "openspec/changes/rename-project-to-loomx/tasks.md",
+  "openspec_delta_spec": "openspec/changes/rename-project-to-loomx/specs/app-data-migration/spec.md",
+  "handoff_context": "openspec/changes/rename-project-to-loomx/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/rename-project-to-loomx/.comet/handoff/design-context.md"
+}
