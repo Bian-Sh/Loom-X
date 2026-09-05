@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: b31fb3b813d257dfad0a1cee875801e9cba5fe5f
 design_doc: docs/superpowers/specs/2026-09-04-consolidate-desktop-project-design.md
 plan: docs/superpowers/plans/2026-09-04-consolidate-desktop-project.md
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-09-05-consolidate-desktop-project-verify.md
 branch_status: handled
 created_at: 2026-09-04
-verified_at: null
+verified_at: 2026-09-05
 archived: false
 direct_override: true
 handoff_context: openspec/changes/consolidate-desktop-project/.comet/handoff/design-context.json
