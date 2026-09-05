@@ -541,7 +541,7 @@ public sealed class OverviewEndpointViewModel : NotifyViewModel
     public string PublicPath { get; }
     public bool Enabled { get; }
     public ObservableCollection<OverviewRouteViewModel> Routes { get; } = [];
-    public bool IsGraphVisible { get => isGraphVisible; internal set => SetProperty(ref isGraphVisible, value); }
+    public bool IsGraphVisible { get => isGraphVisible; set => SetProperty(ref isGraphVisible, value); }
     public RuntimeGraphSnapshot? GraphSnapshot { get => graphSnapshot; internal set => SetProperty(ref graphSnapshot, value); }
     public int ActiveCount => Routes.Count(item => item.IsActive);
     public string Status => !Enabled ? "已停用" : Routes.Count == 0 ? "无路由" : ActiveCount > 0 ? "有请求" : "已就绪";

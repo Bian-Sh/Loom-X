@@ -60,8 +60,10 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("xmlns:nodegraph=\"using:LoomX.NodeGraph\"", source, StringComparison.Ordinal);
         Assert.Contains("<nodegraph:RuntimeGraphControl", source, StringComparison.Ordinal);
         Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
-        Assert.Contains("滚轮缩放 · 拖动平移 · Fit 重置视野", source, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"适合视图\"", source, StringComparison.Ordinal);
+        Assert.Contains("滚轮缩放 · 拖动平移 · 适应画布", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"适应画布\"", source, StringComparison.Ordinal);
+        Assert.Contains("<PathIcon Data=", source, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"Endpoint\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<NativeWebView", source, StringComparison.Ordinal);
     }
@@ -77,8 +79,10 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding IsGraphVisible}\"", source, StringComparison.Ordinal);
         Assert.Contains("Click=\"FocusEndpoint_OnClick\"", source, StringComparison.Ordinal);
-        Assert.Contains("Button.graph-endpoint-link:pointerover", source, StringComparison.Ordinal);
+        Assert.Contains("ToggleButton.graph-endpoint-link:pointerover", source, StringComparison.Ordinal);
+        Assert.Contains("ToggleButton.graph-endpoint-link:checked", source, StringComparison.Ordinal);
         Assert.Contains("TextDecorations=\"Underline\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding IsGraphVisible, Mode=TwoWay}\"", source, StringComparison.Ordinal);
         Assert.Contains("Cursor\" Value=\"Hand\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GraphStatus", source, StringComparison.Ordinal);
         Assert.Contains("viewModel.SelectEndpoint(endpoint)", codeBehind, StringComparison.Ordinal);

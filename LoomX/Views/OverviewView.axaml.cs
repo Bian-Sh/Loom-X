@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -32,7 +33,7 @@ public partial class OverviewView : UserControl
 
     private void FocusEndpoint_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (sender is not Button { DataContext: OverviewEndpointViewModel endpoint }) return;
+        if (sender is not ToggleButton { DataContext: OverviewEndpointViewModel endpoint }) return;
         if (DataContext is OverviewViewModel viewModel) viewModel.SelectEndpoint(endpoint);
         Dispatcher.UIThread.Post(() => FindActiveGraph()?.FitToView());
     }
