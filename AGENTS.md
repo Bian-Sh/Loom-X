@@ -1,8 +1,9 @@
-# OllamaHub 开发约定
+# Loom-x 开发约定
 
 ## 设置数据库路径
 
-- OllamaHub 的设置数据库唯一使用 `%LOCALAPPDATA%\OllamaHub\OllamaHub.db`。
+- Loom-x 的配置数据库唯一使用 `%LOCALAPPDATA%\LoomX\LoomX.db`，活动库使用 `%LOCALAPPDATA%\LoomX\LoomX.Activity.db`。
+- `%LOCALAPPDATA%\OllamaHub\OllamaHub.db` 和 `%LOCALAPPDATA%\OllamaHub\Activity.db` 仅作为首次启动迁移源，迁移成功或失败后均保留，不得作为正常运行时路径。
 - 服务端、桌面端、命令行和测试中的运行时配置访问必须通过统一路径实现，不得使用 `AppContext.BaseDirectory`、当前工作目录或其他路径创建、读取或写入设置数据库。
 - 修改数据库路径逻辑时，必须验证所有入口仍指向上述唯一位置，并避免静默创建第二份空数据库。
 

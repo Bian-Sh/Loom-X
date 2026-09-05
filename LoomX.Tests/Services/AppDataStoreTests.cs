@@ -14,7 +14,7 @@ public sealed class AppDataStoreTests
     {
         var directory = CreateDirectory();
         var configPath = Path.Combine(directory, "LoomX.db");
-        var activityPath = Path.Combine(directory, "Activity.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
         try
         {
             await InitializeConfigurationAsync(configPath);
@@ -41,7 +41,7 @@ public sealed class AppDataStoreTests
     {
         var directory = CreateDirectory();
         var configPath = Path.Combine(directory, "LoomX.db");
-        var activityPath = Path.Combine(directory, "Activity.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
         try
         {
             await InitializeConfigurationAsync(configPath);
@@ -70,7 +70,7 @@ public sealed class AppDataStoreTests
     {
         var directory = CreateDirectory();
         var configPath = Path.Combine(directory, "LoomX.db");
-        var activityPath = Path.Combine(directory, "Activity.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
         try
         {
             await InitializeConfigurationAsync(configPath);
@@ -95,7 +95,7 @@ public sealed class AppDataStoreTests
     {
         var directory = CreateDirectory();
         var configPath = Path.Combine(directory, "LoomX.db");
-        var activityPath = Path.Combine(directory, "Activity.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
         try
         {
             await InitializeConfigurationAsync(configPath);
@@ -132,7 +132,7 @@ public sealed class AppDataStoreTests
     {
         var directory = CreateDirectory();
         var configPath = Path.Combine(directory, "LoomX.db");
-        var activityPath = Path.Combine(directory, "Activity.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
         try
         {
             await InitializeConfigurationAsync(configPath);

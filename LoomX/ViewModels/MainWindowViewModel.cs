@@ -74,7 +74,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = gatewayViewModel; }
     private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = consoleViewModel; }
     private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = activityViewModel; }
-    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 LoomX 的显示、连接、更新与隐私偏好。"; CurrentView = settingsViewModel; }
+    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 Loom-x 的显示、连接、更新与隐私偏好。"; CurrentView = settingsViewModel; }
     private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
 
     private void OnConfigurationReady(object? sender, EventArgs args)
@@ -285,7 +285,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
                 _ => "未运行"
             };
             LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "尚未检查";
-            Version = gatewayService.State == GatewayState.Running ? "LoomX API 在线" : "未连接";
+            Version = gatewayService.State == GatewayState.Running ? "Loom-x API 在线" : "未连接";
             GraphStatus = gatewayService.State == GatewayState.Running ? "实时拓扑已连接" : "等待网关启动";
             UpdateGatewayControls();
             GraphMetricsChanged?.Invoke(this, EventArgs.Empty);

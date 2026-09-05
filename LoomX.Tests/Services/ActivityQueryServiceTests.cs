@@ -12,7 +12,7 @@ public sealed class ActivityQueryServiceTests
     public async Task QueryAsyncReturnsRecentRowsWithCreatedAtOrdering()
     {
         var directory = Path.Combine(Path.GetTempPath(), "LoomXTests", Guid.NewGuid().ToString("N"));
-        var databasePath = Path.Combine(directory, "Activity.db");
+        var databasePath = Path.Combine(directory, "LoomX.Activity.db");
         Directory.CreateDirectory(directory);
         try
         {
@@ -48,7 +48,7 @@ public sealed class ActivityQueryServiceTests
     public async Task QueryAsyncLimitsAfterCreatedAtOrdering()
     {
         var directory = Path.Combine(Path.GetTempPath(), "LoomXTests", Guid.NewGuid().ToString("N"));
-        var databasePath = Path.Combine(directory, "Activity.db");
+        var databasePath = Path.Combine(directory, "LoomX.Activity.db");
         Directory.CreateDirectory(directory);
         try
         {
@@ -84,7 +84,7 @@ public sealed class ActivityQueryServiceTests
     public async Task QueryPageAsyncUsesCreatedAtAndIdCursor()
     {
         var directory = Path.Combine(Path.GetTempPath(), "LoomXTests", Guid.NewGuid().ToString("N"));
-        var databasePath = Path.Combine(directory, "Activity.db");
+        var databasePath = Path.Combine(directory, "LoomX.Activity.db");
         Directory.CreateDirectory(directory);
         try
         {

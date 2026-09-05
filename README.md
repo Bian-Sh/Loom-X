@@ -1,11 +1,11 @@
-# OllamaHub
+# Loom-x
 
-OllamaHub 是一个本地 HTTP 代理服务，对外提供 Ollama 与 OpenAI 兼容入口，并将请求转发到可配置的 Provider/Model。
+Loom-x 是一个本地 HTTP 代理服务，对外提供 Ollama 与 OpenAI 兼容入口，并将请求转发到可配置的 Provider/Model。
 
 ## 当前能力
 
 - Provider 与 Model 通过 Avalonia 桌面控制中心增删改。
-- 配置唯一存储在 `%LOCALAPPDATA%\OllamaHub\OllamaHub.db`，使用 Entity Framework Core + SQLite。
+- 正常运行数据唯一存储在 `%LOCALAPPDATA%\LoomX`：配置库为 `LoomX.db`，活动库为 `LoomX.Activity.db`，日志位于 `logs` 子目录。
 - API Key 使用 Windows DPAPI 保护后写入数据库，界面和管理 API 不回显旧值。
 - 日志使用 Serilog，按日期和 10 MB 大小滚动，保留最近 30 个文件。
 - 支持 `openai`、`anthropic`、`ollama` 协议模式。
@@ -13,7 +13,9 @@ OllamaHub 是一个本地 HTTP 代理服务，对外提供 Ollama 与 OpenAI 兼
 
 ## 配置与数据
 
-应用首次运行会在 `%LOCALAPPDATA%\OllamaHub\` 创建 `OllamaHub.db`，并建立默认网关监听地址 `http://127.0.0.1:11434`。应用程序目录中的旧数据库不会被读取或迁移。
+应用首次运行会在 `%LOCALAPPDATA%\LoomX\` 创建数据库，并建立默认网关监听地址 `http://127.0.0.1:11434`。如果检测到旧 `%LOCALAPPDATA%\OllamaHub\` 目录，Loom-x 会在首次创建新数据库连接前使用 SQLite `VACUUM INTO` 迁移 `OllamaHub.db` 和 `Activity.db`，完成完整性检查后原子提交；旧目录和旧日志始终保留，不会被删除或覆盖。
+
+新库优先于旧库。迁移期间如果旧版仍占用数据库、源库损坏、权限不足或校验失败，Loom-x 会阻止启动，不会静默创建空配置库；修复占用或权限后可再次启动重试。
 
 数据库主要包含：
 
@@ -25,9 +27,9 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 
 ## 日志
 
-日志写入 `%LOCALAPPDATA%\OllamaHub\logs\`：
+日志写入 `%LOCALAPPDATA%\LoomX\logs\`：
 
-- 文件名格式：`ollamahub-YYYYMMDD.log`。
+- 文件名格式：`loomx-YYYYMMDD.log`。
 - 单文件超过 10 MB 时自动切分序号文件。
 - 最多保留 30 个日志文件，超期文件自动删除。
 - 日志不写入 SQLite，API Key 和授权头不得写入日志内容。
@@ -36,7 +38,7 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 
 开发运行桌面控制中心：
 
-`dotnet run --project OllamaHub.Desktop`
+`dotnet run --project LoomX\LoomX.csproj`
 
 启动桌面端后进入 **Provider** 页面：
 
@@ -73,23 +75,23 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 
 构建解决方案：
 
-`dotnet build OllamaHub.slnx`
+`dotnet build LoomX.slnx`
 
 运行测试：
 
-`dotnet test OllamaHub.Tests/OllamaHub.Tests.csproj`
+`dotnet test LoomX.Tests\LoomX.Tests.csproj`
 
 发布桌面端：
 
-`dotnet publish OllamaHub.Desktop -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o <output-directory>`
+`pwsh -File scripts\publish-desktop.ps1 -Configuration Release`
 
-发布目录只包含一个应用入口 `OllamaHub.Desktop.exe`，网关在桌面进程内运行，不会生成或启动独立的 `OllamaHub.exe`。
+发布目录位于 `outputs\<时间戳>\`，只包含一个应用入口 `LoomX.exe`；网关在桌面进程内运行，不会生成或启动独立的 `LoomX.Desktop.exe` 或旧名称入口。
 
 ## Visual Studio Copilot Chat BYOM
 
-将 OllamaHub 作为本地 Ollama 服务使用：
+将 Loom-x 作为本地 Ollama 服务使用：
 
 1. 启动网关并确认监听 `http://127.0.0.1:11434`。
 2. 在桌面控制中心配置 Provider 和 Model。
 3. 在 Visual Studio Copilot Chat BYOM 中选择本地 Ollama。
-4. 将地址指向 OllamaHub 的监听地址。
+4. 将地址指向 Loom-x 的监听地址。

@@ -23,9 +23,17 @@ public static class LoomXHost
     public static async Task<WebApplication> CreateAsync(CancellationToken cancellationToken = default)
     {
         AppDataPaths.EnsureCreated();
+
+        LoggingBootstrap.Configure();
+        using (var migrationLoggerFactory = LoggerFactory.Create(builder => builder.AddSerilog(dispose: false)))
+        {
+            var migration = new ApplicationDataMigration(
+                migrationLoggerFactory.CreateLogger<ApplicationDataMigration>());
+            await migration.EnsureMigratedAsync(cancellationToken);
+        }
+
         var databasePath = AppDataPaths.DatabasePath;
         var builder = WebApplication.CreateBuilder(Array.Empty<string>());
-        LoggingBootstrap.Configure();
         builder.Host.UseSerilog();
 
         var dbOptions = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite(CreateConnectionString(databasePath)).Options;
@@ -66,7 +74,7 @@ public static class LoomXHost
 
     private static void MapEndpoints(WebApplication app)
     {
-        app.MapGet("/", () => Results.Ok(new { name = "LoomX", status = "ok" }));
+        app.MapGet("/", () => Results.Ok(new { name = "Loom-x", status = "ok" }));
         app.MapGet("/api/version", () => Results.Ok(new { version = "0.12.6" }));
         app.MapGet("/api/ps", () => Results.Ok(new { models = Array.Empty<object>() }));
         app.MapGet("/api/tags", (IDatabaseConfigurationProvider configProvider) =>
@@ -133,7 +141,7 @@ public static class LoomXHost
         {
             var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
             var configuredUrls = app.Services.GetRequiredService<IDatabaseConfigurationProvider>().Current.Server.Urls;
-            logger.LogInformation("LoomX listening on {Urls}", configuredUrls.Count > 0 ? string.Join(", ", configuredUrls) : "default ASP.NET Core URLs");
+            logger.LogInformation("Loom-x 网关监听 {Urls}", configuredUrls.Count > 0 ? string.Join(", ", configuredUrls) : "默认 ASP.NET Core 地址");
         });
     }
 

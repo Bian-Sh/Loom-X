@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
-$projectPath = Join-Path $repositoryRoot "OllamaHub.Desktop\OllamaHub.Desktop.csproj"
+$projectPath = Join-Path $repositoryRoot "LoomX\LoomX.csproj"
 $outputsRoot = Join-Path $repositoryRoot "outputs"
 
 if (-not (Test-Path -LiteralPath $projectPath)) {
@@ -57,15 +57,10 @@ if (Test-Path -LiteralPath $generatedCrashDumper) {
     Remove-Item -LiteralPath $generatedCrashDumper -Force
 }
 
-$gatewayAppHost = Join-Path $publishDirectory "OllamaHub.exe"
-if (Test-Path -LiteralPath $gatewayAppHost) {
-    Remove-Item -LiteralPath $gatewayAppHost -Force
-}
-
 $executables = @(Get-ChildItem -LiteralPath $publishDirectory -Filter *.exe -File)
-if ($executables.Count -ne 1 -or $executables[0].Name -ne "OllamaHub.Desktop.exe") {
+if ($executables.Count -ne 1 -or $executables[0].Name -ne "LoomX.exe") {
     $names = if ($executables.Count -eq 0) { "(none)" } else { ($executables | ForEach-Object Name) -join ", " }
-    throw "Publish output must contain only OllamaHub.Desktop.exe; actual: $names"
+    throw "发布目录必须只包含 LoomX.exe，实际包含：$names"
 }
 
 Write-Host "发布目录：$publishDirectory"

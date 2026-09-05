@@ -10,6 +10,31 @@ namespace LoomX.Tests.Hosting;
 public sealed class LoomXHostTests
 {
     [Fact]
+    public void CreateAsync_迁移发生在首次配置数据库连接之前()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "LoomXHost.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        var migrationIndex = source.IndexOf("EnsureMigratedAsync", StringComparison.Ordinal);
+        var configurationContextIndex = source.IndexOf("new ConfigurationDbContext", StringComparison.Ordinal);
+        var factoryRegistrationIndex = source.IndexOf("AddDbContextFactory<ConfigurationDbContext>", StringComparison.Ordinal);
+
+        Assert.True(migrationIndex >= 0);
+        Assert.True(configurationContextIndex > migrationIndex);
+        Assert.True(factoryRegistrationIndex > migrationIndex);
+    }
+
+    [Fact]
+    public void 根健康响应使用Loomx产品显示名()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "LoomXHost.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        Assert.Contains("name = \"Loom-x\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("name = \"LoomX\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuildGatewayAttemptPayload_ForwardsModelReasoningEffortWithoutMutatingRequest()
     {
         var request = JsonNode.Parse("""

@@ -107,6 +107,8 @@ public partial class App : Application
             if (allowMultipleInstances)
                 startupLogger.LogWarning("调试启动已允许多个桌面实例，进程 {ProcessId}", Environment.ProcessId);
             startupLogger.LogInformation("桌面应用启动，进程 {ProcessId}，用户 {UserName}，进程路径 {ProcessPath}，基目录 {BaseDirectory}，启动工作目录 {LauncherWorkingDirectory}，规范化工作目录 {CurrentDirectory}", Environment.ProcessId, Environment.UserName, Environment.ProcessPath, AppContext.BaseDirectory, launcherWorkingDirectory, Environment.CurrentDirectory);
+            var migration = new ApplicationDataMigration(loggerFactory.CreateLogger<ApplicationDataMigration>());
+            migration.EnsureMigratedAsync().GetAwaiter().GetResult();
             var configService = new ConfigSnapshotService(loggerFactory.CreateLogger<ConfigSnapshotService>());
             gatewayService = new GatewayProcessService();
             var toastService = new ToastService();

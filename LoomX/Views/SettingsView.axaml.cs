@@ -14,6 +14,6 @@ public partial class SettingsView : UserControl
         catch { }
     }
 
-    private void ProjectHomeButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/mingkuang-Chuyu/LoomX");
-    private void IssuesButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/mingkuang-Chuyu/LoomX/issues");
+    private void ProjectHomeButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/Bian-Sh/Loom-X");
+    private void IssuesButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/Bian-Sh/Loom-X/issues");
 }
