@@ -20,7 +20,7 @@ Provider 页面左侧目前直接展示全部 Provider，搜索框没有绑定�
 - 查询先执行 `Trim()`；空查询返回全部 Provider，否则以不区分大小写的方式匹配显示名称、Provider ID、Base URL 和协议类型。
 - Provider 集合变化、选中 Provider 属性变化和搜索词变化时通知 `FilteredProviders`，保证新增、删除、编辑和刷新后列表及时更新。
 
-XAML 将左侧 `ListBox.ItemsSource` 改为 `FilteredProviders`，搜索框绑定 `ProviderSearchQuery`。Provider 单元格调整为三行：第一行放显示名称、启用开关和删除按钮，第二行放 Base URL，第三行放协议、模型数和密钥状态；移除 `P` 图标及其占位边距，使用更小的内边距。删除按钮的 `Path` 直接使用模型删除按钮现有的几何数据。
+XAML 将左侧 `ListBox.ItemsSource` 改为 `FilteredProviders`，搜索框绑定 `ProviderSearchQuery`。Provider 单元格的真实内容保持三行：第一行放显示名称和启用开关，第二行放 Base URL，第三行放协议、模型数和密钥状态；移除 `P` 图标及其占位边距，使用更小的内边距。删除按钮通过叠放方式悬浮在 cell 右下角，不参与行高计算，右边缘与第一行启用开关的右边缘对齐。删除按钮的 `Path` 直接使用模型删除按钮现有的几何数据。
 
 ## 错误处理与边界
 
