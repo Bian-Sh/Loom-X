@@ -143,4 +143,16 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("Property=\"Margin\" Value=\"0,0,0,1\"", source, StringComparison.Ordinal);
         Assert.Contains("<Border Padding=\"14,12\" Background=\"Transparent\" BorderBrush=\"{DynamicResource BorderStrongBrush}\" BorderThickness=\"0,0,0,1\">", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ModelDirectoryMatchesProviderDirectoryTransparencyContract()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("Classes=\"model-list\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.model-list\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.model-list ListBoxItem\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.model-list ListBoxItem:selected\"><Setter Property=\"Background\" Value=\"{DynamicResource AccentSoftBrush}\"/>", source, StringComparison.Ordinal);
+    }
 }
