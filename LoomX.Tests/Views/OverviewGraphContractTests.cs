@@ -72,8 +72,12 @@ public sealed class OverviewGraphContractTests
         var codeBehind = ReadDesktopFile("Views", "OverviewView.axaml.cs");
 
         Assert.Contains("ItemsSource=\"{Binding Endpoints}\"", source, StringComparison.Ordinal);
+        Assert.Contains("<ItemsPanelTemplate><Grid/></ItemsPanelTemplate>", source, StringComparison.Ordinal);
+        Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsGraphVisible}\"", source, StringComparison.Ordinal);
         Assert.Contains("Click=\"FocusEndpoint_OnClick\"", source, StringComparison.Ordinal);
-        Assert.Contains("RuntimeGraph.FocusEndpoint(endpoint.Key)", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("viewModel.SelectEndpoint(endpoint)", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("FindActiveGraph()?.FitToView()", codeBehind, StringComparison.Ordinal);
     }
 
     [Fact]

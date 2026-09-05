@@ -158,6 +158,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private string graphStatus = "等待网关启动";
     private string gatewayActionLabel = "启动网关";
     private RuntimeGraphSnapshot? graphSnapshot;
+    private OverviewEndpointViewModel? selectedEndpoint;
     private bool gatewayToggleInProgress;
     private bool refreshInProgress;
     private string topologyJson = "{\"endpoints\":[],\"combos\":[],\"providers\":[],\"models\":[],\"edges\":[]}";
@@ -182,6 +183,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public string GraphStatus { get => graphStatus; private set => SetProperty(ref graphStatus, value); }
     public string GatewayActionLabel { get => gatewayActionLabel; private set => SetProperty(ref gatewayActionLabel, value); }
     public RuntimeGraphSnapshot? GraphSnapshot { get => graphSnapshot; private set => SetProperty(ref graphSnapshot, value); }
+    public OverviewEndpointViewModel? SelectedEndpoint { get => selectedEndpoint; private set => SetProperty(ref selectedEndpoint, value); }
     public ObservableCollection<OverviewEndpointViewModel> Endpoints { get; } = [];
     public ObservableCollection<OverviewComboViewModel> Combos { get; } = [];
     public ObservableCollection<OverviewProviderViewModel> Providers { get; } = [];
@@ -334,10 +336,12 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 
     private void BuildTopology(ResolvedAppConfig config)
     {
+        SelectedEndpoint = null;
         Endpoints.Clear();
         Combos.Clear();
         Providers.Clear();
         Models.Clear();
+        GraphSnapshot = RuntimeGraphProjection.Create(config, dataStore.Providers);
         foreach (var provider in dataStore.Providers
                      .GroupBy(item => item.BusinessId, StringComparer.OrdinalIgnoreCase)
                      .Select(group => group.First()))
@@ -349,6 +353,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         foreach (var endpoint in config.GatewayEndpoints.OrderBy(item => item.Key))
         {
             var endpointVm = new OverviewEndpointViewModel(endpoint.Key, EndpointLabel(endpoint.Key), endpoint.PublicPath, endpoint.Enabled);
+            endpointVm.GraphSnapshot = GraphSnapshot.ForEndpoint(endpoint.Key);
             foreach (var combo in endpoint.Combos.OrderBy(item => item.SortOrder))
             {
                 var comboVm = new OverviewComboViewModel(ComboId(endpoint.Key, combo.Name), endpoint.Key, combo.Name, combo.Enabled);
@@ -364,9 +369,16 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             }
             Endpoints.Add(endpointVm);
         }
-        GraphSnapshot = RuntimeGraphProjection.Create(config, dataStore.Providers);
+        SelectEndpoint(Endpoints.FirstOrDefault());
         topologyJson = CreateTopologyJson(config, dataStore.Providers);
         TopologyChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SelectEndpoint(OverviewEndpointViewModel? endpoint)
+    {
+        if (endpoint is null || !Endpoints.Contains(endpoint)) return;
+        SelectedEndpoint = endpoint;
+        foreach (var item in Endpoints) item.IsGraphVisible = ReferenceEquals(item, endpoint);
     }
 
     internal static string CreateTopologyJson(ResolvedAppConfig config, IReadOnlyList<ProviderResponse> providerResponses)
@@ -522,11 +534,15 @@ public static class OverviewGraphEdgeKey
 
 public sealed class OverviewEndpointViewModel : NotifyViewModel
 {
+    private bool isGraphVisible;
+    private RuntimeGraphSnapshot? graphSnapshot;
     public string Key { get; }
     public string DisplayName { get; }
     public string PublicPath { get; }
     public bool Enabled { get; }
     public ObservableCollection<OverviewRouteViewModel> Routes { get; } = [];
+    public bool IsGraphVisible { get => isGraphVisible; internal set => SetProperty(ref isGraphVisible, value); }
+    public RuntimeGraphSnapshot? GraphSnapshot { get => graphSnapshot; internal set => SetProperty(ref graphSnapshot, value); }
     public int ActiveCount => Routes.Count(item => item.IsActive);
     public string Status => !Enabled ? "已停用" : Routes.Count == 0 ? "无路由" : ActiveCount > 0 ? "有请求" : "已就绪";
     public OverviewEndpointViewModel(string key, string displayName, string publicPath, bool enabled) => (Key, DisplayName, PublicPath, Enabled) = (key, displayName, publicPath, enabled);

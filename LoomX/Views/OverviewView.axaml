@@ -7,7 +7,16 @@
   <Grid RowDefinitions="*,Auto" RowSpacing="16">
     <Border Grid.Row="0" Background="{DynamicResource GraphBackgroundBrush}" BorderBrush="{DynamicResource GraphBorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360" VerticalAlignment="Stretch">
       <Grid>
-        <nodegraph:RuntimeGraphControl x:Name="RuntimeGraph" Snapshot="{Binding GraphSnapshot}" MinHeight="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+        <ItemsControl ItemsSource="{Binding Endpoints}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><Grid/></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <nodegraph:RuntimeGraphControl Snapshot="{Binding GraphSnapshot}" IsVisible="{Binding IsGraphVisible}" MinHeight="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" SizeChanged="OnGraphSizeChanged"/>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
         <Grid Panel.ZIndex="1" ColumnDefinitions="*,Auto" Margin="10,8,10,0" IsHitTestVisible="True">
           <ItemsControl ItemsSource="{Binding Endpoints}" HorizontalAlignment="Left" VerticalAlignment="Top">
             <ItemsControl.ItemsPanel>

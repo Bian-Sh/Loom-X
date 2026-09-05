@@ -121,6 +121,39 @@ public sealed class RuntimeGraphProjectionTests
         Assert.Contains(snapshot.Edges, item => item.Kind == RuntimeGraphEdgeKind.ProviderToModel);
     }
 
+    [Fact]
+    public void EndpointSnapshotKeepsOnlyItsRouteModelsAndEdges()
+    {
+        var shared = CreateModel("provider-a", "shared-model");
+        var config = CreateConfig(
+            new ResolvedGatewayEndpointConfig
+            {
+                Key = "openai",
+                PublicPath = "/openai",
+                Enabled = true,
+                Combos = [CreateCombo("coding", shared)]
+            },
+            new ResolvedGatewayEndpointConfig
+            {
+                Key = "azure",
+                PublicPath = "/azure",
+                Enabled = true,
+                Combos = [CreateCombo("coding", CreateModel("provider-a", "azure-only"))]
+            });
+        var snapshot = RuntimeGraphProjection.Create(config, [CreateProvider("provider-a", "Provider A", 2)]);
+
+        var endpointSnapshot = snapshot.ForEndpoint("openai");
+
+        Assert.Single(endpointSnapshot.Endpoints);
+        Assert.Equal("openai", endpointSnapshot.Endpoints[0].Id);
+        Assert.Single(endpointSnapshot.Combos);
+        var provider = Assert.Single(endpointSnapshot.Providers);
+        Assert.Single(provider.Models);
+        Assert.Equal("provider-a|shared-model", provider.Models[0].Id);
+        Assert.Single(endpointSnapshot.Routes);
+        Assert.All(endpointSnapshot.Edges, edge => Assert.Contains(edge.Id, endpointSnapshot.Routes[0].EdgeIds));
+    }
+
     private static ResolvedAppConfig CreateConfig(params ResolvedGatewayEndpointConfig[] endpoints) => new()
     {
         GatewayEndpoints = endpoints,
