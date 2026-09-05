@@ -65,6 +65,39 @@ public sealed class WindowAppearanceCoordinatorTests
     }
 
     [Fact]
+    public void SemanticSurfaceBrushesFollowTransparencyAndOpaqueFallback()
+    {
+        EnsureAvaloniaSetup();
+        var window = new MainWindow();
+        var dictionary = LoadVisualTokens();
+        window.Resources.MergedDictionaries.Add(dictionary);
+
+        window.ApplyAppearance(true, 20, 0, "acrylic");
+        var lowBlurFactor = MainWindow.CalculateBlurTintFactor(0);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["SuccessSoftBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["WarningSoftBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["DangerSoftBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["SuccessBorderBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["WarningBorderBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["DangerBorderBrush"]).Color.A);
+
+        window.ApplyAppearance(true, 20, 64, "acrylic");
+        var highBlurFactor = MainWindow.CalculateBlurTintFactor(64);
+        Assert.True(
+            Assert.IsType<SolidColorBrush>(dictionary["SuccessSoftBrush"]).Color.A
+            > MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor));
+        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, highBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["DangerBorderBrush"]).Color.A);
+
+        window.ApplyAppearance(false, 20, 64, "acrylic");
+        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["SuccessSoftBrush"]).Color.A);
+        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["WarningSoftBrush"]).Color.A);
+        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["DangerSoftBrush"]).Color.A);
+        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["SuccessBorderBrush"]).Color.A);
+        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["WarningBorderBrush"]).Color.A);
+        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["DangerBorderBrush"]).Color.A);
+    }
+
+    [Fact]
     public void AppliedSecondaryWindowTracksLaterAppearanceChanges()
     {
         EnsureAvaloniaSetup();
