@@ -90,6 +90,10 @@ public sealed class RuntimeGraphControl : Control
     {
         base.Render(context);
 
+        var background = ResolveBrush("GraphCanvasBrush", Brushes.Transparent);
+        using (context.PushClip(Bounds))
+            context.DrawRectangle(background, null, new Rect(Bounds.Size));
+
         var layout = ResolveLayout();
         if (layout is null) return;
 

@@ -35,6 +35,7 @@
 
   <!-- 深色拓扑图使用独立令牌，避免被玻璃层降低可读性。 -->
   <SolidColorBrush x:Key="GraphBackgroundBrush" Color="#07131B" />
+  <SolidColorBrush x:Key="GraphCanvasBrush" Color="#2607131B" />
   <SolidColorBrush x:Key="GraphBorderBrush" Color="#1D3944" />
   <SolidColorBrush x:Key="GraphTextBrush" Color="#F1F7FA" />
   <SolidColorBrush x:Key="GraphMutedBrush" Color="#91A7B1" />
