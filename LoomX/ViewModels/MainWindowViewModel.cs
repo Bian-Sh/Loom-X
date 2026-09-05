@@ -627,6 +627,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private DispatcherTimer? modelSyncAnimationTimer;
     private bool isModelSyncing;
     private double syncIconAngle;
+    private string modelSearchQuery = "";
     private CancellationTokenSource? providerAutoSaveCancellation;
     private CancellationTokenSource? modelAutoSaveCancellation;
     private ModelEditorViewModel? draggingModel;
@@ -654,6 +655,9 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             SelectedModel = null;
             OnPropertyChanged(nameof(HasSelectedProvider));
             OnPropertyChanged(nameof(HasNoSelectedProvider));
+            OnPropertyChanged(nameof(FilteredModels));
+            OnPropertyChanged(nameof(HasFilteredModels));
+            OnPropertyChanged(nameof(HasNoFilteredModels));
             OnPropertyChanged(nameof(EnabledModelCount));
             OnPropertyChanged(nameof(AllModelsEnabled));
             OnPropertyChanged(nameof(EnabledModelSummary));
@@ -675,6 +679,32 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         }
     }
     public bool HasSelectedModel => SelectedModel is not null;
+    public string ModelSearchQuery
+    {
+        get => modelSearchQuery;
+        set
+        {
+            if (!SetProperty(ref modelSearchQuery, value ?? "")) return;
+            OnPropertyChanged(nameof(HasModelSearchQuery));
+            OnPropertyChanged(nameof(FilteredModels));
+            OnPropertyChanged(nameof(HasFilteredModels));
+            OnPropertyChanged(nameof(HasNoFilteredModels));
+        }
+    }
+    public bool HasModelSearchQuery => !string.IsNullOrWhiteSpace(ModelSearchQuery);
+    public IReadOnlyList<ModelEditorViewModel> FilteredModels
+    {
+        get
+        {
+            if (SelectedProvider is null) return [];
+            var query = ModelSearchQuery.Trim();
+            return string.IsNullOrEmpty(query)
+                ? SelectedProvider.Models.ToArray()
+                : SelectedProvider.Models.Where(model => model.IsRealModel && model.ModelId.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+        }
+    }
+    public bool HasFilteredModels => FilteredModels.Count > 0;
+    public bool HasNoFilteredModels => SelectedProvider?.HasModels == true && !HasFilteredModels;
     public ModelEditorViewModel? DraggingModel { get => draggingModel; private set { if (ReferenceEquals(draggingModel, value)) return; draggingModel = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsModelDragActive)); OnPropertyChanged(nameof(EnabledModelCount)); OnPropertyChanged(nameof(EnabledModelSummary)); OnPropertyChanged(nameof(AllModelsEnabled)); } }
     public bool IsModelDragActive => DraggingModel is not null;
     public int EnabledModelCount => GetSelectedProviderModelsForSummary().Count(model => model.Enabled);
@@ -1087,7 +1117,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     public bool BeginModelDrag(ModelEditorViewModel? model)
     {
-        if (model is null || model.IsPlaceholder || SelectedProvider is null || DraggingModel is not null) return false;
+        if (model is null || model.IsPlaceholder || SelectedProvider is null || HasModelSearchQuery || DraggingModel is not null) return false;
         var provider = SelectedProvider;
         var index = provider.Models.IndexOf(model);
         if (index < 0 || provider.Models.Count(item => item.IsRealModel) < 2) return false;
@@ -1248,6 +1278,9 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         if (args.NewItems is not null) foreach (ModelEditorViewModel model in args.NewItems) model.PropertyChanged += ModelChanged;
         if (args.OldItems is not null) foreach (ModelEditorViewModel model in args.OldItems) model.PropertyChanged -= ModelChanged;
         UpdateSummary();
+        OnPropertyChanged(nameof(FilteredModels));
+        OnPropertyChanged(nameof(HasFilteredModels));
+        OnPropertyChanged(nameof(HasNoFilteredModels));
         OnPropertyChanged(nameof(EnabledModelCount));
         OnPropertyChanged(nameof(AllModelsEnabled));
         OnPropertyChanged(nameof(EnabledModelSummary));

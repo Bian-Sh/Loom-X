@@ -82,6 +82,7 @@ public partial class ProvidersView : UserControl
     private void ModelHandle_OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (sender is not Border handleBorder || handleBorder.Tag is not ModelEditorViewModel model || DataContext is not ProvidersViewModel viewModel) return;
+        if (viewModel.HasModelSearchQuery) return;
         var modelBorder = handleBorder.FindAncestorOfType<Border>();
         if (modelBorder is null || !modelBorder.Classes.Contains("model-cell")) return;
         var itemsControl = handleBorder.FindAncestorOfType<ItemsControl>();

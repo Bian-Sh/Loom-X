@@ -40,6 +40,10 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("EnabledModelSummary", source, StringComparison.Ordinal);
         Assert.Contains("RemoteVision", source, StringComparison.Ordinal);
         Assert.Contains("MetadataToolTip", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"支持图片输入\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ModelSearchQuery, UpdateSourceTrigger=PropertyChanged}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding FilteredModels}\"", source, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Right\"", source, StringComparison.Ordinal);
         Assert.Contains("Data=\"M 10,5 A 1,1 0 1 1 8,5", source, StringComparison.Ordinal);
         Assert.Contains("Data=\"M 10,11 V 17 M 14,11 V 17", source, StringComparison.Ordinal);
         Assert.Contains("<Grid Height=\"28\" ColumnDefinitions=\"30,46,*,Auto,42\"", source, StringComparison.Ordinal);
@@ -70,6 +74,8 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("IsModelDragPreviewOwner", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("GetSelectedProviderModelsForSummary", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("models.Add(DraggingModel)", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("FilteredModels", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("HasModelSearchQuery", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("model.IsRealModel", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("private async Task ToggleAllModelsAsync()", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("await SaveModelAsync(provider, model);", viewModelSource, StringComparison.Ordinal);
