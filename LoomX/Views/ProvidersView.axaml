@@ -11,9 +11,8 @@
     <Style Selector="Border.model-cell"><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="10,8"/></Style>
     <Style Selector="Border.model-cell.dragging"><Setter Property="Opacity" Value="0.45"/></Style>
     <Style Selector="Border.model-drag-handle"><Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Cursor" Value="SizeAll"/></Style>
-    <Style Selector="Border.model-drag-placeholder"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="0,1,0,1"/><Setter Property="Padding" Value="10,8"/><Setter Property="Opacity" Value="0.8"/></Style>
-    <Style Selector="Border.model-drag-preview"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="6"/><Setter Property="Padding" Value="10,8"/><Setter Property="Opacity" Value="0.98"/></Style>
-    <Style Selector="Ellipse.model-drag-dot"><Setter Property="Width" Value="3"/><Setter Property="Height" Value="3"/><Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+    <Style Selector="Border.model-drag-placeholder"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="10,8"/><Setter Property="Opacity" Value="0.8"/></Style>
+    <Style Selector="Border.model-drag-preview"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="10,8"/><Setter Property="Opacity" Value="0.98"/></Style>
     <Style Selector="Border.stat"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="16,14"/></Style>
     <Style Selector="Button.icon-button"><Setter Property="Width" Value="36"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/><Setter Property="CornerRadius" Value="10"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
     <Style Selector="Button.small-button"><Setter Property="Padding" Value="11,7"/><Setter Property="MinHeight" Value="34"/></Style>
@@ -136,8 +135,8 @@
                           <Grid>
                             <Grid RowDefinitions="Auto,*">
                               <Border Background="{DynamicResource SurfaceSubtleBrush}" Padding="10,7" IsVisible="{Binding SelectedProvider.HasModels}">
-                                <Grid ColumnDefinitions="30,38,*" ColumnSpacing="5">
-                                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding AllModelsEnabled, Mode=OneWay}" Command="{Binding ToggleAllModelsCommand}" OnContent="" OffContent="" ToolTip.Tip="启用或停用全部模型" AutomationProperties.Name="启用或停用全部模型" VerticalAlignment="Center"/>
+                                <Grid ColumnDefinitions="30,46,*" ColumnSpacing="5">
+                                  <ToggleSwitch Grid.Column="1" Width="40" IsChecked="{Binding AllModelsEnabled, Mode=OneWay}" Command="{Binding ToggleAllModelsCommand}" OnContent="" OffContent="" ToolTip.Tip="启用或停用全部模型" AutomationProperties.Name="启用或停用全部模型" VerticalAlignment="Center"/>
                                   <TextBlock Grid.Column="2" Text="{Binding EnabledModelSummary}" Classes="muted" VerticalAlignment="Center"/>
                                 </Grid>
                               </Border>
@@ -145,20 +144,21 @@
                                 <ListBox.ItemTemplate>
                                   <DataTemplate>
                                     <Panel>
-                                      <Border Classes="model-drag-placeholder" IsVisible="{Binding IsPlaceholder}"><Grid Height="40"/></Border>
+                                      <Border Classes="model-drag-placeholder" IsVisible="{Binding IsPlaceholder}"><Grid Height="28"/></Border>
+                                      <!-- 图标几何复制自 LiveAgent IconSet.tsx 使用的 lucide grip-vertical、image、trash-2。 -->
                                       <Border Classes="model-cell" Classes.dragging="{Binding IsDragging}" IsVisible="{Binding IsRealModel}" Tag="{Binding}">
-                                        <Grid ColumnDefinitions="30,38,*,Auto,40" ColumnSpacing="5">
-                                          <Border Classes="model-drag-handle" Grid.Column="0" Tag="{Binding}" PointerPressed="ModelHandle_OnPointerPressed" ToolTip.Tip="拖动调整模型顺序" AutomationProperties.Name="拖动调整模型顺序" Background="Transparent"><Grid Width="12" Height="20" RowDefinitions="*,*,*" ColumnDefinitions="*,*"><Ellipse Classes="model-drag-dot" Grid.Row="0" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="0" Grid.Column="1"/><Ellipse Classes="model-drag-dot" Grid.Row="1" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="1" Grid.Column="1"/><Ellipse Classes="model-drag-dot" Grid.Row="2" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="2" Grid.Column="1"/></Grid></Border>
-                                          <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="控制模型是否暴露给下游" AutomationProperties.Name="启用模型" VerticalAlignment="Center"/>
+                                        <Grid ColumnDefinitions="30,46,*,Auto,42" ColumnSpacing="5">
+                                          <Border Classes="model-drag-handle" Grid.Column="0" Tag="{Binding}" PointerPressed="ModelHandle_OnPointerPressed" ToolTip.Tip="拖动调整模型顺序" AutomationProperties.Name="拖动调整模型顺序" Background="Transparent"><Path Classes="icon-glyph" Data="M 10,5 A 1,1 0 1 1 8,5 A 1,1 0 1 1 10,5 M 10,12 A 1,1 0 1 1 8,12 A 1,1 0 1 1 10,12 M 10,19 A 1,1 0 1 1 8,19 A 1,1 0 1 1 10,19 M 16,5 A 1,1 0 1 1 14,5 A 1,1 0 1 1 16,5 M 16,12 A 1,1 0 1 1 14,12 A 1,1 0 1 1 16,12 M 16,19 A 1,1 0 1 1 14,19 A 1,1 0 1 1 16,19" Width="14" Height="20"/></Border>
+                                          <ToggleSwitch Grid.Column="1" Width="40" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="控制模型是否暴露给下游" AutomationProperties.Name="启用模型" VerticalAlignment="Center"/>
                                           <TextBlock Grid.Column="2" Text="{Binding ModelId}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                                            <Path Classes="icon-glyph" Data="M 3,5 L 21,5 L 21,19 L 3,19 Z M 6,8 L 9,11 L 12,8 L 16,13 L 19,10" Width="14" Height="14" IsVisible="{Binding RemoteVision}" ToolTip.Tip="支持图片输入"/>
+                                          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center" ToolTip.Tip="{Binding MetadataToolTip}">
+                                            <Path Classes="icon-glyph" Data="M 3,3 H 21 A 2,2 0 0 1 23,5 V 19 A 2,2 0 0 1 21,21 H 3 A 2,2 0 0 1 1,19 V 5 A 2,2 0 0 1 3,3 Z M 9,7 A 2,2 0 1 0 9,11 A 2,2 0 1 0 9,7 Z M 21,15 L 17.914,11.914 A 2,2 0 0 0 15.086,11.914 L 6,21" Width="14" Height="14" IsVisible="{Binding RemoteVision}"/>
                                             <TextBlock Text="{Binding ContextDisplay}" Classes="muted" FontSize="11"/>
                                             <TextBlock Text=" ctx · " Classes="muted" FontSize="11"/>
                                             <TextBlock Text="{Binding MaxTokensDisplay}" Classes="muted" FontSize="11"/>
                                             <TextBlock Text=" out" Classes="muted" FontSize="11"/>
                                           </StackPanel>
-                                          <Button Grid.Column="4" Classes="icon-button" Command="{Binding $parent[UserControl].DataContext.DeleteModelCommand}" CommandParameter="{Binding}" ToolTip.Tip="删除模型" AutomationProperties.Name="删除模型"><Path Classes="icon-glyph" Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23" Width="14" Height="14"/></Button>
+                                          <Button Grid.Column="4" Classes="icon-button" Width="36" Command="{Binding $parent[UserControl].DataContext.DeleteModelCommand}" CommandParameter="{Binding}" ToolTip.Tip="删除模型" AutomationProperties.Name="删除模型"><Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="14" Height="14"/></Button>
                                         </Grid>
                                       </Border>
                                     </Panel>
@@ -167,9 +167,9 @@
                               </ListBox>
                             </Grid>
                             <Border x:Name="modelDragPreview" Classes="model-drag-preview" IsVisible="{Binding SelectedProvider.IsModelDragPreviewOwner}" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Top">
-                              <Grid ColumnDefinitions="30,38,*,Auto,40" ColumnSpacing="5">
-                                <Grid Grid.Column="0" Width="12" Height="20" RowDefinitions="*,*,*" ColumnDefinitions="*,*"><Ellipse Classes="model-drag-dot" Grid.Row="0" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="0" Grid.Column="1"/><Ellipse Classes="model-drag-dot" Grid.Row="1" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="1" Grid.Column="1"/><Ellipse Classes="model-drag-dot" Grid.Row="2" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="2" Grid.Column="1"/></Grid>
-                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding DraggingModel.Enabled, Mode=OneWay}" OnContent="" OffContent="" IsHitTestVisible="False" VerticalAlignment="Center"/>
+                              <Grid Height="28" ColumnDefinitions="30,46,*,Auto,42" ColumnSpacing="5">
+                                <Path Grid.Column="0" Classes="icon-glyph" Data="M 10,5 A 1,1 0 1 1 8,5 A 1,1 0 1 1 10,5 M 10,12 A 1,1 0 1 1 8,12 A 1,1 0 1 1 10,12 M 10,19 A 1,1 0 1 1 8,19 A 1,1 0 1 1 10,19 M 16,5 A 1,1 0 1 1 14,5 A 1,1 0 1 1 16,5 M 16,12 A 1,1 0 1 1 14,12 A 1,1 0 1 1 16,12 M 16,19 A 1,1 0 1 1 14,19 A 1,1 0 1 1 16,19" Width="14" Height="20" VerticalAlignment="Center"/>
+                                <ToggleSwitch Grid.Column="1" Width="40" IsChecked="{Binding DraggingModel.Enabled, Mode=OneWay}" OnContent="" OffContent="" IsHitTestVisible="False" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="2" Text="{Binding DraggingModel.ModelId}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Grid.Column="3" Text="拖动中" Foreground="{DynamicResource AccentBrush}" FontSize="11" VerticalAlignment="Center"/>
                               </Grid>

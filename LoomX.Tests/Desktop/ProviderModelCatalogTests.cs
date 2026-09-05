@@ -50,8 +50,9 @@ public sealed class ProviderModelCatalogTests
             "relay", null, null, null, null, 0));
 
         Assert.Equal("relay", model.OwnedBy);
-        Assert.Equal("未提供", model.ContextDisplay);
-        Assert.Equal("未提供", model.MaxTokensDisplay);
-        Assert.Equal("未提供", model.CapabilitiesDisplay);
+        Assert.Equal("-", model.ContextDisplay);
+        Assert.Equal("-", model.MaxTokensDisplay);
+        Assert.Equal("-", model.CapabilitiesDisplay);
+        Assert.Equal("AI 提供商模型接口未返回上下文配置", model.MetadataToolTip);
     }
 }

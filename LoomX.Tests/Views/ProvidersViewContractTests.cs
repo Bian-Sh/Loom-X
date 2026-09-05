@@ -31,7 +31,7 @@ public sealed class ProvidersViewContractTests
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
 
-        Assert.Equal(2, source.Split("ColumnDefinitions=\"30,38,*,Auto,40\"", StringSplitOptions.None).Length - 1);
+        Assert.Equal(2, source.Split("ColumnDefinitions=\"30,46,*,Auto,42\"", StringSplitOptions.None).Length - 1);
         Assert.Contains("Classes=\"model-drag-handle\"", source, StringComparison.Ordinal);
         Assert.Contains("Classes=\"model-drag-placeholder\"", source, StringComparison.Ordinal);
         Assert.Contains("Classes=\"model-drag-preview\"", source, StringComparison.Ordinal);
@@ -39,6 +39,10 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("ToggleAllModelsCommand", source, StringComparison.Ordinal);
         Assert.Contains("EnabledModelSummary", source, StringComparison.Ordinal);
         Assert.Contains("RemoteVision", source, StringComparison.Ordinal);
+        Assert.Contains("MetadataToolTip", source, StringComparison.Ordinal);
+        Assert.Contains("Data=\"M 10,5 A 1,1 0 1 1 8,5", source, StringComparison.Ordinal);
+        Assert.Contains("Data=\"M 10,11 V 17 M 14,11 V 17", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid Height=\"28\" ColumnDefinitions=\"30,46,*,Auto,42\"", source, StringComparison.Ordinal);
         Assert.Contains("DeleteModelCommand", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Pencil", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"添加模型\"", source, StringComparison.Ordinal);
@@ -54,6 +58,8 @@ public sealed class ProvidersViewContractTests
 
         Assert.Contains("FindModelDragHost", viewSource, StringComparison.Ordinal);
         Assert.Contains("modelDragPointerOffsetY", viewSource, StringComparison.Ordinal);
+        Assert.Contains("handleBorder.FindAncestorOfType<Border>()", viewSource, StringComparison.Ordinal);
+        Assert.Contains("e.GetPosition(modelBorder)", viewSource, StringComparison.Ordinal);
         Assert.Contains("previewCenterY", viewSource, StringComparison.Ordinal);
         Assert.Contains("AnimateMovedRows", viewSource, StringComparison.Ordinal);
         Assert.Contains("CompleteModelDragAsync", viewSource, StringComparison.Ordinal);
