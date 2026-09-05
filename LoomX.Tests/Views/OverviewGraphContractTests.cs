@@ -79,6 +79,7 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("Click=\"FocusEndpoint_OnClick\"", source, StringComparison.Ordinal);
         Assert.Contains("Button.graph-endpoint-link:pointerover", source, StringComparison.Ordinal);
         Assert.Contains("TextDecorations=\"Underline\"", source, StringComparison.Ordinal);
+        Assert.Contains("Cursor\" Value=\"Hand\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("GraphStatus", source, StringComparison.Ordinal);
         Assert.Contains("viewModel.SelectEndpoint(endpoint)", codeBehind, StringComparison.Ordinal);
         Assert.Contains("FindActiveGraph()?.FitToView()", codeBehind, StringComparison.Ordinal);
