@@ -53,11 +53,11 @@ public sealed class WindowAppearanceCoordinatorTests
 
         window.ApplyAppearance(true, 20, 0, "acrylic");
         var lowBlurAlpha = Assert.IsType<SolidColorBrush>(dictionary["AccentSoftBrush"]).Color.A;
-        Assert.Equal(MainWindow.CalculateBrushAlpha(255, 20, MainWindow.CalculateBlurTintFactor(0)), lowBlurAlpha);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, MainWindow.CalculateBlurTintFactor(0)), lowBlurAlpha);
 
         window.ApplyAppearance(true, 20, 64, "acrylic");
         var highBlurAlpha = Assert.IsType<SolidColorBrush>(dictionary["AccentSoftBrush"]).Color.A;
-        Assert.Equal(MainWindow.CalculateBrushAlpha(255, 20, MainWindow.CalculateBlurTintFactor(64)), highBlurAlpha);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, MainWindow.CalculateBlurTintFactor(64)), highBlurAlpha);
         Assert.True(highBlurAlpha > lowBlurAlpha);
 
         window.ApplyAppearance(false, 20, 64, "acrylic");

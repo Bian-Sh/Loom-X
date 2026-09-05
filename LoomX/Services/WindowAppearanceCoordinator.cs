@@ -43,7 +43,7 @@ public sealed class WindowAppearanceCoordinator
         SetConfiguredBrushAlpha("SurfaceSubtleBrush", 164, blurFactor);
         SetConfiguredBrushAlpha("SurfaceMutedBrush", 128, blurFactor);
         SetConfiguredBrushAlpha("NavigationHoverBrush", 214, blurFactor);
-        SetConfiguredBrushAlpha("AccentSoftBrush", 255, blurFactor);
+        SetConfiguredBrushAlpha("AccentSoftBrush", 214, blurFactor);
         SetConfiguredBrushAlpha("PopupBackgroundBrush", 224, blurFactor);
         SetConfiguredBrushAlpha("DialogBackgroundBrush", 232, blurFactor);
 
