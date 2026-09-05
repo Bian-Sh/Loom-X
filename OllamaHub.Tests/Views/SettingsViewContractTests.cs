@@ -37,7 +37,7 @@ public sealed class SettingsViewContractTests
     public void AppearancePipelineUsesAContinuousZeroToHundredOpacityRange()
     {
         var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
-        var servicePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub", "Configuration", "ConfigurationManagementService.cs");
+        var servicePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Configuration", "ConfigurationManagementService.cs");
         var serviceSource = File.ReadAllText(servicePath);
 
         Assert.Contains("Math.Clamp(opacity, 0, 100)", windowSource, StringComparison.Ordinal);

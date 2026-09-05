@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using OllamaHub.Configuration;
 using OllamaHub.Contracts;
 
