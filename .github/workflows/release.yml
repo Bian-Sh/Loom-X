@@ -93,7 +93,8 @@ jobs:
 
           $setup = Get-ChildItem "artifacts/installer" -Filter "*.exe" -File | Select-Object -First 1
           if (-not $setup) { throw "没有生成安装包" }
-          Get-FileHash $setup.FullName -Algorithm SHA256 |
+          $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $($setup.Name)" |
             Set-Content -LiteralPath "$($setup.FullName).sha256" -Encoding utf8
 
       - name: 上传安装包构建产物
