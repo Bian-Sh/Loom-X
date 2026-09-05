@@ -675,16 +675,16 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         }
     }
     public bool HasSelectedModel => SelectedModel is not null;
-    public ModelEditorViewModel? DraggingModel { get => draggingModel; private set { if (ReferenceEquals(draggingModel, value)) return; draggingModel = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsModelDragActive)); } }
+    public ModelEditorViewModel? DraggingModel { get => draggingModel; private set { if (ReferenceEquals(draggingModel, value)) return; draggingModel = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsModelDragActive)); OnPropertyChanged(nameof(EnabledModelCount)); OnPropertyChanged(nameof(EnabledModelSummary)); OnPropertyChanged(nameof(AllModelsEnabled)); } }
     public bool IsModelDragActive => DraggingModel is not null;
-    public int EnabledModelCount => SelectedProvider?.Models.Count(model => model.IsRealModel && model.Enabled) ?? 0;
-    public string EnabledModelSummary => $"已启用 {EnabledModelCount} / {SelectedProvider?.Models.Count(model => model.IsRealModel) ?? 0} 个模型";
+    public int EnabledModelCount => GetSelectedProviderModelsForSummary().Count(model => model.Enabled);
+    public string EnabledModelSummary => $"已启用 {EnabledModelCount} / {GetSelectedProviderModelsForSummary().Count} 个模型";
     public bool AllModelsEnabled
     {
         get
         {
-            var models = SelectedProvider?.Models.Where(model => model.IsRealModel).ToArray() ?? [];
-            return models.Length > 0 && models.All(model => model.Enabled);
+            var models = GetSelectedProviderModelsForSummary();
+            return models.Count > 0 && models.All(model => model.Enabled);
         }
     }
     public string Status { get => status; private set => SetProperty(ref status, value); }
@@ -706,6 +706,16 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public ICommand ToggleAllModelsCommand { get; }
     public ICommand TestConnectionCommand { get; }
     public ICommand SyncModelsCommand { get; }
+
+    private IReadOnlyList<ModelEditorViewModel> GetSelectedProviderModelsForSummary()
+    {
+        if (SelectedProvider is null) return [];
+
+        var models = SelectedProvider.Models.Where(model => model.IsRealModel).ToList();
+        if (ReferenceEquals(modelDragOwnerProvider, SelectedProvider) && DraggingModel is not null && !models.Contains(DraggingModel))
+            models.Add(DraggingModel);
+        return models;
+    }
 
     public ProvidersViewModel(AppDataStore dataStore, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null)
     {
@@ -1084,11 +1094,11 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         modelDragOwnerProvider = provider;
         draggingModelOriginIndex = index;
         modelDragPlaceholder = ModelEditorViewModel.CreatePlaceholder();
+        DraggingModel = model;
         provider.Models.RemoveAt(index);
         provider.Models.Insert(index, modelDragPlaceholder);
         provider.IsModelDragPreviewOwner = true;
         model.IsDragging = true;
-        DraggingModel = model;
         return true;
     }
 

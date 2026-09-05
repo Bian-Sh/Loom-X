@@ -68,6 +68,8 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("MoveModelDragPlaceholder", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("ClearModelDragState", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("IsModelDragPreviewOwner", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("GetSelectedProviderModelsForSummary", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("models.Add(DraggingModel)", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("model.IsRealModel", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("private async Task ToggleAllModelsAsync()", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("await SaveModelAsync(provider, model);", viewModelSource, StringComparison.Ordinal);
