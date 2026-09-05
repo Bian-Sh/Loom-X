@@ -60,7 +60,8 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("xmlns:nodegraph=\"using:LoomX.NodeGraph\"", source, StringComparison.Ordinal);
         Assert.Contains("<nodegraph:RuntimeGraphControl", source, StringComparison.Ordinal);
         Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Panel.ZIndex=\"1\"", source, StringComparison.Ordinal);
+        Assert.Contains("滚轮缩放 · 拖动平移 · Fit 重置视野", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"适合视图\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"Endpoint\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<NativeWebView", source, StringComparison.Ordinal);
     }
@@ -76,8 +77,9 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding IsGraphVisible}\"", source, StringComparison.Ordinal);
         Assert.Contains("Click=\"FocusEndpoint_OnClick\"", source, StringComparison.Ordinal);
-        Assert.Contains("Button.graph-endpoint:pointerover", source, StringComparison.Ordinal);
-        Assert.Contains("Button.graph-endpoint:pressed", source, StringComparison.Ordinal);
+        Assert.Contains("Button.graph-endpoint-link:pointerover", source, StringComparison.Ordinal);
+        Assert.Contains("TextDecorations=\"Underline\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("GraphStatus", source, StringComparison.Ordinal);
         Assert.Contains("viewModel.SelectEndpoint(endpoint)", codeBehind, StringComparison.Ordinal);
         Assert.Contains("FindActiveGraph()?.FitToView()", codeBehind, StringComparison.Ordinal);
     }

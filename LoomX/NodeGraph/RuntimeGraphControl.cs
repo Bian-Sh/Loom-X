@@ -17,6 +17,7 @@ public sealed class RuntimeGraphControl : Control
     public const double MaxZoom = 2.5;
     public const double ZoomStep = 1.2;
     public const double KindWatermarkMinZoom = 1.0;
+    public const double PanStartThreshold = 4;
 
     public static readonly StyledProperty<RuntimeGraphSnapshot?> SnapshotProperty =
         AvaloniaProperty.Register<RuntimeGraphControl, RuntimeGraphSnapshot?>(nameof(Snapshot));
@@ -248,18 +249,20 @@ public sealed class RuntimeGraphControl : Control
         panAtPointerDown = Pan;
         pointerDownOnNode = Pick(point) is not null;
         isPanning = middleButton || (leftButton && !pointerDownOnNode);
-        if (isPanning)
-        {
-            e.Pointer.Capture(this);
-            e.Handled = true;
-        }
+        e.Pointer.Capture(this);
+        e.Handled = true;
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (!isPanning || e.Pointer.Captured != this) return;
+        if (e.Pointer.Captured != this) return;
         var point = e.GetPosition(this);
+        var pointerDelta = point - pointerDownPosition;
+        var pointerDistance = Math.Sqrt(pointerDelta.X * pointerDelta.X + pointerDelta.Y * pointerDelta.Y);
+        if (!isPanning && pointerDownOnNode && pointerDistance > PanStartThreshold)
+            isPanning = true;
+        if (!isPanning) return;
         Pan = panAtPointerDown + point - pointerDownPosition;
         e.Handled = true;
     }
@@ -271,19 +274,13 @@ public sealed class RuntimeGraphControl : Control
         var updateKind = e.GetCurrentPoint(this).Properties.PointerUpdateKind;
         var pointerDelta = point - pointerDownPosition;
         var pointerDistance = Math.Sqrt(pointerDelta.X * pointerDelta.X + pointerDelta.Y * pointerDelta.Y);
-        if (isPanning && updateKind is PointerUpdateKind.LeftButtonReleased or PointerUpdateKind.MiddleButtonReleased)
+        if (e.Pointer.Captured == this
+            && (updateKind is PointerUpdateKind.LeftButtonReleased or PointerUpdateKind.MiddleButtonReleased))
         {
             isPanning = false;
             e.Pointer.Capture(null);
-            if (updateKind == PointerUpdateKind.LeftButtonReleased && !pointerDownOnNode && pointerDistance <= 4)
-                SetSelection(null);
-            e.Handled = true;
-            return;
-        }
-
-        if (updateKind == PointerUpdateKind.LeftButtonReleased && pointerDownOnNode && pointerDistance <= 4)
-        {
-            SetSelection(Pick(point));
+            if (updateKind == PointerUpdateKind.LeftButtonReleased && pointerDistance <= PanStartThreshold)
+                SetSelection(pointerDownOnNode ? Pick(point) : null);
             e.Handled = true;
         }
     }
