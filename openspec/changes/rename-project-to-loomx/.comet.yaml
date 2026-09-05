@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: executing-plans
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: 46a86148bf114b6618f13e87f95af4017f11d30a
 design_doc: docs/superpowers/specs/2026-09-05-rename-project-to-loomx-design.md
 plan: docs/superpowers/plans/2026-09-05-rename-project-to-loomx.md
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-09-05-rename-project-to-loomx-verify.md
 branch_status: handled
 created_at: 2026-09-05
-verified_at: null
+verified_at: 2026-09-05
 archived: false
 direct_override: null
 handoff_context: openspec/changes/rename-project-to-loomx/.comet/handoff/design-context.json
