@@ -34,6 +34,65 @@ public sealed class RuntimeGraphControlTests
         Assert.Equal(expected.ContentBounds.Size, control.DesiredSize);
     }
 
+    [Fact]
+    public void FitToViewKeepsContentInsideRequestedViewport()
+    {
+        var snapshot = CreateSnapshot();
+        var layout = RuntimeGraphLayout.Create(snapshot);
+        var control = new RuntimeGraphControl { Snapshot = snapshot, Layout = layout };
+
+        control.FitToView(new Size(900, 500));
+
+        var left = layout.ContentBounds.Left * control.Zoom + control.Pan.X;
+        var top = layout.ContentBounds.Top * control.Zoom + control.Pan.Y;
+        var right = layout.ContentBounds.Right * control.Zoom + control.Pan.X;
+        var bottom = layout.ContentBounds.Bottom * control.Zoom + control.Pan.Y;
+        Assert.InRange(left, 23.99, 876.01);
+        Assert.InRange(top, 23.99, 476.01);
+        Assert.InRange(right, 23.99, 876.01);
+        Assert.InRange(bottom, 23.99, 476.01);
+        Assert.InRange(control.Zoom, RuntimeGraphControl.MinZoom, RuntimeGraphControl.MaxZoom);
+    }
+
+    [Fact]
+    public void SelectionAndInspectorFollowTransformedNodeBounds()
+    {
+        var snapshot = CreateSnapshot();
+        var layout = RuntimeGraphLayout.Create(snapshot);
+        var control = new RuntimeGraphControl { Snapshot = snapshot, Layout = layout, Zoom = 1.5, Pan = new Vector(80, 35) };
+        var graphNode = layout.Nodes["provider-a|model-a"].Bounds;
+        var viewportPoint = new Point(
+            graphNode.Center.X * control.Zoom + control.Pan.X,
+            graphNode.Center.Y * control.Zoom + control.Pan.Y);
+
+        var selection = control.SelectAt(viewportPoint);
+        var details = control.GetSelectionDetails();
+
+        Assert.Equal(new RuntimeGraphSelection(RuntimeGraphSelectionKind.Node, "provider-a|model-a"), selection);
+        Assert.NotNull(details);
+        Assert.Equal("model-a", details.DisplayName);
+        Assert.Equal("provider-a", details.ProviderId);
+        Assert.Equal(RuntimeGraphSelectionKind.Node, details.Kind);
+    }
+
+    [Fact]
+    public void ProviderGroupSelectionReturnsGroupInspectorDetails()
+    {
+        var snapshot = CreateSnapshot();
+        var layout = RuntimeGraphLayout.Create(snapshot);
+        var control = new RuntimeGraphControl { Snapshot = snapshot, Layout = layout };
+
+        var providerBounds = layout.ProviderGroups["provider-a"].Bounds;
+        var selection = control.SelectAt(new Point(providerBounds.Center.X, providerBounds.Top + 18));
+        var details = control.GetSelectionDetails();
+
+        Assert.Equal(new RuntimeGraphSelection(RuntimeGraphSelectionKind.ProviderGroup, "provider-a"), selection);
+        Assert.NotNull(details);
+        Assert.Equal("Provider A", details.DisplayName);
+        Assert.Equal(1, details.ModelCount);
+        Assert.Equal("openai", details.Protocol);
+    }
+
     private static RuntimeGraphSnapshot CreateSnapshot()
     {
         var model = new RuntimeGraphNode(

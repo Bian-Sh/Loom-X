@@ -1,6 +1,7 @@
 using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media;
 
 namespace LoomX.NodeGraph;
@@ -11,16 +12,31 @@ namespace LoomX.NodeGraph;
 /// </summary>
 public sealed class RuntimeGraphControl : Control
 {
+    public const double MinZoom = 0.25;
+    public const double MaxZoom = 2.5;
+    public const double ZoomStep = 1.2;
+
     public static readonly StyledProperty<RuntimeGraphSnapshot?> SnapshotProperty =
         AvaloniaProperty.Register<RuntimeGraphControl, RuntimeGraphSnapshot?>(nameof(Snapshot));
 
     public static readonly StyledProperty<RuntimeGraphLayoutSnapshot?> LayoutProperty =
         AvaloniaProperty.Register<RuntimeGraphControl, RuntimeGraphLayoutSnapshot?>(nameof(Layout));
 
+    public static readonly StyledProperty<double> ZoomProperty =
+        AvaloniaProperty.Register<RuntimeGraphControl, double>(nameof(Zoom), 1d);
+
+    public static readonly StyledProperty<Vector> PanProperty =
+        AvaloniaProperty.Register<RuntimeGraphControl, Vector>(nameof(Pan), default);
+
+    private Point pointerDownPosition;
+    private Vector panAtPointerDown;
+    private bool pointerDownOnNode;
+    private bool isPanning;
+
     static RuntimeGraphControl()
     {
         AffectsMeasure<RuntimeGraphControl>(LayoutProperty, SnapshotProperty);
-        AffectsRender<RuntimeGraphControl>(LayoutProperty, SnapshotProperty);
+        AffectsRender<RuntimeGraphControl>(LayoutProperty, SnapshotProperty, ZoomProperty, PanProperty);
     }
 
     public RuntimeGraphSnapshot? Snapshot
@@ -34,6 +50,24 @@ public sealed class RuntimeGraphControl : Control
         get => GetValue(LayoutProperty);
         set => SetValue(LayoutProperty, value);
     }
+
+    public double Zoom
+    {
+        get => GetValue(ZoomProperty);
+        set => SetValue(ZoomProperty, Math.Clamp(value, MinZoom, MaxZoom));
+    }
+
+    public Vector Pan
+    {
+        get => GetValue(PanProperty);
+        set => SetValue(PanProperty, value);
+    }
+
+    public double FitPadding { get; set; } = 24;
+
+    public RuntimeGraphSelection? Selection { get; private set; }
+
+    public event EventHandler<RuntimeGraphSelectionChangedEventArgs>? SelectionChanged;
 
     protected override Size MeasureOverride(Size availableSize)
     {
@@ -59,17 +93,22 @@ public sealed class RuntimeGraphControl : Control
         var text = ResolveBrush("GraphTextBrush", Brushes.White);
         var muted = ResolveBrush("GraphMutedBrush", Brushes.LightGray);
         var live = ResolveBrush("GraphLiveBrush", Brushes.LightGreen);
-        var edgePen = new Pen(WithAlpha(muted, 0.78), 1.5);
+        var zoom = EffectiveZoom;
 
         using (context.PushClip(Bounds))
         {
             context.DrawRectangle(background, null, new Rect(Bounds.Size));
 
             foreach (var edge in layout.Edges)
-                context.DrawLine(edgePen, edge.Source, edge.Target);
+            {
+                var selected = IsEdgeRelated(edge.EdgeId);
+                var edgeBrush = selected ? live : muted;
+                var edgePen = new Pen(WithAlpha(edgeBrush, selected ? 0.95 : 0.78), selected ? 2.4 : 1.5);
+                context.DrawLine(edgePen, ToViewport(edge.Source), ToViewport(edge.Target));
+            }
 
             foreach (var provider in layout.ProviderGroups.Values.OrderBy(item => item.ProviderId, StringComparer.OrdinalIgnoreCase))
-                DrawProviderGroup(context, provider, text, muted, border);
+                DrawProviderGroup(context, provider, text, muted, border, zoom);
 
             foreach (var node in layout.Nodes.Values
                          .Where(item => item.Kind is RuntimeGraphNodeKind.Endpoint or RuntimeGraphNodeKind.Combo)
@@ -78,14 +117,226 @@ public sealed class RuntimeGraphControl : Control
                 var fill = node.Kind == RuntimeGraphNodeKind.Endpoint
                     ? WithAlpha(live, 0.16)
                     : WithAlpha(border, 0.42);
-                DrawNode(context, node.Bounds, NodeLabel(node.NodeId), fill, border, text);
+                DrawNode(context, node, NodeLabel(node.NodeId), fill, border, text, zoom);
             }
 
             foreach (var node in layout.Nodes.Values
                          .Where(item => item.Kind == RuntimeGraphNodeKind.Model)
                          .OrderBy(item => item.NodeId, StringComparer.OrdinalIgnoreCase))
-                DrawNode(context, node.Bounds, NodeLabel(node.NodeId), WithAlpha(border, 0.28), border, text, 12);
+                DrawNode(context, node, NodeLabel(node.NodeId), WithAlpha(border, 0.28), border, text, zoom, 12);
         }
+    }
+
+    public void ZoomIn() => ZoomAround(EffectiveZoom * ZoomStep, new Point(Bounds.Width / 2, Bounds.Height / 2));
+
+    public void ZoomOut() => ZoomAround(EffectiveZoom / ZoomStep, new Point(Bounds.Width / 2, Bounds.Height / 2));
+
+    public void FitToView() => FitToView(Bounds.Size);
+
+    public void FitToView(Size viewport)
+    {
+        var layout = ResolveLayout();
+        if (layout is null || viewport.Width <= 0 || viewport.Height <= 0) return;
+
+        var content = layout.ContentBounds;
+        var availableWidth = Math.Max(1, viewport.Width - FitPadding * 2);
+        var availableHeight = Math.Max(1, viewport.Height - FitPadding * 2);
+        var fitZoom = Math.Clamp(
+            Math.Min(availableWidth / Math.Max(1, content.Width), availableHeight / Math.Max(1, content.Height)),
+            MinZoom,
+            MaxZoom);
+        Zoom = fitZoom;
+        Pan = new Vector(
+            (viewport.Width - content.Width * fitZoom) / 2 - content.X * fitZoom,
+            (viewport.Height - content.Height * fitZoom) / 2 - content.Y * fitZoom);
+    }
+
+    public RuntimeGraphSelection? Pick(Point viewportPoint)
+    {
+        var layout = ResolveLayout();
+        if (layout is null) return null;
+        var graphPoint = FromViewport(viewportPoint);
+
+        foreach (var node in layout.Nodes.Values.OrderByDescending(item => item.Kind == RuntimeGraphNodeKind.Model))
+            if (node.Bounds.Contains(graphPoint))
+                return new RuntimeGraphSelection(RuntimeGraphSelectionKind.Node, node.NodeId);
+
+        foreach (var provider in layout.ProviderGroups.Values)
+            if (provider.Bounds.Contains(graphPoint))
+                return new RuntimeGraphSelection(RuntimeGraphSelectionKind.ProviderGroup, provider.ProviderId);
+
+        return null;
+    }
+
+    public RuntimeGraphSelection? SelectAt(Point viewportPoint)
+    {
+        var selection = Pick(viewportPoint);
+        SetSelection(selection);
+        return selection;
+    }
+
+    public RuntimeGraphSelectionDetails? GetSelectionDetails()
+    {
+        if (Selection is null || Snapshot is null) return null;
+        if (Selection.Kind == RuntimeGraphSelectionKind.ProviderGroup)
+        {
+            var provider = Snapshot.Providers.FirstOrDefault(item => string.Equals(item.Id, Selection.Id, StringComparison.OrdinalIgnoreCase));
+            return provider is null
+                ? null
+                : new RuntimeGraphSelectionDetails(
+                    Selection.Id,
+                    Selection.Kind,
+                    provider.DisplayName,
+                    provider.Enabled,
+                    provider.BaseUrl,
+                    provider.Protocol,
+                    null,
+                    null,
+                    provider.Models.Count);
+        }
+
+        var node = Snapshot.Endpoints.FirstOrDefault(item => string.Equals(item.Id, Selection.Id, StringComparison.OrdinalIgnoreCase))
+            ?? Snapshot.Combos.FirstOrDefault(item => string.Equals(item.Id, Selection.Id, StringComparison.OrdinalIgnoreCase))
+            ?? Snapshot.Models.FirstOrDefault(item => string.Equals(item.Id, Selection.Id, StringComparison.OrdinalIgnoreCase));
+        if (node is null) return null;
+        return new RuntimeGraphSelectionDetails(
+            node.Id,
+            Selection.Kind,
+            node.DisplayName,
+            node.Enabled,
+            null,
+            null,
+            node.EndpointId,
+            node.ProviderId,
+            null);
+    }
+
+    public void ClearSelection() => SetSelection(null);
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        var point = e.GetPosition(this);
+        var updateKind = e.GetCurrentPoint(this).Properties.PointerUpdateKind;
+        var middleButton = updateKind == PointerUpdateKind.MiddleButtonPressed;
+        var leftButton = updateKind == PointerUpdateKind.LeftButtonPressed;
+        if (!middleButton && !leftButton) return;
+
+        pointerDownPosition = point;
+        panAtPointerDown = Pan;
+        pointerDownOnNode = Pick(point) is not null;
+        isPanning = middleButton || (leftButton && !pointerDownOnNode);
+        if (isPanning)
+        {
+            e.Pointer.Capture(this);
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (!isPanning || e.Pointer.Captured != this) return;
+        var point = e.GetPosition(this);
+        Pan = panAtPointerDown + point - pointerDownPosition;
+        e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        var point = e.GetPosition(this);
+        var updateKind = e.GetCurrentPoint(this).Properties.PointerUpdateKind;
+        var pointerDelta = point - pointerDownPosition;
+        var pointerDistance = Math.Sqrt(pointerDelta.X * pointerDelta.X + pointerDelta.Y * pointerDelta.Y);
+        if (isPanning && updateKind is PointerUpdateKind.LeftButtonReleased or PointerUpdateKind.MiddleButtonReleased)
+        {
+            isPanning = false;
+            e.Pointer.Capture(null);
+            if (updateKind == PointerUpdateKind.LeftButtonReleased && !pointerDownOnNode && pointerDistance <= 4)
+                SetSelection(null);
+            e.Handled = true;
+            return;
+        }
+
+        if (updateKind == PointerUpdateKind.LeftButtonReleased && pointerDownOnNode && pointerDistance <= 4)
+        {
+            SetSelection(Pick(point));
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        isPanning = false;
+        base.OnPointerCaptureLost(e);
+    }
+
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+        if (e.Delta.Y == 0) return;
+        ZoomAround(e.Delta.Y > 0 ? EffectiveZoom * ZoomStep : EffectiveZoom / ZoomStep, e.GetPosition(this));
+        e.Handled = true;
+    }
+
+    private double EffectiveZoom
+    {
+        get
+        {
+            var value = GetValue(ZoomProperty);
+            return double.IsFinite(value) ? Math.Clamp(value, MinZoom, MaxZoom) : 1;
+        }
+    }
+
+    private Point ToViewport(Point graphPoint)
+    {
+        var zoom = EffectiveZoom;
+        return new Point(graphPoint.X * zoom + Pan.X, graphPoint.Y * zoom + Pan.Y);
+    }
+
+    private Rect ToViewport(Rect graphBounds)
+    {
+        var topLeft = ToViewport(graphBounds.TopLeft);
+        var zoom = EffectiveZoom;
+        return new Rect(topLeft, new Size(graphBounds.Width * zoom, graphBounds.Height * zoom));
+    }
+
+    private Point FromViewport(Point viewportPoint)
+    {
+        var zoom = EffectiveZoom;
+        return new Point((viewportPoint.X - Pan.X) / zoom, (viewportPoint.Y - Pan.Y) / zoom);
+    }
+
+    private void ZoomAround(double requestedZoom, Point viewportAnchor)
+    {
+        var nextZoom = Math.Clamp(requestedZoom, MinZoom, MaxZoom);
+        var currentZoom = EffectiveZoom;
+        if (Math.Abs(nextZoom - currentZoom) < 0.0001) return;
+
+        var graphAnchor = FromViewport(viewportAnchor);
+        Zoom = nextZoom;
+        Pan = new Vector(
+            viewportAnchor.X - graphAnchor.X * nextZoom,
+            viewportAnchor.Y - graphAnchor.Y * nextZoom);
+    }
+
+    private void SetSelection(RuntimeGraphSelection? selection)
+    {
+        if (Equals(Selection, selection)) return;
+        var previous = Selection;
+        Selection = selection;
+        InvalidateVisual();
+        SelectionChanged?.Invoke(this, new RuntimeGraphSelectionChangedEventArgs(previous, selection));
+    }
+
+    private bool IsEdgeRelated(string edgeId)
+    {
+        if (Selection is null || Snapshot is null) return false;
+        var edge = Snapshot.Edges.FirstOrDefault(item => string.Equals(item.Id, edgeId, StringComparison.OrdinalIgnoreCase));
+        if (edge is null) return false;
+        return string.Equals(edge.SourceId, Selection.Id, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(edge.TargetId, Selection.Id, StringComparison.OrdinalIgnoreCase);
     }
 
     private RuntimeGraphLayoutSnapshot? ResolveLayout() =>
@@ -96,34 +347,49 @@ public sealed class RuntimeGraphControl : Control
         RuntimeGraphProviderGroupLayout provider,
         IBrush text,
         IBrush muted,
-        IBrush border)
+        IBrush border,
+        double zoom)
     {
         var groupFill = WithAlpha(border, 0.16);
         var headerFill = WithAlpha(border, 0.28);
-        context.DrawRectangle(groupFill, new Pen(WithAlpha(border, 0.92), 1), provider.Bounds, 10, 10, default);
+        var bounds = ToViewport(provider.Bounds);
+        var selected = Selection is { Kind: RuntimeGraphSelectionKind.ProviderGroup } selection
+            && string.Equals(selection.Id, provider.ProviderId, StringComparison.OrdinalIgnoreCase);
+        var groupBorder = selected ? ResolveBrush("GraphLiveBrush", Brushes.LightGreen) : border;
+        context.DrawRectangle(groupFill, new Pen(WithAlpha(groupBorder, selected ? 1 : 0.92), selected ? 2 : 1), bounds, 10 * zoom, 10 * zoom, default);
 
-        var headerBounds = new Rect(provider.Bounds.X, provider.Bounds.Y, provider.Bounds.Width, 38);
-        context.DrawRectangle(headerFill, null, headerBounds, 10, 10, default);
-        context.DrawRectangle(headerFill, null, new Rect(headerBounds.X, headerBounds.Y + 10, headerBounds.Width, headerBounds.Height - 10));
-        context.DrawLine(new Pen(WithAlpha(border, 0.68), 1), new Point(provider.Bounds.Left + 12, headerBounds.Bottom), new Point(provider.Bounds.Right - 12, headerBounds.Bottom));
+        var headerBounds = new Rect(bounds.X, bounds.Y, bounds.Width, 38 * zoom);
+        context.DrawRectangle(headerFill, null, headerBounds, 10 * zoom, 10 * zoom, default);
+        context.DrawRectangle(headerFill, null, new Rect(headerBounds.X, headerBounds.Y + 10 * zoom, headerBounds.Width, Math.Max(0, headerBounds.Height - 10 * zoom)));
+        context.DrawLine(new Pen(WithAlpha(groupBorder, 0.68), Math.Max(1, zoom)), new Point(bounds.Left + 12 * zoom, headerBounds.Bottom), new Point(bounds.Right - 12 * zoom, headerBounds.Bottom));
 
         var providerName = Snapshot?.Providers.FirstOrDefault(item => string.Equals(item.Id, provider.ProviderId, StringComparison.OrdinalIgnoreCase))?.DisplayName
             ?? provider.ProviderId;
-        DrawText(context, providerName, new Rect(provider.Bounds.X + 14, provider.Bounds.Y + 7, provider.Bounds.Width - 28, 20), text, 14, FontWeight.SemiBold, TextAlignment.Left);
-        DrawText(context, $"{provider.ModelIds.Count} 个模型", new Rect(provider.Bounds.X + 14, provider.Bounds.Y + 23, provider.Bounds.Width - 28, 14), muted, 10, FontWeight.Normal, TextAlignment.Left);
+        if (zoom >= 0.45)
+        {
+            DrawText(context, providerName, new Rect(bounds.X + 14 * zoom, bounds.Y + 7 * zoom, Math.Max(0, bounds.Width - 28 * zoom), 20 * zoom), text, 14 * zoom, FontWeight.SemiBold, TextAlignment.Left);
+            if (zoom >= 0.65)
+                DrawText(context, $"{provider.ModelIds.Count} 个模型", new Rect(bounds.X + 14 * zoom, bounds.Y + 23 * zoom, Math.Max(0, bounds.Width - 28 * zoom), 14 * zoom), muted, 10 * zoom, FontWeight.Normal, TextAlignment.Left);
+        }
     }
 
-    private static void DrawNode(
+    private void DrawNode(
         DrawingContext context,
-        Rect bounds,
+        RuntimeGraphNodeLayout node,
         string label,
         IBrush fill,
         IBrush border,
         IBrush text,
+        double zoom,
         double fontSize = 14)
     {
-        context.DrawRectangle(fill, new Pen(WithAlpha(border, 0.9), 1), bounds, 8, 8, default);
-        DrawText(context, label, new Rect(bounds.X + 12, bounds.Y, Math.Max(0, bounds.Width - 24), bounds.Height), text, fontSize, FontWeight.SemiBold, TextAlignment.Left);
+        var bounds = ToViewport(node.Bounds);
+        var selected = Selection is { Kind: RuntimeGraphSelectionKind.Node } selection
+            && string.Equals(selection.Id, node.NodeId, StringComparison.OrdinalIgnoreCase);
+        var nodeBorder = selected ? ResolveBrush("GraphLiveBrush", Brushes.LightGreen) : border;
+        context.DrawRectangle(fill, new Pen(WithAlpha(nodeBorder, selected ? 1 : 0.9), selected ? 2 : 1), bounds, 8 * zoom, 8 * zoom, default);
+        if (zoom >= 0.5)
+            DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, Math.Max(0, bounds.Width - 24 * zoom), bounds.Height), text, fontSize * zoom, FontWeight.SemiBold, TextAlignment.Left);
     }
 
     private string NodeLabel(string nodeId)
@@ -178,3 +444,30 @@ public sealed class RuntimeGraphControl : Control
         return new SolidColorBrush(Color.FromArgb(alpha, solid.Color.R, solid.Color.G, solid.Color.B));
     }
 }
+
+public enum RuntimeGraphSelectionKind
+{
+    Node,
+    ProviderGroup
+}
+
+public sealed record RuntimeGraphSelection(RuntimeGraphSelectionKind Kind, string Id);
+
+public sealed class RuntimeGraphSelectionChangedEventArgs(
+    RuntimeGraphSelection? previous,
+    RuntimeGraphSelection? current) : EventArgs
+{
+    public RuntimeGraphSelection? Previous { get; } = previous;
+    public RuntimeGraphSelection? Current { get; } = current;
+}
+
+public sealed record RuntimeGraphSelectionDetails(
+    string Id,
+    RuntimeGraphSelectionKind Kind,
+    string DisplayName,
+    bool Enabled,
+    string? BaseUrl,
+    string? Protocol,
+    string? EndpointId,
+    string? ProviderId,
+    int? ModelCount);
