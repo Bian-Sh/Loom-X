@@ -36,22 +36,16 @@ public sealed class WindowAppearanceCoordinator
             NormalizeAlgorithm(algorithm));
 
         var blurFactor = MainWindow.CalculateBlurTintFactor(Current.BlurAmount);
-        SetBrushAlpha("WindowBackgroundBrush", MainWindow.CalculateBrushAlpha(230, Current.Opacity, blurFactor));
-        SetBrushAlpha("GlassBrush", MainWindow.CalculateBrushAlpha(184, Current.Opacity, blurFactor));
-        SetBrushAlpha("GlassStrongBrush", MainWindow.CalculateBrushAlpha(208, Current.Opacity, blurFactor));
-        SetBrushAlpha("SurfaceBrush", MainWindow.CalculateBrushAlpha(199, Current.Opacity, blurFactor));
-        SetBrushAlpha("SurfaceSubtleBrush", MainWindow.CalculateBrushAlpha(164, Current.Opacity, blurFactor));
-        SetBrushAlpha("SurfaceMutedBrush", MainWindow.CalculateBrushAlpha(128, Current.Opacity, blurFactor));
-        SetBrushAlpha("NavigationHoverBrush", MainWindow.CalculateBrushAlpha(214, Current.Opacity, blurFactor));
-
-        var popupAlpha = Current.Enabled
-            ? MainWindow.CalculateBrushAlpha(224, Current.Opacity, blurFactor)
-            : (byte)255;
-        var dialogAlpha = Current.Enabled
-            ? MainWindow.CalculateBrushAlpha(232, Current.Opacity, blurFactor)
-            : (byte)255;
-        SetBrushAlpha("PopupBackgroundBrush", popupAlpha);
-        SetBrushAlpha("DialogBackgroundBrush", dialogAlpha);
+        SetConfiguredBrushAlpha("WindowBackgroundBrush", 230, blurFactor);
+        SetConfiguredBrushAlpha("GlassBrush", 184, blurFactor);
+        SetConfiguredBrushAlpha("GlassStrongBrush", 208, blurFactor);
+        SetConfiguredBrushAlpha("SurfaceBrush", 199, blurFactor);
+        SetConfiguredBrushAlpha("SurfaceSubtleBrush", 164, blurFactor);
+        SetConfiguredBrushAlpha("SurfaceMutedBrush", 128, blurFactor);
+        SetConfiguredBrushAlpha("NavigationHoverBrush", 214, blurFactor);
+        SetConfiguredBrushAlpha("AccentSoftBrush", 255, blurFactor);
+        SetConfiguredBrushAlpha("PopupBackgroundBrush", 224, blurFactor);
+        SetConfiguredBrushAlpha("DialogBackgroundBrush", 232, blurFactor);
 
         ApplyWindow(owner);
         foreach (var window in attachedWindows.ToArray()) ApplyWindow(window);
@@ -85,6 +79,14 @@ public sealed class WindowAppearanceCoordinator
     {
         if (!owner.TryResolveAppearanceResource(key, out var value) || value is not SolidColorBrush brush) return;
         AppearanceBrushUpdater.Apply(brush, key, baseBrushColors, alpha);
+    }
+
+    private void SetConfiguredBrushAlpha(string key, byte baseAlpha, double blurFactor)
+    {
+        var alpha = Current.Enabled
+            ? MainWindow.CalculateBrushAlpha(baseAlpha, Current.Opacity, blurFactor)
+            : (byte)255;
+        SetBrushAlpha(key, alpha);
     }
 
     private static string NormalizeAlgorithm(string? algorithm) => "acrylic";
