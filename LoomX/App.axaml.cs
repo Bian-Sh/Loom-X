@@ -5,20 +5,20 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
-using OllamaHub;
-using OllamaHub.Logging;
-using OllamaHub.Desktop.Services;
-using OllamaHub.Desktop.ViewModels;
+using LoomX;
+using LoomX.Logging;
+using LoomX.Services;
+using LoomX.ViewModels;
 using Serilog;
 
-namespace OllamaHub.Desktop;
+namespace LoomX;
 
 public partial class App : Application
 {
-    private const string SingleInstanceMutexName = @"Local\OllamaHub.Desktop";
-    private const string ShellBootstrapMutexName = @"Local\OllamaHub.Desktop.ShellBootstrap";
-    private const string SelfLaunchArgument = "--ollamahub-child";
-    private const string BootstrapShortcutArgumentPrefix = "--ollamahub-bootstrap-link=";
+    private const string SingleInstanceMutexName = @"Local\LoomX";
+    private const string ShellBootstrapMutexName = @"Local\LoomX.ShellBootstrap";
+    private const string SelfLaunchArgument = "--loomx-child";
+    private const string BootstrapShortcutArgumentPrefix = "--loomx-bootstrap-link=";
     private GatewayProcessService? gatewayService;
     private AppDataStore? dataStore;
     private ILoggerFactory? loggerFactory;
@@ -35,11 +35,11 @@ public partial class App : Application
         {
             allowMultipleInstances = InstanceLaunchPolicy.AllowsMultipleInstances(
                 Environment.GetCommandLineArgs(),
-                Environment.GetEnvironmentVariable("OLLAMAHUB_ALLOW_MULTIPLE_INSTANCES"));
-            var launchedByOllamaHub = Environment.GetCommandLineArgs()
+                Environment.GetEnvironmentVariable("LOOMX_ALLOW_MULTIPLE_INSTANCES"));
+            var launchedByLoomX = Environment.GetCommandLineArgs()
                 .Skip(1)
                 .Any(argument => string.Equals(argument, SelfLaunchArgument, StringComparison.OrdinalIgnoreCase));
-            if (!allowMultipleInstances && !launchedByOllamaHub)
+            if (!allowMultipleInstances && !launchedByLoomX)
             {
                 shellBootstrapMutex = new Mutex(true, ShellBootstrapMutexName, out var isShellBootstrapOwner);
                 ownsShellBootstrapMutex = isShellBootstrapOwner;
@@ -93,7 +93,7 @@ public partial class App : Application
                     singleInstanceMutex = null;
                     LoggingBootstrap.Configure();
                     loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
-                    loggerFactory.CreateLogger<App>().LogWarning("检测到已有 OllamaHub 桌面实例，当前进程退出以避免并发读取配置库，进程 {ProcessId}", Environment.ProcessId);
+                    loggerFactory.CreateLogger<App>().LogWarning("检测到已有 LoomX 桌面实例，当前进程退出以避免并发读取配置库，进程 {ProcessId}", Environment.ProcessId);
                     Environment.Exit(0);
                     return;
                 }
@@ -138,7 +138,7 @@ public partial class App : Application
     [SupportedOSPlatform("windows")]
     private static string? CreateBootstrapShortcut(string processPath)
     {
-        var shortcutPath = Path.Combine(Path.GetTempPath(), $"OllamaHub-{Environment.ProcessId}-{Guid.NewGuid():N}.lnk");
+        var shortcutPath = Path.Combine(Path.GetTempPath(), $"LoomX-{Environment.ProcessId}-{Guid.NewGuid():N}.lnk");
         object? shell = null;
         object? shortcut = null;
         try

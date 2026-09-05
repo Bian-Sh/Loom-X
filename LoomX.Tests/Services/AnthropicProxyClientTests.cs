@@ -1,12 +1,12 @@
 using System.Net;
 using System.Text;
-using OllamaHub.Configuration;
-using OllamaHub.Contracts;
-using OllamaHub.Services;
-using OllamaHub.Tests.Logging;
+using LoomX.Configuration;
+using LoomX.Contracts;
+using LoomX.Services;
+using LoomX.Tests.Logging;
 using Xunit;
 
-namespace OllamaHub.Tests.Services;
+namespace LoomX.Tests.Services;
 
 public sealed class AnthropicProxyClientTests
 {

@@ -1,14 +1,14 @@
 using System.IO;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 public sealed class ActivityViewContractTests
 {
     [Fact]
     public void ActivityViewBindsHistoryLoadingAndPendingActivityControls()
     {
-        var viewPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ActivityView.axaml");
+        var viewPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ActivityView.axaml");
         var viewSource = File.ReadAllText(viewPath);
         var codePath = Path.Combine(Path.GetDirectoryName(viewPath)!, "ActivityView.axaml.cs");
         var codeSource = File.ReadAllText(codePath);

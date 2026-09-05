@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
 using System.Data.Common;
 
-namespace OllamaHub.Configuration;
+namespace LoomX.Configuration;
 
 public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbContext> options) : DbContext(options)
 {
@@ -179,8 +179,6 @@ public sealed class GatewayRouteEntity
 
 public static class ConfigurationDatabase
 {
-    private static readonly string InitializationLockPath = Path.Combine(AppDataPaths.RootDirectory, "OllamaHub.db.init.lock");
-
     public static IDisposable AcquireInitializationLock()
     {
         AppDataPaths.EnsureCreated();
@@ -189,7 +187,7 @@ public static class ConfigurationDatabase
         {
             try
             {
-                return new FileStream(InitializationLockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+                return new FileStream(AppDataPaths.ConfigurationInitializationLockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
             }
             catch (IOException) when (DateTime.UtcNow < deadline)
             {

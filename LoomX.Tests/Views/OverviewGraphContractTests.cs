@@ -1,10 +1,10 @@
 using System.IO;
 using System.Text.Json;
-using OllamaHub.Configuration;
-using OllamaHub.Desktop.ViewModels;
+using LoomX.Configuration;
+using LoomX.ViewModels;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 public sealed class OverviewGraphContractTests
 {
@@ -20,7 +20,7 @@ public sealed class OverviewGraphContractTests
     [Fact]
     public void OverviewGraphHostUsesBaseUriNavigationForLocalModules()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "OverviewGraphHost.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "OverviewGraphHost.cs");
         var source = File.ReadAllText(path);
 
         Assert.Contains("var assetDirectory = Path.GetDirectoryName(Path.GetFullPath(htmlPath))!", source, StringComparison.Ordinal);
@@ -138,7 +138,7 @@ public sealed class OverviewGraphContractTests
 
     private static string ReadDesktopFile(params string[] segments)
     {
-        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", .. segments]);
+        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);
         return File.ReadAllText(path);
     }
 }

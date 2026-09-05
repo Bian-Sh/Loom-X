@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using OllamaHub.Activity;
-using OllamaHub.Configuration;
-using OllamaHub.Desktop.Services;
+using LoomX.Activity;
+using LoomX.Configuration;
+using LoomX.Services;
 using Xunit;
 
-namespace OllamaHub.Tests.Services;
+namespace LoomX.Tests.Services;
 
 public sealed class AppDataStoreTests
 {
@@ -13,7 +13,7 @@ public sealed class AppDataStoreTests
     public async Task InitializeAsyncReturnsTheSameTaskAndLoadsConfigurationOnce()
     {
         var directory = CreateDirectory();
-        var configPath = Path.Combine(directory, "OllamaHub.db");
+        var configPath = Path.Combine(directory, "LoomX.db");
         var activityPath = Path.Combine(directory, "Activity.db");
         try
         {
@@ -40,7 +40,7 @@ public sealed class AppDataStoreTests
     public async Task SuccessfulConfigurationWriteReplacesSnapshotAndPublishesChange()
     {
         var directory = CreateDirectory();
-        var configPath = Path.Combine(directory, "OllamaHub.db");
+        var configPath = Path.Combine(directory, "LoomX.db");
         var activityPath = Path.Combine(directory, "Activity.db");
         try
         {
@@ -69,7 +69,7 @@ public sealed class AppDataStoreTests
     public async Task FailedConfigurationWriteKeepsExistingSnapshot()
     {
         var directory = CreateDirectory();
-        var configPath = Path.Combine(directory, "OllamaHub.db");
+        var configPath = Path.Combine(directory, "LoomX.db");
         var activityPath = Path.Combine(directory, "Activity.db");
         try
         {
@@ -94,7 +94,7 @@ public sealed class AppDataStoreTests
     public async Task ActivityWindowEvictsOldestRowsAndQueuesFilteredOutHistoryEvents()
     {
         var directory = CreateDirectory();
-        var configPath = Path.Combine(directory, "OllamaHub.db");
+        var configPath = Path.Combine(directory, "LoomX.db");
         var activityPath = Path.Combine(directory, "Activity.db");
         try
         {
@@ -131,7 +131,7 @@ public sealed class AppDataStoreTests
     public async Task ActivityHistoryDeduplicatesRealtimeAndPagedRecords()
     {
         var directory = CreateDirectory();
-        var configPath = Path.Combine(directory, "OllamaHub.db");
+        var configPath = Path.Combine(directory, "LoomX.db");
         var activityPath = Path.Combine(directory, "Activity.db");
         try
         {
@@ -202,7 +202,7 @@ public sealed class AppDataStoreTests
 
     private static string CreateDirectory()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "OllamaHubTests", Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(Path.GetTempPath(), "LoomXTests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         return directory;
     }

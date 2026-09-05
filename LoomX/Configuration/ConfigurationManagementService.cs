@@ -2,7 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
-namespace OllamaHub.Configuration;
+namespace LoomX.Configuration;
 
 public sealed record ProviderInput(string BusinessId, string DisplayName, string BaseUrl, string ApiMode, bool Enabled, string? ApiKey, bool ClearApiKey, Dictionary<string, string>? Headers, bool UseProxy = false, string? ModelListUrl = null, string? EndpointFormat = "responses");
 public sealed record AppSettingsInput(string Language, string Theme, string ProxyMode, string ProxyHost, int ProxyPort, string? ProxyUsername, string? ProxyPassword, bool ClearProxyPassword, bool AutoCheckUpdates, string UpdateChannel, bool DiagnosticsEnabled, int LogRetentionDays, bool LogStackTrace = false, bool TransparencyEnabled = true, int TransparencyOpacity = 86, int BlurAmount = 24, string TransparencyAlgorithm = "acrylic");

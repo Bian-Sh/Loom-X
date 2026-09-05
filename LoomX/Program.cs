@@ -1,6 +1,6 @@
 using Avalonia;
 
-namespace OllamaHub.Desktop;
+namespace LoomX;
 
 internal static class Program
 {

@@ -1,7 +1,7 @@
-using OllamaHub.Configuration;
+using LoomX.Configuration;
 using Xunit;
 
-namespace OllamaHub.Tests.Configuration;
+namespace LoomX.Tests.Configuration;
 
 public sealed class GatewayComboCatalogTests
 {

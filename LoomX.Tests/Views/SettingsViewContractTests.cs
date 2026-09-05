@@ -2,11 +2,11 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
-using OllamaHub.Desktop;
+using LoomX;
 using System.IO;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 [Collection("Avalonia UI")]
 public sealed class SettingsViewContractTests
@@ -37,7 +37,7 @@ public sealed class SettingsViewContractTests
     public void AppearancePipelineUsesAContinuousZeroToHundredOpacityRange()
     {
         var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
-        var servicePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Configuration", "ConfigurationManagementService.cs");
+        var servicePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Configuration", "ConfigurationManagementService.cs");
         var serviceSource = File.ReadAllText(servicePath);
 
         Assert.Contains("Math.Clamp(opacity, 0, 100)", windowSource, StringComparison.Ordinal);
@@ -163,7 +163,7 @@ public sealed class SettingsViewContractTests
         EnsureAvaloniaSetup();
 
         var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
-            new Uri("avares://OllamaHub.Desktop/Styles/VisualTokens.axaml")));
+            new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
 
         var brush = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]);
         var originalColor = brush.Color;
@@ -178,7 +178,7 @@ public sealed class SettingsViewContractTests
         EnsureAvaloniaSetup();
         var window = new MainWindow();
         var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
-            new Uri("avares://OllamaHub.Desktop/Styles/VisualTokens.axaml")));
+            new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
         window.Resources.MergedDictionaries.Add(dictionary);
 
         window.ApplyAppearance(true, 0, 64, "acrylic");
@@ -223,7 +223,7 @@ public sealed class SettingsViewContractTests
 
     private static string ReadDesktopFile(params string[] segments)
     {
-        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", .. segments]);
+        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);
         return File.ReadAllText(path);
     }
 }

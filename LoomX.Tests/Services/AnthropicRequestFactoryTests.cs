@@ -1,11 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using OllamaHub.Configuration;
-using OllamaHub.Contracts;
-using OllamaHub.Services;
+using LoomX.Configuration;
+using LoomX.Contracts;
+using LoomX.Services;
 using Xunit;
 
-namespace OllamaHub.Tests.Services;
+namespace LoomX.Tests.Services;
 
 public sealed class AnthropicRequestFactoryTests
 {

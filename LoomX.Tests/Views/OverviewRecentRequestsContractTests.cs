@@ -1,8 +1,8 @@
-using OllamaHub.Activity;
-using OllamaHub.Desktop.ViewModels;
+using LoomX.Activity;
+using LoomX.ViewModels;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 public sealed class OverviewRecentRequestsContractTests
 {
@@ -37,7 +37,7 @@ public sealed class OverviewRecentRequestsContractTests
     [Fact]
     public void OverviewViewContainsPersistedQueryAndStatusColumn()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "OverviewView.axaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "OverviewView.axaml");
         var source = File.ReadAllText(path);
 
         Assert.Contains("ActivityQueryService", File.ReadAllText(Path.Combine(Path.GetDirectoryName(path)!, "..", "ViewModels", "MainWindowViewModel.cs")), StringComparison.Ordinal);

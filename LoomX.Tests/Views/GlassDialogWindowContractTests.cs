@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 public sealed class GlassDialogWindowContractTests
 {
@@ -40,7 +40,7 @@ public sealed class GlassDialogWindowContractTests
 
     private static string ReadDesktopFile(params string[] segments)
     {
-        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", .. segments]);
+        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);
         return File.ReadAllText(path);
     }
 }

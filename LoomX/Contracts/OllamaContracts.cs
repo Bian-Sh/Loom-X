@@ -1,7 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
-namespace OllamaHub.Contracts;
+namespace LoomX.Contracts;
 
 public sealed class OllamaTagListResponse
 {

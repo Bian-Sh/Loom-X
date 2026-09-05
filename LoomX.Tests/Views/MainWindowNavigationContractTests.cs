@@ -1,14 +1,14 @@
 using System.IO;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 public sealed class MainWindowNavigationContractTests
 {
     [Fact]
     public void MainWindowCreatesAndReusesAllLongLivedPageViewModels()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
         var source = File.ReadAllText(path);
 
         foreach (var field in new[]

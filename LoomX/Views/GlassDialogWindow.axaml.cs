@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 
-namespace OllamaHub.Desktop.Views;
+namespace LoomX.Views;
 
 public partial class GlassDialogWindow : Window
 {

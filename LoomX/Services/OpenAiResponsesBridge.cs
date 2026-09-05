@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace OllamaHub.Services;
+namespace LoomX.Services;
 
 internal static class OpenAiResponsesBridge
 {

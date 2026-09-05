@@ -1,9 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using OllamaHub.Desktop;
-using OllamaHub.Desktop.ViewModels;
+using LoomX;
+using LoomX.ViewModels;
 
-namespace OllamaHub.Desktop.Views;
+namespace LoomX.Views;
 public partial class ProvidersView : UserControl
 {
     public ProvidersView() => InitializeComponent();

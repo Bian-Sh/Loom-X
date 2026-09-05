@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 
-namespace OllamaHub.Logging;
+namespace LoomX.Logging;
 
 public sealed class FileLoggerProvider(string filePath, LogLevel minLogLevel) : ILoggerProvider
 {

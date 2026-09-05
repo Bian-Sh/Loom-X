@@ -1,4 +1,4 @@
-namespace OllamaHub.Configuration;
+namespace LoomX.Configuration;
 
 internal static class GatewayComboCatalog
 {

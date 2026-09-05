@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace OllamaHub.Activity;
+namespace LoomX.Activity;
 
 public interface IActivityStore
 {

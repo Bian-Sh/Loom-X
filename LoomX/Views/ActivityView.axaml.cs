@@ -4,11 +4,11 @@ using Avalonia.Controls.Primitives;
 using Avalonia;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using OllamaHub.Desktop;
-using OllamaHub.Desktop.Services;
-using OllamaHub.Desktop.ViewModels;
+using LoomX;
+using LoomX.Services;
+using LoomX.ViewModels;
 
-namespace OllamaHub.Desktop.Views;
+namespace LoomX.Views;
 
 public partial class ActivityView : UserControl
 {

@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace OllamaHub.Activity;
+namespace LoomX.Activity;
 
 public sealed class ActivityDbContext(DbContextOptions<ActivityDbContext> options) : DbContext(options)
 {

@@ -1,8 +1,8 @@
-using OllamaHub.Configuration;
-using OllamaHub.Desktop.ViewModels;
+using LoomX.Configuration;
+using LoomX.ViewModels;
 using Xunit;
 
-namespace OllamaHub.Tests.Desktop;
+namespace LoomX.Tests.Desktop;
 
 public sealed class ProviderEditorViewModelTests
 {

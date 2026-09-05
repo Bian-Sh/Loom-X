@@ -1,9 +1,9 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using OllamaHub;
-using OllamaHub.Activity;
+using LoomX;
+using LoomX.Activity;
 
-namespace OllamaHub.Desktop.Services;
+namespace LoomX.Services;
 
 public sealed class ActivityQueryService
 {

@@ -1,14 +1,14 @@
 using System.IO;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 public sealed class ProvidersViewContractTests
 {
     [Fact]
     public void ModelListBindsSelectedModelForAutomaticModelSave()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
 
         Assert.Contains("SelectedItem=\"{Binding SelectedModel, Mode=TwoWay}\"", source, StringComparison.Ordinal);
@@ -17,7 +17,7 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void ModelChangesSelectTheChangedModelBeforeAutomaticSave()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
         var source = File.ReadAllText(path);
 
         Assert.Contains("if (sender is not ModelEditorViewModel model) return;", source, StringComparison.Ordinal);
@@ -28,7 +28,7 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void ModelRowsDoNotReserveSpaceForDragHandle()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
 
         Assert.Equal(2, source.Split("ColumnDefinitions=\"1.5*,*,80,100,56\"", StringSplitOptions.None).Length - 1);
@@ -38,7 +38,7 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void IncompleteHeadersShowPersistentWarning()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
 
         Assert.Contains("SelectedProvider.HasIncompleteHeaders", source, StringComparison.Ordinal);
@@ -49,7 +49,7 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void ModelSyncButtonUsesCompactRotatingIcon()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
 
         Assert.Contains("Classes=\"icon-glyph\" Data=\"M 26,12 A 10,10 0 1,0 23,20", source, StringComparison.Ordinal);
@@ -60,7 +60,7 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void ModelSyncReportsToastAndStopsAnimationForCurrentRequest()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
         var source = File.ReadAllText(path);
 
         Assert.Contains("toastService.Show(Status, ToastLevel.Success);", source, StringComparison.Ordinal);
@@ -72,7 +72,7 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void LocalSavesSuppressConfigurationRefreshThatWouldReplaceEditorControls()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
         var source = File.ReadAllText(path);
 
         Assert.Contains("private bool suppressConfigurationRefresh;", source, StringComparison.Ordinal);
@@ -84,7 +84,7 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void AutomaticSavesSkipUnchangedEditors()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
         var source = File.ReadAllText(path);
 
         Assert.Contains("public bool HasUnsavedChanges => Id == Guid.Empty || isDirty;", source, StringComparison.Ordinal);
@@ -95,9 +95,9 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void ProviderEditorUsesViewModelChangesInsteadOfFocusSaves()
     {
-        var viewModelPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
-        var viewPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
-        var codeBehindPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml.cs");
+        var viewModelPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
+        var viewPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
+        var codeBehindPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml.cs");
         var viewModelSource = File.ReadAllText(viewModelPath);
         var viewSource = File.ReadAllText(viewPath);
         var codeBehindSource = File.ReadAllText(codeBehindPath);
@@ -119,7 +119,7 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void BaseUrlHelpControlUsesAdjacentQuestionMarkAndHelpCursor()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
 
         Assert.Contains("<StackPanel Orientation=\"Horizontal\" Spacing=\"4\"><TextBlock Text=\"Base URL\"", source, StringComparison.Ordinal);
@@ -133,7 +133,7 @@ public sealed class ProvidersViewContractTests
     [Fact]
     public void ProviderDirectoryMatchesEndpointListSurfaceContract()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Views", "ProvidersView.axaml");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
 
         Assert.Contains("Classes=\"provider-list\"", source, StringComparison.Ordinal);

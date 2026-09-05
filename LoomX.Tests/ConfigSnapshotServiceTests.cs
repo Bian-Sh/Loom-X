@@ -1,14 +1,14 @@
-using OllamaHub.Desktop.Services;
+using LoomX.Services;
 using Xunit;
 
-namespace OllamaHub.Tests;
+namespace LoomX.Tests;
 
 public sealed class ConfigSnapshotServiceTests
 {
     [Fact]
     public void FileStateReadCanOpenWhileDatabaseWriterHandleIsActive()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"ollamahub-config-state-{Guid.NewGuid():N}.db");
+        var path = Path.Combine(Path.GetTempPath(), $"loomx-config-state-{Guid.NewGuid():N}.db");
         try
         {
             File.WriteAllText(path, "database");

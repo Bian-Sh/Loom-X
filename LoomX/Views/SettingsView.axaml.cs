@@ -2,7 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using System.Diagnostics;
 
-namespace OllamaHub.Desktop.Views;
+namespace LoomX.Views;
 
 public partial class SettingsView : UserControl
 {
@@ -14,6 +14,6 @@ public partial class SettingsView : UserControl
         catch { }
     }
 
-    private void ProjectHomeButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/mingkuang-Chuyu/OllamaHub");
-    private void IssuesButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/mingkuang-Chuyu/OllamaHub/issues");
+    private void ProjectHomeButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/mingkuang-Chuyu/LoomX");
+    private void IssuesButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/mingkuang-Chuyu/LoomX/issues");
 }

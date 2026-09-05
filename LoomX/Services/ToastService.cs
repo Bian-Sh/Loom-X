@@ -1,4 +1,4 @@
-namespace OllamaHub.Desktop.Services;
+namespace LoomX.Services;
 
 public enum ToastLevel
 {

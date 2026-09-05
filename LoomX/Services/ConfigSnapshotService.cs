@@ -3,9 +3,9 @@ using System.Security.Cryptography;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using OllamaHub.Configuration;
+using LoomX.Configuration;
 
-namespace OllamaHub.Desktop.Services;
+namespace LoomX.Services;
 
 public sealed class ConfigSnapshotService : IDisposable
 {

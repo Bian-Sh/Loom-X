@@ -1,17 +1,17 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using OllamaHub.Activity;
-using OllamaHub.Desktop.Services;
+using LoomX.Activity;
+using LoomX.Services;
 using Xunit;
 
-namespace OllamaHub.Tests.Services;
+namespace LoomX.Tests.Services;
 
 public sealed class ActivityQueryServiceTests
 {
     [Fact]
     public async Task QueryAsyncReturnsRecentRowsWithCreatedAtOrdering()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "OllamaHubTests", Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(Path.GetTempPath(), "LoomXTests", Guid.NewGuid().ToString("N"));
         var databasePath = Path.Combine(directory, "Activity.db");
         Directory.CreateDirectory(directory);
         try
@@ -47,7 +47,7 @@ public sealed class ActivityQueryServiceTests
     [Fact]
     public async Task QueryAsyncLimitsAfterCreatedAtOrdering()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "OllamaHubTests", Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(Path.GetTempPath(), "LoomXTests", Guid.NewGuid().ToString("N"));
         var databasePath = Path.Combine(directory, "Activity.db");
         Directory.CreateDirectory(directory);
         try
@@ -83,7 +83,7 @@ public sealed class ActivityQueryServiceTests
     [Fact]
     public async Task QueryPageAsyncUsesCreatedAtAndIdCursor()
     {
-        var directory = Path.Combine(Path.GetTempPath(), "OllamaHubTests", Guid.NewGuid().ToString("N"));
+        var directory = Path.Combine(Path.GetTempPath(), "LoomXTests", Guid.NewGuid().ToString("N"));
         var databasePath = Path.Combine(directory, "Activity.db");
         Directory.CreateDirectory(directory);
         try

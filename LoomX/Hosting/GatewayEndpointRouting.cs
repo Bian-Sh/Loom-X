@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 
-namespace OllamaHub.Hosting;
+namespace LoomX.Hosting;
 
 internal static class GatewayEndpointRouting
 {

@@ -1,14 +1,14 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using OllamaHub.Activity;
-using OllamaHub.Configuration;
+using LoomX.Activity;
+using LoomX.Configuration;
 
-namespace OllamaHub.Services;
+namespace LoomX.Services;
 
 public interface IProtocolPassthroughClient
 {

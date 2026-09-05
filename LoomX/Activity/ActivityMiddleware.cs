@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using OllamaHub.Hosting;
+using LoomX.Hosting;
 
-namespace OllamaHub.Activity;
+namespace LoomX.Activity;
 
 public sealed class ActivityRequestContext
 {
@@ -20,7 +20,7 @@ public sealed class ActivityRequestContext
 
 public static class ActivityContextKeys
 {
-    public const string Request = "OllamaHub.Activity.Request";
+    public const string Request = "LoomX.Activity.Request";
 }
 
 public sealed class ActivityMiddleware(RequestDelegate next, IActivityStore activityStore, ILogger<ActivityMiddleware> logger, RequestTelemetryHub? telemetryHub = null)

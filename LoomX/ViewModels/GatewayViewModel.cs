@@ -1,10 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Avalonia.Threading;
-using OllamaHub.Configuration;
-using OllamaHub.Desktop.Services;
+using LoomX.Configuration;
+using LoomX.Services;
 
-namespace OllamaHub.Desktop.ViewModels;
+namespace LoomX.ViewModels;
 
 public sealed class GatewayViewModel : NotifyViewModel, IDisposable
 {

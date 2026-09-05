@@ -1,8 +1,8 @@
 using System.Text.Json.Nodes;
-using OllamaHub.Services;
+using LoomX.Services;
 using Xunit;
 
-namespace OllamaHub.Tests.Services;
+namespace LoomX.Tests.Services;
 
 public sealed class OpenAiResponsesBridgeTests
 {

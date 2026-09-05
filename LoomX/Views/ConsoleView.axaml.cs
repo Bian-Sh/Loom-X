@@ -5,9 +5,9 @@ using Avalonia;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using System.Collections.Specialized;
-using OllamaHub.Desktop.ViewModels;
+using LoomX.ViewModels;
 
-namespace OllamaHub.Desktop.Views;
+namespace LoomX.Views;
 
 public partial class ConsoleView : UserControl
 {

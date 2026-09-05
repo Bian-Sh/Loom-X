@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Logging;
 using System.Collections.Specialized;
-using OllamaHub.Desktop.ViewModels;
-using OllamaHub.Logging;
+using LoomX.ViewModels;
+using LoomX.Logging;
 using Xunit;
 
-namespace OllamaHub.Tests.ViewModels;
+namespace LoomX.Tests.ViewModels;
 
 public sealed class ConsoleViewModelTests
 {

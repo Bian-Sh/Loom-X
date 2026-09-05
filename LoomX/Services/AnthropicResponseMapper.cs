@@ -1,9 +1,9 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using OllamaHub.Configuration;
-using OllamaHub.Contracts;
+using LoomX.Configuration;
+using LoomX.Contracts;
 
-namespace OllamaHub.Services;
+namespace LoomX.Services;
 
 public interface IAnthropicResponseMapper
 {

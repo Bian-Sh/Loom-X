@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using OllamaHub.Logging;
+using LoomX.Logging;
 using Xunit;
 
-namespace OllamaHub.Tests.Logging;
+namespace LoomX.Tests.Logging;
 
 public sealed class RuntimeLogBufferTests
 {

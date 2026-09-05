@@ -1,6 +1,6 @@
 using System.Text.Json.Nodes;
 
-namespace OllamaHub.Configuration;
+namespace LoomX.Configuration;
 
 public sealed class ResolvedModelConfig
 {

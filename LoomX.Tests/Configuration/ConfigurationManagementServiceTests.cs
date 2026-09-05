@@ -2,11 +2,11 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Data.Common;
-using OllamaHub.Configuration;
-using OllamaHub.Desktop.ViewModels;
+using LoomX.Configuration;
+using LoomX.ViewModels;
 using Xunit;
 
-namespace OllamaHub.Tests.Configuration;
+namespace LoomX.Tests.Configuration;
 
 public sealed class ConfigurationManagementServiceTests
 {
@@ -65,7 +65,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task NewProvider_DefaultsEndpointFormatToResponses()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -88,7 +88,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task GatewayEndpoints_UseUniqueCanonicalPaths()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -111,7 +111,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task InitializeAsync_WhenSchemaIsReady_DoesNotRewriteDatabase()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -143,7 +143,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task InitializeAsync_WhenSchemaIsReadyInWalMode_DoesNotRewriteDatabase()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var interceptor = new SqlWriteCommandInterceptor();
@@ -190,7 +190,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task ProviderEndpointFormat_CanBeUpdatedAndAppearsInSnapshot()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -216,7 +216,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task InvalidEndpointFormat_IsRejectedWithoutChangingStoredValue()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -241,7 +241,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task ExistingDatabase_MissingEndpointFormatColumn_GetsDefaultValue()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var connectionString = $"Data Source={databasePath}";
@@ -271,7 +271,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task ProviderAndModelCrud_RebuildsRuntimeSnapshot()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -302,7 +302,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task GatewayCombos_AreIndependentPerEndpoint()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -329,7 +329,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task GatewayCombos_ExposeNamedGroupsAndMembers()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -356,7 +356,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task GatewayModelSource_ReadsEnabledProviderModelsFromOrmRelationship()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -384,7 +384,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task GatewayComboNames_AreCaseInsensitivePerEndpoint()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -404,7 +404,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task LegacyGatewayRoutes_AreNotExposedUntilAddedToCombo()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -428,7 +428,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task DeleteModel_WithLegacyGatewayRoute_IsRejected()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -455,7 +455,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task DeleteProvider_WithModels_IsRejected()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -479,7 +479,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task SettingsAndProviderProxy_ArePersistedInSqlite()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -550,7 +550,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task ProviderType_RejectsUnsupportedValue()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -571,7 +571,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task ModelListUrl_RejectsNonHttpAddress()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -592,7 +592,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task ModelListUrl_PreservesTrailingSlash()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -618,7 +618,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task EmptyProviderApiKey_ClearsStoredKey()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
@@ -644,7 +644,7 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public async Task InvalidProtectedProviderKey_DoesNotHideProvider()
     {
-        var databasePath = Path.Combine(Path.GetTempPath(), $"ollamahub-{Guid.NewGuid():N}.db");
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
         {
             var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;

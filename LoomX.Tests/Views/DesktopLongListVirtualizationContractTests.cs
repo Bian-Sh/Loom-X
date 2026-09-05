@@ -1,7 +1,7 @@
 using System.IO;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 public sealed class DesktopLongListVirtualizationContractTests
 {
@@ -24,7 +24,7 @@ public sealed class DesktopLongListVirtualizationContractTests
         var path = Path.Combine(new[]
         {
             AppContext.BaseDirectory,
-            "..", "..", "..", "..", "OllamaHub.Desktop"
+            "..", "..", "..", "..", "LoomX"
         }.Concat(parts).ToArray());
         return File.ReadAllText(path);
     }

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
-using OllamaHub.Hosting;
+using LoomX.Hosting;
 using Xunit;
 
-namespace OllamaHub.Tests.Hosting;
+namespace LoomX.Tests.Hosting;
 
 public sealed class GatewayEndpointRoutingTests
 {

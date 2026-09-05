@@ -1,4 +1,4 @@
-namespace OllamaHub.Desktop;
+namespace LoomX;
 
 internal static class InstanceLaunchPolicy
 {

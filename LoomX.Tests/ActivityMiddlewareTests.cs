@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
-using OllamaHub.Activity;
+using LoomX.Activity;
 using Xunit;
 
-namespace OllamaHub.Tests;
+namespace LoomX.Tests;
 
 public sealed class ActivityMiddlewareTests
 {

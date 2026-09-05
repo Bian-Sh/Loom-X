@@ -1,8 +1,8 @@
 using Avalonia;
-using OllamaHub.Desktop;
+using LoomX;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 [CollectionDefinition("Avalonia UI", DisableParallelization = true)]
 public sealed class AvaloniaUiCollectionDefinition { }

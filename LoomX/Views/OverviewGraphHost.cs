@@ -4,10 +4,10 @@ using System.Net;
 using System.Net.Sockets;
 using Avalonia.Controls;
 using Microsoft.Extensions.Logging;
-using OllamaHub.Activity;
-using OllamaHub.Desktop.ViewModels;
+using LoomX.Activity;
+using LoomX.ViewModels;
 
-namespace OllamaHub.Desktop.Views;
+namespace LoomX.Views;
 
 public interface IOverviewGraphHost : IDisposable
 {

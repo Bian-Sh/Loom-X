@@ -1,17 +1,17 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
-using OllamaHub.Configuration;
-using OllamaHub.Contracts;
-using OllamaHub.Tests.Logging;
-using OllamaHub.Services;
+using LoomX.Configuration;
+using LoomX.Contracts;
+using LoomX.Tests.Logging;
+using LoomX.Services;
 using Xunit;
 
-namespace OllamaHub.Tests.Services;
+namespace LoomX.Tests.Services;
 
 public sealed class ProtocolPassthroughClientTests
 {

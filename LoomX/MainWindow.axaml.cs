@@ -6,9 +6,9 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.Logging;
-using OllamaHub.Desktop.Services;
+using LoomX.Services;
 
-namespace OllamaHub.Desktop;
+namespace LoomX;
 public partial class MainWindow : Window
 {
     // 透明度为 0 时保留轻微基底，避免系统材质在 alpha=0 时退化为仅边框。

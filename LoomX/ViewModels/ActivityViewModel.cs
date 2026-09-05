@@ -2,10 +2,10 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
-using OllamaHub.Activity;
-using OllamaHub.Desktop.Services;
+using LoomX.Activity;
+using LoomX.Services;
 
-namespace OllamaHub.Desktop.ViewModels;
+namespace LoomX.ViewModels;
 
 public sealed class ActivityViewModel : NotifyViewModel, IDisposable
 {

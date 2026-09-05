@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace OllamaHub.Configuration;
+namespace LoomX.Configuration;
 
 public static class ProtectedApiKeyStore
 {

@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Logging;
-using OllamaHub.Activity;
-using OllamaHub.Configuration;
+using LoomX.Activity;
+using LoomX.Configuration;
 
-namespace OllamaHub.Desktop.Services;
+namespace LoomX.Services;
 
 public sealed class AppDataStore : IDisposable
 {

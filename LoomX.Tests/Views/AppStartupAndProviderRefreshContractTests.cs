@@ -1,14 +1,14 @@
 using System.IO;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 public sealed class AppStartupAndProviderRefreshContractTests
 {
     [Fact]
     public void ShutdownPathsReturnWithoutReenteringAvaloniaFrameworkInitialization()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "App.axaml.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "App.axaml.cs");
         var source = File.ReadAllText(path);
 
         Assert.DoesNotContain("desktop.Shutdown(0);\n                            base.OnFrameworkInitializationCompleted();", source, StringComparison.Ordinal);
@@ -19,7 +19,7 @@ public sealed class AppStartupAndProviderRefreshContractTests
     [Fact]
     public void ShellBootstrapUsesExplorerShellContext()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "App.axaml.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "App.axaml.cs");
         var source = File.ReadAllText(path);
 
         Assert.Contains("FileName = \"explorer.exe\"", source, StringComparison.Ordinal);
@@ -29,7 +29,7 @@ public sealed class AppStartupAndProviderRefreshContractTests
     [Fact]
     public void ProviderRefreshRequestsAreCoalesced()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "ViewModels", "MainWindowViewModel.cs");
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
         var source = File.ReadAllText(path);
 
         Assert.Contains("private readonly object refreshSync", source, StringComparison.Ordinal);
@@ -41,10 +41,10 @@ public sealed class AppStartupAndProviderRefreshContractTests
     [Fact]
     public void ConfigurationReloadIsExplicitInsteadOfPeriodicOrFileDriven()
     {
-        var hostPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "OllamaHubHost.cs");
-        var providerPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Configuration", "DatabaseConfigurationProvider.cs");
-        var snapshotPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Services", "ConfigSnapshotService.cs");
-        var storePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Services", "AppDataStore.cs");
+        var hostPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "LoomXHost.cs");
+        var providerPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Configuration", "DatabaseConfigurationProvider.cs");
+        var snapshotPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Services", "ConfigSnapshotService.cs");
+        var storePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Services", "AppDataStore.cs");
 
         Assert.DoesNotContain("ConfigurationRefreshService", File.ReadAllText(hostPath), StringComparison.Ordinal);
         Assert.DoesNotContain("PeriodicTimer", File.ReadAllText(providerPath), StringComparison.Ordinal);

@@ -2,12 +2,12 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
-using OllamaHub.Desktop;
-using OllamaHub.Desktop.Services;
-using OllamaHub.Desktop.Views;
+using LoomX;
+using LoomX.Services;
+using LoomX.Views;
 using Xunit;
 
-namespace OllamaHub.Tests.Views;
+namespace LoomX.Tests.Views;
 
 [Collection("Avalonia UI")]
 public sealed class WindowAppearanceCoordinatorTests
@@ -81,7 +81,7 @@ public sealed class WindowAppearanceCoordinatorTests
     }
 
     private static ResourceDictionary LoadVisualTokens() => Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
-        new Uri("avares://OllamaHub.Desktop/Styles/VisualTokens.axaml")));
+        new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
 
     private static void EnsureAvaloniaSetup()
     {

@@ -1,8 +1,8 @@
 ## 1. 结构与技术标识改名
 
 - [x] 1.1 使用 `git mv` 将 `OllamaHub.slnx`、`OllamaHub.Desktop/`、`OllamaHub.Tests/`、项目文件和 `OllamaHubHost.cs` 重命名为 LoomX 对应名称，并保留既有流程产物
-- [ ] 1.2 更新解决方案项目路径、项目引用、程序集属性和 `InternalsVisibleTo`，使 `LoomX.slnx` 仅引用 `LoomX` 与 `LoomX.Tests`
-- [ ] 1.3 将活动源码和测试中的 `OllamaHub.*` namespace、`using`、类型名、Avalonia `x:Class`、`using:` 声明和 `avares://` URI 改为 `LoomX.*`
+- [x] 1.2 更新解决方案项目路径、项目引用、程序集属性和 `InternalsVisibleTo`，使 `LoomX.slnx` 仅引用 `LoomX` 与 `LoomX.Tests`
+- [x] 1.3 将活动源码和测试中的 `OllamaHub.*` namespace、`using`、类型名、Avalonia `x:Class`、`using:` 声明和 `avares://` URI 改为 `LoomX.*`
 - [ ] 1.4 更新静态源码路径断言、测试临时目录名称和所有构建/测试命令引用，确保测试不依赖旧目录
 
 ## 2. 运行时身份与用户界面
@@ -14,7 +14,7 @@
 
 ## 3. 应用数据迁移
 
-- [ ] 3.1 更新 `AppDataPaths`，定义 `%LOCALAPPDATA%\\LoomX`、`LoomX.db`、`LoomX.Activity.db`、新日志目录和初始化锁路径，并保留旧路径只读常量
+- [x] 3.1 更新 `AppDataPaths`，定义 `%LOCALAPPDATA%\\LoomX`、`LoomX.db`、`LoomX.Activity.db`、新日志目录和初始化锁路径，并保留旧路径只读常量
 - [ ] 3.2 实现幂等应用数据迁移组件，使用迁移锁、SQLite 备份 API、临时文件、完整性检查和原子提交
 - [ ] 3.3 在 `LoomXHost` 创建数据库连接前接入迁移，处理新库优先、旧库保留、无旧库初始化和失败阻止启动规则
 - [ ] 3.4 为配置库、活动库、WAL、重复启动、目标已存在、源库损坏、完整性失败和 DPAPI 密文保留新增测试入口与测试用例

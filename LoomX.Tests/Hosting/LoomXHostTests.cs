@@ -1,13 +1,13 @@
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging.Abstractions;
-using OllamaHub.Configuration;
-using OllamaHub.Services;
+using LoomX.Configuration;
+using LoomX.Services;
 using Xunit;
 
-namespace OllamaHub.Tests.Hosting;
+namespace LoomX.Tests.Hosting;
 
-public sealed class OllamaHubHostTests
+public sealed class LoomXHostTests
 {
     [Fact]
     public void BuildGatewayAttemptPayload_ForwardsModelReasoningEffortWithoutMutatingRequest()
@@ -26,7 +26,7 @@ public sealed class OllamaHubHostTests
                 ["provider_options"] = new JsonObject { ["enabled"] = true }
             });
 
-        var result = OllamaHubHost.BuildGatewayAttemptPayload(request, model);
+        var result = LoomXHost.BuildGatewayAttemptPayload(request, model);
 
         Assert.Equal("deepseek-v4", result["model"]!.GetValue<string>());
         Assert.Equal("high", result["reasoning_effort"]!.GetValue<string>());
@@ -47,8 +47,8 @@ public sealed class OllamaHubHostTests
         var first = BuildModel("first", "high");
         var second = BuildModel("second", "low");
 
-        var firstAttempt = OllamaHubHost.BuildGatewayAttemptPayload(request, first);
-        var secondAttempt = OllamaHubHost.BuildGatewayAttemptPayload(request, second);
+        var firstAttempt = LoomXHost.BuildGatewayAttemptPayload(request, first);
+        var secondAttempt = LoomXHost.BuildGatewayAttemptPayload(request, second);
 
         Assert.Equal("first", firstAttempt["model"]!.GetValue<string>());
         Assert.Equal("high", firstAttempt["reasoning_effort"]!.GetValue<string>());
@@ -99,7 +99,7 @@ public sealed class OllamaHubHostTests
         }
         """)!.AsObject();
 
-        await OllamaHubHost.HandleResponsesAsync(
+        await LoomXHost.HandleResponsesAsync(
             context,
             configuration,
             passthrough,

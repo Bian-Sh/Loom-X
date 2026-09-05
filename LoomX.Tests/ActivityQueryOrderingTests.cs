@@ -1,9 +1,9 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using OllamaHub.Activity;
+using LoomX.Activity;
 using Xunit;
 
-namespace OllamaHub.Tests;
+namespace LoomX.Tests;
 
 public sealed class ActivityQueryOrderingTests
 {

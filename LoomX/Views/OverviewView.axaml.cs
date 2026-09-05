@@ -2,8 +2,8 @@ using Avalonia.Controls;
 using Avalonia;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using OllamaHub.Desktop.ViewModels;
-namespace OllamaHub.Desktop.Views;
+using LoomX.ViewModels;
+namespace LoomX.Views;
 public partial class OverviewView : UserControl
 {
     private readonly IOverviewGraphHost graphHost;

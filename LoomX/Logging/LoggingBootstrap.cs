@@ -2,7 +2,7 @@ using Serilog;
 using Serilog.Events;
 using Serilog.Formatting;
 
-namespace OllamaHub.Logging;
+namespace LoomX.Logging;
 
 public static class LoggingBootstrap
 {
@@ -24,7 +24,7 @@ public static class LoggingBootstrap
                 .WriteTo.Sink(new RuntimeLogSink(RuntimeLogBuffer.Default))
                 .WriteTo.File(
                     new RuntimeLogTextFormatter(),
-                    Path.Combine(AppDataPaths.LogDirectory, "ollamahub-.log"),
+                    Path.Combine(AppDataPaths.LogDirectory, "loomx-.log"),
                     rollingInterval: RollingInterval.Day,
                     fileSizeLimitBytes: 10 * 1024 * 1024,
                     rollOnFileSizeLimit: true,

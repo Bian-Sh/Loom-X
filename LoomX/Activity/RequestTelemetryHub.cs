@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace OllamaHub.Activity;
+namespace LoomX.Activity;
 
 public enum TelemetryEventKind
 {

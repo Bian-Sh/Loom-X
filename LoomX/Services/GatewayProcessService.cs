@@ -2,10 +2,10 @@ using System.Net.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
-using OllamaHub;
-using OllamaHub.Activity;
+using LoomX;
+using LoomX.Activity;
 
-namespace OllamaHub.Desktop.Services;
+namespace LoomX.Services;
 
 public enum GatewayState
 {
@@ -40,7 +40,7 @@ public sealed class GatewayProcessService : IDisposable
             if (app is not null) return;
 
             SetState(GatewayState.Starting, null);
-            app = await OllamaHubHost.CreateAsync(cancellationToken);
+            app = await LoomXHost.CreateAsync(cancellationToken);
             activityStore = app.Services.GetRequiredService<ActivityStore>();
             telemetryHub = app.Services.GetRequiredService<RequestTelemetryHub>();
             activityStore.ActivityEnqueued += OnActivityEnqueued;

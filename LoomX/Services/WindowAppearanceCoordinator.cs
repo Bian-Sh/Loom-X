@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 
-namespace OllamaHub.Desktop.Services;
+namespace LoomX.Services;
 
 public sealed record WindowAppearanceSnapshot(bool Enabled, int Opacity, int BlurAmount, string Algorithm);
 

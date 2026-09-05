@@ -2,9 +2,9 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using OllamaHub.Logging;
+using LoomX.Logging;
 
-namespace OllamaHub.Configuration;
+namespace LoomX.Configuration;
 
 public interface IDatabaseConfigurationProvider
 {

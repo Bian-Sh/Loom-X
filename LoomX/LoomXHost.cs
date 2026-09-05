@@ -8,17 +8,17 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using OllamaHub.Configuration;
-using OllamaHub.Contracts;
-using OllamaHub.Services;
-using OllamaHub.Activity;
-using OllamaHub.Logging;
-using OllamaHub.Hosting;
+using LoomX.Configuration;
+using LoomX.Contracts;
+using LoomX.Services;
+using LoomX.Activity;
+using LoomX.Logging;
+using LoomX.Hosting;
 using Serilog;
 
-namespace OllamaHub;
+namespace LoomX;
 
-public static class OllamaHubHost
+public static class LoomXHost
 {
     public static async Task<WebApplication> CreateAsync(CancellationToken cancellationToken = default)
     {
@@ -66,7 +66,7 @@ public static class OllamaHubHost
 
     private static void MapEndpoints(WebApplication app)
     {
-        app.MapGet("/", () => Results.Ok(new { name = "OllamaHub", status = "ok" }));
+        app.MapGet("/", () => Results.Ok(new { name = "LoomX", status = "ok" }));
         app.MapGet("/api/version", () => Results.Ok(new { version = "0.12.6" }));
         app.MapGet("/api/ps", () => Results.Ok(new { models = Array.Empty<object>() }));
         app.MapGet("/api/tags", (IDatabaseConfigurationProvider configProvider) =>
@@ -133,7 +133,7 @@ public static class OllamaHubHost
         {
             var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
             var configuredUrls = app.Services.GetRequiredService<IDatabaseConfigurationProvider>().Current.Server.Urls;
-            logger.LogInformation("OllamaHub listening on {Urls}", configuredUrls.Count > 0 ? string.Join(", ", configuredUrls) : "default ASP.NET Core URLs");
+            logger.LogInformation("LoomX listening on {Urls}", configuredUrls.Count > 0 ? string.Join(", ", configuredUrls) : "default ASP.NET Core URLs");
         });
     }
 
@@ -330,7 +330,7 @@ public static class OllamaHubHost
 
     private static object ListGatewayModels(IDatabaseConfigurationProvider provider, string endpointKey)
     {
-        var data = ListEnabledCombos(provider, endpointKey).Select(item => new { id = item.Name, @object = "model", owned_by = "ollamahub" }).ToArray();
+        var data = ListEnabledCombos(provider, endpointKey).Select(item => new { id = item.Name, @object = "model", owned_by = "loomx" }).ToArray();
         return new { @object = "list", data };
     }
 

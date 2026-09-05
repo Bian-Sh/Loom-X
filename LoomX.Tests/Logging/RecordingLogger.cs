@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace OllamaHub.Tests.Logging;
+namespace LoomX.Tests.Logging;
 
 internal sealed class RecordingLogger<T> : ILogger<T>
 {

@@ -5,12 +5,12 @@ using System.Windows.Input;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using OllamaHub;
-using OllamaHub.Configuration;
-using OllamaHub.Desktop.Services;
-using OllamaHub.Logging;
+using LoomX;
+using LoomX.Configuration;
+using LoomX.Services;
+using LoomX.Logging;
 
-namespace OllamaHub.Desktop.ViewModels;
+namespace LoomX.ViewModels;
 
 public sealed record SettingOption(string Value, string DisplayName)
 {
@@ -288,7 +288,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         {
             AppDataPaths.EnsureCreated();
             var path = Path.Combine(AppDataPaths.RootDirectory, $"diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
-            var content = $"OllamaHub 诊断摘要\n版本：{VersionLabel}\n系统：{Environment.OSVersion}\n数据目录：{AppDataPaths.RootDirectory}\n代理模式：{SelectedProxyMode.DisplayName}\n日志保留：{LogRetentionDays} 天\n";
+            var content = $"LoomX 诊断摘要\n版本：{VersionLabel}\n系统：{Environment.OSVersion}\n数据目录：{AppDataPaths.RootDirectory}\n代理模式：{SelectedProxyMode.DisplayName}\n日志保留：{LogRetentionDays} 天\n";
             await File.WriteAllTextAsync(path, content);
             Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
             Status = "诊断摘要已导出。";

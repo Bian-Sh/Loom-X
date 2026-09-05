@@ -5,9 +5,9 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
-using OllamaHub.Desktop.ViewModels;
+using LoomX.ViewModels;
 
-namespace OllamaHub.Desktop.Views;
+namespace LoomX.Views;
 
 public partial class GatewayView : UserControl
 {

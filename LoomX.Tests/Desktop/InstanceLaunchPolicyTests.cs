@@ -1,14 +1,14 @@
-using OllamaHub.Desktop;
+using LoomX;
 using Xunit;
 
-namespace OllamaHub.Tests.Desktop;
+namespace LoomX.Tests.Desktop;
 
 public sealed class InstanceLaunchPolicyTests
 {
     [Fact]
     public void AllowsMultipleInstancesForExplicitDebugArgument()
     {
-        Assert.True(InstanceLaunchPolicy.AllowsMultipleInstances(["OllamaHub.Desktop.exe", "--allow-multiple-instances"], null));
+        Assert.True(InstanceLaunchPolicy.AllowsMultipleInstances(["LoomX.exe", "--allow-multiple-instances"], null));
     }
 
     [Fact]
@@ -21,6 +21,6 @@ public sealed class InstanceLaunchPolicyTests
     public void KeepsSingleInstanceByDefault()
     {
         Assert.False(InstanceLaunchPolicy.AllowsMultipleInstances([], null));
-        Assert.False(InstanceLaunchPolicy.AllowsMultipleInstances(["OllamaHub.Desktop.exe"], "0"));
+        Assert.False(InstanceLaunchPolicy.AllowsMultipleInstances(["LoomX.exe"], "0"));
     }
 }

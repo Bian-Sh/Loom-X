@@ -3,11 +3,11 @@ using System.Text.RegularExpressions;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
-using OllamaHub;
-using OllamaHub.Logging;
-using OllamaHub.Desktop.Services;
+using LoomX;
+using LoomX.Logging;
+using LoomX.Services;
 
-namespace OllamaHub.Desktop.ViewModels;
+namespace LoomX.ViewModels;
 
 public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
 {

@@ -4,10 +4,10 @@ using System.Text;
 using System.Text.Json;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using OllamaHub.Configuration;
-using OllamaHub.Contracts;
+using LoomX.Configuration;
+using LoomX.Contracts;
 
-namespace OllamaHub.Services;
+namespace LoomX.Services;
 
 public interface IAnthropicProxyClient
 {
