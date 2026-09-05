@@ -158,6 +158,8 @@ public sealed class GatewayEndpointEntity
     public string DisplayName { get; set; } = string.Empty;
     public string PublicPath { get; set; } = string.Empty;
     public bool Enabled { get; set; } = true;
+    public string? ProtectedApiKey { get; set; }
+    public string ReasoningEffort { get; set; } = GatewayEndpointSettings.DefaultReasoningEffort;
     public List<GatewayComboEntity> Combos { get; set; } = [];
     public List<GatewayRouteEntity> Routes { get; set; } = [];
 }
@@ -214,20 +216,23 @@ public static class ConfigurationDatabase
     {
         using var initializationLock = AcquireInitializationLock();
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
-        if (await IsSchemaReadyAsync(dbContext, cancellationToken)) return;
-
-        await EnsureSchemaAsync(dbContext, cancellationToken);
-        if (!await dbContext.GatewayConfigurations.AnyAsync(cancellationToken))
+        if (!await IsSchemaReadyAsync(dbContext, cancellationToken))
         {
-            dbContext.GatewayConfigurations.Add(new GatewayConfigurationEntity());
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await EnsureSchemaAsync(dbContext, cancellationToken);
+            if (!await dbContext.GatewayConfigurations.AnyAsync(cancellationToken))
+            {
+                dbContext.GatewayConfigurations.Add(new GatewayConfigurationEntity());
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            if (!await dbContext.AppSettings.AnyAsync(cancellationToken))
+            {
+                dbContext.AppSettings.Add(new AppSettingsEntity());
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
         }
 
-        if (!await dbContext.AppSettings.AnyAsync(cancellationToken))
-        {
-            dbContext.AppSettings.Add(new AppSettingsEntity());
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
+        await EnsureEndpointDefaultsAsync(dbContext, cancellationToken);
     }
 
     private static async Task<bool> IsSchemaReadyAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
@@ -256,7 +261,7 @@ public static class ConfigurationDatabase
                 || !await HasColumnsAsync(connection, "Models", cancellationToken,
                     "Id", "ProviderId", "ModelId", "DisplayName", "ConfigId", "Family", "BaseUrl", "ProtectedApiKey", "ApiMode",
                     "ContextLength", "MaxTokens", "Vision", "Temperature", "TopP", "HeadersJson", "ExtraJson", "OwnedBy", "RemoteFamily", "RemoteContextLength", "RemoteMaxTokens", "RemoteVision", "Enabled", "SortOrder")
-                || !await HasColumnsAsync(connection, "GatewayEndpoints", cancellationToken, "Key", "DisplayName", "PublicPath", "Enabled")
+                || !await HasColumnsAsync(connection, "GatewayEndpoints", cancellationToken, "Key", "DisplayName", "PublicPath", "Enabled", "ProtectedApiKey", "ReasoningEffort")
                 || !await HasColumnsAsync(connection, "GatewayCombos", cancellationToken, "Id", "EndpointKey", "Name", "Enabled", "SortOrder")
                 || !await HasColumnsAsync(connection, "GatewayRoutes", cancellationToken, "Id", "EndpointKey", "ComboId", "ModelId", "Enabled", "SortOrder"))
                 return false;
@@ -400,9 +405,25 @@ public static class ConfigurationDatabase
                 Key TEXT NOT NULL CONSTRAINT PK_GatewayEndpoints PRIMARY KEY,
                 DisplayName TEXT NOT NULL,
                 PublicPath TEXT NOT NULL,
-                Enabled INTEGER NOT NULL
+                Enabled INTEGER NOT NULL,
+                ProtectedApiKey TEXT NULL,
+                ReasoningEffort TEXT NOT NULL DEFAULT 'medium'
             )
             """, cancellationToken);
+        foreach (var statement in new[]
+        {
+            "ALTER TABLE GatewayEndpoints ADD COLUMN ProtectedApiKey TEXT NULL",
+            "ALTER TABLE GatewayEndpoints ADD COLUMN ReasoningEffort TEXT NOT NULL DEFAULT 'medium'"
+        })
+        {
+            try
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);
+            }
+            catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+            {
+            }
+        }
         await dbContext.Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS GatewayRoutes (
                 Id TEXT NOT NULL CONSTRAINT PK_GatewayRoutes PRIMARY KEY,
@@ -448,5 +469,36 @@ public static class ConfigurationDatabase
                 dbContext.GatewayEndpoints.Add(endpoint);
         }
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task EnsureEndpointDefaultsAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var endpoints = await dbContext.GatewayEndpoints.ToListAsync(cancellationToken);
+        var changed = false;
+        foreach (var endpoint in endpoints)
+        {
+            if (GatewayEndpointSettings.RequiresApiKey(endpoint.Key))
+            {
+                if (string.IsNullOrWhiteSpace(endpoint.ProtectedApiKey))
+                {
+                    endpoint.ProtectedApiKey = ProtectedApiKeyStore.Protect(GatewayEndpointSettings.GenerateApiKey());
+                    changed = true;
+                }
+            }
+            else if (endpoint.ProtectedApiKey is not null)
+            {
+                endpoint.ProtectedApiKey = null;
+                changed = true;
+            }
+
+            var normalizedReasoning = GatewayEndpointSettings.NormalizeReasoningEffort(endpoint.ReasoningEffort);
+            if (!string.Equals(endpoint.ReasoningEffort, normalizedReasoning, StringComparison.Ordinal))
+            {
+                endpoint.ReasoningEffort = normalizedReasoning;
+                changed = true;
+            }
+        }
+
+        if (changed) await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

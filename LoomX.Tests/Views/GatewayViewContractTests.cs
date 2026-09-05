@@ -1,4 +1,5 @@
 using System.IO;
+using LoomX.Configuration;
 using LoomX.ViewModels;
 using Xunit;
 
@@ -91,6 +92,21 @@ public sealed class GatewayViewContractTests
     }
 
     [Fact]
+    public void EndpointCardsExposeCredentialAndReasoningControls()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+
+        Assert.Contains("Text=\"API Key\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding MaskedApiKey}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"复制 API Key\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"重新生成 API Key\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Border.endpoint-key-row:pointerover Button.endpoint-refresh\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Reasoning effort\"", source, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding ReasoningEffortOptions}\"", source, StringComparison.Ordinal);
+        Assert.Contains("SelectionChanged=\"ReasoningEffort_OnSelectionChanged\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DragAndAlphabeticalSortAreHandledByGatewayInteractions()
     {
         var viewSource = ReadDesktopFile("Views", "GatewayView.axaml.cs");
@@ -150,6 +166,19 @@ public sealed class GatewayViewContractTests
         combo.Routes.Remove(second);
         Assert.False(combo.CanDragRoutes);
         Assert.False(first.IsDragEnabled);
+    }
+
+    [Fact]
+    public void EndpointApiKeyIsMaskedAndOllamaExposesFourReasoningLevels()
+    {
+        var openAi = GatewayEndpointEditorViewModel.FromResponse(new GatewayEndpointResponse("openai", "OpenAI", "/openai", true, [], "lx_1234567890", "medium"), "http://127.0.0.1:11434");
+        var ollama = GatewayEndpointEditorViewModel.FromResponse(new GatewayEndpointResponse("ollama", "Ollama", "/", true, [], null, "high"), "http://127.0.0.1:11434");
+
+        Assert.Equal("lx_1••••7890", openAi.MaskedApiKey);
+        Assert.True(openAi.IsApiKeyVisible);
+        Assert.False(ollama.IsApiKeyVisible);
+        Assert.Equal(["minimal", "low", "medium", "high"], ollama.ReasoningEffortOptions);
+        Assert.Equal("high", ollama.ReasoningEffort);
     }
 
     [Fact]

@@ -166,6 +166,20 @@ public sealed class AppDataStore : IDisposable
         return result;
     }
 
+    public async Task<GatewayEndpointResponse> RotateGatewayApiKeyAsync(string key, CancellationToken cancellationToken = default)
+    {
+        var result = await configService.RotateGatewayApiKeyAsync(key, cancellationToken);
+        await RefreshAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<GatewayEndpointResponse> UpdateGatewayEndpointReasoningEffortAsync(string key, string value, CancellationToken cancellationToken = default)
+    {
+        var result = await configService.UpdateGatewayEndpointReasoningEffortAsync(key, value, cancellationToken);
+        await RefreshAsync(cancellationToken);
+        return result;
+    }
+
     public async Task<GatewayComboResponse> CreateGatewayComboAsync(string endpointKey, GatewayComboInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.CreateGatewayComboAsync(endpointKey, input, cancellationToken);

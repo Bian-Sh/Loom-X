@@ -46,6 +46,8 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     public ICommand RemoveComboCommand { get; }
     public ICommand ToggleRouteCommand { get; }
     public ICommand RemoveRouteCommand { get; }
+    public ICommand RotateGatewayApiKeyCommand { get; }
+    public ICommand SaveGatewayReasoningEffortCommand { get; }
 
     public GatewayViewModel(AppDataStore dataStore, ToastService? toastService = null)
     {
@@ -57,6 +59,8 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         RemoveComboCommand = new AsyncCommand(parameter => RemoveComboAsync(parameter as GatewayComboEditorViewModel));
         ToggleRouteCommand = new AsyncCommand(parameter => ToggleRouteAsync(parameter as GatewayRouteEditorViewModel));
         RemoveRouteCommand = new AsyncCommand(parameter => RemoveRouteAsync(parameter as GatewayRouteEditorViewModel));
+        RotateGatewayApiKeyCommand = new AsyncCommand(parameter => RotateGatewayApiKeyAsync(parameter as GatewayEndpointEditorViewModel));
+        SaveGatewayReasoningEffortCommand = new AsyncCommand(parameter => SaveGatewayReasoningEffortAsync(parameter as GatewayEndpointEditorViewModel));
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         _ = RefreshAsync();
     }
@@ -65,6 +69,7 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         : this(new AppDataStore(configService, new GatewayProcessService()), toastService) { }
 
     public void NotifyCopied() => toastService.Show("地址已复制", ToastLevel.Success);
+    public void NotifyApiKeyCopied() => toastService.Show("API Key 已复制", ToastLevel.Success);
     private async Task RefreshAsync()
     {
         try
@@ -231,6 +236,38 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         try { endpoint.Enabled = (await dataStore.SetGatewayEndpointEnabledAsync(endpoint.Key, !endpoint.Enabled)).Enabled; Status = $"{endpoint.DisplayName} 已{(endpoint.Enabled ? "启用" : "停用")}"; }
         catch (Exception exception) { Status = $"Endpoint 更新失败：{exception.Message}"; }
     }
+    private async Task RotateGatewayApiKeyAsync(GatewayEndpointEditorViewModel? endpoint)
+    {
+        if (endpoint is null || !endpoint.IsApiKeyVisible) return;
+        try
+        {
+            endpoint.ApplyResponse(await dataStore.RotateGatewayApiKeyAsync(endpoint.Key));
+            Status = $"{endpoint.DisplayName} API Key 已重新生成";
+            toastService.Show("API Key 已重新生成", ToastLevel.Success);
+        }
+        catch (Exception exception)
+        {
+            Status = $"API Key 重新生成失败：{exception.Message}";
+            toastService.Show("API Key 重新生成失败", ToastLevel.Error);
+        }
+    }
+
+    public async Task SaveGatewayReasoningEffortAsync(GatewayEndpointEditorViewModel? endpoint)
+    {
+        if (endpoint is null || !endpoint.IsOllamaEndpoint) return;
+        try
+        {
+            endpoint.ApplyResponse(await dataStore.UpdateGatewayEndpointReasoningEffortAsync(endpoint.Key, endpoint.ReasoningEffort));
+            endpoint.MarkReasoningEffortSaved();
+            Status = $"{endpoint.DisplayName} Reasoning effort 已保存";
+            toastService.Show("Reasoning effort 已保存", ToastLevel.Success);
+        }
+        catch (Exception exception)
+        {
+            Status = $"Reasoning effort 保存失败：{exception.Message}";
+            toastService.Show("Reasoning effort 保存失败", ToastLevel.Error);
+        }
+    }
     private async Task ToggleComboAsync(GatewayComboEditorViewModel? combo) { if (combo is null) return; combo.Enabled = !combo.Enabled; await SaveComboChangesAsync(combo); }
     private async Task RemoveComboAsync(GatewayComboEditorViewModel? combo)
     {
@@ -281,17 +318,52 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
 public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
 {
     private bool enabled;
+    private string apiKey = "";
+    private string reasoningEffort = GatewayEndpointSettings.DefaultReasoningEffort;
+    private bool isHydrated;
+    private bool reasoningEffortDirty;
     public string Key { get; init; } = ""; public string DisplayName { get; init; } = ""; public string PublicPath { get; init; } = ""; public string PublicUrl { get; init; } = "";
     public ObservableCollection<GatewayComboEditorViewModel> Combos { get; } = [];
     public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); }
+    public string ApiKey { get => apiKey; private set { if (SetProperty(ref apiKey, value)) OnPropertyChanged(nameof(MaskedApiKey)); } }
+    public string MaskedApiKey => MaskApiKey(ApiKey);
+    public bool IsApiKeyVisible => GatewayEndpointSettings.RequiresApiKey(Key);
+    public bool IsOllamaEndpoint => string.Equals(Key, "ollama", StringComparison.OrdinalIgnoreCase);
+    public IReadOnlyList<string> ReasoningEffortOptions => GatewayEndpointSettings.ReasoningEfforts;
+    public string ReasoningEffort
+    {
+        get => reasoningEffort;
+        set
+        {
+            if (!SetProperty(ref reasoningEffort, GatewayEndpointSettings.NormalizeReasoningEffort(value))) return;
+            if (isHydrated) reasoningEffortDirty = true;
+        }
+    }
+    public bool IsHydrated => isHydrated;
+    public bool HasPendingReasoningEffortChange => reasoningEffortDirty;
     public static GatewayEndpointEditorViewModel FromResponse(GatewayEndpointResponse response, string baseUrl)
     {
         var normalizedBaseUrl = baseUrl.TrimEnd('/');
         var publicUrl = string.Equals(response.Key, "ollama", StringComparison.OrdinalIgnoreCase)
             ? normalizedBaseUrl
             : $"{normalizedBaseUrl}{response.PublicPath}";
-        var value = new GatewayEndpointEditorViewModel { Key = response.Key, DisplayName = response.DisplayName, PublicPath = response.PublicPath, PublicUrl = publicUrl, Enabled = response.Enabled };
-        foreach (var combo in response.Combos) value.Combos.Add(GatewayComboEditorViewModel.FromResponse(combo)); return value;
+        var value = new GatewayEndpointEditorViewModel { Key = response.Key, DisplayName = response.DisplayName, PublicPath = response.PublicPath, PublicUrl = publicUrl, Enabled = response.Enabled, ApiKey = response.ApiKey ?? "", reasoningEffort = GatewayEndpointSettings.NormalizeReasoningEffort(response.ReasoningEffort) };
+        foreach (var combo in response.Combos) value.Combos.Add(GatewayComboEditorViewModel.FromResponse(combo));
+        value.isHydrated = true;
+        return value;
+    }
+    public void ApplyResponse(GatewayEndpointResponse response)
+    {
+        Enabled = response.Enabled;
+        ApiKey = response.ApiKey ?? ApiKey;
+        ReasoningEffort = response.ReasoningEffort;
+    }
+    public void MarkReasoningEffortSaved() => reasoningEffortDirty = false;
+    private static string MaskApiKey(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "未生成";
+        if (value.Length <= 8) return new string('•', value.Length);
+        return $"{value[..4]}••••{value[^4..]}";
     }
 }
 public sealed class GatewayComboEditorViewModel : NotifyViewModel

@@ -33,6 +33,17 @@ public sealed class OpenAiResponsesBridgeTests
     }
 
     [Fact]
+    public void CreateResponsesRequest_MapsReasoningEffortToResponsesReasoning()
+    {
+        var chatRequest = JsonNode.Parse("{\"reasoning_effort\":\"high\"}")!.AsObject();
+
+        var result = OpenAiResponsesBridge.CreateResponsesRequest(chatRequest);
+
+        Assert.Equal("high", result["reasoning"]!["effort"]!.GetValue<string>());
+        Assert.Null(result["reasoning_effort"]);
+    }
+
+    [Fact]
     public void CreateChatCompletionsSse_ConvertsTextToolCallsAndCompletion()
     {
         const string responsesSse = """

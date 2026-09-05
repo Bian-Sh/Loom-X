@@ -16,8 +16,9 @@ public sealed record GatewayComboInput(string Name, bool Enabled, int SortOrder)
 public sealed record GatewayComboResponse(Guid Id, string EndpointKey, string Name, bool Enabled, int SortOrder, IReadOnlyList<GatewayRouteResponse> Routes);
 public sealed record GatewayRouteInput(Guid ModelId, bool Enabled, int SortOrder);
 public sealed record GatewayRouteResponse(Guid Id, Guid ComboId, Guid ModelId, string ModelName, string ProviderName, bool Enabled, int SortOrder);
-public sealed record GatewayEndpointResponse(string Key, string DisplayName, string PublicPath, bool Enabled, IReadOnlyList<GatewayComboResponse> Combos);
+public sealed record GatewayEndpointResponse(string Key, string DisplayName, string PublicPath, bool Enabled, IReadOnlyList<GatewayComboResponse> Combos, string? ApiKey = null, string ReasoningEffort = GatewayEndpointSettings.DefaultReasoningEffort);
 public sealed record GatewayEndpointToggleInput(bool Enabled);
+public sealed record GatewayEndpointReasoningInput(string ReasoningEffort);
 
 internal static class AppearanceSettingsLimits
 {
@@ -175,6 +176,30 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         endpoint.Enabled = enabled; await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToGatewayResponse(endpoint);
     }
 
+    public async Task<GatewayEndpointResponse> RotateGatewayApiKeyAsync(string key, CancellationToken cancellationToken = default)
+    {
+        if (!GatewayEndpointSettings.RequiresApiKey(key)) throw new InvalidOperationException("只有 OpenAI 和 Azure Endpoint 支持 API Key。");
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var endpoint = await db.GatewayEndpoints.Include(item => item.Combos).ThenInclude(item => item.Routes).ThenInclude(item => item.Model).ThenInclude(item => item.Provider).SingleOrDefaultAsync(item => item.Key == key, cancellationToken) ?? throw new KeyNotFoundException("Endpoint 不存在。");
+        endpoint.ProtectedApiKey = ProtectedApiKeyStore.Protect(GatewayEndpointSettings.GenerateApiKey());
+        await db.SaveChangesAsync(cancellationToken);
+        await configurationProvider.ReloadAsync(cancellationToken);
+        return ToGatewayResponse(endpoint);
+    }
+
+    public async Task<GatewayEndpointResponse> UpdateGatewayEndpointReasoningEffortAsync(string key, string value, CancellationToken cancellationToken = default)
+    {
+        if (!string.Equals(key, "ollama", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("只有 Ollama Endpoint 支持 Reasoning effort。");
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var endpoint = await db.GatewayEndpoints.Include(item => item.Combos).ThenInclude(item => item.Routes).ThenInclude(item => item.Model).ThenInclude(item => item.Provider).SingleOrDefaultAsync(item => item.Key == key, cancellationToken) ?? throw new KeyNotFoundException("Endpoint 不存在。");
+        var normalized = GatewayEndpointSettings.NormalizeReasoningEffort(value);
+        if (!string.Equals(value?.Trim(), normalized, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Reasoning effort 仅支持 minimal、low、medium 或 high。");
+        endpoint.ReasoningEffort = normalized;
+        await db.SaveChangesAsync(cancellationToken);
+        await configurationProvider.ReloadAsync(cancellationToken);
+        return ToGatewayResponse(endpoint);
+    }
+
     public async Task<GatewayComboResponse> CreateGatewayComboAsync(string endpointKey, GatewayComboInput input, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
@@ -224,7 +249,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken); var route = await db.GatewayRoutes.SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("路由不存在。"); db.GatewayRoutes.Remove(route); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
     }
 
-    private static GatewayEndpointResponse ToGatewayResponse(GatewayEndpointEntity endpoint) => new(endpoint.Key, endpoint.DisplayName, endpoint.PublicPath, endpoint.Enabled, endpoint.Combos.OrderBy(item => item.SortOrder).Select(ToGatewayComboResponse).ToArray());
+    private static GatewayEndpointResponse ToGatewayResponse(GatewayEndpointEntity endpoint) => new(endpoint.Key, endpoint.DisplayName, endpoint.PublicPath, endpoint.Enabled, endpoint.Combos.OrderBy(item => item.SortOrder).Select(ToGatewayComboResponse).ToArray(), ReadApiKey(endpoint.ProtectedApiKey), GatewayEndpointSettings.NormalizeReasoningEffort(endpoint.ReasoningEffort));
     private static GatewayComboResponse ToGatewayComboResponse(GatewayComboEntity combo) => new(combo.Id, combo.EndpointKey, combo.Name, combo.Enabled, combo.SortOrder, combo.Routes.OrderBy(item => item.SortOrder).Select(ToGatewayRouteResponse).ToArray());
     private static GatewayRouteResponse ToGatewayRouteResponse(GatewayRouteEntity route) => new(route.Id, route.ComboId ?? Guid.Empty, route.ModelId, route.Model.DisplayName, route.Model.Provider.DisplayName, route.Enabled, route.SortOrder);
     private static string NormalizeComboName(string value)
