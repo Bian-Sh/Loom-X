@@ -13,3 +13,5 @@
 - [x] 3.1 运行 `dotnet test OllamaHub.slnx`，验证核心与桌面行为测试通过。
 - [x] 3.2 运行 `dotnet build OllamaHub.slnx`，验证解决方案仅由桌面和测试工程构成且构建成功。
 - [x] 3.3 发布桌面工程到 `outputs` 下的可读时间命名目录，验证产物存在且未生成独立 `OllamaHub.exe`。
+
+<!-- review skipped: skill unavailable -->
