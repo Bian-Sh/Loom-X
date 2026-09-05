@@ -66,6 +66,7 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 - `PUT /api/admin/providers/{id}`
 - `DELETE /api/admin/providers/{id}`
 - `POST /api/admin/providers/{providerId}/models`
+- `PUT /api/admin/providers/{providerId}/models/order`
 - `PUT /api/admin/models/{id}`
 - `DELETE /api/admin/models/{id}`
 

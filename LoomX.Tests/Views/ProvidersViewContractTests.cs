@@ -26,13 +26,17 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
-    public void ModelRowsDoNotReserveSpaceForDragHandle()
+    public void ModelRowsExposeDragHandleAndReadonlyMetadataLayout()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
 
-        Assert.Equal(2, source.Split("ColumnDefinitions=\"1.5*,*,80,100,56\"", StringSplitOptions.None).Length - 1);
-        Assert.DoesNotContain("M 6,8 L 11,8 M 6,16 L 11,16", source, StringComparison.Ordinal);
+        Assert.Equal(2, source.Split("ColumnDefinitions=\"26,2*,1.1*,95,95,58,38\"", StringSplitOptions.None).Length - 1);
+        Assert.Contains("Classes=\"model-drag-handle\"", source, StringComparison.Ordinal);
+        Assert.Contains("PointerPressed=\"ModelHandle_OnPointerPressed\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"添加模型\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"模型配置\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectedModel.DisplayName", source, StringComparison.Ordinal);
     }
 
     [Fact]

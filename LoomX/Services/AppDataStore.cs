@@ -146,6 +146,13 @@ public sealed class AppDataStore : IDisposable
         return result;
     }
 
+    public async Task<IReadOnlyList<ModelResponse>> UpdateModelOrderAsync(Guid providerId, ModelOrderInput input, CancellationToken cancellationToken = default)
+    {
+        var result = await configService.UpdateModelOrderAsync(providerId, input, cancellationToken);
+        await RefreshAsync(cancellationToken);
+        return result;
+    }
+
     public async Task DeleteModelAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await configService.DeleteModelAsync(id, cancellationToken);

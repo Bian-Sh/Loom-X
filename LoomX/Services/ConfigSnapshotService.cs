@@ -120,6 +120,7 @@ public sealed class ConfigSnapshotService : IDisposable
     public Task DeleteProviderAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteProviderAsync(id, token); return true; }, cancellationToken);
     public Task<ModelResponse> CreateModelAsync(Guid providerId, ModelInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateModelAsync(providerId, input, token), cancellationToken);
     public Task<ModelResponse> UpdateModelAsync(Guid id, ModelInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateModelAsync(id, input, token), cancellationToken);
+    public Task<IReadOnlyList<ModelResponse>> UpdateModelOrderAsync(Guid providerId, ModelOrderInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateModelOrderAsync(providerId, input, token), cancellationToken);
     public Task DeleteModelAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteModelAsync(id, token); return true; }, cancellationToken);
     public async Task<IReadOnlyList<GatewayModelSourceResponse>> ListEnabledGatewayModelsAsync(CancellationToken cancellationToken = default)
     {

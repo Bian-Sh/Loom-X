@@ -49,6 +49,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.HasIndex(item => new { item.ProviderId, item.ModelId }).IsUnique();
             entity.Property(item => item.ModelId).HasMaxLength(256).IsRequired();
             entity.Property(item => item.DisplayName).HasMaxLength(256).IsRequired();
+            entity.Property(item => item.OwnedBy).HasMaxLength(256);
+            entity.Property(item => item.RemoteFamily).HasMaxLength(128);
         });
         modelBuilder.Entity<GatewayEndpointEntity>(entity =>
         {
@@ -141,6 +143,11 @@ public sealed class ModelEntity
     public double? TopP { get; set; }
     public string HeadersJson { get; set; } = "{}";
     public string ExtraJson { get; set; } = "{}";
+    public string? OwnedBy { get; set; }
+    public string? RemoteFamily { get; set; }
+    public int? RemoteContextLength { get; set; }
+    public int? RemoteMaxTokens { get; set; }
+    public bool? RemoteVision { get; set; }
     public bool Enabled { get; set; } = true;
     public int SortOrder { get; set; }
 }
@@ -248,7 +255,7 @@ public static class ConfigurationDatabase
                     "Id", "BusinessId", "DisplayName", "BaseUrl", "ModelListUrl", "ApiMode", "EndpointFormat", "Enabled", "UseProxy", "ProtectedApiKey", "HeadersJson", "SortOrder")
                 || !await HasColumnsAsync(connection, "Models", cancellationToken,
                     "Id", "ProviderId", "ModelId", "DisplayName", "ConfigId", "Family", "BaseUrl", "ProtectedApiKey", "ApiMode",
-                    "ContextLength", "MaxTokens", "Vision", "Temperature", "TopP", "HeadersJson", "ExtraJson", "Enabled", "SortOrder")
+                    "ContextLength", "MaxTokens", "Vision", "Temperature", "TopP", "HeadersJson", "ExtraJson", "OwnedBy", "RemoteFamily", "RemoteContextLength", "RemoteMaxTokens", "RemoteVision", "Enabled", "SortOrder")
                 || !await HasColumnsAsync(connection, "GatewayEndpoints", cancellationToken, "Key", "DisplayName", "PublicPath", "Enabled")
                 || !await HasColumnsAsync(connection, "GatewayCombos", cancellationToken, "Id", "EndpointKey", "Name", "Enabled", "SortOrder")
                 || !await HasColumnsAsync(connection, "GatewayRoutes", cancellationToken, "Id", "EndpointKey", "ComboId", "ModelId", "Enabled", "SortOrder"))
@@ -371,6 +378,23 @@ public static class ConfigurationDatabase
         {
         }
 
+        foreach (var statement in new[]
+        {
+            "ALTER TABLE Models ADD COLUMN OwnedBy TEXT NULL",
+            "ALTER TABLE Models ADD COLUMN RemoteFamily TEXT NULL",
+            "ALTER TABLE Models ADD COLUMN RemoteContextLength INTEGER NULL",
+            "ALTER TABLE Models ADD COLUMN RemoteMaxTokens INTEGER NULL",
+            "ALTER TABLE Models ADD COLUMN RemoteVision INTEGER NULL"
+        })
+        {
+            try
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);
+            }
+            catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+            {
+            }
+        }
         await dbContext.Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS GatewayEndpoints (
                 Key TEXT NOT NULL CONSTRAINT PK_GatewayEndpoints PRIMARY KEY,

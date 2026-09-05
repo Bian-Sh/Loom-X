@@ -1,12 +1,24 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using LoomX;
 using LoomX.ViewModels;
 
 namespace LoomX.Views;
 public partial class ProvidersView : UserControl
 {
-    public ProvidersView() => InitializeComponent();
+    private ListBox? modelDragList;
+    private bool ignoreModelCaptureLost;
+
+    public ProvidersView()
+    {
+        InitializeComponent();
+        AddHandler(InputElement.PointerMovedEvent, ModelDrag_OnPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
+        AddHandler(InputElement.PointerReleasedEvent, ModelDrag_OnPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
+        AddHandler(InputElement.PointerCaptureLostEvent, ModelDrag_OnPointerCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
+    }
 
     private void AddHeaderButton_OnClick(object? sender, RoutedEventArgs e)
     {
@@ -60,4 +72,67 @@ public partial class ProvidersView : UserControl
 
         if (await dialog.ShowDialog<bool>(owner)) viewModel.DeleteProviderCommand.Execute(provider);
     }
+
+    private void ModelHandle_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Border { Tag: ModelEditorViewModel model } || DataContext is not ProvidersViewModel viewModel) return;
+        var list = sender is Visual visual ? visual.FindAncestorOfType<ListBox>() : null;
+        if (list is null || !viewModel.BeginModelDrag(model)) return;
+        modelDragList = list;
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
+    private void ModelDrag_OnPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (DataContext is not ProvidersViewModel viewModel || !viewModel.IsModelDragActive || modelDragList is null || e.Pointer.Captured != this) return;
+        var pointer = e.GetPosition(modelDragList);
+        var targetIndex = GetModelInsertionSlot(pointer.Y, GetModelRows());
+        if (viewModel.MoveModelDrag(targetIndex)) modelDragList.UpdateLayout();
+        e.Handled = true;
+    }
+
+    private async void ModelDrag_OnPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (DataContext is not ProvidersViewModel viewModel || !viewModel.IsModelDragActive || e.Pointer.Captured != this) return;
+        ignoreModelCaptureLost = true;
+        e.Pointer.Capture(null);
+        modelDragList = null;
+        await viewModel.CompleteModelDragAsync();
+        ignoreModelCaptureLost = false;
+        e.Handled = true;
+    }
+
+    private void ModelDrag_OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (ignoreModelCaptureLost || DataContext is not ProvidersViewModel viewModel || !viewModel.IsModelDragActive) return;
+        modelDragList = null;
+        viewModel.CancelModelDrag();
+    }
+
+    private IReadOnlyList<ModelRow> GetModelRows()
+    {
+        if (modelDragList is null) return [];
+        var rows = new List<ModelRow>();
+        for (var index = 0; index < modelDragList.ItemCount; index++)
+        {
+            if (modelDragList.ContainerFromIndex(index) is not Visual container || container.DataContext is not ModelEditorViewModel model) continue;
+            var top = container.TranslatePoint(new Avalonia.Point(0, 0), modelDragList)?.Y;
+            if (top is not null) rows.Add(new ModelRow(model, top.Value, container.Bounds.Height));
+        }
+        return rows;
+    }
+
+    private static int GetModelInsertionSlot(double pointerY, IReadOnlyList<ModelRow> rows)
+    {
+        var slot = 0;
+        foreach (var row in rows)
+        {
+            if (pointerY < row.Top + row.Height / 2) break;
+            slot++;
+        }
+        return slot;
+    }
+
+    private sealed record ModelRow(ModelEditorViewModel Model, double Top, double Height);
 }
