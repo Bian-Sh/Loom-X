@@ -60,7 +60,10 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("xmlns:nodegraph=\"using:LoomX.NodeGraph\"", source, StringComparison.Ordinal);
         Assert.Contains("<nodegraph:RuntimeGraphControl", source, StringComparison.Ordinal);
         Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
-        Assert.Contains("滚轮缩放 · 拖动平移 · 适应画布", source, StringComparison.Ordinal);
+        Assert.Contains("滚轮缩放 · 拖动平移", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("滚轮缩放 · 拖动平移 · 适应画布", source, StringComparison.Ordinal);
+        Assert.Contains("Background=\"Transparent\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"{DynamicResource GraphBackgroundBrush}\"", source, StringComparison.Ordinal);
         Assert.Contains("ToolTip.Tip=\"适应画布\"", source, StringComparison.Ordinal);
         Assert.Contains("<PathIcon Data=", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"", source, StringComparison.Ordinal);

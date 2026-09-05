@@ -6,19 +6,19 @@
     <Style Selector="Button.graph-tool:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="Foreground" Value="{DynamicResource GraphBackgroundBrush}"/></Style>
     <Style Selector="Button.graph-tool:pressed"><Setter Property="Background" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="Foreground" Value="{DynamicResource GraphBackgroundBrush}"/></Style>
     <Style Selector="Button.graph-tool:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="Foreground" Value="{DynamicResource GraphBackgroundBrush}"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link"><Setter Property="MinHeight" Value="24"/><Setter Property="Padding" Value="4,2"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="11"/><Setter Property="Foreground" Value="{DynamicResource GraphTextBrush}"/><Setter Property="Cursor" Value="Hand"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link:pointerover"><Setter Property="Foreground" Value="{DynamicResource GraphLiveBrush}"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource GraphLiveBrush}"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link:checked"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Foreground" Value="{DynamicResource GraphLiveBrush}"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link:checked /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource GraphLiveBrush}"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link:pressed"><Setter Property="Foreground" Value="{DynamicResource GraphLiveBrush}"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource GraphLiveBrush}"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link TextBlock.graph-endpoint-link-text"><Setter Property="Foreground" Value="{DynamicResource GraphTextBrush}"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link:pointerover TextBlock.graph-endpoint-link-text"><Setter Property="Foreground" Value="{DynamicResource GraphLiveBrush}"/></Style>
-    <Style Selector="ToggleButton.graph-endpoint-link:checked TextBlock.graph-endpoint-link-text"><Setter Property="Foreground" Value="{DynamicResource GraphLiveBrush}"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link"><Setter Property="MinHeight" Value="24"/><Setter Property="Padding" Value="4,2"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="11"/><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="Cursor" Value="Hand"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link:pointerover"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link:checked"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link:checked /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link:pressed"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link TextBlock.graph-endpoint-link-text"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link:pointerover TextBlock.graph-endpoint-link-text"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="ToggleButton.graph-endpoint-link:checked TextBlock.graph-endpoint-link-text"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
   </UserControl.Styles>
   <Grid RowDefinitions="*,Auto" RowSpacing="16">
-    <Border Grid.Row="0" Background="{DynamicResource GraphBackgroundBrush}" BorderBrush="{DynamicResource GraphBorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360" VerticalAlignment="Stretch">
+    <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource GraphBorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360" VerticalAlignment="Stretch">
       <Grid>
         <ItemsControl ItemsSource="{Binding Endpoints}">
           <ItemsControl.ItemsPanel>
@@ -30,7 +30,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <TextBlock Text="滚轮缩放 · 拖动平移 · 适应画布" Foreground="{DynamicResource GraphMutedBrush}" FontSize="11" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,10,0,0" IsHitTestVisible="False"/>
+        <TextBlock Text="滚轮缩放 · 拖动平移" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,10,0,0" IsHitTestVisible="False"/>
         <ItemsControl ItemsSource="{Binding Endpoints}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,12" IsHitTestVisible="True">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6"/></ItemsPanelTemplate>

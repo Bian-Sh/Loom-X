@@ -16,7 +16,7 @@ public sealed class RuntimeGraphControl : Control
     public const double MinZoom = 0.25;
     public const double MaxZoom = 2.5;
     public const double ZoomStep = 1.2;
-    public const double KindWatermarkMinZoom = 1.0;
+    public const double KindWatermarkMinZoom = 0.55;
     public const double PanStartThreshold = 4;
 
     public static readonly StyledProperty<RuntimeGraphSnapshot?> SnapshotProperty =
@@ -93,17 +93,14 @@ public sealed class RuntimeGraphControl : Control
         var layout = ResolveLayout();
         if (layout is null) return;
 
-        var background = ResolveBrush("GraphBackgroundBrush", Brushes.Transparent);
-        var border = ResolveBrush("GraphBorderBrush", Brushes.Gray);
-        var text = ResolveBrush("GraphTextBrush", Brushes.White);
-        var muted = ResolveBrush("GraphMutedBrush", Brushes.LightGray);
-        var live = ResolveBrush("GraphLiveBrush", Brushes.LightGreen);
+        var border = ResolveBrush("BorderBrush", Brushes.Gray);
+        var text = ResolveBrush("TextPrimaryBrush", Brushes.Black);
+        var muted = ResolveBrush("TextSecondaryBrush", Brushes.Gray);
+        var live = ResolveBrush("AccentBrush", Brushes.Teal);
         var zoom = EffectiveZoom;
 
         using (context.PushClip(Bounds))
         {
-            context.DrawRectangle(background, null, new Rect(Bounds.Size));
-
             foreach (var edge in layout.Edges)
             {
                 var selected = IsEdgeRelated(edge.EdgeId);
@@ -380,7 +377,7 @@ public sealed class RuntimeGraphControl : Control
         var bounds = ToViewport(provider.Bounds);
         var selected = Selection is { Kind: RuntimeGraphSelectionKind.ProviderGroup } selection
             && string.Equals(selection.Id, provider.ProviderId, StringComparison.OrdinalIgnoreCase);
-        var groupBorder = selected ? ResolveBrush("GraphLiveBrush", Brushes.LightGreen) : border;
+        var groupBorder = selected ? ResolveBrush("AccentBrush", Brushes.Teal) : border;
         context.DrawRectangle(groupFill, new Pen(WithAlpha(groupBorder, selected ? 1 : 0.92), selected ? 2 : 1), bounds, 10 * zoom, 10 * zoom, default);
 
         var headerInset = Math.Max(1, zoom);
