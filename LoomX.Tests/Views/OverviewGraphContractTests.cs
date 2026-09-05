@@ -76,6 +76,8 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding IsGraphVisible}\"", source, StringComparison.Ordinal);
         Assert.Contains("Click=\"FocusEndpoint_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("Button.graph-endpoint:pointerover", source, StringComparison.Ordinal);
+        Assert.Contains("Button.graph-endpoint:pressed", source, StringComparison.Ordinal);
         Assert.Contains("viewModel.SelectEndpoint(endpoint)", codeBehind, StringComparison.Ordinal);
         Assert.Contains("FindActiveGraph()?.FitToView()", codeBehind, StringComparison.Ordinal);
     }

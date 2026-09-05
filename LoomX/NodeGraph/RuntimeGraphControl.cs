@@ -385,18 +385,40 @@ public sealed class RuntimeGraphControl : Control
         var groupBorder = selected ? ResolveBrush("GraphLiveBrush", Brushes.LightGreen) : border;
         context.DrawRectangle(groupFill, new Pen(WithAlpha(groupBorder, selected ? 1 : 0.92), selected ? 2 : 1), bounds, 10 * zoom, 10 * zoom, default);
 
-        var headerBounds = new Rect(bounds.X, bounds.Y, bounds.Width, 38 * zoom);
-        context.DrawRectangle(headerFill, null, headerBounds, 10 * zoom, 10 * zoom, default);
-        context.DrawRectangle(headerFill, null, new Rect(headerBounds.X, headerBounds.Y + 10 * zoom, headerBounds.Width, Math.Max(0, headerBounds.Height - 10 * zoom)));
-        context.DrawLine(new Pen(WithAlpha(groupBorder, 0.68), Math.Max(1, zoom)), new Point(bounds.Left + 12 * zoom, headerBounds.Bottom), new Point(bounds.Right - 12 * zoom, headerBounds.Bottom));
+        var headerInset = Math.Max(1, zoom);
+        var headerBounds = new Rect(
+            bounds.X + headerInset,
+            bounds.Y + headerInset,
+            Math.Max(0, bounds.Width - headerInset * 2),
+            Math.Max(0, 38 * zoom - headerInset));
+        context.DrawRectangle(headerFill, null, headerBounds);
+        context.DrawLine(
+            new Pen(WithAlpha(groupBorder, 0.68), Math.Max(1, zoom)),
+            new Point(headerBounds.Left, headerBounds.Bottom),
+            new Point(headerBounds.Right, headerBounds.Bottom));
 
         var providerName = Snapshot?.Providers.FirstOrDefault(item => string.Equals(item.Id, provider.ProviderId, StringComparison.OrdinalIgnoreCase))?.DisplayName
             ?? provider.ProviderId;
         if (zoom >= 0.25)
         {
-            DrawText(context, providerName, new Rect(bounds.X + 14 * zoom, bounds.Y + 5 * zoom, Math.Max(0, bounds.Width - 28 * zoom), 20 * zoom), text, Math.Max(9, 14 * zoom), FontWeight.SemiBold, TextAlignment.Left);
+            var countWidth = Math.Min(100 * zoom, Math.Max(0, headerBounds.Width * 0.42));
+            DrawText(
+                context,
+                providerName,
+                new Rect(headerBounds.X + 12 * zoom, headerBounds.Y, Math.Max(0, headerBounds.Width - countWidth - 24 * zoom), headerBounds.Height),
+                text,
+                Math.Max(9, 14 * zoom),
+                FontWeight.SemiBold,
+                TextAlignment.Left);
             if (zoom >= 0.4)
-                DrawText(context, $"{provider.ModelIds.Count} 个模型", new Rect(bounds.X + 14 * zoom, bounds.Y + 21 * zoom, Math.Max(0, bounds.Width - 28 * zoom), 14 * zoom), muted, Math.Max(8, 10 * zoom), FontWeight.Normal, TextAlignment.Left);
+                DrawText(
+                    context,
+                    $"{provider.ModelIds.Count} 个模型",
+                    new Rect(headerBounds.Right - countWidth - 12 * zoom, headerBounds.Y, Math.Max(0, countWidth), headerBounds.Height),
+                    muted,
+                    Math.Max(8, 10 * zoom),
+                    FontWeight.Normal,
+                    TextAlignment.Right);
         }
     }
 

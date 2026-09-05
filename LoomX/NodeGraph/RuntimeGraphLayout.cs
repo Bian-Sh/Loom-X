@@ -54,7 +54,20 @@ public static class RuntimeGraphLayout
             .ThenBy(node => node.SortOrder)
             .ThenBy(node => node.Id, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var providers = snapshot.Providers.OrderBy(provider => provider.Id, StringComparer.OrdinalIgnoreCase).ToArray();
+        var comboOrder = combos
+            .Select((combo, index) => (combo.Id, index))
+            .ToDictionary(item => item.Id, item => item.index, StringComparer.OrdinalIgnoreCase);
+        var providers = snapshot.Providers
+            .Select(provider => new
+            {
+                Provider = provider,
+                Order = ProviderOrder(provider.Id, snapshot.Edges, comboOrder)
+            })
+            .OrderBy(item => item.Order.Barycenter)
+            .ThenBy(item => item.Order.FirstComboIndex)
+            .ThenBy(item => item.Provider.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(item => item.Provider)
+            .ToArray();
         var contentHeight = Math.Max(
             Math.Max(ColumnHeight(endpoints.Length, options.NodeHeight, options.RowGap), ColumnHeight(combos.Length, options.NodeHeight, options.RowGap)),
             providers.Sum(provider => ProviderHeight(provider.Models.Count, options)) + Math.Max(0, providers.Length - 1) * options.ProviderGap);
@@ -173,6 +186,24 @@ public static class RuntimeGraphLayout
         return Math.Max(
             options.EmptyProviderHeight,
             options.ProviderHeaderHeight + options.ProviderPadding * 2 + modelsHeight);
+    }
+
+    private static (double Barycenter, int FirstComboIndex) ProviderOrder(
+        string providerId,
+        IReadOnlyList<RuntimeGraphEdge> edges,
+        IReadOnlyDictionary<string, int> comboOrder)
+    {
+        var comboIndexes = edges
+            .Where(edge => edge.Kind == RuntimeGraphEdgeKind.ComboToProvider
+                && string.Equals(edge.TargetId, providerId, StringComparison.OrdinalIgnoreCase))
+            .Select(edge => comboOrder.GetValueOrDefault(edge.SourceId, int.MaxValue))
+            .Where(index => index != int.MaxValue)
+            .Distinct()
+            .OrderBy(index => index)
+            .ToArray();
+        return comboIndexes.Length == 0
+            ? (double.PositiveInfinity, int.MaxValue)
+            : (comboIndexes.Average(), comboIndexes[0]);
     }
 
     private static void Validate(RuntimeGraphLayoutOptions options)

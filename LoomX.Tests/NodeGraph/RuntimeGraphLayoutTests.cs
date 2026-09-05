@@ -77,6 +77,38 @@ public sealed class RuntimeGraphLayoutTests
         Assert.Contains(layout.Nodes, item => item.Key == "provider-a|model-a");
     }
 
+    [Fact]
+    public void ProviderGroupsFollowTheirConnectedComboOrder()
+    {
+        var endpoint = new RuntimeGraphNode("endpoint-a", RuntimeGraphNodeKind.Endpoint, "OpenAI", true);
+        var combos = new[]
+        {
+            new RuntimeGraphNode("endpoint-a|first", RuntimeGraphNodeKind.Combo, "first", true, EndpointId: endpoint.Id, SortOrder: 0),
+            new RuntimeGraphNode("endpoint-a|second", RuntimeGraphNodeKind.Combo, "second", true, EndpointId: endpoint.Id, SortOrder: 1),
+            new RuntimeGraphNode("endpoint-a|third", RuntimeGraphNodeKind.Combo, "third", true, EndpointId: endpoint.Id, SortOrder: 2)
+        };
+        var providers = new[]
+        {
+            new RuntimeGraphProviderGroup("provider-third", "Third", true, null, "openai", []),
+            new RuntimeGraphProviderGroup("provider-first", "First", true, null, "openai", []),
+            new RuntimeGraphProviderGroup("provider-second", "Second", true, null, "openai", [])
+        };
+        var edges = combos.Select((combo, index) => new RuntimeGraphEdge(
+            $"combo-provider|{combo.Id}|provider-{new[] { "first", "second", "third" }[index]}",
+            RuntimeGraphEdgeKind.ComboToProvider,
+            combo.Id,
+            $"provider-{new[] { "first", "second", "third" }[index]}",
+            true,
+            endpoint.Id,
+            combo.Id,
+            $"provider-{new[] { "first", "second", "third" }[index]}")).ToArray();
+        var snapshot = new RuntimeGraphSnapshot([endpoint], combos, providers, edges, []);
+        var layout = RuntimeGraphLayout.Create(snapshot);
+
+        Assert.True(layout.ProviderGroups["provider-first"].Bounds.Top < layout.ProviderGroups["provider-second"].Bounds.Top);
+        Assert.True(layout.ProviderGroups["provider-second"].Bounds.Top < layout.ProviderGroups["provider-third"].Bounds.Top);
+    }
+
     private static RuntimeGraphSnapshot CreateSnapshot(bool reverse)
     {
         var endpoints = new[]
