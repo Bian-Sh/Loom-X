@@ -362,6 +362,7 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /.codegraph
+/.superpowers/
 
 # OllamaHub 发布产物
 /outputs/
