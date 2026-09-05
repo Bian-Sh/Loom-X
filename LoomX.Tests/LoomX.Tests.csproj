@@ -24,6 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OllamaHub.Desktop\OllamaHub.Desktop.csproj" />
+    <ProjectReference Include="..\LoomX\LoomX.csproj" />
   </ItemGroup>
 </Project>

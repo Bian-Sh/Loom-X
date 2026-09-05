@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="LoomX.Tests/LoomX.Tests.csproj" />
+  <Project Path="LoomX/LoomX.csproj" />
+</Solution>

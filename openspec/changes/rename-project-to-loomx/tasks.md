@@ -1,6 +1,6 @@
 ## 1. 结构与技术标识改名
 
-- [ ] 1.1 使用 `git mv` 将 `OllamaHub.slnx`、`OllamaHub.Desktop/`、`OllamaHub.Tests/`、项目文件和 `OllamaHubHost.cs` 重命名为 LoomX 对应名称，并保留既有流程产物
+- [x] 1.1 使用 `git mv` 将 `OllamaHub.slnx`、`OllamaHub.Desktop/`、`OllamaHub.Tests/`、项目文件和 `OllamaHubHost.cs` 重命名为 LoomX 对应名称，并保留既有流程产物
 - [ ] 1.2 更新解决方案项目路径、项目引用、程序集属性和 `InternalsVisibleTo`，使 `LoomX.slnx` 仅引用 `LoomX` 与 `LoomX.Tests`
 - [ ] 1.3 将活动源码和测试中的 `OllamaHub.*` namespace、`using`、类型名、Avalonia `x:Class`、`using:` 声明和 `avares://` URI 改为 `LoomX.*`
 - [ ] 1.4 更新静态源码路径断言、测试临时目录名称和所有构建/测试命令引用，确保测试不依赖旧目录
