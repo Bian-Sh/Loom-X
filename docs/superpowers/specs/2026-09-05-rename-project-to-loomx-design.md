@@ -6,6 +6,8 @@ canonical_spec: openspec
 
 # LoomX 项目更名技术设计
 
+状态：已确认，实施完成
+
 ## 1. 设计目标
 
 本设计细化 `rename-project-to-loomx` 的实现方式。目标是把当前已经是单一桌面应用的 OllamaHub 工程收敛为 LoomX，同时安全迁移用户本地数据。

@@ -35,6 +35,28 @@ public sealed class LoomXHostTests
     }
 
     [Fact]
+    public void 既有协议路由仍然注册()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "LoomXHost.cs");
+        var source = File.ReadAllText(Path.GetFullPath(path));
+
+        foreach (var route in new[]
+        {
+            "MapGet(\"/api/tags\"",
+            "MapPost(\"/api/chat\"",
+            "MapGet(\"/v1/models\"",
+            "MapPost(\"/v1/chat/completions\"",
+            "MapGet(\"/openai/v1/models\"",
+            "MapPost(\"/openai/v1/chat/completions\"",
+            "MapGet(\"/azure/v1/models\"",
+            "MapPost(\"/azure/v1/responses\""
+        })
+        {
+            Assert.Contains(route, source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void BuildGatewayAttemptPayload_ForwardsModelReasoningEffortWithoutMutatingRequest()
     {
         var request = JsonNode.Parse("""

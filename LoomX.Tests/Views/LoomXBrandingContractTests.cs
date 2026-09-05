@@ -49,9 +49,25 @@ public sealed class LoomXBrandingContractTests
         Assert.True(configServiceIndex > migrationIndex);
     }
 
+    [Fact]
+    public void 发布脚本只发布Loomx唯一入口()
+    {
+        var script = ReadRepositoryFile("scripts", "publish-desktop.ps1");
+
+        Assert.Contains("LoomX\\LoomX.csproj", script, StringComparison.Ordinal);
+        Assert.Contains("$executables.Count -ne 1", script, StringComparison.Ordinal);
+        Assert.Contains("LoomX.exe", script, StringComparison.Ordinal);
+        Assert.DoesNotContain("OllamaHub.Desktop", script, StringComparison.Ordinal);
+    }
+
     private static string ReadSource(params string[] segments)
     {
-        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);
+        return ReadRepositoryFile(["LoomX", .. segments]);
+    }
+
+    private static string ReadRepositoryFile(params string[] segments)
+    {
+        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", .. segments]);
         return File.ReadAllText(Path.GetFullPath(path));
     }
 }

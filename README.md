@@ -85,7 +85,7 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 
 `pwsh -File scripts\publish-desktop.ps1 -Configuration Release`
 
-发布目录位于 `outputs\<时间戳>\`，只包含一个应用入口 `LoomX.exe`；网关在桌面进程内运行，不会生成或启动独立的 `LoomX.Desktop.exe` 或旧名称入口。
+发布目录位于 `outputs\<时间戳>\`，只包含一个应用入口 `LoomX.exe`；网关在桌面进程内运行，不会生成额外的桌面入口或旧名称入口。
 
 ## Visual Studio Copilot Chat BYOM
 
