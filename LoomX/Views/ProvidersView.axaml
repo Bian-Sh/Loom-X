@@ -52,11 +52,11 @@
                   <Border Padding="10,8" Background="Transparent" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
                     <Panel>
                       <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
-                        <StackPanel Orientation="Horizontal" Spacing="5">
+                        <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                           <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                          <Ellipse Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" IsVisible="{Binding Enabled}"/>
+                          <Ellipse Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" ToolTip.Tip="绿色表示已启用" IsVisible="{Binding Enabled}"/>
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="启用 Provider" AutomationProperties.Name="启用 Provider" VerticalAlignment="Center"/>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="启用 Provider" AutomationProperties.Name="启用 Provider" VerticalAlignment="Center"><ToggleSwitch.RenderTransform><TranslateTransform X="12"/></ToggleSwitch.RenderTransform></ToggleSwitch>
                         <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding BaseUrl}" Classes="muted" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,5,0,0"/>
                         <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="9" Margin="0,4,42,0">
                           <TextBlock Text="{Binding ApiMode}" Classes="muted"/>

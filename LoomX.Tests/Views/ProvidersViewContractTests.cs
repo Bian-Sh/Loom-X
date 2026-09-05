@@ -202,6 +202,9 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("Text=\"{Binding ProviderSearchQuery, UpdateSourceTrigger=PropertyChanged}\"", source, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding FilteredProviders}\"", source, StringComparison.Ordinal);
         Assert.Contains("Grid RowDefinitions=\"Auto,Auto,Auto\"", source, StringComparison.Ordinal);
+        Assert.Contains("Orientation=\"Horizontal\" Spacing=\"5\" VerticalAlignment=\"Center\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"绿色表示已启用\"", source, StringComparison.Ordinal);
+        Assert.Contains("<TranslateTransform X=\"12\"/>", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Right\" VerticalAlignment=\"Bottom\"", source, StringComparison.Ordinal);
         Assert.Equal(2, source.Split(deletePath, StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("Text=\"P\" Foreground=\"{DynamicResource AccentBrush}\"", source, StringComparison.Ordinal);
