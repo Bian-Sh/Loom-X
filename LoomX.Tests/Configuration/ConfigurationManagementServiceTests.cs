@@ -675,6 +675,40 @@ public sealed class ConfigurationManagementServiceTests
         }
     }
 
+    [Fact]
+    public async Task ModelMetadataAndOrder_ArePersistedSeparatelyFromRuntimeFallbacks()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+            var provider = await service.CreateProviderAsync(new ProviderInput("metadata", "元数据 Provider", "https://example.com", "openai", true, null, false, null));
+            var first = await service.CreateModelAsync(provider.Id, new ModelInput("first", "first", null, "unknown", null, null, 128000, 4096, false, null, null, true, null, false, null, null, "relay", null, null, null, null, 0));
+            var second = await service.CreateModelAsync(provider.Id, new ModelInput("second", "second", null, "unknown", null, null, 128000, 4096, false, null, null, true, null, false, null, null, "relay", "gpt", 400000, 128000, true, 1));
+
+            var ordered = await service.UpdateModelOrderAsync(provider.Id, new ModelOrderInput([second.Id, first.Id]));
+
+            Assert.Equal(new[] { second.Id, first.Id }, ordered.Select(item => item.Id));
+            Assert.Equal("relay", ordered[0].OwnedBy);
+            Assert.Equal(400000, ordered[0].RemoteContextLength);
+            Assert.Equal(128000, ordered[0].RemoteMaxTokens);
+            Assert.True(ordered[0].RemoteVision);
+            await using var verifyContext = new ConfigurationDbContext(options);
+            var stored = await verifyContext.Models.SingleAsync(item => item.Id == second.Id);
+            Assert.Equal(0, stored.SortOrder);
+            Assert.Equal(400000, stored.RemoteContextLength);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
     private sealed class TestDbContextFactory(DbContextOptions<ConfigurationDbContext> options) : IDbContextFactory<ConfigurationDbContext>
     {
         public ConfigurationDbContext CreateDbContext() => new(options);
