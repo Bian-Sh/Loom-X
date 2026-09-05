@@ -41,8 +41,8 @@ public sealed class AppStartupAndProviderRefreshContractTests
     [Fact]
     public void ConfigurationReloadIsExplicitInsteadOfPeriodicOrFileDriven()
     {
-        var hostPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub", "OllamaHubHost.cs");
-        var providerPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub", "Configuration", "DatabaseConfigurationProvider.cs");
+        var hostPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "OllamaHubHost.cs");
+        var providerPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Configuration", "DatabaseConfigurationProvider.cs");
         var snapshotPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Services", "ConfigSnapshotService.cs");
         var storePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "OllamaHub.Desktop", "Services", "AppDataStore.cs");
 

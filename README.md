@@ -34,10 +34,6 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 
 ## 启动
 
-开发运行网关：
-
-`dotnet run --project OllamaHub`
-
 开发运行桌面控制中心：
 
 `dotnet run --project OllamaHub.Desktop`
@@ -48,12 +44,6 @@ Provider/Model 的保存会立即刷新运行时内存快照；监听地址的�
 2. 输入 API Key 后保存；留空表示保留已有密钥。
 3. 保存 Provider 后新增模型，填写模型 ID、显示名称和 Family。
 4. 保存模型后，可从 `/api/tags` 查看对外暴露的模型。
-
-命令行也支持写入受保护 API Key：
-
-`dotnet run --project OllamaHub -- SetApiKey <providerOrModelId> <apiKey>`
-
-该命令直接更新 `%LOCALAPPDATA%\OllamaHub\OllamaHub.db`，不依赖 JSON 配置文件。
 
 ## HTTP 接口
 
