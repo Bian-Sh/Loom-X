@@ -33,8 +33,8 @@ public sealed class MainWindowChromeContractTests
         Assert.DoesNotContain("StrokeThickness=\"1.1\"", source, StringComparison.Ordinal);
         Assert.Contains("Width=\"12\" Height=\"12\"", source, StringComparison.Ordinal);
         Assert.Contains("<Border Width=\"12\" Height=\"1\"", source, StringComparison.Ordinal);
-        Assert.Contains("RowDefinitions=\"80,*\"", source, StringComparison.Ordinal);
-        Assert.Contains("FontSize=\"22\"", source, StringComparison.Ordinal);
+        Assert.Contains("RowDefinitions=\"104,*\"", source, StringComparison.Ordinal);
+        Assert.Contains("FontSize=\"26\"", source, StringComparison.Ordinal);
     }
 
     private static string ReadDesktopFile(params string[] segments)

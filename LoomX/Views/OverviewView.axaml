@@ -6,29 +6,26 @@
   </UserControl.Styles>
   <Grid RowDefinitions="*,Auto" RowSpacing="16">
     <Border Grid.Row="0" Background="{DynamicResource GraphBackgroundBrush}" BorderBrush="{DynamicResource GraphBorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360" VerticalAlignment="Stretch">
-      <Grid RowDefinitions="Auto,*">
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,4,10,3" MinHeight="30">
-          <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-            <TextBlock Text="Endpoint" Foreground="{DynamicResource GraphMutedBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,3,0"/>
-            <ItemsControl ItemsSource="{Binding Endpoints}" HorizontalAlignment="Left">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4"/></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <Button Classes="graph-endpoint" Content="{Binding DisplayName}" ToolTip.Tip="聚焦 Endpoint" Click="FocusEndpoint_OnClick" IsEnabled="{Binding Enabled}"/>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+      <Grid>
+        <nodegraph:RuntimeGraphControl x:Name="RuntimeGraph" Snapshot="{Binding GraphSnapshot}" MinHeight="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+        <Grid Panel.ZIndex="1" ColumnDefinitions="*,Auto" Margin="10,8,10,0" IsHitTestVisible="True">
+          <ItemsControl ItemsSource="{Binding Endpoints}" HorizontalAlignment="Left" VerticalAlignment="Top">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4"/></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Classes="graph-endpoint" Content="{Binding DisplayName}" ToolTip.Tip="聚焦 Endpoint" Click="FocusEndpoint_OnClick" IsEnabled="{Binding Enabled}"/>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
             <TextBlock Text="{Binding GraphStatus}" Foreground="{DynamicResource GraphMutedBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <Button Classes="graph-tool" Content="-" ToolTip.Tip="缩小" Click="ZoomOut_OnClick"/>
             <Button Classes="graph-tool" Content="+" ToolTip.Tip="放大" Click="ZoomIn_OnClick"/>
             <Button Classes="graph-tool" Content="[]" ToolTip.Tip="适合视图" Click="FitGraph_OnClick"/>
           </StackPanel>
         </Grid>
-        <nodegraph:RuntimeGraphControl x:Name="RuntimeGraph" Grid.Row="1" Snapshot="{Binding GraphSnapshot}" MinHeight="320" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
       </Grid>
     </Border>
     <Grid Grid.Row="1" ColumnDefinitions="1.15*,0.85*" ColumnSpacing="12">

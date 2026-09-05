@@ -60,6 +60,8 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("xmlns:nodegraph=\"using:LoomX.NodeGraph\"", source, StringComparison.Ordinal);
         Assert.Contains("<nodegraph:RuntimeGraphControl", source, StringComparison.Ordinal);
         Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Panel.ZIndex=\"1\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"Endpoint\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<NativeWebView", source, StringComparison.Ordinal);
     }
 
