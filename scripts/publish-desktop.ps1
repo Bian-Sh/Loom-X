@@ -1,6 +1,7 @@
 param(
     [string]$Configuration = "Release",
-    [string]$IdePath = "D:\Program Files\Microsoft Visual Studio\2026\Community\Common7\IDE\devenv.exe"
+    [string]$IdePath = "",
+    [string]$OutputDirectory = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,16 +13,27 @@ if (-not (Test-Path -LiteralPath $projectPath)) {
     throw "找不到桌面项目：$projectPath"
 }
 
-if (-not (Test-Path -LiteralPath $IdePath)) {
+if ($IdePath -and -not (Test-Path -LiteralPath $IdePath)) {
     throw "找不到 Visual Studio IDE：$IdePath"
 }
 
-$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$publishRoot = Join-Path $outputsRoot $stamp
-$suffix = 1
-while (Test-Path -LiteralPath $publishRoot) {
-    $publishRoot = Join-Path $outputsRoot ("{0}-{1:D2}" -f $stamp, $suffix)
-    $suffix++
+if ($OutputDirectory) {
+    $publishRoot = if ([System.IO.Path]::IsPathRooted($OutputDirectory)) {
+        $OutputDirectory
+    } else {
+        Join-Path $repositoryRoot $OutputDirectory
+    }
+    if (Test-Path -LiteralPath $publishRoot) {
+        Remove-Item -LiteralPath $publishRoot -Recurse -Force
+    }
+} else {
+    $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $publishRoot = Join-Path $outputsRoot $stamp
+    $suffix = 1
+    while (Test-Path -LiteralPath $publishRoot) {
+        $publishRoot = Join-Path $outputsRoot ("{0}-{1:D2}" -f $stamp, $suffix)
+        $suffix++
+    }
 }
 
 $publishDirectory = $publishRoot
@@ -30,7 +42,7 @@ $logPath = Join-Path $publishRoot "publish.log"
 New-Item -ItemType Directory -Force -Path $publishDirectory | Out-Null
 @(
     "发布时间：$(Get-Date -Format o)",
-    "Visual Studio：$IdePath",
+    "Visual Studio：$(if ($IdePath) { $IdePath } else { '(未指定)' })",
     "项目：$projectPath",
     "运行时：win-x64",
     "自包含：true",
