@@ -64,6 +64,19 @@ public sealed class RuntimeGraphLayoutTests
         Assert.Equal(layout.ProviderGroups["provider-a"].Bounds.Left, comboProvider.Target.X);
     }
 
+    [Fact]
+    public void ProviderToModelSemanticEdgeIsNotRenderedAsVisualConnection()
+    {
+        var snapshot = CreateSnapshot(reverse: false);
+        var layout = RuntimeGraphLayout.Create(snapshot);
+
+        Assert.Contains(snapshot.Edges, edge =>
+            edge.Kind == RuntimeGraphEdgeKind.ProviderToModel
+            && edge.Id == "provider-model|provider-a|model-a");
+        Assert.DoesNotContain(layout.Edges, edge => edge.EdgeId == "provider-model|provider-a|model-a");
+        Assert.Contains(layout.Nodes, item => item.Key == "provider-a|model-a");
+    }
+
     private static RuntimeGraphSnapshot CreateSnapshot(bool reverse)
     {
         var endpoints = new[]

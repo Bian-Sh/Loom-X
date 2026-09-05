@@ -129,6 +129,11 @@ public static class RuntimeGraphLayout
         IReadOnlyDictionary<string, RuntimeGraphNodeLayout> nodes,
         IReadOnlyDictionary<string, RuntimeGraphProviderGroupLayout> providers)
     {
+        // Model 属于 Provider Group 的内部节点，不绘制独立的 Provider→Model 连线。
+        // 该语义边仍保留在 Snapshot 中，供真实请求 Telemetry 映射和节点高亮使用。
+        if (edge.Kind == RuntimeGraphEdgeKind.ProviderToModel)
+            return null;
+
         if (!TryGetBounds(edge.SourceId, nodes, providers, out var sourceBounds)
             || !TryGetBounds(edge.TargetId, nodes, providers, out var targetBounds)) return null;
         return new RuntimeGraphEdgeLayout(
