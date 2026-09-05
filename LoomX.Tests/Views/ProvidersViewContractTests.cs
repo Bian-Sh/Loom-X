@@ -45,6 +45,7 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("ItemsSource=\"{Binding FilteredModels}\"", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Right\"", source, StringComparison.Ordinal);
         Assert.Contains("Data=\"M 10,5 A 1,1 0 1 1 8,5", source, StringComparison.Ordinal);
+        Assert.Contains("model-drag-glyph", source, StringComparison.Ordinal);
         Assert.Contains("Data=\"M 10,11 V 17 M 14,11 V 17", source, StringComparison.Ordinal);
         Assert.Contains("<Grid Height=\"28\" ColumnDefinitions=\"30,46,*,Auto,42\"", source, StringComparison.Ordinal);
         Assert.Contains("DeleteModelCommand", source, StringComparison.Ordinal);
