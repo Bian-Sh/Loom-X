@@ -111,6 +111,14 @@ public sealed class RuntimeGraphControlTests
         Assert.False(control.FocusEndpoint("missing-endpoint", new Size(900, 500)));
     }
 
+    [Fact]
+    public void KindWatermarksOnlyAppearAfterTheReadableZoomThreshold()
+    {
+        Assert.Equal(1.0, RuntimeGraphControl.KindWatermarkMinZoom);
+        Assert.True(RuntimeGraphControl.KindWatermarkMinZoom > RuntimeGraphControl.MinZoom);
+        Assert.True(RuntimeGraphControl.KindWatermarkMinZoom < RuntimeGraphControl.MaxZoom);
+    }
+
     private static RuntimeGraphSnapshot CreateSnapshot()
     {
         var model = new RuntimeGraphNode(

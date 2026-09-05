@@ -16,6 +16,7 @@ public sealed class RuntimeGraphControl : Control
     public const double MinZoom = 0.25;
     public const double MaxZoom = 2.5;
     public const double ZoomStep = 1.2;
+    public const double KindWatermarkMinZoom = 1.0;
 
     public static readonly StyledProperty<RuntimeGraphSnapshot?> SnapshotProperty =
         AvaloniaProperty.Register<RuntimeGraphControl, RuntimeGraphSnapshot?>(nameof(Snapshot));
@@ -420,6 +421,8 @@ public sealed class RuntimeGraphControl : Control
                     FontWeight.Normal,
                     TextAlignment.Right);
         }
+
+        DrawKindWatermark(context, "Provider", bounds, zoom, bottomInset: 3);
     }
 
     private void DrawNode(
@@ -439,7 +442,44 @@ public sealed class RuntimeGraphControl : Control
         context.DrawRectangle(fill, new Pen(WithAlpha(nodeBorder, selected ? 1 : 0.9), selected ? 2 : 1), bounds, 8 * zoom, 8 * zoom, default);
         if (zoom >= 0.25)
             DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, Math.Max(0, bounds.Width - 24 * zoom), bounds.Height), text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
+        DrawKindWatermark(context, NodeKindLabel(node.Kind), bounds, zoom);
     }
+
+    private static void DrawKindWatermark(
+        DrawingContext context,
+        string label,
+        Rect bounds,
+        double zoom,
+        double bottomInset = 5)
+    {
+        if (zoom < KindWatermarkMinZoom || string.IsNullOrWhiteSpace(label)) return;
+
+        var textHeight = Math.Max(10, 11 * zoom);
+        var textWidth = Math.Min(78 * zoom, Math.Max(0, bounds.Width - 16 * zoom));
+        if (textWidth <= 0 || bounds.Height <= textHeight) return;
+
+        var brush = new SolidColorBrush(Color.FromArgb(125, 145, 167, 177));
+        DrawText(
+            context,
+            label,
+            new Rect(
+                bounds.Right - textWidth - 8 * zoom,
+                bounds.Bottom - textHeight - bottomInset * zoom,
+                textWidth,
+                textHeight),
+            brush,
+            Math.Clamp(9 * zoom, 7, 11),
+            FontWeight.Normal,
+            TextAlignment.Right);
+    }
+
+    private static string NodeKindLabel(RuntimeGraphNodeKind kind) => kind switch
+    {
+        RuntimeGraphNodeKind.Endpoint => "Endpoint",
+        RuntimeGraphNodeKind.Combo => "Combo",
+        RuntimeGraphNodeKind.Model => "Model",
+        _ => kind.ToString()
+    };
 
     private string NodeLabel(string nodeId)
     {
