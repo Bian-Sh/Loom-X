@@ -117,6 +117,38 @@ public sealed class ProviderEditorViewModelTests
         Assert.True(viewModel.HasUnsavedChanges);
     }
 
+    [Theory]
+    [InlineData("  grox  ")]
+    [InlineData("PROVIDER-ID")]
+    [InlineData("api.example.com")]
+    [InlineData("ANTHROPIC")]
+    public void ProviderSearchMatchesVisibleProviderFieldsIgnoringCase(string query)
+    {
+        var provider = new ProviderEditorViewModel
+        {
+            DisplayName = "Grox",
+            BusinessId = "provider-id",
+            BaseUrl = "https://api.example.com/v1",
+            ApiMode = "anthropic"
+        };
+
+        Assert.True(ProvidersViewModel.MatchesProviderSearch(provider, query));
+    }
+
+    [Fact]
+    public void ProviderSearchRejectsUnmatchedQuery()
+    {
+        var provider = new ProviderEditorViewModel
+        {
+            DisplayName = "Grox",
+            BusinessId = "provider-id",
+            BaseUrl = "https://api.example.com/v1",
+            ApiMode = "openai"
+        };
+
+        Assert.False(ProvidersViewModel.MatchesProviderSearch(provider, "missing"));
+    }
+
     [Fact]
     public void ModelEditorFromResponseStartsCleanAndTracksChanges()
     {

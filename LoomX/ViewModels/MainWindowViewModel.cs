@@ -627,6 +627,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private DispatcherTimer? modelSyncAnimationTimer;
     private bool isModelSyncing;
     private double syncIconAngle;
+    private string providerSearchQuery = "";
     private string modelSearchQuery = "";
     private CancellationTokenSource? providerAutoSaveCancellation;
     private CancellationTokenSource? modelAutoSaveCancellation;
@@ -646,8 +647,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         get => selectedProvider;
         set
         {
-            if (value is null && !suppressSelectionInvariant && Providers.Count > 0)
-                value = Providers[0];
+            if (value is null && !suppressSelectionInvariant)
+                value = FilteredProviders.FirstOrDefault();
             if (ReferenceEquals(selectedProvider, value)) return;
             DetachProvider(selectedProvider);
             SetProperty(ref selectedProvider, value);
@@ -665,6 +666,28 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     }
     public bool HasSelectedProvider => SelectedProvider is not null;
     public bool HasNoSelectedProvider => Providers.Count == 0;
+
+    public string ProviderSearchQuery
+    {
+        get => providerSearchQuery;
+        set
+        {
+            if (!SetProperty(ref providerSearchQuery, value ?? "")) return;
+            OnPropertyChanged(nameof(HasProviderSearchQuery));
+            OnPropertyChanged(nameof(FilteredProviders));
+        }
+    }
+    public bool HasProviderSearchQuery => !string.IsNullOrWhiteSpace(ProviderSearchQuery);
+    public IReadOnlyList<ProviderEditorViewModel> FilteredProviders
+    {
+        get
+        {
+            var query = ProviderSearchQuery.Trim();
+            return string.IsNullOrEmpty(query)
+                ? Providers.ToArray()
+                : Providers.Where(provider => MatchesProviderSearch(provider, query)).ToArray();
+        }
+    }
 
     public ModelEditorViewModel? SelectedModel
     {
@@ -752,6 +775,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         this.dataStore = dataStore;
         this.toastService = toastService ?? new ToastService();
         this.logger = logger;
+        Providers.CollectionChanged += ProvidersChanged;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(parameter => DeleteModelAsync(parameter as ModelEditorViewModel)); ToggleAllModelsCommand = new AsyncCommand(ToggleAllModelsAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
     }
@@ -818,6 +842,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     public void Dispose()
     {
+        Providers.CollectionChanged -= ProvidersChanged;
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
         providerAutoSaveCancellation?.Cancel();
         providerAutoSaveCancellation?.Dispose();
@@ -1270,8 +1295,14 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private void ProviderChanged(object? sender, PropertyChangedEventArgs args)
     {
         UpdateSummary();
+        OnPropertyChanged(nameof(FilteredProviders));
         if (!suppressConfigurationRefresh && sender is ProviderEditorViewModel provider && provider.HasUnsavedChanges)
             QueueProviderAutoSave(provider);
+    }
+    private void ProvidersChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
+    {
+        OnPropertyChanged(nameof(FilteredProviders));
+        OnPropertyChanged(nameof(HasNoSelectedProvider));
     }
     private void ModelsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
@@ -1309,6 +1340,16 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         ProtectedKeyCount = Providers.Count(provider => provider.HasApiKey);
         EnabledProviderCount = Providers.Count(provider => provider.Enabled);
         HealthyProviderCount = Providers.Count(provider => provider.Enabled && !string.IsNullOrWhiteSpace(provider.BaseUrl));
+    }
+
+    internal static bool MatchesProviderSearch(ProviderEditorViewModel provider, string query)
+    {
+        query = query.Trim();
+        if (string.IsNullOrEmpty(query)) return true;
+        return provider.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || provider.BusinessId.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || provider.BaseUrl.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || provider.ApiMode.Contains(query, StringComparison.OrdinalIgnoreCase);
     }
 
 }

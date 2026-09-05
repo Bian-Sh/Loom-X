@@ -39,31 +39,33 @@
           <Grid RowDefinitions="Auto,Auto,*">
             <Border Padding="14,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
               <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2"><TextBlock Text="Provider 目录" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="按当前路由顺序显示" Classes="muted"/></StackPanel>
+                <StackPanel Spacing="2"><TextBlock Text="供应商列表" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="按当前路由顺序显示" Classes="muted"/></StackPanel>
                 <Button Grid.Column="1" Command="{Binding NewProviderCommand}" Classes="icon-button" AutomationProperties.Name="新增 Provider"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z" Width="16" Height="16"/></Button>
               </Grid>
             </Border>
             <Border Grid.Row="1" Padding="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-              <TextBox Watermark="搜索 Provider"/>
+              <TextBox Text="{Binding ProviderSearchQuery, UpdateSourceTrigger=PropertyChanged}" Watermark="搜索 Provider"/>
             </Border>
-            <ListBox Grid.Row="2" Classes="provider-list" ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox Grid.Row="2" Classes="provider-list" ItemsSource="{Binding FilteredProviders}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate>
                 <DataTemplate>
-                  <Border Padding="14,12" Background="Transparent" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
-                    <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
-                      <StackPanel Orientation="Horizontal" Spacing="9">
-                        <Border Width="30" Height="30" Background="{DynamicResource AccentSoftBrush}" CornerRadius="9"><TextBlock Text="P" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                        <StackPanel VerticalAlignment="Center" Spacing="1"><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><Ellipse Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" IsVisible="{Binding Enabled}"/></StackPanel></StackPanel>
-                      </StackPanel>
-                      <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="启用 Provider" AutomationProperties.Name="启用 Provider" VerticalAlignment="Center"/>
-                      <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding BaseUrl}" Classes="muted" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="39,7,0,0"/>
-                      <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="9" Margin="39,5,0,0">
-                        <TextBlock Text="{Binding ApiMode}" Classes="muted"/>
-                        <TextBlock Text="{Binding Models.Count, StringFormat='{}{0} 个模型'}" Classes="muted"/>
-                        <TextBlock Text="密钥已配置" Foreground="{DynamicResource SuccessBrush}" FontSize="10" IsVisible="{Binding HasApiKey}"/>
-                      </StackPanel>
-                      <Button Grid.Row="3" Grid.Column="1" Classes="icon-button" Click="DeleteProviderButton_OnClick" ToolTip.Tip="删除 Provider" AutomationProperties.Name="删除 Provider" HorizontalAlignment="Right" VerticalAlignment="Center"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23" Width="14" Height="14"/></Button>
-                    </Grid>
+                  <Border Padding="10,8" Background="Transparent" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
+                    <Panel>
+                      <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                          <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                          <Ellipse Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" IsVisible="{Binding Enabled}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="启用 Provider" AutomationProperties.Name="启用 Provider" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding BaseUrl}" Classes="muted" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,5,0,0"/>
+                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="9" Margin="0,4,42,0">
+                          <TextBlock Text="{Binding ApiMode}" Classes="muted"/>
+                          <TextBlock Text="{Binding Models.Count, StringFormat='{}{0} 个模型'}" Classes="muted"/>
+                          <TextBlock Text="密钥已配置" Foreground="{DynamicResource SuccessBrush}" FontSize="10" IsVisible="{Binding HasApiKey}"/>
+                        </StackPanel>
+                      </Grid>
+                      <Button Classes="icon-button" Width="36" Click="DeleteProviderButton_OnClick" ToolTip.Tip="删除 Provider" AutomationProperties.Name="删除 Provider" HorizontalAlignment="Right" VerticalAlignment="Bottom"><Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="14" Height="14"/></Button>
+                    </Panel>
                   </Border>
                 </DataTemplate>
               </ListBox.ItemTemplate>
