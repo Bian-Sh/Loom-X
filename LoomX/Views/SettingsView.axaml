@@ -13,7 +13,7 @@
           <StackPanel Spacing="12" Margin="0,14,8,20">
             <Border Classes="panel" Padding="18">
               <StackPanel Spacing="14">
-                <StackPanel Spacing="4"><TextBlock Text="界面语言" FontWeight="SemiBold"/><TextBlock Text="切换控制中心的显示语言。" Classes="hint"/><ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"/></StackPanel>
+                <StackPanel Spacing="4"><TextBlock Text="界面语言" FontWeight="SemiBold"/><TextBlock Text="切换界面显示语言。" Classes="hint"/><ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"/></StackPanel>
                 <StackPanel Spacing="4"><TextBlock Text="主题" FontWeight="SemiBold"/><TextBlock Text="选择适合当前工作环境的配色。" Classes="hint"/><ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"/></StackPanel>
                 <Border Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="12">
@@ -82,7 +82,7 @@
       <TabItem Header="关于">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="12" Margin="0,14,8,20">
-            <Border Classes="panel" Padding="18"><StackPanel Spacing="6"><TextBlock Text="Loom-x 控制中心" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="{Binding VersionLabel}" Classes="hint"/><TextBlock Text="本地优先，开源可审计。" Classes="hint"/><StackPanel Orientation="Horizontal" Spacing="12" Margin="0,6,0,0"><Button Content="项目主页" Classes="outline" Click="ProjectHomeButton_OnClick"/><Button Content="反馈问题" Classes="outline" Click="IssuesButton_OnClick"/></StackPanel></StackPanel></Border>
+            <Border Classes="panel" Padding="18"><StackPanel Spacing="6"><TextBlock Text="Loom-X" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="{Binding VersionLabel}" Classes="hint"/><TextBlock Text="Loom-X 为本地与云端 AI 服务提供统一接入层，支持基于 OpenAI、Anthropic、Ollama 三种Endpoint，让 IDE 与 GitHub Copilot 能接入你选择的模型。把模型选择权交还给开发者，让日常编码更自由、更高效，不再 Token 焦虑。" Classes="hint" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="12" Margin="0,6,0,0"><Button Content="项目主页" Classes="outline" Click="ProjectHomeButton_OnClick"/><Button Content="反馈问题" Classes="outline" Click="IssuesButton_OnClick"/></StackPanel></StackPanel></Border>
             <Border Classes="panel" Padding="18"><Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="3"><TextBlock Text="导出诊断信息" FontWeight="SemiBold"/><TextBlock Text="生成不含密钥和请求正文的诊断摘要。" Classes="hint"/></StackPanel><Button Grid.Column="1" Content="导出诊断" Command="{Binding ExportDiagnosticsCommand}" Classes="outline"/></Grid></Border>
           </StackPanel>
         </ScrollViewer>

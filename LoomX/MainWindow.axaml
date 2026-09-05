@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-x 控制中心" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
   <Window.Styles>
     <Style Selector="ToggleButton.nav-button">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -113,8 +113,7 @@
               <PathIcon Data="M 19,3 L 22,3 L 22,16 L 35,16 L 35,19 L 22,19 L 22,32 L 19,32 L 19,19 L 6,19 L 6,16 L 19,16 Z" Foreground="{DynamicResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <StackPanel Spacing="1" VerticalAlignment="Center">
-              <TextBlock Text="Loom-x" FontSize="16" FontWeight="SemiBold" />
-              <TextBlock Text="控制中心" FontSize="10" Foreground="{DynamicResource TextTertiaryBrush}" />
+              <TextBlock Text="Loom-X" FontSize="16" FontWeight="SemiBold" />
             </StackPanel>
           </StackPanel>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">

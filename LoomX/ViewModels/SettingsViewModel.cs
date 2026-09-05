@@ -299,7 +299,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         {
             AppDataPaths.EnsureCreated();
             var path = Path.Combine(AppDataPaths.RootDirectory, $"diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
-            var content = $"Loom-x 诊断摘要\n版本：{VersionLabel}\n系统：{Environment.OSVersion}\n数据目录：{AppDataPaths.RootDirectory}\n代理模式：{SelectedProxyMode.DisplayName}\n日志保留：{LogRetentionDays} 天\n";
+            var content = $"Loom-X 诊断摘要\n版本：{VersionLabel}\n系统：{Environment.OSVersion}\n数据目录：{AppDataPaths.RootDirectory}\n代理模式：{SelectedProxyMode.DisplayName}\n日志保留：{LogRetentionDays} 天\n";
             await File.WriteAllTextAsync(path, content);
             Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
             Status = "诊断摘要已导出。";

@@ -11,10 +11,13 @@ public sealed class LoomXBrandingContractTests
         var settingsView = ReadSource("Views", "SettingsView.axaml");
         var settingsViewModel = ReadSource("ViewModels", "SettingsViewModel.cs");
 
-        Assert.Contains("Title=\"Loom-x 控制中心\"", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Loom-x\"", mainWindow, StringComparison.Ordinal);
-        Assert.Contains("Text=\"Loom-x 控制中心\"", settingsView, StringComparison.Ordinal);
-        Assert.Contains("Loom-x 诊断摘要", settingsViewModel, StringComparison.Ordinal);
+        Assert.Contains("Title=\"Loom-X\"", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Loom-X\"", mainWindow, StringComparison.Ordinal);
+        Assert.DoesNotContain("控制中心", mainWindow, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Loom-X\"", settingsView, StringComparison.Ordinal);
+        Assert.Contains("Loom-X 为本地与云端 AI 服务提供统一接入层，支持基于 OpenAI、Anthropic、Ollama 三种Endpoint，让 IDE 与 GitHub Copilot 能接入你选择的模型。把模型选择权交还给开发者，让日常编码更自由、更高效，不再 Token 焦虑。", settingsView, StringComparison.Ordinal);
+        Assert.DoesNotContain("控制中心", settingsView, StringComparison.Ordinal);
+        Assert.Contains("Loom-X 诊断摘要", settingsViewModel, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"LoomX\"", mainWindow, StringComparison.Ordinal);
     }
 
