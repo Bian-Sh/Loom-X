@@ -30,7 +30,7 @@ public sealed class ConfigSnapshotService : IDisposable
         {
             LogRuntimeContext("配置快照同步读取开始");
             using var db = new ConfigurationDbContext(CreateReadOnlyOptions());
-            EnsureDatabaseReadyForReadAsync(db).GetAwaiter().GetResult();
+            EnsureDatabaseReadyForReadAsync().GetAwaiter().GetResult();
             LogDatabaseState(db, "配置数据库初始化完成");
             var provider = new DatabaseConfigurationProvider(db, CreateProviderLogger());
             provider.ReloadAsync().GetAwaiter().GetResult();
@@ -58,7 +58,7 @@ public sealed class ConfigSnapshotService : IDisposable
         {
             LogRuntimeContext("Provider 列表读取开始");
             await using var db = CreateContext(CreateReadOnlyOptions());
-            await EnsureDatabaseReadyForReadAsync(db, cancellationToken);
+            await EnsureDatabaseReadyForReadAsync(cancellationToken);
             LogDatabaseState(db, "Provider 列表数据库初始化完成");
             var rawProviderCount = await db.Providers.AsNoTracking().CountAsync(cancellationToken);
             var rawModelCount = await db.Models.AsNoTracking().CountAsync(cancellationToken);
@@ -85,7 +85,7 @@ public sealed class ConfigSnapshotService : IDisposable
     public async Task<AppSettingsResponse> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
         await using var db = CreateContext(CreateReadOnlyOptions());
-        await EnsureDatabaseReadyForReadAsync(db, cancellationToken);
+        await EnsureDatabaseReadyForReadAsync(cancellationToken);
         var provider = new DatabaseConfigurationProvider(db, CreateProviderLogger());
         await provider.ReloadAsync(cancellationToken);
         return await new ConfigurationManagementService(new DesktopDbContextFactory(CreateReadOnlyOptions()), provider).GetSettingsAsync(cancellationToken);
@@ -97,7 +97,7 @@ public sealed class ConfigSnapshotService : IDisposable
     public async Task<UpdateProxySettings> GetUpdateProxySettingsAsync(CancellationToken cancellationToken = default)
     {
         await using var db = CreateContext(CreateReadOnlyOptions());
-        await EnsureDatabaseReadyForReadAsync(db, cancellationToken);
+        await EnsureDatabaseReadyForReadAsync(cancellationToken);
         var settings = await db.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
         string? password = null;
         if (!string.IsNullOrWhiteSpace(settings.ProtectedProxyPassword)
@@ -191,39 +191,11 @@ public sealed class ConfigSnapshotService : IDisposable
     }
     private ILogger<DatabaseConfigurationProvider>? CreateProviderLogger() => logger is null ? null : new ProviderLoggerAdapter(logger);
 
-    private async Task EnsureDatabaseReadyForReadAsync(ConfigurationDbContext db, CancellationToken cancellationToken = default)
+    private async Task EnsureDatabaseReadyForReadAsync(CancellationToken cancellationToken = default)
     {
-        if (!File.Exists(databasePath))
-        {
-            logger?.LogInformation("配置库不存在，执行首次初始化 {DatabasePath}", databasePath);
-            await using var writableDb = new ConfigurationDbContext(CreateOptions());
-            await ConfigurationDatabase.InitializeAsync(writableDb, cancellationToken);
-            return;
-        }
-
-        await db.Database.OpenConnectionAsync(cancellationToken);
-        try
-        {
-            await using var command = db.Database.GetDbConnection().CreateCommand();
-            command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name IN ('AppSettings', 'GatewayConfigurations', 'Providers', 'Models')";
-            var tableCount = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
-            await using var columnCommand = db.Database.GetDbConnection().CreateCommand();
-            columnCommand.CommandText = "SELECT COUNT(*) FROM pragma_table_info('AppSettings') WHERE name IN ('TransparencyEnabled', 'TransparencyOpacity', 'BlurAmount', 'TransparencyAlgorithm', 'UseProxyForUpdates')";
-            var appearanceColumnCount = Convert.ToInt32(await columnCommand.ExecuteScalarAsync(cancellationToken));
-            logger?.LogInformation("配置库只读预检完成，必要表 {RequiredTableCount}/4，更新与外观字段 {AppearanceColumnCount}/5", tableCount, appearanceColumnCount);
-            if (tableCount < 4 || appearanceColumnCount < 5)
-            {
-                logger?.LogWarning("配置库需要结构迁移，必要表 {RequiredTableCount}/4，更新与外观字段 {AppearanceColumnCount}/5，执行初始化 {DatabasePath}", tableCount, appearanceColumnCount, databasePath);
-                await db.Database.CloseConnectionAsync();
-                await using var writableDb = new ConfigurationDbContext(CreateOptions());
-                await ConfigurationDatabase.InitializeAsync(writableDb, cancellationToken);
-            }
-        }
-        finally
-        {
-            if (db.Database.GetDbConnection().State == System.Data.ConnectionState.Open)
-                await db.Database.CloseConnectionAsync();
-        }
+        await using var writableDb = new ConfigurationDbContext(CreateOptions());
+        await ConfigurationDatabase.InitializeAsync(writableDb, cancellationToken);
+        logger?.LogInformation("配置库读取前初始化完成 {DatabasePath}", databasePath);
     }
 
     private void LogRuntimeContext(string operation)
