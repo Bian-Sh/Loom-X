@@ -2,6 +2,7 @@
 change: rename-project-to-loomx
 design-doc: docs/superpowers/specs/2026-09-05-rename-project-to-loomx-design.md
 base-ref: 46a86148bf114b6618f13e87f95af4017f11d30a
+archived-with: 2026-09-05-rename-project-to-loomx
 ---
 
 # LoomX 项目更名与数据迁移实施计划
@@ -25,6 +26,7 @@ base-ref: 46a86148bf114b6618f13e87f95af4017f11d30a
 - 迁移组件通过 `ILogger<T>` 记录开始、成功、降级/冲突和失败摘要，禁止记录数据库内容、API Key、Authorization、请求/响应正文或用户 prompt。
 - 测试使用临时目录和内部构造函数，不读写真实用户 `%LOCALAPPDATA%`；需要 GUI 验证时只截取 LoomX 应用窗口。
 
+archived-with: 2026-09-05-rename-project-to-loomx
 ---
 
 ## 1. 基线检查与改名清单
@@ -245,4 +247,3 @@ base-ref: 46a86148bf114b6618f13e87f95af4017f11d30a
 2. 更新 Comet/OpenSpec 状态和中文验证报告，列明旧目录保留、旧日志不迁移、兼容路由保持不变及任何残余风险。
 3. 运行最终 `git diff --check` 和受影响文件的旧名称扫描，确认没有误改生成产物或无关文档。
 4. 使用中文提交消息提交并推送；提交前再次确认没有包含其他 session 的未提交修改，后续再进入 Comet verify/archive。
-

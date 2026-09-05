@@ -2,6 +2,8 @@
 comet_change: rename-project-to-loomx
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-05-rename-project-to-loomx
+status: final
 ---
 
 # LoomX 项目更名技术设计
