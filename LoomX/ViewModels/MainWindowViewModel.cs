@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using LoomX;
 using LoomX.Configuration;
 using LoomX.Activity;
+using LoomX.NodeGraph;
 using LoomX.Services;
 
 namespace LoomX.ViewModels;
@@ -156,6 +157,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private string p95Latency = "—";
     private string graphStatus = "等待网关启动";
     private string gatewayActionLabel = "启动网关";
+    private RuntimeGraphSnapshot? graphSnapshot;
     private bool gatewayToggleInProgress;
     private bool refreshInProgress;
     private string topologyJson = "{\"endpoints\":[],\"combos\":[],\"providers\":[],\"models\":[],\"edges\":[]}";
@@ -179,6 +181,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public string P95Latency { get => p95Latency; private set => SetProperty(ref p95Latency, value); }
     public string GraphStatus { get => graphStatus; private set => SetProperty(ref graphStatus, value); }
     public string GatewayActionLabel { get => gatewayActionLabel; private set => SetProperty(ref gatewayActionLabel, value); }
+    public RuntimeGraphSnapshot? GraphSnapshot { get => graphSnapshot; private set => SetProperty(ref graphSnapshot, value); }
     public ObservableCollection<OverviewEndpointViewModel> Endpoints { get; } = [];
     public ObservableCollection<OverviewComboViewModel> Combos { get; } = [];
     public ObservableCollection<OverviewProviderViewModel> Providers { get; } = [];
@@ -361,6 +364,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             }
             Endpoints.Add(endpointVm);
         }
+        GraphSnapshot = RuntimeGraphProjection.Create(config, dataStore.Providers);
         topologyJson = CreateTopologyJson(config, dataStore.Providers);
         TopologyChanged?.Invoke(this, EventArgs.Empty);
     }

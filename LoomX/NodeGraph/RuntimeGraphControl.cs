@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 
 namespace LoomX.NodeGraph;
 
@@ -37,6 +38,8 @@ public sealed class RuntimeGraphControl : Control
     {
         AffectsMeasure<RuntimeGraphControl>(LayoutProperty, SnapshotProperty);
         AffectsRender<RuntimeGraphControl>(LayoutProperty, SnapshotProperty, ZoomProperty, PanProperty);
+        SnapshotProperty.Changed.AddClassHandler<RuntimeGraphControl>((control, _) => control.ScheduleFitToView());
+        LayoutProperty.Changed.AddClassHandler<RuntimeGraphControl>((control, _) => control.ScheduleFitToView());
     }
 
     public RuntimeGraphSnapshot? Snapshot
@@ -149,6 +152,24 @@ public sealed class RuntimeGraphControl : Control
         Pan = new Vector(
             (viewport.Width - content.Width * fitZoom) / 2 - content.X * fitZoom,
             (viewport.Height - content.Height * fitZoom) / 2 - content.Y * fitZoom);
+    }
+
+    public bool FocusEndpoint(string endpointId) => FocusEndpoint(endpointId, Bounds.Size);
+
+    public bool FocusEndpoint(string endpointId, Size viewport)
+    {
+        if (string.IsNullOrWhiteSpace(endpointId) || viewport.Width <= 0 || viewport.Height <= 0) return false;
+        var layout = ResolveLayout();
+        if (layout is null || !layout.Nodes.TryGetValue(endpointId, out var node)
+            || node.Kind != RuntimeGraphNodeKind.Endpoint) return false;
+
+        SetSelection(new RuntimeGraphSelection(RuntimeGraphSelectionKind.Node, endpointId));
+        var zoom = Math.Clamp(Math.Max(EffectiveZoom, 0.85), MinZoom, MaxZoom);
+        Zoom = zoom;
+        Pan = new Vector(
+            viewport.Width / 2 - node.Bounds.Center.X * zoom,
+            viewport.Height / 2 - node.Bounds.Center.Y * zoom);
+        return true;
     }
 
     public RuntimeGraphSelection? Pick(Point viewportPoint)
@@ -342,6 +363,12 @@ public sealed class RuntimeGraphControl : Control
     private RuntimeGraphLayoutSnapshot? ResolveLayout() =>
         Layout ?? (Snapshot is null ? null : RuntimeGraphLayout.Create(Snapshot));
 
+    private void ScheduleFitToView()
+    {
+        if (Bounds.Width <= 0 || Bounds.Height <= 0 || ResolveLayout() is null) return;
+        Dispatcher.UIThread.Post(FitToView, DispatcherPriority.Loaded);
+    }
+
     private void DrawProviderGroup(
         DrawingContext context,
         RuntimeGraphProviderGroupLayout provider,
@@ -365,11 +392,11 @@ public sealed class RuntimeGraphControl : Control
 
         var providerName = Snapshot?.Providers.FirstOrDefault(item => string.Equals(item.Id, provider.ProviderId, StringComparison.OrdinalIgnoreCase))?.DisplayName
             ?? provider.ProviderId;
-        if (zoom >= 0.45)
+        if (zoom >= 0.25)
         {
-            DrawText(context, providerName, new Rect(bounds.X + 14 * zoom, bounds.Y + 7 * zoom, Math.Max(0, bounds.Width - 28 * zoom), 20 * zoom), text, 14 * zoom, FontWeight.SemiBold, TextAlignment.Left);
-            if (zoom >= 0.65)
-                DrawText(context, $"{provider.ModelIds.Count} 个模型", new Rect(bounds.X + 14 * zoom, bounds.Y + 23 * zoom, Math.Max(0, bounds.Width - 28 * zoom), 14 * zoom), muted, 10 * zoom, FontWeight.Normal, TextAlignment.Left);
+            DrawText(context, providerName, new Rect(bounds.X + 14 * zoom, bounds.Y + 5 * zoom, Math.Max(0, bounds.Width - 28 * zoom), 20 * zoom), text, Math.Max(9, 14 * zoom), FontWeight.SemiBold, TextAlignment.Left);
+            if (zoom >= 0.4)
+                DrawText(context, $"{provider.ModelIds.Count} 个模型", new Rect(bounds.X + 14 * zoom, bounds.Y + 21 * zoom, Math.Max(0, bounds.Width - 28 * zoom), 14 * zoom), muted, Math.Max(8, 10 * zoom), FontWeight.Normal, TextAlignment.Left);
         }
     }
 
@@ -388,8 +415,8 @@ public sealed class RuntimeGraphControl : Control
             && string.Equals(selection.Id, node.NodeId, StringComparison.OrdinalIgnoreCase);
         var nodeBorder = selected ? ResolveBrush("GraphLiveBrush", Brushes.LightGreen) : border;
         context.DrawRectangle(fill, new Pen(WithAlpha(nodeBorder, selected ? 1 : 0.9), selected ? 2 : 1), bounds, 8 * zoom, 8 * zoom, default);
-        if (zoom >= 0.5)
-            DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, Math.Max(0, bounds.Width - 24 * zoom), bounds.Height), text, fontSize * zoom, FontWeight.SemiBold, TextAlignment.Left);
+        if (zoom >= 0.25)
+            DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, Math.Max(0, bounds.Width - 24 * zoom), bounds.Height), text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
     }
 
     private string NodeLabel(string nodeId)
@@ -420,10 +447,8 @@ public sealed class RuntimeGraphControl : Control
             brush)
         {
             MaxTextWidth = bounds.Width,
-            MaxTextHeight = bounds.Height,
             TextAlignment = alignment,
-            Trimming = TextTrimming.CharacterEllipsis,
-            LineHeight = bounds.Height
+            Trimming = TextTrimming.CharacterEllipsis
         };
         var y = bounds.Y + Math.Max(0, (bounds.Height - formatted.Height) / 2);
         context.DrawText(formatted, new Point(bounds.X, y));

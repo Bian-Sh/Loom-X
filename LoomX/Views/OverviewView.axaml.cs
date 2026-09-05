@@ -1,35 +1,38 @@
 using Avalonia.Controls;
 using Avalonia;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using LoomX.ViewModels;
 namespace LoomX.Views;
 public partial class OverviewView : UserControl
 {
-    private readonly IOverviewGraphHost graphHost;
-
     public OverviewView()
     {
         InitializeComponent();
-        var logger = (Application.Current as App)?.LoggerFactory?.CreateLogger<OverviewGraphHost>()
-            ?? NullLogger<OverviewGraphHost>.Instance;
-        graphHost = new OverviewGraphHost(GraphWebView, logger);
         DataContextChanged += OnDataContextChanged;
         AttachedToVisualTree += OnAttachedToVisualTree;
         DetachedFromVisualTree += OnDetachedFromVisualTree;
+        RuntimeGraph.SizeChanged += OnGraphSizeChanged;
     }
 
-    private void OnDataContextChanged(object? sender, EventArgs args)
+    private void OnDataContextChanged(object? sender, EventArgs args) => RuntimeGraph.FitToView();
+
+    private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs args) => RuntimeGraph.FitToView();
+
+    private void OnGraphSizeChanged(object? sender, SizeChangedEventArgs args) => RuntimeGraph.FitToView(args.NewSize);
+
+    private void ZoomOut_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => RuntimeGraph.ZoomOut();
+
+    private void ZoomIn_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => RuntimeGraph.ZoomIn();
+
+    private void FitGraph_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => RuntimeGraph.FitToView();
+
+    private void FocusEndpoint_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (DataContext is OverviewViewModel viewModel) graphHost.Attach(viewModel);
-        else graphHost.Detach();
+        if (sender is Button { DataContext: OverviewEndpointViewModel endpoint })
+            RuntimeGraph.FocusEndpoint(endpoint.Key);
     }
-
-    private void OnAttachedToVisualTree(object? sender, VisualTreeAttachmentEventArgs args) => graphHost.Initialize();
 
     private void OnDetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs args)
     {
-        graphHost.Detach();
         (DataContext as OverviewViewModel)?.Dispose();
     }
 }

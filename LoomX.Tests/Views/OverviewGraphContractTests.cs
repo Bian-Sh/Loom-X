@@ -53,6 +53,28 @@ public sealed class OverviewGraphContractTests
     }
 
     [Fact]
+    public void OverviewUsesNativeRuntimeGraphControl()
+    {
+        var source = ReadDesktopFile("Views", "OverviewView.axaml");
+
+        Assert.Contains("xmlns:nodegraph=\"using:LoomX.NodeGraph\"", source, StringComparison.Ordinal);
+        Assert.Contains("<nodegraph:RuntimeGraphControl", source, StringComparison.Ordinal);
+        Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<NativeWebView", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OverviewProvidesEndpointNavigationButtons()
+    {
+        var source = ReadDesktopFile("Views", "OverviewView.axaml");
+        var codeBehind = ReadDesktopFile("Views", "OverviewView.axaml.cs");
+
+        Assert.Contains("ItemsSource=\"{Binding Endpoints}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"FocusEndpoint_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("RuntimeGraph.FocusEndpoint(endpoint.Key)", codeBehind, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OverviewWebHudContainsMetricsWithoutActiveEdgeLegend()
     {
         var source = ReadDesktopFile("Assets", "Overview", "index.html");

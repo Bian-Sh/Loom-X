@@ -93,6 +93,24 @@ public sealed class RuntimeGraphControlTests
         Assert.Equal("openai", details.Protocol);
     }
 
+    [Fact]
+    public void FocusEndpointCentersAndSelectsTheEndpoint()
+    {
+        var snapshot = CreateSnapshot();
+        var layout = RuntimeGraphLayout.Create(snapshot);
+        var control = new RuntimeGraphControl { Snapshot = snapshot, Layout = layout };
+
+        Assert.True(control.FocusEndpoint("endpoint-a", new Size(900, 500)));
+
+        var endpointBounds = layout.Nodes["endpoint-a"].Bounds;
+        var viewportCenter = new Point(
+            endpointBounds.Center.X * control.Zoom + control.Pan.X,
+            endpointBounds.Center.Y * control.Zoom + control.Pan.Y);
+        Assert.Equal(new Point(450, 250), viewportCenter);
+        Assert.Equal(new RuntimeGraphSelection(RuntimeGraphSelectionKind.Node, "endpoint-a"), control.Selection);
+        Assert.False(control.FocusEndpoint("missing-endpoint", new Size(900, 500)));
+    }
+
     private static RuntimeGraphSnapshot CreateSnapshot()
     {
         var model = new RuntimeGraphNode(
