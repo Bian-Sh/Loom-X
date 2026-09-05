@@ -71,6 +71,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     HasProxyPassword = !string.IsNullOrWhiteSpace(settings.ProtectedProxyPassword),
                     AutoCheckUpdates = settings.AutoCheckUpdates,
                     UpdateChannel = settings.UpdateChannel,
+                    UseProxyForUpdates = settings.UseProxyForUpdates,
                     DiagnosticsEnabled = settings.DiagnosticsEnabled,
                     LogRetentionDays = settings.LogRetentionDays,
                     LogStackTrace = settings.LogStackTrace,

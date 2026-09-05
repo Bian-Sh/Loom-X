@@ -65,6 +65,7 @@ jobs:
         run: |
           pwsh -File scripts/publish-desktop.ps1 `
             -Configuration Release `
+            -Version "${{ steps.version.outputs.version }}" `
             -OutputDirectory "artifacts/publish"
 
       - name: 安装 Inno Setup

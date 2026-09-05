@@ -75,7 +75,7 @@ public static class LoomXHost
     private static void MapEndpoints(WebApplication app)
     {
         app.MapGet("/", () => Results.Ok(new { name = "Loom-x", status = "ok" }));
-        app.MapGet("/api/version", () => Results.Ok(new { version = "0.12.6" }));
+        app.MapGet("/api/version", () => Results.Ok(new { version = AppVersion.Current }));
         app.MapGet("/api/ps", () => Results.Ok(new { models = Array.Empty<object>() }));
         app.MapGet("/api/tags", (IDatabaseConfigurationProvider configProvider) =>
             Results.Ok(new OllamaTagListResponse { Models = ListEnabledCombos(configProvider, "ollama").Select(ToDescriptor).ToArray() }));

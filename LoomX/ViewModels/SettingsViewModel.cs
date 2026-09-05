@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Net;
-using System.Net.Http;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Microsoft.Extensions.Logging;
@@ -22,19 +21,20 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private const string AcrylicTransparencyAlgorithm = "acrylic";
     private readonly AppDataStore dataStore;
     private readonly ToastService toastService;
+    private readonly UpdateCoordinator updateCoordinator;
+    private readonly bool ownsUpdateCoordinator;
     private readonly ILogger<SettingsViewModel> logger;
     private readonly Action<bool, int, int, string>? applyAppearance;
-    private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private SettingOption selectedLanguage = LanguageOptions[0];
     private SettingOption selectedTheme = ThemeOptions[0];
     private SettingOption selectedProxyMode = ProxyModeOptions[0];
-    private SettingOption selectedUpdateChannel = UpdateChannelOptions[0];
     private string proxyHost = "http://127.0.0.1";
     private int proxyPort = 7890;
     private string proxyUsername = "";
     private string proxyPassword = "";
     private bool clearProxyPassword;
     private bool autoCheckUpdates = true;
+    private bool useProxyForUpdates = true;
     private bool diagnosticsEnabled;
     private bool logStackTrace;
     private bool transparencyEnabled = true;
@@ -50,7 +50,6 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public static IReadOnlyList<SettingOption> LanguageOptions { get; } = [new("zh-CN", "简体中文"), new("en-US", "English"), new("ja-JP", "日本語")];
     public static IReadOnlyList<SettingOption> ThemeOptions { get; } = [new("system", "跟随系统"), new("dark", "深色"), new("light", "浅色")];
     public static IReadOnlyList<SettingOption> ProxyModeOptions { get; } = [new("direct", "直连"), new("system", "系统代理"), new("custom", "自定义代理")];
-    public static IReadOnlyList<SettingOption> UpdateChannelOptions { get; } = [new("stable", "稳定版"), new("preview", "预览版")];
     public static IReadOnlyList<SettingOption> LogRetentionOptions { get; } = [new("7", "7 天"), new("30", "30 天"), new("90", "90 天"), new("365", "365 天"), new("3650", "永久保留")];
 
     public SettingOption SelectedLanguage { get => selectedLanguage; set { if (SetProperty(ref selectedLanguage, value)) QueueAutoSave(); } }
@@ -66,7 +65,6 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             QueueAutoSave();
         }
     }
-    public SettingOption SelectedUpdateChannel { get => selectedUpdateChannel; set { if (SetProperty(ref selectedUpdateChannel, value)) QueueAutoSave(); } }
     public string ProxyHost { get => proxyHost; set { if (SetProperty(ref proxyHost, value)) { OnPropertyChanged(nameof(ProxyStatus)); QueueAutoSave(); } } }
     public int ProxyPort { get => proxyPort; set { if (SetProperty(ref proxyPort, value)) { OnPropertyChanged(nameof(ProxyStatus)); QueueAutoSave(); } } }
     public string ProxyUsername { get => proxyUsername; set { if (SetProperty(ref proxyUsername, value)) QueueAutoSave(); } }
@@ -74,6 +72,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public bool ClearProxyPassword { get => clearProxyPassword; set { if (SetProperty(ref clearProxyPassword, value)) QueueAutoSave(); } }
     public bool HasProxyPassword { get => hasProxyPassword; private set => SetProperty(ref hasProxyPassword, value); }
     public bool AutoCheckUpdates { get => autoCheckUpdates; set { if (SetProperty(ref autoCheckUpdates, value)) QueueAutoSave(); } }
+    public bool UseProxyForUpdates { get => useProxyForUpdates; set { if (SetProperty(ref useProxyForUpdates, value)) QueueAutoSave(); } }
     public bool DiagnosticsEnabled { get => diagnosticsEnabled; set { if (SetProperty(ref diagnosticsEnabled, value)) QueueAutoSave(); } }
     public bool LogStackTrace { get => logStackTrace; set { if (SetProperty(ref logStackTrace, value)) { LoggingBootstrap.SetIncludeStackTrace(value); QueueAutoSave(); } } }
     public bool TransparencyEnabled { get => transparencyEnabled; set { if (SetProperty(ref transparencyEnabled, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
@@ -84,7 +83,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public bool IsBusy { get => isBusy; private set { if (SetProperty(ref isBusy, value)) { OnPropertyChanged(nameof(IsNotBusy)); } } }
     public bool IsNotBusy => !IsBusy;
     public string Status { get => status; private set => SetProperty(ref status, value); }
-    public string VersionLabel => "v0.12.6";
+    public string VersionLabel => AppVersion.Label;
     public string DataDirectory => AppDataPaths.RootDirectory;
     public bool IsCustomProxyVisible => SelectedProxyMode.Value == "custom";
     public string ProxyStatus => SelectedProxyMode.Value switch
@@ -101,11 +100,13 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public ICommand ClearLogsCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
 
-    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null)
+    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null)
     {
         this.dataStore = dataStore;
         this.logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         this.toastService = toastService ?? new ToastService();
+        this.updateCoordinator = updateCoordinator ?? new UpdateCoordinator(dataStore);
+        ownsUpdateCoordinator = updateCoordinator is null;
         this.applyAppearance = applyAppearance;
         LoadCommand = new AsyncCommand(LoadAsync);
         TestProxyCommand = new AsyncCommand(TestProxyAsync);
@@ -118,7 +119,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     }
 
     public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null)
-        : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance) { }
+        : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance, null) { }
 
     private async Task LoadAsync()
     {
@@ -133,8 +134,8 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             SelectedLanguage = FindOption(LanguageOptions, settings.Language, LanguageOptions[0]);
             SelectedTheme = FindOption(ThemeOptions, settings.Theme, ThemeOptions[0]);
             SelectedProxyMode = FindOption(ProxyModeOptions, settings.ProxyMode, ProxyModeOptions[0]);
-            SelectedUpdateChannel = FindOption(UpdateChannelOptions, settings.UpdateChannel, UpdateChannelOptions[0]);
             AutoCheckUpdates = settings.AutoCheckUpdates;
+            UseProxyForUpdates = settings.UseProxyForUpdates;
             DiagnosticsEnabled = settings.DiagnosticsEnabled;
             LogStackTrace = settings.LogStackTrace;
             ProxyHost = settings.ProxyHost;
@@ -148,7 +149,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             TransparencyOpacity = settings.TransparencyOpacity;
             BlurAmount = settings.BlurAmount;
             Status = "设置已加载";
-            logger.LogInformation("设置加载完成 {ProxyMode} {UpdateChannel}", settings.ProxyMode, settings.UpdateChannel);
+            logger.LogInformation("设置加载完成 {ProxyMode} {AutoCheckUpdates} {UseProxyForUpdates}", settings.ProxyMode, settings.AutoCheckUpdates, settings.UseProxyForUpdates);
         }
         catch (Exception exception)
         {
@@ -175,20 +176,21 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
                 string.IsNullOrWhiteSpace(ProxyPassword) ? null : ProxyPassword,
                 ClearProxyPassword,
                 AutoCheckUpdates,
-                SelectedUpdateChannel.Value,
+                "stable",
                 DiagnosticsEnabled,
                 LogRetentionDays,
                 LogStackTrace,
                 TransparencyEnabled,
                 TransparencyOpacity,
                 BlurAmount,
-                AcrylicTransparencyAlgorithm);
+                AcrylicTransparencyAlgorithm,
+                UseProxyForUpdates);
             var response = await dataStore.UpdateSettingsAsync(input, cancellationToken);
             HasProxyPassword = response.HasProxyPassword;
             ProxyPassword = "";
             ClearProxyPassword = false;
             Status = $"设置已保存 · {DateTime.Now:HH:mm:ss}";
-            logger.LogInformation("设置保存完成 {ProxyMode} {UpdateChannel} {DiagnosticsEnabled}", response.ProxyMode, response.UpdateChannel, response.DiagnosticsEnabled);
+            logger.LogInformation("设置保存完成 {ProxyMode} {AutoCheckUpdates} {UseProxyForUpdates} {DiagnosticsEnabled}", response.ProxyMode, response.AutoCheckUpdates, response.UseProxyForUpdates, response.DiagnosticsEnabled);
         }
         catch (Exception exception)
         {
@@ -248,11 +250,20 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         finally { IsBusy = false; }
     }
 
-    private Task CheckUpdateAsync()
+    private async Task CheckUpdateAsync()
     {
-        Status = $"当前版本 {VersionLabel}；远程更新服务尚未接入。";
-        logger.LogInformation("本地更新检查完成 {Version}", VersionLabel);
-        return Task.CompletedTask;
+        if (IsBusy) return;
+        IsBusy = true;
+        Status = "正在检查更新…";
+        try
+        {
+            var result = await updateCoordinator.CheckNowAsync(true);
+            Status = result?.Latest is null
+                ? $"当前版本 {VersionLabel}，已是最新版本。"
+                : $"发现新版本 v{result.Latest.Version}，请查看右下角更新提示。";
+            toastService.Show(result?.Latest is null ? "已是最新版本" : $"发现新版本 v{result.Latest.Version}", result?.Latest is null ? ToastLevel.Info : ToastLevel.Success);
+        }
+        finally { IsBusy = false; }
     }
 
     private Task OpenDataDirectoryAsync()
@@ -312,6 +323,6 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
         autoSaveCancellation?.Cancel();
         autoSaveCancellation?.Dispose();
-        httpClient.Dispose();
+        if (ownsUpdateCoordinator) updateCoordinator.Dispose();
     }
 }
