@@ -315,7 +315,7 @@ public sealed class ConfigurationManagementServiceTests
     }
 
     [Fact]
-    public async Task GatewayCombos_AreIndependentPerEndpoint()
+    public async Task GatewayCombos_AreGlobalAndCanBeBoundToMultipleEndpoints()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
@@ -329,14 +329,17 @@ public sealed class ConfigurationManagementServiceTests
             var provider = await service.CreateProviderAsync(new ProviderInput("gateway", "网关 Provider", "https://example.com", "openai", true, null, false, null));
             var model = await service.CreateModelAsync(provider.Id, new ModelInput("model", "模型", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
 
-            var openAiCombo = await service.CreateGatewayComboAsync("openai", new GatewayComboInput("公共模型", true, 2));
-            var ollamaCombo = await service.CreateGatewayComboAsync("ollama", new GatewayComboInput("本地模型", false, 0));
-            await service.CreateGatewayRouteAsync(openAiCombo.Id, new GatewayRouteInput(model.Id, true, 0));
-            await service.CreateGatewayRouteAsync(ollamaCombo.Id, new GatewayRouteInput(model.Id, false, 0));
+            var combo = await service.CreateGatewayComboAsync(new GatewayComboInput("公共模型", true, 2));
+            await service.UpdateGatewayEndpointComboBindingsAsync("openai", new GatewayEndpointComboSelectionInput([combo.Id]));
+            await service.UpdateGatewayEndpointComboBindingsAsync("ollama", new GatewayEndpointComboSelectionInput([combo.Id]));
+            await service.CreateGatewayRouteAsync(combo.Id, new GatewayRouteInput(model.Id, true, 0));
             var endpoints = await service.ListGatewayEndpointsAsync();
-            Assert.Contains(endpoints.Single(item => item.Key == "openai").Combos, combo => combo.Name == "公共模型" && combo.Enabled && combo.SortOrder == 2);
-            Assert.Contains(endpoints.Single(item => item.Key == "ollama").Combos, combo => !combo.Enabled);
-            Assert.Equal(2, configurationProvider.Current.GatewayEndpoints.Count(item => item.Combos.Count > 0));
+            Assert.Contains(endpoints.Single(item => item.Key == "openai").Combos, combo => combo.Name == "公共模型" && combo.ComboEnabled && combo.Enabled);
+            Assert.Contains(endpoints.Single(item => item.Key == "ollama").Combos, combo => combo.Name == "公共模型");
+            Assert.Single(configurationProvider.Current.GatewayCombos);
+            Assert.Single(configurationProvider.Current.GatewayEndpoints.Single(item => item.Key == "openai").ComboBindings);
+            Assert.Single(configurationProvider.Current.GatewayEndpoints.Single(item => item.Key == "ollama").ComboBindings);
+            Assert.Empty(configurationProvider.Current.GatewayEndpoints.Single(item => item.Key == "azure").ComboBindings);
         }
         finally { DeleteDatabaseFiles(databasePath); }
     }
@@ -356,11 +359,10 @@ public sealed class ConfigurationManagementServiceTests
             var provider = await service.CreateProviderAsync(new ProviderInput("combo", "Combo Provider", "https://example.com", "openai", true, null, false, null));
             var model = await service.CreateModelAsync(provider.Id, new ModelInput("model", "模型", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
 
-            var combo = await service.CreateGatewayComboAsync("openai", new GatewayComboInput("coding", true, 0));
+            var combo = await service.CreateGatewayComboAsync(new GatewayComboInput("coding", true, 0));
             await service.CreateGatewayRouteAsync(combo.Id, new GatewayRouteInput(model.Id, true, 0));
 
-            var endpoints = await service.ListGatewayEndpointsAsync();
-            var listedCombo = endpoints.Single(item => item.Key == "openai").Combos.Single();
+            var listedCombo = (await service.ListGatewayCombosAsync()).Single();
             Assert.Equal("coding", listedCombo.Name);
             Assert.Single(listedCombo.Routes);
             Assert.Equal(model.Id, listedCombo.Routes[0].ModelId);
@@ -397,7 +399,7 @@ public sealed class ConfigurationManagementServiceTests
     }
 
     [Fact]
-    public async Task GatewayComboNames_AreCaseInsensitivePerEndpoint()
+    public async Task GatewayComboNames_AreGloballyCaseInsensitive()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
@@ -409,15 +411,15 @@ public sealed class ConfigurationManagementServiceTests
             await configurationProvider.ReloadAsync();
             var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
 
-            await service.CreateGatewayComboAsync("openai", new GatewayComboInput("Coding", true, 0));
+            await service.CreateGatewayComboAsync(new GatewayComboInput("Coding", true, 0));
 
-            await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateGatewayComboAsync("openai", new GatewayComboInput("coding", true, 1)));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => service.CreateGatewayComboAsync(new GatewayComboInput("coding", true, 1)));
         }
         finally { DeleteDatabaseFiles(databasePath); }
     }
 
     [Fact]
-    public async Task LegacyGatewayRoutes_AreNotExposedUntilAddedToCombo()
+    public async Task UnboundGlobalCombo_IsNotExposedByEndpoint()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
@@ -426,22 +428,19 @@ public sealed class ConfigurationManagementServiceTests
             await using var context = new ConfigurationDbContext(options);
             await ConfigurationDatabase.InitializeAsync(context);
             var configurationProvider = new DatabaseConfigurationProvider(context);
-            var provider = new ProviderEntity { BusinessId = "legacy", DisplayName = "旧 Provider", BaseUrl = "https://example.com" };
-            var model = new ModelEntity { Provider = provider, ModelId = "legacy-model", DisplayName = "旧模型" };
-            context.Providers.Add(provider);
-            context.Models.Add(model);
-            context.GatewayRoutes.Add(new GatewayRouteEntity { EndpointKey = "ollama", Model = model, ModelId = model.Id });
-            await context.SaveChangesAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+            var combo = await service.CreateGatewayComboAsync(new GatewayComboInput("unbound", true, 0));
 
             await configurationProvider.ReloadAsync();
 
-            Assert.Empty(configurationProvider.Current.GatewayEndpoints.Single(item => item.Key == "ollama").Combos);
+            Assert.Empty(configurationProvider.Current.GatewayEndpoints.Single(item => item.Key == "ollama").ComboBindings);
+            Assert.Single(configurationProvider.Current.GatewayCombos, item => item.Id == combo.Id);
         }
         finally { DeleteDatabaseFiles(databasePath); }
     }
 
     [Fact]
-    public async Task DeleteModel_WithLegacyGatewayRoute_IsRejected()
+    public async Task DeleteModel_WithComboRoute_IsRejected()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
         try
@@ -455,11 +454,8 @@ public sealed class ConfigurationManagementServiceTests
             var provider = await service.CreateProviderAsync(new ProviderInput("legacy-delete", "旧 Provider", "https://example.com", "openai", true, null, false, null));
             var model = await service.CreateModelAsync(provider.Id, new ModelInput("legacy-model", "旧模型", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
 
-            await using (var routeContext = new ConfigurationDbContext(options))
-            {
-                routeContext.GatewayRoutes.Add(new GatewayRouteEntity { EndpointKey = "openai", ModelId = model.Id });
-                await routeContext.SaveChangesAsync();
-            }
+            var combo = await service.CreateGatewayComboAsync(new GatewayComboInput("delete-check", true, 0));
+            await service.CreateGatewayRouteAsync(combo.Id, new GatewayRouteInput(model.Id, true, 0));
 
             var exception = await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteModelAsync(model.Id));
             Assert.Contains("网关路由", exception.Message);

@@ -122,9 +122,6 @@ public sealed class RuntimeGraphControl : Control
                 context.DrawLine(edgePen, ToViewport(edge.Source), ToViewport(edge.Target));
             }
 
-            foreach (var provider in layout.ProviderGroups.Values.OrderBy(item => item.ProviderId, StringComparer.OrdinalIgnoreCase))
-                DrawProviderGroup(context, provider, surfaceMuted, surfaceSubtle, text, muted, border, zoom);
-
             foreach (var node in layout.Nodes.Values
                          .Where(item => item.Kind is RuntimeGraphNodeKind.Endpoint or RuntimeGraphNodeKind.Combo)
                          .OrderBy(item => item.NodeId, StringComparer.OrdinalIgnoreCase))
@@ -194,10 +191,6 @@ public sealed class RuntimeGraphControl : Control
             if (node.Bounds.Contains(graphPoint))
                 return new RuntimeGraphSelection(RuntimeGraphSelectionKind.Node, node.NodeId);
 
-        foreach (var provider in layout.ProviderGroups.Values)
-            if (provider.Bounds.Contains(graphPoint))
-                return new RuntimeGraphSelection(RuntimeGraphSelectionKind.ProviderGroup, provider.ProviderId);
-
         return null;
     }
 
@@ -211,23 +204,6 @@ public sealed class RuntimeGraphControl : Control
     public RuntimeGraphSelectionDetails? GetSelectionDetails()
     {
         if (Selection is null || Snapshot is null) return null;
-        if (Selection.Kind == RuntimeGraphSelectionKind.ProviderGroup)
-        {
-            var provider = Snapshot.Providers.FirstOrDefault(item => string.Equals(item.Id, Selection.Id, StringComparison.OrdinalIgnoreCase));
-            return provider is null
-                ? null
-                : new RuntimeGraphSelectionDetails(
-                    Selection.Id,
-                    Selection.Kind,
-                    provider.DisplayName,
-                    provider.Enabled,
-                    provider.BaseUrl,
-                    provider.Protocol,
-                    null,
-                    null,
-                    provider.Models.Count);
-        }
-
         var node = Snapshot.Endpoints.FirstOrDefault(item => string.Equals(item.Id, Selection.Id, StringComparison.OrdinalIgnoreCase))
             ?? Snapshot.Combos.FirstOrDefault(item => string.Equals(item.Id, Selection.Id, StringComparison.OrdinalIgnoreCase))
             ?? Snapshot.Models.FirstOrDefault(item => string.Equals(item.Id, Selection.Id, StringComparison.OrdinalIgnoreCase));
@@ -237,8 +213,8 @@ public sealed class RuntimeGraphControl : Control
             Selection.Kind,
             node.DisplayName,
             node.Enabled,
-            null,
-            null,
+            node.ProviderBaseUrl,
+            node.ProviderProtocol,
             node.EndpointId,
             node.ProviderId,
             null);
@@ -377,62 +353,6 @@ public sealed class RuntimeGraphControl : Control
         Dispatcher.UIThread.Post(FitToView, DispatcherPriority.Loaded);
     }
 
-    private void DrawProviderGroup(
-        DrawingContext context,
-        RuntimeGraphProviderGroupLayout provider,
-        IBrush groupFill,
-        IBrush headerFill,
-        IBrush text,
-        IBrush muted,
-        IBrush border,
-        double zoom)
-    {
-        var bounds = ToViewport(provider.Bounds);
-        var selected = Selection is { Kind: RuntimeGraphSelectionKind.ProviderGroup } selection
-            && string.Equals(selection.Id, provider.ProviderId, StringComparison.OrdinalIgnoreCase);
-        var groupBorder = selected ? ResolveBrush("AccentBrush", Brushes.Teal) : border;
-        context.DrawRectangle(groupFill, new Pen(WithAlpha(groupBorder, selected ? 1 : 0.92), selected ? 2 : 1), bounds, 10 * zoom, 10 * zoom, default);
-
-        var headerInset = Math.Max(1, zoom);
-        var headerBounds = new Rect(
-            bounds.X + headerInset,
-            bounds.Y + headerInset,
-            Math.Max(0, bounds.Width - headerInset * 2),
-            Math.Max(0, 38 * zoom - headerInset));
-        using (context.PushClip(new RoundedRect(bounds, 10 * zoom)))
-            context.DrawRectangle(headerFill, null, headerBounds);
-        context.DrawLine(
-            new Pen(WithAlpha(groupBorder, 0.68), Math.Max(1, zoom)),
-            new Point(headerBounds.Left, headerBounds.Bottom),
-            new Point(headerBounds.Right, headerBounds.Bottom));
-
-        var providerName = Snapshot?.Providers.FirstOrDefault(item => string.Equals(item.Id, provider.ProviderId, StringComparison.OrdinalIgnoreCase))?.DisplayName
-            ?? provider.ProviderId;
-        if (zoom >= 0.25)
-        {
-            var countWidth = Math.Min(100 * zoom, Math.Max(0, headerBounds.Width * 0.42));
-            DrawText(
-                context,
-                providerName,
-                new Rect(headerBounds.X + 12 * zoom, headerBounds.Y, Math.Max(0, headerBounds.Width - countWidth - 24 * zoom), headerBounds.Height),
-                text,
-                Math.Max(9, 14 * zoom),
-                FontWeight.SemiBold,
-                TextAlignment.Left);
-            if (zoom >= 0.4)
-                DrawText(
-                    context,
-                    $"{provider.ModelIds.Count} 个模型",
-                    new Rect(headerBounds.Right - countWidth - 12 * zoom, headerBounds.Y, Math.Max(0, countWidth), headerBounds.Height),
-                    muted,
-                    Math.Max(8, 10 * zoom),
-                    FontWeight.Normal,
-                    TextAlignment.Right);
-        }
-
-        DrawKindWatermark(context, "Provider", bounds, zoom, muted, bottomInset: 3);
-    }
-
     private void DrawNode(
         DrawingContext context,
         RuntimeGraphNodeLayout node,
@@ -499,10 +419,11 @@ public sealed class RuntimeGraphControl : Control
     private string NodeLabel(string nodeId)
     {
         if (Snapshot is null) return nodeId;
-        return Snapshot.Endpoints.FirstOrDefault(item => string.Equals(item.Id, nodeId, StringComparison.OrdinalIgnoreCase))?.DisplayName
-            ?? Snapshot.Combos.FirstOrDefault(item => string.Equals(item.Id, nodeId, StringComparison.OrdinalIgnoreCase))?.DisplayName
-            ?? Snapshot.Models.FirstOrDefault(item => string.Equals(item.Id, nodeId, StringComparison.OrdinalIgnoreCase))?.DisplayName
-            ?? nodeId;
+        var endpointOrCombo = Snapshot.Endpoints.FirstOrDefault(item => string.Equals(item.Id, nodeId, StringComparison.OrdinalIgnoreCase))
+            ?? Snapshot.Combos.FirstOrDefault(item => string.Equals(item.Id, nodeId, StringComparison.OrdinalIgnoreCase));
+        if (endpointOrCombo is not null) return endpointOrCombo.DisplayName;
+        var model = Snapshot.Models.FirstOrDefault(item => string.Equals(item.Id, nodeId, StringComparison.OrdinalIgnoreCase));
+        return model is null ? nodeId : $"{model.DisplayName} · {model.ProviderDisplayName}";
     }
 
     private static void DrawText(
@@ -549,8 +470,7 @@ public sealed class RuntimeGraphControl : Control
 
 public enum RuntimeGraphSelectionKind
 {
-    Node,
-    ProviderGroup
+    Node
 }
 
 public sealed record RuntimeGraphSelection(RuntimeGraphSelectionKind Kind, string Id);

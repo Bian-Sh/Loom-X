@@ -10,8 +10,7 @@ public enum RuntimeGraphNodeKind
 public enum RuntimeGraphEdgeKind
 {
     EndpointToCombo,
-    ComboToProvider,
-    ProviderToModel
+    ComboToModel
 }
 
 public sealed record RuntimeGraphNode(
@@ -21,17 +20,12 @@ public sealed record RuntimeGraphNode(
     bool Enabled,
     string? EndpointId = null,
     string? ProviderId = null,
+    string? ProviderDisplayName = null,
+    string? ProviderBaseUrl = null,
+    string? ProviderProtocol = null,
     string? ModelId = null,
     string? PublicPath = null,
     int SortOrder = 0);
-
-public sealed record RuntimeGraphProviderGroup(
-    string Id,
-    string DisplayName,
-    bool Enabled,
-    string? BaseUrl,
-    string? Protocol,
-    IReadOnlyList<RuntimeGraphNode> Models);
 
 public sealed record RuntimeGraphEdge(
     string Id,
@@ -56,61 +50,36 @@ public sealed record RuntimeGraphRoute(
 public sealed record RuntimeGraphSnapshot(
     IReadOnlyList<RuntimeGraphNode> Endpoints,
     IReadOnlyList<RuntimeGraphNode> Combos,
-    IReadOnlyList<RuntimeGraphProviderGroup> Providers,
+    IReadOnlyList<RuntimeGraphNode> Models,
     IReadOnlyList<RuntimeGraphEdge> Edges,
     IReadOnlyList<RuntimeGraphRoute> Routes)
 {
-    public IReadOnlyList<RuntimeGraphNode> Models => Providers.SelectMany(provider => provider.Models).ToArray();
-
     public RuntimeGraphSnapshot ForEndpoint(string endpointId)
     {
         var endpoint = Endpoints.FirstOrDefault(item => string.Equals(item.Id, endpointId, StringComparison.OrdinalIgnoreCase));
         if (endpoint is null)
             return new RuntimeGraphSnapshot([], [], [], [], []);
 
-        var combos = Combos
-            .Where(item => string.Equals(item.EndpointId, endpoint.Id, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
+        var visibleComboIds = Edges
+            .Where(edge => edge.Kind == RuntimeGraphEdgeKind.EndpointToCombo
+                && string.Equals(edge.EndpointId, endpoint.Id, StringComparison.OrdinalIgnoreCase))
+            .Select(edge => edge.TargetId)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var routes = Routes
             .Where(item => string.Equals(item.EndpointId, endpoint.Id, StringComparison.OrdinalIgnoreCase))
             .ToArray();
-        var providerIds = routes
-            .Select(item => item.ProviderId)
+        var visibleModelIds = routes
+            .Select(item => RuntimeGraphIds.Model(item.ProviderId, item.ModelId))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var modelIdsByProvider = routes
-            .GroupBy(item => item.ProviderId, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(item => RuntimeGraphIds.Model(item.ProviderId, item.ModelId)).ToHashSet(StringComparer.OrdinalIgnoreCase),
-                StringComparer.OrdinalIgnoreCase);
-        var providers = Providers
-            .Where(item => providerIds.Contains(item.Id))
-            .Select(provider => provider with
-            {
-                Models = provider.Models
-                    .Where(model => modelIdsByProvider.GetValueOrDefault(provider.Id)?.Contains(model.Id) == true)
-                    .ToArray()
-            })
-            .ToArray();
-        var visibleModelIds = providers
-            .SelectMany(item => item.Models)
-            .Select(item => item.Id)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var visibleComboIds = combos
-            .Select(item => item.Id)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var combos = Combos.Where(item => visibleComboIds.Contains(item.Id)).ToArray();
+        var models = Models.Where(item => visibleModelIds.Contains(item.Id)).ToArray();
         var edges = Edges
-            .Where(edge =>
-                edge.Kind == RuntimeGraphEdgeKind.EndpointToCombo
-                    ? string.Equals(edge.EndpointId, endpoint.Id, StringComparison.OrdinalIgnoreCase)
-                    : edge.Kind == RuntimeGraphEdgeKind.ComboToProvider
-                        ? string.Equals(edge.EndpointId, endpoint.Id, StringComparison.OrdinalIgnoreCase)
-                            && visibleComboIds.Contains(edge.SourceId)
-                            && providerIds.Contains(edge.TargetId)
-                        : visibleModelIds.Contains(edge.TargetId))
+            .Where(edge => edge.Kind == RuntimeGraphEdgeKind.EndpointToCombo
+                ? string.Equals(edge.EndpointId, endpoint.Id, StringComparison.OrdinalIgnoreCase)
+                : visibleComboIds.Contains(edge.SourceId) && visibleModelIds.Contains(edge.TargetId))
             .ToArray();
 
-        return new RuntimeGraphSnapshot([endpoint], combos, providers, edges, routes);
+        return new RuntimeGraphSnapshot([endpoint], combos, models, edges, routes);
     }
 
     public RuntimeGraphRoute? FindRoute(string endpointId, string? comboName, string? providerId, string? modelId) =>
@@ -123,15 +92,13 @@ public sealed record RuntimeGraphSnapshot(
 
 public static class RuntimeGraphIds
 {
-    public static string Combo(string endpointId, string comboName) => $"{endpointId}|{comboName}";
+    public static string Combo(Guid comboId) => $"combo|{comboId:N}";
 
-    public static string Model(string providerId, string modelId) => $"{providerId}|{modelId}";
+    public static string Model(string providerId, string modelId) => $"model|{providerId}|{modelId}";
 
-    public static string EndpointComboEdge(string comboId) => $"endpoint-combo|{comboId}";
+    public static string EndpointComboEdge(string endpointId, string comboId) => $"endpoint-combo|{endpointId}|{comboId}";
 
-    public static string ComboProviderEdge(string comboId, string providerId) => $"combo-provider|{comboId}|{providerId}";
-
-    public static string ProviderModelEdge(string providerId, string modelId) => $"provider-model|{providerId}|{modelId}";
+    public static string ComboModelEdge(string comboId, string providerId, string modelId) => $"combo-model|{comboId}|{providerId}|{modelId}";
 
     public static string Route(string endpointId, string comboId, string providerId, string modelId) =>
         $"route|{endpointId}|{comboId}|{providerId}|{modelId}";

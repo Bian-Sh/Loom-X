@@ -42,7 +42,12 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
             var settings = await dbContext.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
             LoggingBootstrap.SetIncludeStackTrace(settings.LogStackTrace);
             var providers = await dbContext.Providers.AsNoTracking().Include(provider => provider.Models).ToListAsync(cancellationToken);
-            var endpoints = await dbContext.GatewayEndpoints.AsNoTracking().Include(endpoint => endpoint.Combos).ThenInclude(combo => combo.Routes).ThenInclude(route => route.Model).ThenInclude(model => model.Provider).ToListAsync(cancellationToken);
+            var combos = await dbContext.GatewayCombos.AsNoTracking().AsSplitQuery()
+                .Include(combo => combo.Routes).ThenInclude(route => route.Model).ThenInclude(model => model.Provider)
+                .ToListAsync(cancellationToken);
+            var endpoints = await dbContext.GatewayEndpoints.AsNoTracking()
+                .Include(endpoint => endpoint.ComboBindings)
+                .ToListAsync(cancellationToken);
             logger?.LogInformation("数据库配置行读取完成，Provider {ProviderCount}，模型 {ModelCount}，Endpoint {EndpointCount}，启用 Provider {EnabledProviderCount}", providers.Count, providers.Sum(provider => provider.Models.Count), endpoints.Count, providers.Count(provider => provider.Enabled));
             var resolvedProviders = providers.OrderBy(provider => provider.SortOrder).Select(provider => new ResolvedProviderConfig
             {
@@ -82,6 +87,19 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                 },
                 Providers = resolvedProviders,
                 Models = models,
+                GatewayCombos = combos.OrderBy(combo => combo.SortOrder).ThenBy(combo => combo.Name, StringComparer.OrdinalIgnoreCase).Select(combo => new ResolvedGatewayComboConfig
+                {
+                    Id = combo.Id,
+                    Name = combo.Name,
+                    Enabled = combo.Enabled,
+                    SortOrder = combo.SortOrder,
+                    Routes = combo.Routes.OrderBy(route => route.SortOrder).Where(route => modelLookup.ContainsKey(route.ModelId)).Select(route => new ResolvedGatewayRouteConfig
+                    {
+                        Model = modelLookup[route.ModelId],
+                        Enabled = route.Enabled,
+                        SortOrder = route.SortOrder
+                    }).ToArray()
+                }).ToArray(),
                 GatewayEndpoints = endpoints.OrderBy(endpoint => endpoint.Key).Select(endpoint => new ResolvedGatewayEndpointConfig
                 {
                     Key = endpoint.Key,
@@ -89,17 +107,11 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     Enabled = endpoint.Enabled,
                     ApiKey = ReadEndpointApiKey(endpoint),
                     ReasoningEffort = GatewayEndpointSettings.NormalizeReasoningEffort(endpoint.ReasoningEffort),
-                    Combos = endpoint.Combos.OrderBy(combo => combo.SortOrder).Select(combo => new ResolvedGatewayComboConfig
+                    ComboBindings = endpoint.ComboBindings.OrderBy(binding => binding.SortOrder).Select(binding => new ResolvedGatewayComboBindingConfig
                     {
-                        Name = combo.Name,
-                        Enabled = combo.Enabled,
-                        SortOrder = combo.SortOrder,
-                        Routes = combo.Routes.OrderBy(route => route.SortOrder).Where(route => modelLookup.ContainsKey(route.ModelId)).Select(route => new ResolvedGatewayRouteConfig
-                        {
-                            Model = modelLookup[route.ModelId],
-                            Enabled = route.Enabled,
-                            SortOrder = route.SortOrder
-                        }).ToArray()
+                        ComboId = binding.ComboId,
+                        Enabled = binding.Enabled,
+                        SortOrder = binding.SortOrder
                     }).ToArray()
                 }).ToArray()
             });

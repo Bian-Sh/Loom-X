@@ -52,6 +52,18 @@ public partial class GatewayView : UserControl
         if (DataContext is GatewayViewModel viewModel) viewModel.ToggleModelSortDirection();
     }
 
+    private void EndpointComboPicker_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Button { DataContext: GatewayEndpointEditorViewModel endpoint })
+            endpoint.IsComboPickerOpen = !endpoint.IsComboPickerOpen;
+    }
+
+    private async void EndpointComboOption_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is CheckBox { Tag: GatewayComboBindingOption option } && DataContext is GatewayViewModel viewModel)
+            await viewModel.ToggleEndpointComboAsync(option);
+    }
+
     private void ToggleProviderGroup_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (sender is Button { Tag: GatewayModelGroup group }) group.IsExpanded = !group.IsExpanded;

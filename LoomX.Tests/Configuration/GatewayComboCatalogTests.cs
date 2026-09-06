@@ -6,46 +6,50 @@ namespace LoomX.Tests.Configuration;
 public sealed class GatewayComboCatalogTests
 {
     [Fact]
-    public void ExcludesComboFromAnotherEndpoint()
+    public void ExcludesGlobalComboWhenEndpointIsNotBound()
     {
         var combo = CreateCombo("deepseek-v4");
         var config = new ResolvedAppConfig
         {
+            GatewayCombos = [combo],
             GatewayEndpoints =
             [
-                new ResolvedGatewayEndpointConfig { Key = "openai", PublicPath = "/openai", Enabled = true },
-                new ResolvedGatewayEndpointConfig { Key = "ollama", PublicPath = "/", Enabled = true, Combos = [combo] }
+                new ResolvedGatewayEndpointConfig { Key = "openai", PublicPath = "/openai", Enabled = true }
             ]
         };
 
-        var result = GatewayComboCatalog.ForEndpoint(config, "openai");
-
-        Assert.Empty(result);
+        Assert.Empty(GatewayComboCatalog.ForEndpoint(config, "openai"));
     }
 
     [Fact]
-    public void UsesCurrentEndpointWhenComboNamesOverlap()
+    public void SharesTheSameGlobalComboAcrossEndpoints()
     {
-        var local = CreateCombo("shared", "local-model", sortOrder: 10);
-        var global = CreateCombo("shared", "global-model", sortOrder: 1);
+        var combo = CreateCombo("shared", "shared-model");
         var config = new ResolvedAppConfig
         {
+            GatewayCombos = [combo],
             GatewayEndpoints =
             [
-                new ResolvedGatewayEndpointConfig { Key = "openai", PublicPath = "/openai", Enabled = true, Combos = [local] },
-                new ResolvedGatewayEndpointConfig { Key = "ollama", PublicPath = "/", Enabled = true, Combos = [global] }
+                new ResolvedGatewayEndpointConfig
+                {
+                    Key = "openai", PublicPath = "/openai", Enabled = true,
+                    ComboBindings = [new ResolvedGatewayComboBindingConfig { ComboId = combo.Id, Enabled = true, SortOrder = 0 }]
+                },
+                new ResolvedGatewayEndpointConfig
+                {
+                    Key = "ollama", PublicPath = "/", Enabled = true,
+                    ComboBindings = [new ResolvedGatewayComboBindingConfig { ComboId = combo.Id, Enabled = true, SortOrder = 0 }]
+                }
             ]
         };
 
-        var result = GatewayComboCatalog.ForEndpoint(config, "openai");
-
-        Assert.Single(result);
-        Assert.Single(result);
-        Assert.Equal("local-model", result[0].Routes[0].Model.ModelId);
+        Assert.Same(combo, Assert.Single(GatewayComboCatalog.ForEndpoint(config, "openai")));
+        Assert.Same(combo, Assert.Single(GatewayComboCatalog.ForEndpoint(config, "ollama")));
     }
 
     private static ResolvedGatewayComboConfig CreateCombo(string name, string modelId = "model", int sortOrder = 0) => new()
     {
+        Id = Guid.NewGuid(),
         Name = name,
         Enabled = true,
         SortOrder = sortOrder,

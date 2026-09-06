@@ -28,6 +28,7 @@ public sealed class AppDataStore : IDisposable
     public ResolvedAppConfig CurrentConfig { get; private set; } = new();
     public IReadOnlyList<ProviderResponse> Providers { get; private set; } = [];
     public IReadOnlyList<GatewayEndpointResponse> GatewayEndpoints { get; private set; } = [];
+    public IReadOnlyList<GatewayComboResponse> GatewayCombos { get; private set; } = [];
     public AppSettingsResponse? Settings { get; private set; }
     public IReadOnlyList<GatewayModelSourceResponse> EnabledGatewayModels { get; private set; } = [];
     public IReadOnlyList<ActivityEventRecord> ActivityWindow => activityWindow.ToArray();
@@ -91,6 +92,12 @@ public sealed class AppDataStore : IDisposable
     {
         await InitializeAsync(cancellationToken);
         return GatewayEndpoints;
+    }
+
+    public async Task<IReadOnlyList<GatewayComboResponse>> ListGatewayCombosAsync(CancellationToken cancellationToken = default)
+    {
+        await InitializeAsync(cancellationToken);
+        return GatewayCombos;
     }
 
     public async Task<IReadOnlyList<GatewayModelSourceResponse>> ListEnabledGatewayModelsAsync(CancellationToken cancellationToken = default)
@@ -180,9 +187,16 @@ public sealed class AppDataStore : IDisposable
         return result;
     }
 
-    public async Task<GatewayComboResponse> CreateGatewayComboAsync(string endpointKey, GatewayComboInput input, CancellationToken cancellationToken = default)
+    public async Task<GatewayEndpointResponse> UpdateGatewayEndpointComboBindingsAsync(string endpointKey, GatewayEndpointComboSelectionInput input, CancellationToken cancellationToken = default)
     {
-        var result = await configService.CreateGatewayComboAsync(endpointKey, input, cancellationToken);
+        var result = await configService.UpdateGatewayEndpointComboBindingsAsync(endpointKey, input, cancellationToken);
+        await RefreshAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<GatewayComboResponse> CreateGatewayComboAsync(GatewayComboInput input, CancellationToken cancellationToken = default)
+    {
+        var result = await configService.CreateGatewayComboAsync(input, cancellationToken);
         await RefreshAsync(cancellationToken);
         return result;
     }
@@ -320,11 +334,13 @@ public sealed class AppDataStore : IDisposable
             var providers = await configService.ListProvidersAsync(cancellationToken);
             var settings = await configService.GetSettingsAsync(cancellationToken);
             var endpoints = await configService.ListGatewayEndpointsAsync(cancellationToken);
+            var combos = await configService.ListGatewayCombosAsync(cancellationToken);
             var enabledModels = await configService.ListEnabledGatewayModelsAsync(cancellationToken);
             CurrentConfig = config;
             Providers = providers;
             Settings = settings;
             GatewayEndpoints = endpoints;
+            GatewayCombos = combos;
             EnabledGatewayModels = enabledModels;
             logger.LogInformation("桌面数据中心配置快照完成 {ProviderCount} {ModelCount} {EndpointCount}", providers.Count, config.Models.Count, endpoints.Count);
             ConfigurationChanged?.Invoke(this, EventArgs.Empty);

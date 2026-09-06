@@ -350,14 +350,16 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         }
         foreach (var model in config.Models.GroupBy(item => $"{item.ProviderId}:{item.ModelId}", StringComparer.OrdinalIgnoreCase).Select(group => group.First()))
             Models.Add(new OverviewModelViewModel(model.DisplayName, model.ModelId, model.ProviderId));
+        var comboById = config.GatewayCombos.ToDictionary(item => item.Id);
+        foreach (var combo in config.GatewayCombos.OrderBy(item => item.SortOrder))
+            Combos.Add(new OverviewComboViewModel(RuntimeGraphIds.Combo(combo.Id), "global", combo.Name, combo.Enabled));
         foreach (var endpoint in config.GatewayEndpoints.OrderBy(item => item.Key))
         {
             var endpointVm = new OverviewEndpointViewModel(endpoint.Key, EndpointLabel(endpoint.Key), endpoint.PublicPath, endpoint.Enabled);
             endpointVm.GraphSnapshot = GraphSnapshot.ForEndpoint(endpoint.Key);
-            foreach (var combo in endpoint.Combos.OrderBy(item => item.SortOrder))
+            foreach (var binding in endpoint.ComboBindings.OrderBy(item => item.SortOrder))
             {
-                var comboVm = new OverviewComboViewModel(ComboId(endpoint.Key, combo.Name), endpoint.Key, combo.Name, combo.Enabled);
-                Combos.Add(comboVm);
+                if (!comboById.TryGetValue(binding.ComboId, out var combo)) continue;
                 foreach (var route in combo.Routes.Where(item => item.Enabled))
                 {
                     var routeVm = new OverviewRouteViewModel(combo.Name, route.Model.DisplayName, route.Model.ModelId, route.Model.ProviderId)
@@ -386,48 +388,35 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         var providers = providerResponses
             .GroupBy(item => item.BusinessId, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
-            .Select(item => new { id = item.BusinessId, displayName = item.DisplayName, enabled = item.Enabled, modelCount = item.ModelCount })
-            .ToArray();
+            .ToDictionary(item => item.BusinessId, StringComparer.OrdinalIgnoreCase);
         var models = config.Models
             .GroupBy(item => $"{item.ProviderId}:{item.ModelId}", StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
-            .Select(item => new { displayName = item.DisplayName, modelId = item.ModelId, providerId = item.ProviderId })
+            .Select(item => new { displayName = item.DisplayName, modelId = item.ModelId, providerId = item.ProviderId, providerName = providers.GetValueOrDefault(item.ProviderId)?.DisplayName ?? item.ProviderId })
             .ToArray();
         var endpoints = config.GatewayEndpoints.OrderBy(item => item.Key)
             .Select(item => new { key = item.Key, displayName = EndpointLabel(item.Key), publicPath = item.PublicPath, enabled = item.Enabled })
             .ToArray();
-        var combos = config.GatewayEndpoints.SelectMany(endpoint => endpoint.Combos.OrderBy(combo => combo.SortOrder)
-            .Select(combo => new { id = ComboId(endpoint.Key, combo.Name), endpointKey = endpoint.Key, displayName = combo.Name, enabled = combo.Enabled }))
+        var combos = config.GatewayCombos.OrderBy(combo => combo.SortOrder)
+            .Select(combo => new { id = RuntimeGraphIds.Combo(combo.Id), displayName = combo.Name, enabled = combo.Enabled })
             .ToArray();
         var edges = new List<object>();
-        var comboProviders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var providerModels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var model in config.Models)
-        {
-            var modelKey = $"{model.ProviderId}|{model.ModelId}";
-            if (providerModels.Add(modelKey))
-                edges.Add(new { type = "provider-model", sourceType = "provider", sourceId = model.ProviderId, targetType = "model", targetId = modelKey, endpointKey = "", comboId = "", providerId = model.ProviderId, modelId = model.ModelId });
-        }
         foreach (var endpoint in config.GatewayEndpoints)
-        foreach (var combo in endpoint.Combos)
+        foreach (var binding in endpoint.ComboBindings)
         {
-            var comboId = ComboId(endpoint.Key, combo.Name);
-            edges.Add(new { type = "endpoint-combo", sourceType = "endpoint", sourceId = endpoint.Key, targetType = "combo", targetId = comboId, endpointKey = endpoint.Key, comboId });
-            foreach (var route in combo.Routes)
-            {
-                var providerKey = $"{comboId}|{route.Model.ProviderId}";
-                if (comboProviders.Add(providerKey))
-                    edges.Add(new { type = "combo-provider", sourceType = "combo", sourceId = comboId, targetType = "provider", targetId = route.Model.ProviderId, endpointKey = endpoint.Key, comboId, providerId = route.Model.ProviderId, modelId = route.Model.ModelId });
-                var modelKey = $"{route.Model.ProviderId}|{route.Model.ModelId}";
-                if (providerModels.Add(modelKey))
-                    edges.Add(new { type = "provider-model", sourceType = "provider", sourceId = route.Model.ProviderId, targetType = "model", targetId = modelKey, endpointKey = endpoint.Key, comboId, providerId = route.Model.ProviderId, modelId = route.Model.ModelId });
-                edges.Add(new { type = "route", sourceType = "endpoint", sourceId = endpoint.Key, targetType = "model", targetId = modelKey, endpointKey = endpoint.Key, comboId, providerId = route.Model.ProviderId, modelId = route.Model.ModelId, alias = combo.Name, enabled = combo.Enabled && route.Enabled });
-            }
+            var combo = config.GatewayCombos.FirstOrDefault(item => item.Id == binding.ComboId);
+            if (combo is null) continue;
+            var comboId = RuntimeGraphIds.Combo(combo.Id);
+            edges.Add(new { type = "endpoint-combo", sourceType = "endpoint", sourceId = endpoint.Key, targetType = "combo", targetId = comboId, endpointKey = endpoint.Key, comboId, enabled = endpoint.Enabled && binding.Enabled && combo.Enabled });
         }
-        return JsonSerializer.Serialize(new { endpoints, combos, providers, models, edges });
+        foreach (var combo in config.GatewayCombos)
+        foreach (var route in combo.Routes.Where(item => item.Enabled))
+        {
+            var comboId = RuntimeGraphIds.Combo(combo.Id);
+            edges.Add(new { type = "combo-model", sourceType = "combo", sourceId = comboId, targetType = "model", targetId = RuntimeGraphIds.Model(route.Model.ProviderId, route.Model.ModelId), endpointKey = "", comboId, providerId = route.Model.ProviderId, modelId = route.Model.ModelId, providerName = providers.GetValueOrDefault(route.Model.ProviderId)?.DisplayName ?? route.Model.ProviderId, enabled = combo.Enabled });
+        }
+        return JsonSerializer.Serialize(new { endpoints, combos, models, edges });
     }
-
-    private static string ComboId(string endpointKey, string name) => $"{endpointKey}|{name}";
 
     private string LoadEndpoint()
     {

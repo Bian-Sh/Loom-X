@@ -103,11 +103,11 @@ public sealed class OverviewGraphContractTests
     }
 
     [Fact]
-    public void RuntimeGraphRoundsProviderHeaderCorners()
+    public void RuntimeGraphDoesNotRenderProviderGroupHeaders()
     {
         var controlSource = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
 
-        Assert.Contains("context.PushClip(new RoundedRect(bounds, 10 * zoom))", controlSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("DrawProviderGroup", controlSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -174,22 +174,65 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("function setCameraState", source, StringComparison.Ordinal);
         Assert.Contains("cameraDistance+e.deltaY*.012", source, StringComparison.Ordinal);
         Assert.Contains("combos", source, StringComparison.Ordinal);
-        Assert.Contains("providers", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers", source, StringComparison.Ordinal);
         Assert.Contains("comboId:edge.comboId", source, StringComparison.Ordinal);
         Assert.Contains("function escapeHtml", source, StringComparison.Ordinal);
         Assert.Contains("getBoundingClientRect", source, StringComparison.Ordinal);
         Assert.Contains("routeBindings", source, StringComparison.Ordinal);
-        Assert.Contains("if(edge.type==='route')", source, StringComparison.Ordinal);
-        Assert.Contains("function providerContainer", source, StringComparison.Ordinal);
-        Assert.Contains("new THREE.EdgesGeometry(new THREE.BoxGeometry", source, StringComparison.Ordinal);
+        Assert.Contains("edge.type==='endpoint-combo'", source, StringComparison.Ordinal);
+        Assert.Contains("edge.type==='combo-model'", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("if(edge.type==='route')", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("function providerContainer", source, StringComparison.Ordinal);
+        Assert.Contains("new THREE.TubeGeometry(curve", source, StringComparison.Ordinal);
         Assert.DoesNotContain("makeEdge(edge,from,to,key)", source, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void TopologyProjectionKeepsProviderWithoutModelAndExposesCombos()
+    public void TopologyProjectionExposesGlobalCombosAndModelProviderMetadata()
     {
+        var comboId = Guid.NewGuid();
+        var unboundComboId = Guid.NewGuid();
         var config = new ResolvedAppConfig
         {
+            GatewayCombos =
+            [
+                new ResolvedGatewayComboConfig
+                {
+                    Id = comboId,
+                    Name = "coding",
+                    Enabled = true,
+                    Routes =
+                    [
+                        new ResolvedGatewayRouteConfig
+                        {
+                            Enabled = true,
+                            Model = new ResolvedModelConfig
+                            {
+                                ModelId = "m1", OllamaModelName = "m1", DisplayName = "模型一", ProviderId = "provider-a",
+                                BaseUrl = "https://example.invalid", ApiKey = "", AnthropicModel = "m1"
+                            }
+                        }
+                    ]
+                },
+                new ResolvedGatewayComboConfig
+                {
+                    Id = unboundComboId,
+                    Name = "unbound",
+                    Enabled = true,
+                    Routes =
+                    [
+                        new ResolvedGatewayRouteConfig
+                        {
+                            Enabled = true,
+                            Model = new ResolvedModelConfig
+                            {
+                                ModelId = "m1", OllamaModelName = "m1", DisplayName = "模型一", ProviderId = "provider-a",
+                                BaseUrl = "https://example.invalid", ApiKey = "", AnthropicModel = "m1"
+                            }
+                        }
+                    ]
+                }
+            ],
             GatewayEndpoints =
             [
                 new ResolvedGatewayEndpointConfig
@@ -197,26 +240,7 @@ public sealed class OverviewGraphContractTests
                     Key = "openai",
                     PublicPath = "/v1",
                     Enabled = true,
-                    Combos =
-                    [
-                        new ResolvedGatewayComboConfig
-                        {
-                            Name = "coding",
-                            Enabled = true,
-                            Routes =
-                            [
-                                new ResolvedGatewayRouteConfig
-                                {
-                                    Enabled = true,
-                                    Model = new ResolvedModelConfig
-                                    {
-                                        ModelId = "m1", OllamaModelName = "m1", DisplayName = "模型一", ProviderId = "provider-a",
-                                        BaseUrl = "https://example.invalid", ApiKey = "", AnthropicModel = "m1"
-                                    }
-                                }
-                            ]
-                        }
-                    ]
+                    ComboBindings = [new ResolvedGatewayComboBindingConfig { ComboId = comboId, Enabled = true }]
                 }
             ],
             Models =
@@ -235,12 +259,12 @@ public sealed class OverviewGraphContractTests
         using var document = JsonDocument.Parse(OverviewViewModel.CreateTopologyJson(config, providers));
         var root = document.RootElement;
         Assert.Equal(1, root.GetProperty("endpoints").GetArrayLength());
-        Assert.Equal(1, root.GetProperty("combos").GetArrayLength());
-        Assert.Equal(2, root.GetProperty("providers").GetArrayLength());
+        Assert.Equal(2, root.GetProperty("combos").GetArrayLength());
+        Assert.False(root.TryGetProperty("providers", out _));
         Assert.Equal(1, root.GetProperty("models").GetArrayLength());
+        Assert.Equal(3, root.GetProperty("edges").GetArrayLength());
         Assert.Contains(root.GetProperty("edges").EnumerateArray(), edge => edge.GetProperty("type").GetString() == "endpoint-combo");
-        Assert.Contains(root.GetProperty("edges").EnumerateArray(), edge => edge.GetProperty("type").GetString() == "combo-provider");
-        Assert.Contains(root.GetProperty("edges").EnumerateArray(), edge => edge.GetProperty("type").GetString() == "provider-model");
+        Assert.Contains(root.GetProperty("edges").EnumerateArray(), edge => edge.GetProperty("type").GetString() == "combo-model");
     }
 
     private static string ReadDesktopFile(params string[] segments)

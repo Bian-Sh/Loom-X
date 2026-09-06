@@ -90,6 +90,8 @@ public sealed class ResolvedAppConfig
 
     public IReadOnlyList<ResolvedModelConfig> Models { get; init; } = [];
 
+    public IReadOnlyList<ResolvedGatewayComboConfig> GatewayCombos { get; init; } = [];
+
     public IReadOnlyList<ResolvedGatewayEndpointConfig> GatewayEndpoints { get; init; } = [];
 }
 
@@ -100,15 +102,23 @@ public sealed class ResolvedGatewayEndpointConfig
     public bool Enabled { get; init; }
     public string ApiKey { get; init; } = string.Empty;
     public string ReasoningEffort { get; init; } = GatewayEndpointSettings.DefaultReasoningEffort;
-    public IReadOnlyList<ResolvedGatewayComboConfig> Combos { get; init; } = [];
+    public IReadOnlyList<ResolvedGatewayComboBindingConfig> ComboBindings { get; init; } = [];
 }
 
 public sealed class ResolvedGatewayComboConfig
 {
+    public Guid Id { get; init; }
     public required string Name { get; init; }
     public bool Enabled { get; init; }
     public int SortOrder { get; init; }
     public IReadOnlyList<ResolvedGatewayRouteConfig> Routes { get; init; } = [];
+}
+
+public sealed class ResolvedGatewayComboBindingConfig
+{
+    public required Guid ComboId { get; init; }
+    public bool Enabled { get; init; }
+    public int SortOrder { get; init; }
 }
 
 public sealed class ResolvedGatewayRouteConfig

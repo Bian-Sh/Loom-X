@@ -27,10 +27,10 @@
       <Border Classes="panel" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*">
           <StackPanel Margin="16,14,16,12" Spacing="3"><TextBlock Text="Endpoint" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="独立维护模型组合与故障转移顺序" Classes="muted" FontSize="11"/></StackPanel>
-          <ListBox Grid.Row="1" Classes="endpoint-list" ItemsSource="{Binding Endpoints}" SelectedItem="{Binding SelectedEndpoint}">
+          <ListBox Grid.Row="1" Classes="endpoint-list" ItemsSource="{Binding Endpoints}">
             <ListBox.ItemTemplate><DataTemplate>
               <Border Padding="14,12" Background="Transparent" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="5">
                   <TextBlock Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold"/>
                   <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleEndpointCommand}" CommandParameter="{Binding}" OnContent="" OffContent=""/>
                   <TextBlock Grid.Row="1" Text="{Binding PublicUrl}" Classes="muted" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center"/>
@@ -45,22 +45,36 @@
                       </StackPanel>
                     </Grid>
                   </Border>
-                  <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="7" IsVisible="{Binding IsOllamaEndpoint}">
-                    <TextBlock Text="Reasoning effort" Classes="muted" FontSize="11" VerticalAlignment="Center"/>
-                    <ComboBox Classes="endpoint-reasoning" ItemsSource="{Binding ReasoningEffortOptions}" SelectedItem="{Binding ReasoningEffort, Mode=TwoWay}" SelectionChanged="ReasoningEffort_OnSelectionChanged"/>
-                  </StackPanel>
-                  <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="{Binding Combos.Count, StringFormat='{}{0} 个 Combo'}" Classes="muted" FontSize="11"/>
+                  <Grid Grid.Row="3" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Button x:Name="comboPickerButton" HorizontalContentAlignment="Stretch" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="8,5" Click="EndpointComboPicker_OnClick">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBlock Text="{Binding SelectedComboSummary}" TextTrimming="CharacterEllipsis"/><PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="12" Height="12"/></Grid>
+                    </Button>
+                    <Popup PlacementTarget="{Binding #comboPickerButton}" Placement="Bottom" IsLightDismissEnabled="True" IsOpen="{Binding IsComboPickerOpen, Mode=TwoWay}" HorizontalOffset="0" VerticalOffset="4">
+                      <Border Width="250" MaxHeight="260" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsControl ItemsSource="{Binding ComboOptions}"><ItemsControl.ItemTemplate><DataTemplate>
+                          <CheckBox Tag="{Binding}" IsChecked="{Binding IsSelected, Mode=OneWay}" Click="EndpointComboOption_OnClick" Padding="7,6">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBlock Text="{Binding Name}"/><TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="muted" FontSize="10"/></Grid>
+                          </CheckBox>
+                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+                      </Border>
+                    </Popup>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsOllamaEndpoint}">
+                      <TextBlock Text="Reasoning effort" Classes="muted" FontSize="11" VerticalAlignment="Center"/>
+                      <ComboBox Classes="endpoint-reasoning" ItemsSource="{Binding ReasoningEffortOptions}" SelectedItem="{Binding ReasoningEffort, Mode=TwoWay}" SelectionChanged="ReasoningEffort_OnSelectionChanged"/>
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Text="{Binding SelectedComboCount, StringFormat='已暴露 {0} 个 Combo'}" Classes="muted" FontSize="11"/>
                 </Grid>
               </Border>
             </DataTemplate></ListBox.ItemTemplate>
           </ListBox>
         </Grid>
       </Border>
-      <Border Grid.Column="1" Classes="panel" Padding="16" IsVisible="{Binding HasSelectedEndpoint}">
+      <Border Grid.Column="1" Classes="panel" Padding="16">
         <Grid RowDefinitions="Auto,*" RowSpacing="10">
-          <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{Binding SelectedEndpoint.DisplayName}" FontSize="20" FontWeight="SemiBold"/><Button Grid.Column="1" Classes="icon" Command="{Binding AddComboCommand}" ToolTip.Tip="新增 Combo 模型" AutomationProperties.Name="新增 Combo 模型"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z"/></Button></Grid>
+          <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="2"><TextBlock Text="全局 Combo" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="跨 Endpoint 共享，按成员顺序故障转移" Classes="muted" FontSize="11"/></StackPanel><Button Grid.Column="1" Classes="icon" Command="{Binding AddComboCommand}" ToolTip.Tip="新增 Combo 模型" AutomationProperties.Name="新增 Combo 模型"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z"/></Button></Grid>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding SelectedEndpoint.Combos}">
+            <ItemsControl ItemsSource="{Binding Combos}">
               <ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:GatewayComboEditorViewModel}">
                 <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,8" ClipToBounds="True">
                   <Grid RowDefinitions="Auto,Auto">

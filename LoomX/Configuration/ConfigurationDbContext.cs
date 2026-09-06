@@ -12,6 +12,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     public DbSet<ModelEntity> Models => Set<ModelEntity>();
     public DbSet<GatewayEndpointEntity> GatewayEndpoints => Set<GatewayEndpointEntity>();
     public DbSet<GatewayComboEntity> GatewayCombos => Set<GatewayComboEntity>();
+    public DbSet<GatewayEndpointComboBindingEntity> GatewayEndpointComboBindings => Set<GatewayEndpointComboBindingEntity>();
     public DbSet<GatewayRouteEntity> GatewayRoutes => Set<GatewayRouteEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -58,22 +59,25 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.Property(item => item.Key).HasMaxLength(32).IsRequired();
             entity.Property(item => item.DisplayName).HasMaxLength(64).IsRequired();
             entity.Property(item => item.PublicPath).HasMaxLength(128).IsRequired();
-            entity.HasMany(item => item.Routes).WithOne(item => item.Endpoint).HasForeignKey(item => item.EndpointKey).OnDelete(DeleteBehavior.Cascade);
-            entity.HasMany(item => item.Combos).WithOne(item => item.Endpoint).HasForeignKey(item => item.EndpointKey).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(item => item.ComboBindings).WithOne(item => item.Endpoint).HasForeignKey(item => item.EndpointKey).OnDelete(DeleteBehavior.Cascade);
         });
         modelBuilder.Entity<GatewayComboEntity>(entity =>
         {
             entity.HasKey(item => item.Id);
-            entity.HasIndex(item => new { item.EndpointKey, item.Name }).IsUnique();
+            entity.HasIndex(item => item.Name).IsUnique();
             entity.Property(item => item.Name).HasMaxLength(256).IsRequired().UseCollation("NOCASE");
-            entity.Property(item => item.EndpointKey).HasMaxLength(32).IsRequired();
             entity.HasMany(item => item.Routes).WithOne(item => item.Combo).HasForeignKey(item => item.ComboId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(item => item.EndpointBindings).WithOne(item => item.Combo).HasForeignKey(item => item.ComboId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<GatewayEndpointComboBindingEntity>(entity =>
+        {
+            entity.HasKey(item => new { item.EndpointKey, item.ComboId });
+            entity.Property(item => item.EndpointKey).HasMaxLength(32).IsRequired();
         });
         modelBuilder.Entity<GatewayRouteEntity>(entity =>
         {
             entity.HasKey(item => item.Id);
             entity.HasIndex(item => new { item.ComboId, item.ModelId }).IsUnique();
-            entity.Property(item => item.EndpointKey).HasMaxLength(32).IsRequired();
             entity.HasOne(item => item.Model).WithMany().HasForeignKey(item => item.ModelId).OnDelete(DeleteBehavior.Restrict);
         });
     }
@@ -160,28 +164,34 @@ public sealed class GatewayEndpointEntity
     public bool Enabled { get; set; } = true;
     public string? ProtectedApiKey { get; set; }
     public string ReasoningEffort { get; set; } = GatewayEndpointSettings.DefaultReasoningEffort;
-    public List<GatewayComboEntity> Combos { get; set; } = [];
-    public List<GatewayRouteEntity> Routes { get; set; } = [];
+    public List<GatewayEndpointComboBindingEntity> ComboBindings { get; set; } = [];
 }
 
 public sealed class GatewayComboEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public string EndpointKey { get; set; } = string.Empty;
-    public GatewayEndpointEntity Endpoint { get; set; } = null!;
     public string Name { get; set; } = string.Empty;
     public bool Enabled { get; set; } = true;
     public int SortOrder { get; set; }
     public List<GatewayRouteEntity> Routes { get; set; } = [];
+    public List<GatewayEndpointComboBindingEntity> EndpointBindings { get; set; } = [];
+}
+
+public sealed class GatewayEndpointComboBindingEntity
+{
+    public string EndpointKey { get; set; } = string.Empty;
+    public GatewayEndpointEntity Endpoint { get; set; } = null!;
+    public Guid ComboId { get; set; }
+    public GatewayComboEntity Combo { get; set; } = null!;
+    public bool Enabled { get; set; } = true;
+    public int SortOrder { get; set; }
 }
 
 public sealed class GatewayRouteEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public string EndpointKey { get; set; } = string.Empty;
-    public GatewayEndpointEntity Endpoint { get; set; } = null!;
-    public Guid? ComboId { get; set; }
-    public GatewayComboEntity? Combo { get; set; }
+    public Guid ComboId { get; set; }
+    public GatewayComboEntity Combo { get; set; } = null!;
     public Guid ModelId { get; set; }
     public ModelEntity Model { get; set; } = null!;
     public bool Enabled { get; set; } = true;
@@ -241,7 +251,7 @@ public static class ConfigurationDatabase
         await dbContext.Database.OpenConnectionAsync(cancellationToken);
         try
         {
-            foreach (var table in new[] { "AppSettings", "GatewayConfigurations", "Providers", "Models", "GatewayEndpoints", "GatewayCombos", "GatewayRoutes" })
+            foreach (var table in new[] { "AppSettings", "GatewayConfigurations", "Providers", "Models", "GatewayEndpoints", "GatewayCombos", "GatewayEndpointComboBindings", "GatewayRoutes" })
             {
                 await using var tableCommand = connection.CreateCommand();
                 tableCommand.CommandText = $"SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '{table}')";
@@ -262,8 +272,11 @@ public static class ConfigurationDatabase
                     "Id", "ProviderId", "ModelId", "DisplayName", "ConfigId", "Family", "BaseUrl", "ProtectedApiKey", "ApiMode",
                     "ContextLength", "MaxTokens", "Vision", "Temperature", "TopP", "HeadersJson", "ExtraJson", "OwnedBy", "RemoteFamily", "RemoteContextLength", "RemoteMaxTokens", "RemoteVision", "Enabled", "SortOrder")
                 || !await HasColumnsAsync(connection, "GatewayEndpoints", cancellationToken, "Key", "DisplayName", "PublicPath", "Enabled", "ProtectedApiKey", "ReasoningEffort")
-                || !await HasColumnsAsync(connection, "GatewayCombos", cancellationToken, "Id", "EndpointKey", "Name", "Enabled", "SortOrder")
-                || !await HasColumnsAsync(connection, "GatewayRoutes", cancellationToken, "Id", "EndpointKey", "ComboId", "ModelId", "Enabled", "SortOrder"))
+                || !await HasColumnsAsync(connection, "GatewayCombos", cancellationToken, "Id", "Name", "Enabled", "SortOrder")
+                || await HasColumnAsync(connection, "GatewayCombos", "EndpointKey", cancellationToken)
+                || !await HasColumnsAsync(connection, "GatewayEndpointComboBindings", cancellationToken, "EndpointKey", "ComboId", "Enabled", "SortOrder")
+                || !await HasColumnsAsync(connection, "GatewayRoutes", cancellationToken, "Id", "ComboId", "ModelId", "Enabled", "SortOrder")
+                || await HasColumnAsync(connection, "GatewayRoutes", "EndpointKey", cancellationToken))
                 return false;
         }
         finally
@@ -424,37 +437,7 @@ public static class ConfigurationDatabase
             {
             }
         }
-        await dbContext.Database.ExecuteSqlRawAsync("""
-            CREATE TABLE IF NOT EXISTS GatewayRoutes (
-                Id TEXT NOT NULL CONSTRAINT PK_GatewayRoutes PRIMARY KEY,
-                EndpointKey TEXT NOT NULL,
-                ComboId TEXT NULL,
-                ModelId TEXT NOT NULL,
-                Alias TEXT NULL,
-                Enabled INTEGER NOT NULL,
-                SortOrder INTEGER NOT NULL,
-                CONSTRAINT FK_GatewayRoutes_GatewayEndpoints_EndpointKey FOREIGN KEY (EndpointKey) REFERENCES GatewayEndpoints (Key) ON DELETE CASCADE,
-                CONSTRAINT FK_GatewayRoutes_Models_ModelId FOREIGN KEY (ModelId) REFERENCES Models (Id) ON DELETE RESTRICT
-            )
-            """, cancellationToken);
-        await dbContext.Database.ExecuteSqlRawAsync("""
-            CREATE TABLE IF NOT EXISTS GatewayCombos (
-                Id TEXT NOT NULL CONSTRAINT PK_GatewayCombos PRIMARY KEY,
-                EndpointKey TEXT NOT NULL,
-                Name TEXT NOT NULL,
-                Enabled INTEGER NOT NULL,
-                SortOrder INTEGER NOT NULL,
-                CONSTRAINT FK_GatewayCombos_GatewayEndpoints_EndpointKey FOREIGN KEY (EndpointKey) REFERENCES GatewayEndpoints (Key) ON DELETE CASCADE,
-                CONSTRAINT UQ_GatewayCombos_EndpointKey_Name UNIQUE (EndpointKey, Name)
-            )
-            """, cancellationToken);
-        try
-        {
-            await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE GatewayRoutes ADD COLUMN ComboId TEXT NULL", cancellationToken);
-        }
-        catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
-        {
-        }
+        await EnsureGatewaySchemaAsync(dbContext, cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/openai' WHERE Key = 'openai' AND PublicPath IN ('/v1', '/openai/v1', '/v1/responses')", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/' WHERE Key = 'ollama' AND (PublicPath = '/api' OR PublicPath = '')", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/azure' WHERE Key = 'azure' AND PublicPath IN ('/azure/v1', '/azure/v1/responses')", cancellationToken);
@@ -469,6 +452,229 @@ public static class ConfigurationDatabase
                 dbContext.GatewayEndpoints.Add(endpoint);
         }
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private sealed record LegacyComboRow(Guid Id, string EndpointKey, string Name, bool Enabled, int SortOrder);
+    private sealed record LegacyRouteRow(Guid Id, Guid ComboId, Guid ModelId, bool Enabled, int SortOrder);
+    private sealed record MigratedCombo(Guid Id, string Name, bool Enabled, int SortOrder, IReadOnlyList<LegacyComboRow> Bindings, IReadOnlyList<LegacyRouteRow> Routes);
+
+    private static async Task EnsureGatewaySchemaAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            var hasCombos = await TableExistsAsync(connection, "GatewayCombos", cancellationToken);
+            var hasRoutes = await TableExistsAsync(connection, "GatewayRoutes", cancellationToken);
+            var hasBindings = await TableExistsAsync(connection, "GatewayEndpointComboBindings", cancellationToken);
+            var legacyCombos = hasCombos && await HasColumnAsync(connection, "GatewayCombos", "EndpointKey", cancellationToken);
+            var legacyRoutes = hasRoutes && await HasColumnAsync(connection, "GatewayRoutes", "EndpointKey", cancellationToken);
+
+            if (hasBindings && !legacyCombos && !legacyRoutes)
+                return;
+
+            var endpointKeys = await ReadEndpointKeysAsync(connection, cancellationToken);
+            var oldCombos = legacyCombos
+                ? await ReadLegacyCombosAsync(connection, cancellationToken)
+                : [];
+            var oldRoutes = legacyRoutes && await HasColumnAsync(connection, "GatewayRoutes", "ComboId", cancellationToken)
+                ? await ReadLegacyRoutesAsync(connection, cancellationToken)
+                : [];
+            var validModelIds = await ReadModelIdsAsync(connection, cancellationToken);
+            var migratedCombos = MergeLegacyCombos(oldCombos, oldRoutes, endpointKeys, validModelIds);
+
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                await ExecuteNonQueryAsync(connection, transaction, """
+                    CREATE TABLE GatewayCombos__new (
+                        Id TEXT NOT NULL CONSTRAINT PK_GatewayCombos PRIMARY KEY,
+                        Name TEXT NOT NULL COLLATE NOCASE,
+                        Enabled INTEGER NOT NULL,
+                        SortOrder INTEGER NOT NULL,
+                        CONSTRAINT UQ_GatewayCombos_Name UNIQUE (Name)
+                    )
+                    """, cancellationToken);
+                await ExecuteNonQueryAsync(connection, transaction, """
+                    CREATE TABLE GatewayRoutes__new (
+                        Id TEXT NOT NULL CONSTRAINT PK_GatewayRoutes PRIMARY KEY,
+                        ComboId TEXT NOT NULL,
+                        ModelId TEXT NOT NULL,
+                        Enabled INTEGER NOT NULL,
+                        SortOrder INTEGER NOT NULL,
+                        CONSTRAINT FK_GatewayRoutes_GatewayCombos_ComboId FOREIGN KEY (ComboId) REFERENCES GatewayCombos__new (Id) ON DELETE CASCADE,
+                        CONSTRAINT FK_GatewayRoutes_Models_ModelId FOREIGN KEY (ModelId) REFERENCES Models (Id) ON DELETE RESTRICT,
+                        CONSTRAINT UQ_GatewayRoutes_ComboId_ModelId UNIQUE (ComboId, ModelId)
+                    )
+                    """, cancellationToken);
+                await ExecuteNonQueryAsync(connection, transaction, """
+                    CREATE TABLE GatewayEndpointComboBindings__new (
+                        EndpointKey TEXT NOT NULL,
+                        ComboId TEXT NOT NULL,
+                        Enabled INTEGER NOT NULL,
+                        SortOrder INTEGER NOT NULL,
+                        CONSTRAINT PK_GatewayEndpointComboBindings PRIMARY KEY (EndpointKey, ComboId),
+                        CONSTRAINT FK_GatewayEndpointComboBindings_GatewayEndpoints_EndpointKey FOREIGN KEY (EndpointKey) REFERENCES GatewayEndpoints (Key) ON DELETE CASCADE,
+                        CONSTRAINT FK_GatewayEndpointComboBindings_GatewayCombos_ComboId FOREIGN KEY (ComboId) REFERENCES GatewayCombos__new (Id) ON DELETE CASCADE
+                    )
+                    """, cancellationToken);
+
+                foreach (var combo in migratedCombos)
+                {
+                    await ExecuteNonQueryAsync(connection, transaction,
+                        "INSERT INTO GatewayCombos__new (Id, Name, Enabled, SortOrder) VALUES ($id, $name, $enabled, $sortOrder)",
+                        cancellationToken,
+                        ("$id", combo.Id.ToString()), ("$name", combo.Name), ("$enabled", combo.Enabled ? 1 : 0), ("$sortOrder", combo.SortOrder));
+
+                    foreach (var binding in combo.Bindings)
+                    {
+                        await ExecuteNonQueryAsync(connection, transaction,
+                            "INSERT INTO GatewayEndpointComboBindings__new (EndpointKey, ComboId, Enabled, SortOrder) VALUES ($endpointKey, $comboId, $enabled, $sortOrder)",
+                            cancellationToken,
+                            ("$endpointKey", binding.EndpointKey), ("$comboId", combo.Id.ToString()), ("$enabled", binding.Enabled ? 1 : 0), ("$sortOrder", binding.SortOrder));
+                    }
+
+                    foreach (var route in combo.Routes)
+                    {
+                        await ExecuteNonQueryAsync(connection, transaction,
+                            "INSERT INTO GatewayRoutes__new (Id, ComboId, ModelId, Enabled, SortOrder) VALUES ($id, $comboId, $modelId, $enabled, $sortOrder)",
+                            cancellationToken,
+                            ("$id", route.Id.ToString()), ("$comboId", combo.Id.ToString()), ("$modelId", validModelIds[route.ModelId]), ("$enabled", route.Enabled ? 1 : 0), ("$sortOrder", route.SortOrder));
+                    }
+                }
+
+                if (hasRoutes) await ExecuteNonQueryAsync(connection, transaction, "DROP TABLE GatewayRoutes", cancellationToken);
+                if (hasBindings) await ExecuteNonQueryAsync(connection, transaction, "DROP TABLE GatewayEndpointComboBindings", cancellationToken);
+                if (hasCombos) await ExecuteNonQueryAsync(connection, transaction, "DROP TABLE GatewayCombos", cancellationToken);
+                await ExecuteNonQueryAsync(connection, transaction, "ALTER TABLE GatewayCombos__new RENAME TO GatewayCombos", cancellationToken);
+                await ExecuteNonQueryAsync(connection, transaction, "ALTER TABLE GatewayRoutes__new RENAME TO GatewayRoutes", cancellationToken);
+                await ExecuteNonQueryAsync(connection, transaction, "ALTER TABLE GatewayEndpointComboBindings__new RENAME TO GatewayEndpointComboBindings", cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+        }
+        finally
+        {
+            await dbContext.Database.CloseConnectionAsync();
+        }
+    }
+
+    private static async Task<bool> TableExistsAsync(DbConnection connection, string table, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $name)";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "$name";
+        parameter.Value = table;
+        command.Parameters.Add(parameter);
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) == 1;
+    }
+
+    private static async Task<HashSet<string>> ReadEndpointKeysAsync(DbConnection connection, CancellationToken cancellationToken)
+    {
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Key FROM GatewayEndpoints";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)) result.Add(reader.GetString(0));
+        return result;
+    }
+
+    private static async Task<Dictionary<Guid, string>> ReadModelIdsAsync(DbConnection connection, CancellationToken cancellationToken)
+    {
+        var result = new Dictionary<Guid, string>();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id FROM Models";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var rawId = reader.GetValue(0)?.ToString();
+            if (Guid.TryParse(rawId, out var id) && rawId is not null) result[id] = rawId;
+        }
+        return result;
+    }
+
+    private static async Task<List<LegacyComboRow>> ReadLegacyCombosAsync(DbConnection connection, CancellationToken cancellationToken)
+    {
+        var result = new List<LegacyComboRow>();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id, EndpointKey, Name, Enabled, SortOrder FROM GatewayCombos";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)
+            && Guid.TryParse(reader.GetValue(0)?.ToString(), out var id))
+        {
+            result.Add(new LegacyComboRow(id, reader.GetString(1), reader.GetString(2), Convert.ToInt32(reader.GetValue(3)) != 0, Convert.ToInt32(reader.GetValue(4))));
+        }
+        return result;
+    }
+
+    private static async Task<List<LegacyRouteRow>> ReadLegacyRoutesAsync(DbConnection connection, CancellationToken cancellationToken)
+    {
+        var result = new List<LegacyRouteRow>();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT Id, ComboId, ModelId, Enabled, SortOrder FROM GatewayRoutes WHERE ComboId IS NOT NULL";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)
+            && Guid.TryParse(reader.GetValue(0)?.ToString(), out var id)
+            && Guid.TryParse(reader.GetValue(1)?.ToString(), out var comboId)
+            && Guid.TryParse(reader.GetValue(2)?.ToString(), out var modelId))
+        {
+            result.Add(new LegacyRouteRow(id, comboId, modelId, Convert.ToInt32(reader.GetValue(3)) != 0, Convert.ToInt32(reader.GetValue(4))));
+        }
+        return result;
+    }
+
+    private static IReadOnlyList<MigratedCombo> MergeLegacyCombos(
+        IReadOnlyList<LegacyComboRow> combos,
+        IReadOnlyList<LegacyRouteRow> routes,
+        IReadOnlySet<string> endpointKeys,
+        IReadOnlyDictionary<Guid, string> modelIds)
+    {
+        return combos
+            .Where(item => endpointKeys.Contains(item.EndpointKey) && !string.IsNullOrWhiteSpace(item.Name))
+            .GroupBy(item => item.Name.Trim(), StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Min(item => item.SortOrder))
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var ordered = group.OrderBy(item => item.SortOrder).ThenBy(item => item.EndpointKey, StringComparer.OrdinalIgnoreCase).ThenBy(item => item.Id).ToArray();
+                var ids = ordered.Select(item => item.Id).ToHashSet();
+                var mergedRoutes = routes
+                    .Where(route => ids.Contains(route.ComboId) && modelIds.ContainsKey(route.ModelId))
+                    .GroupBy(route => route.ModelId)
+                    .Select(routeGroup => routeGroup.OrderBy(route => ordered.First(item => item.Id == route.ComboId).SortOrder).ThenBy(route => route.SortOrder).ThenBy(route => route.ModelId).First())
+                    .OrderBy(route => ordered.First(item => item.Id == route.ComboId).SortOrder)
+                    .ThenBy(route => route.SortOrder)
+                    .ThenBy(route => route.ModelId)
+                    .Select((route, index) => route with { Enabled = routes.Where(item => item.ModelId == route.ModelId && ids.Contains(item.ComboId)).Any(item => item.Enabled), SortOrder = index })
+                    .ToArray();
+                return new MigratedCombo(ordered[0].Id, ordered[0].Name.Trim(), ordered.Any(item => item.Enabled), ordered.Min(item => item.SortOrder), ordered, mergedRoutes);
+            })
+            .ToArray();
+    }
+
+    private static async Task ExecuteNonQueryAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        string sql,
+        CancellationToken cancellationToken,
+        params (string Name, object? Value)[] parameters)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = sql;
+        foreach (var (name, value) in parameters)
+        {
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = name;
+            parameter.Value = value ?? DBNull.Value;
+            command.Parameters.Add(parameter);
+        }
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task EnsureEndpointDefaultsAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)

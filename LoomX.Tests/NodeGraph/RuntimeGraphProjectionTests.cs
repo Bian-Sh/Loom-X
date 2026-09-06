@@ -7,167 +7,92 @@ namespace LoomX.Tests.NodeGraph;
 public sealed class RuntimeGraphProjectionTests
 {
     [Fact]
-    public void CreatesLayeredTopologyWithProviderGroupsAndRouteBinding()
+    public void CreatesEndpointComboModelTopologyWithProviderMetadataOnModel()
     {
+        var model = CreateModel("provider-a", "model-a");
+        var combo = CreateCombo("coding", model);
         var config = CreateConfig(
-            new ResolvedGatewayEndpointConfig
+            [new ResolvedGatewayEndpointConfig
             {
-                Key = "openai",
-                PublicPath = "/openai",
-                Enabled = true,
-                Combos =
-                [
-                    new ResolvedGatewayComboConfig
-                    {
-                        Name = "coding",
-                        Enabled = true,
-                        SortOrder = 0,
-                        Routes = [new ResolvedGatewayRouteConfig { Model = CreateModel("provider-a", "model-a"), Enabled = true, SortOrder = 0 }]
-                    }
-                ]
-            });
-        var providers = new[]
-        {
-            CreateProvider("provider-a", "Provider A", 1),
-            CreateProvider("provider-empty", "Empty Provider", 0)
-        };
+                Key = "openai", PublicPath = "/openai", Enabled = true,
+                ComboBindings = [new ResolvedGatewayComboBindingConfig { ComboId = combo.Id, Enabled = true }]
+            }],
+            [combo],
+            [model]);
 
-        var snapshot = RuntimeGraphProjection.Create(config, providers);
+        var snapshot = RuntimeGraphProjection.Create(config, [CreateProvider("provider-a", "Provider A")]);
 
-        var endpoint = Assert.Single(snapshot.Endpoints);
-        var combo = Assert.Single(snapshot.Combos);
-        var provider = Assert.Single(snapshot.Providers, item => item.Id == "provider-a");
-        var emptyProvider = Assert.Single(snapshot.Providers, item => item.Id == "provider-empty");
-        var model = Assert.Single(provider.Models);
+        Assert.Single(snapshot.Endpoints);
+        var projectedCombo = Assert.Single(snapshot.Combos);
+        var projectedModel = Assert.Single(snapshot.Models);
         var route = Assert.Single(snapshot.Routes);
-
-        Assert.Equal("openai", endpoint.Id);
-        Assert.Equal("openai|coding", combo.Id);
-        Assert.Equal("provider-a|model-a", model.Id);
-        Assert.Empty(emptyProvider.Models);
+        Assert.Equal(RuntimeGraphIds.Combo(combo.Id), projectedCombo.Id);
+        Assert.Equal("model-a", projectedModel.ModelId);
+        Assert.Equal("Provider A", projectedModel.ProviderDisplayName);
+        Assert.Equal([RuntimeGraphEdgeKind.EndpointToCombo, RuntimeGraphEdgeKind.ComboToModel], snapshot.Edges.Select(item => item.Kind));
         Assert.Equal(
-            [RuntimeGraphEdgeKind.EndpointToCombo, RuntimeGraphEdgeKind.ComboToProvider, RuntimeGraphEdgeKind.ProviderToModel],
-            snapshot.Edges.Select(item => item.Kind));
-        Assert.Equal(
-            [
-                "endpoint-combo|openai|coding",
-                "combo-provider|openai|coding|provider-a",
-                "provider-model|provider-a|model-a"
-            ],
+            [RuntimeGraphIds.EndpointComboEdge("openai", projectedCombo.Id), RuntimeGraphIds.ComboModelEdge(projectedCombo.Id, "provider-a", "model-a")],
             route.EdgeIds);
-        Assert.Equal("coding", route.ComboName);
-        Assert.Same(route, snapshot.FindRoute("openai", "coding", "provider-a", "model-a"));
-        Assert.Null(snapshot.FindRoute("openai", "other", "provider-a", "model-a"));
     }
 
     [Fact]
-    public void DeduplicatesSharedProviderAndModelNodesWhileKeepingDistinctRoutes()
+    public void SharesOneComboAndModelAcrossMultipleEndpointBindings()
     {
         var model = CreateModel("provider-a", "shared-model");
-        var config = CreateConfig(
-            new ResolvedGatewayEndpointConfig
-            {
-                Key = "openai",
-                PublicPath = "/openai",
-                Enabled = true,
-                Combos = [CreateCombo("coding", model)]
-            },
-            new ResolvedGatewayEndpointConfig
-            {
-                Key = "azure",
-                PublicPath = "/azure",
-                Enabled = true,
-                Combos = [CreateCombo("coding", model)]
-            });
+        var combo = CreateCombo("coding", model);
+        var endpoints = new[] { "openai", "azure" }.Select(key => new ResolvedGatewayEndpointConfig
+        {
+            Key = key,
+            PublicPath = $"/{key}",
+            Enabled = true,
+            ComboBindings = [new ResolvedGatewayComboBindingConfig { ComboId = combo.Id, Enabled = true }]
+        }).ToArray();
 
-        var snapshot = RuntimeGraphProjection.Create(config, [CreateProvider("provider-a", "Provider A", 1)]);
+        var snapshot = RuntimeGraphProjection.Create(CreateConfig(endpoints, [combo], [model]), [CreateProvider("provider-a", "Provider A")]);
 
-        Assert.Single(snapshot.Providers);
-        Assert.Single(Assert.Single(snapshot.Providers).Models);
+        Assert.Single(snapshot.Combos);
+        Assert.Single(snapshot.Models);
         Assert.Equal(2, snapshot.Routes.Count);
         Assert.Equal(2, snapshot.Edges.Count(item => item.Kind == RuntimeGraphEdgeKind.EndpointToCombo));
-        Assert.Equal(2, snapshot.Edges.Count(item => item.Kind == RuntimeGraphEdgeKind.ComboToProvider));
-        Assert.Single(snapshot.Edges, item => item.Kind == RuntimeGraphEdgeKind.ProviderToModel);
-        Assert.Equal(
-            ["azure|coding", "openai|coding"],
-            snapshot.Routes.Select(item => item.ComboId));
+        Assert.Single(snapshot.Edges, item => item.Kind == RuntimeGraphEdgeKind.ComboToModel);
     }
 
     [Fact]
     public void DisabledRouteRemainsVisibleButDoesNotCreateActiveRouteBinding()
     {
         var model = CreateModel("provider-a", "model-a");
-        var config = CreateConfig(
-            new ResolvedGatewayEndpointConfig
-            {
-                Key = "openai",
-                PublicPath = "/openai",
-                Enabled = true,
-                Combos =
-                [
-                    new ResolvedGatewayComboConfig
-                    {
-                        Name = "disabled-route",
-                        Enabled = true,
-                        Routes = [new ResolvedGatewayRouteConfig { Model = model, Enabled = false }]
-                    }
-                ]
-            });
+        var combo = new ResolvedGatewayComboConfig
+        {
+            Id = Guid.NewGuid(),
+            Name = "disabled-route",
+            Enabled = true,
+            Routes = [new ResolvedGatewayRouteConfig { Model = model, Enabled = false }]
+        };
+        var endpoint = new ResolvedGatewayEndpointConfig
+        {
+            Key = "openai", PublicPath = "/openai", Enabled = true,
+            ComboBindings = [new ResolvedGatewayComboBindingConfig { ComboId = combo.Id, Enabled = true }]
+        };
 
-        var snapshot = RuntimeGraphProjection.Create(config, [CreateProvider("provider-a", "Provider A", 1)]);
+        var snapshot = RuntimeGraphProjection.Create(CreateConfig([endpoint], [combo], [model]), [CreateProvider("provider-a", "Provider A")]);
 
         Assert.Empty(snapshot.Routes);
-        Assert.Contains(snapshot.Edges, item => item.Kind == RuntimeGraphEdgeKind.ComboToProvider && !item.Enabled);
-        Assert.Contains(snapshot.Edges, item => item.Kind == RuntimeGraphEdgeKind.ProviderToModel);
+        Assert.Contains(snapshot.Edges, item => item.Kind == RuntimeGraphEdgeKind.ComboToModel && !item.Enabled);
     }
 
-    [Fact]
-    public void EndpointSnapshotKeepsOnlyItsRouteModelsAndEdges()
-    {
-        var shared = CreateModel("provider-a", "shared-model");
-        var config = CreateConfig(
-            new ResolvedGatewayEndpointConfig
-            {
-                Key = "openai",
-                PublicPath = "/openai",
-                Enabled = true,
-                Combos = [CreateCombo("coding", shared)]
-            },
-            new ResolvedGatewayEndpointConfig
-            {
-                Key = "azure",
-                PublicPath = "/azure",
-                Enabled = true,
-                Combos = [CreateCombo("coding", CreateModel("provider-a", "azure-only"))]
-            });
-        var snapshot = RuntimeGraphProjection.Create(config, [CreateProvider("provider-a", "Provider A", 2)]);
-
-        var endpointSnapshot = snapshot.ForEndpoint("openai");
-
-        Assert.Single(endpointSnapshot.Endpoints);
-        Assert.Equal("openai", endpointSnapshot.Endpoints[0].Id);
-        Assert.Single(endpointSnapshot.Combos);
-        var provider = Assert.Single(endpointSnapshot.Providers);
-        Assert.Single(provider.Models);
-        Assert.Equal("provider-a|shared-model", provider.Models[0].Id);
-        Assert.Single(endpointSnapshot.Routes);
-        Assert.All(endpointSnapshot.Edges, edge => Assert.Contains(edge.Id, endpointSnapshot.Routes[0].EdgeIds));
-    }
-
-    private static ResolvedAppConfig CreateConfig(params ResolvedGatewayEndpointConfig[] endpoints) => new()
+    private static ResolvedAppConfig CreateConfig(
+        IReadOnlyList<ResolvedGatewayEndpointConfig> endpoints,
+        IReadOnlyList<ResolvedGatewayComboConfig> combos,
+        IReadOnlyList<ResolvedModelConfig> models) => new()
     {
         GatewayEndpoints = endpoints,
-        Models = endpoints
-            .SelectMany(endpoint => endpoint.Combos)
-            .SelectMany(combo => combo.Routes)
-            .Select(route => route.Model)
-            .GroupBy(model => $"{model.ProviderId}|{model.ModelId}", StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .ToArray()
+        GatewayCombos = combos,
+        Models = models
     };
 
     private static ResolvedGatewayComboConfig CreateCombo(string name, ResolvedModelConfig model) => new()
     {
+        Id = Guid.NewGuid(),
         Name = name,
         Enabled = true,
         Routes = [new ResolvedGatewayRouteConfig { Model = model, Enabled = true }]
@@ -176,25 +101,14 @@ public sealed class RuntimeGraphProjectionTests
     private static ResolvedModelConfig CreateModel(string providerId, string modelId) => new()
     {
         ModelId = modelId,
-        OllamaModelName = modelId,
         DisplayName = modelId,
+        OllamaModelName = modelId,
         ProviderId = providerId,
-        BaseUrl = "https://example.invalid",
-        ApiKey = "",
-        AnthropicModel = modelId,
-        ApiModes = ["openai"]
+        BaseUrl = "https://example.com",
+        ApiKey = string.Empty,
+        AnthropicModel = modelId
     };
 
-    private static ProviderResponse CreateProvider(string id, string displayName, int modelCount) => new(
-        Guid.NewGuid(),
-        id,
-        displayName,
-        "https://example.invalid",
-        "openai",
-        true,
-        false,
-        false,
-        modelCount,
-        "{}",
-        []);
+    private static ProviderResponse CreateProvider(string businessId, string displayName) =>
+        new(Guid.NewGuid(), businessId, displayName, "https://example.com", "openai", true, false, false, 1, "{}", []);
 }

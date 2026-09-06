@@ -112,8 +112,19 @@ public sealed class LoomXHostTests
             {
                 ["reasoning_effort"] = JsonValue.Create("high")
             });
+        var comboId = Guid.NewGuid();
         var configuration = new StaticConfigurationProvider(new ResolvedAppConfig
         {
+            GatewayCombos =
+            [
+                new ResolvedGatewayComboConfig
+                {
+                    Id = comboId,
+                    Name = "relay-model",
+                    Enabled = true,
+                    Routes = [new ResolvedGatewayRouteConfig { Model = model, Enabled = true }]
+                }
+            ],
             GatewayEndpoints =
             [
                 new ResolvedGatewayEndpointConfig
@@ -122,15 +133,7 @@ public sealed class LoomXHostTests
                     PublicPath = "/openai",
                     Enabled = true,
                     ApiKey = "endpoint-key",
-                    Combos =
-                    [
-                        new ResolvedGatewayComboConfig
-                        {
-                            Name = "relay-model",
-                            Enabled = true,
-                            Routes = [new ResolvedGatewayRouteConfig { Model = model, Enabled = true }]
-                        }
-                    ]
+                    ComboBindings = [new ResolvedGatewayComboBindingConfig { ComboId = comboId, Enabled = true }]
                 }
             ]
         });

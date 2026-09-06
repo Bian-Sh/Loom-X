@@ -107,6 +107,20 @@ public sealed class GatewayViewContractTests
     }
 
     [Fact]
+    public void GatewaySeparatesEndpointBindingsFromGlobalComboEditor()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+        var viewModelSource = ReadDesktopFile("ViewModels", "GatewayViewModel.cs");
+
+        Assert.Contains("ItemsSource=\"{Binding ComboOptions}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"EndpointComboOption_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding Combos}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectedEndpoint.Combos", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("combo is null || SelectedEndpoint is null", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("UpdateGatewayEndpointComboBindingsAsync", viewModelSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void DragAndAlphabeticalSortAreHandledByGatewayInteractions()
     {
         var viewSource = ReadDesktopFile("Views", "GatewayView.axaml.cs");
@@ -171,12 +185,16 @@ public sealed class GatewayViewContractTests
     [Fact]
     public void EndpointApiKeyIsMaskedAndOllamaExposesFourReasoningLevels()
     {
-        var openAi = GatewayEndpointEditorViewModel.FromResponse(new GatewayEndpointResponse("openai", "OpenAI", "/openai", true, [], "lx_1234567890", "medium"), "http://127.0.0.1:11434");
-        var ollama = GatewayEndpointEditorViewModel.FromResponse(new GatewayEndpointResponse("ollama", "Ollama", "/", true, [], null, "high"), "http://127.0.0.1:11434");
+        var comboOne = new GatewayComboEditorViewModel { Id = Guid.NewGuid(), Name = "共享模型", Enabled = true };
+        var comboTwo = new GatewayComboEditorViewModel { Id = Guid.NewGuid(), Name = "备用模型", Enabled = true };
+        var openAi = GatewayEndpointEditorViewModel.FromResponse(new GatewayEndpointResponse("openai", "OpenAI", "/openai", true, [new GatewayEndpointComboResponse(comboOne.Id, comboOne.Name, true, true, 0), new GatewayEndpointComboResponse(comboTwo.Id, comboTwo.Name, true, true, 1)], "lx_1234567890", "medium"), "http://127.0.0.1:11434", [comboOne, comboTwo]);
+        var ollama = GatewayEndpointEditorViewModel.FromResponse(new GatewayEndpointResponse("ollama", "Ollama", "/", true, [], null, "high"), "http://127.0.0.1:11434", [comboOne, comboTwo]);
 
         Assert.Equal("lx_1••••7890", openAi.MaskedApiKey);
         Assert.True(openAi.IsApiKeyVisible);
         Assert.False(ollama.IsApiKeyVisible);
+        Assert.Equal(2, openAi.SelectedComboCount);
+        Assert.Equal("共享模型、备用模型", openAi.SelectedComboSummary);
         Assert.Equal(["minimal", "low", "medium", "high"], ollama.ReasoningEffortOptions);
         Assert.Equal("high", ollama.ReasoningEffort);
     }

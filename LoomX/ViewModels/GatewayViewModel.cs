@@ -20,6 +20,7 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     private bool isModelSortAscending = true;
     private string modelSearchTerm = "";
     public ObservableCollection<GatewayEndpointEditorViewModel> Endpoints { get; } = [];
+    public ObservableCollection<GatewayComboEditorViewModel> Combos { get; } = [];
     public ObservableCollection<GatewayModelOption> AvailableModels { get; } = [];
     public ObservableCollection<GatewayModelGroup> ModelGroups { get; } = [];
     public bool IsModelSortAscending
@@ -34,7 +35,7 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     }
     public bool IsModelSortDescending => !IsModelSortAscending;
     public string ModelSortToolTip => IsModelSortAscending ? "按字母降序排序" : "按字母升序排序";
-    public GatewayEndpointEditorViewModel? SelectedEndpoint { get => selectedEndpoint; set { if (SetProperty(ref selectedEndpoint, value)) { SelectedCombo = null; OnPropertyChanged(nameof(HasSelectedEndpoint)); FilterModels(""); } } }
+    public GatewayEndpointEditorViewModel? SelectedEndpoint { get => selectedEndpoint; set { if (SetProperty(ref selectedEndpoint, value)) OnPropertyChanged(nameof(HasSelectedEndpoint)); } }
     public GatewayComboEditorViewModel? SelectedCombo { get => selectedCombo; private set { if (SetProperty(ref selectedCombo, value)) FilterModels(""); } }
     public GatewayRouteEditorViewModel? DraggingRoute { get => draggingRoute; private set { if (SetProperty(ref draggingRoute, value)) OnPropertyChanged(nameof(IsRouteDragActive)); } }
     public bool IsRouteDragActive => DraggingRoute is not null;
@@ -76,15 +77,17 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         {
             var selectedKey = SelectedEndpoint?.Key;
             await dataStore.InitializeAsync();
-            var providers = dataStore.Providers;
             await ReloadAvailableModelsAsync();
             var endpoints = dataStore.GatewayEndpoints;
+            var comboResponses = dataStore.GatewayCombos;
             var baseUrl = dataStore.CurrentConfig.Server.Urls.FirstOrDefault() ?? "http://127.0.0.1:11434";
+            Combos.Clear();
+            foreach (var combo in comboResponses) Combos.Add(GatewayComboEditorViewModel.FromResponse(combo));
             Endpoints.Clear();
-            foreach (var endpoint in endpoints) Endpoints.Add(GatewayEndpointEditorViewModel.FromResponse(endpoint, baseUrl));
+            foreach (var endpoint in endpoints) Endpoints.Add(GatewayEndpointEditorViewModel.FromResponse(endpoint, baseUrl, Combos));
             SelectedEndpoint = Endpoints.FirstOrDefault(item => item.Key == selectedKey) ?? Endpoints.FirstOrDefault();
             FilterModels("");
-            Status = $"已加载 {providers.Count} 个 Provider、{AvailableModels.Count} 个模型和 {Endpoints.Count} 个 Endpoint";
+            Status = $"已加载 {dataStore.Providers.Count} 个 Provider、{AvailableModels.Count} 个模型、{Endpoints.Count} 个 Endpoint 和 {Combos.Count} 个 Combo";
         }
         catch (Exception exception) { Status = $"网关加载失败：{exception.Message}"; }
     }
@@ -97,14 +100,15 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
 
     private async Task AddComboAsync()
     {
-        if (SelectedEndpoint is null) return;
         try
         {
             var name = "新 Combo"; var index = 2;
-            while (SelectedEndpoint.Combos.Any(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))) name = $"新 Combo {index++}";
-            var response = await dataStore.CreateGatewayComboAsync(SelectedEndpoint.Key, new GatewayComboInput(name, true, SelectedEndpoint.Combos.Count));
-            var combo = GatewayComboEditorViewModel.FromResponse(response); combo.IsExpanded = true;
-            SelectedEndpoint.Combos.Add(combo); SelectedCombo = combo; Status = "Combo 模型已添加";
+            while (Combos.Any(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))) name = $"新 Combo {index++}";
+            var response = await dataStore.CreateGatewayComboAsync(new GatewayComboInput(name, true, Combos.Count));
+            await RefreshAsync();
+            SelectedCombo = Combos.FirstOrDefault(item => item.Id == response.Id);
+            if (SelectedCombo is not null) SelectedCombo.IsExpanded = true;
+            Status = "全局 Combo 已添加";
         }
         catch (Exception exception) { Status = $"添加 Combo 模型失败：{exception.Message}"; }
     }
@@ -117,6 +121,26 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     }
     public void SelectCombo(GatewayComboEditorViewModel? combo) => SelectedCombo = combo;
     public GatewayRouteEditorViewModel? FindSelectedRoute(Guid id) => SelectedCombo?.Routes.FirstOrDefault(item => !item.IsPlaceholder && item.Id == id);
+
+    public async Task ToggleEndpointComboAsync(GatewayComboBindingOption? option)
+    {
+        if (option?.Owner is not { } endpoint) return;
+        var previous = option.IsSelected;
+        option.IsSelected = !previous;
+        try
+        {
+            var selected = endpoint.ComboOptions.Where(item => item.IsSelected).Select(item => item.ComboId).ToArray();
+            var response = await dataStore.UpdateGatewayEndpointComboBindingsAsync(endpoint.Key, new GatewayEndpointComboSelectionInput(selected));
+            endpoint.ApplyBindings(response, Combos);
+            Status = $"{endpoint.DisplayName} 的 Combo 暴露范围已保存";
+        }
+        catch (Exception exception)
+        {
+            option.IsSelected = previous;
+            Status = $"Endpoint Combo 更新失败：{exception.Message}";
+            toastService.Show("Endpoint Combo 更新失败", ToastLevel.Error);
+        }
+    }
 
     public bool BeginRouteDrag(GatewayRouteEditorViewModel? route)
     {
@@ -271,8 +295,8 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     private async Task ToggleComboAsync(GatewayComboEditorViewModel? combo) { if (combo is null) return; combo.Enabled = !combo.Enabled; await SaveComboChangesAsync(combo); }
     private async Task RemoveComboAsync(GatewayComboEditorViewModel? combo)
     {
-        if (combo is null || SelectedEndpoint is null) return;
-        try { await dataStore.DeleteGatewayComboAsync(combo.Id); SelectedEndpoint.Combos.Remove(combo); if (SelectedCombo == combo) SelectedCombo = null; Status = "Combo 模型已移除"; }
+        if (combo is null) return;
+        try { await dataStore.DeleteGatewayComboAsync(combo.Id); Combos.Remove(combo); if (SelectedCombo == combo) SelectedCombo = null; Status = "全局 Combo 已移除"; }
         catch (Exception exception) { Status = $"移除 Combo 模型失败：{exception.Message}"; }
     }
     private async Task ToggleRouteAsync(GatewayRouteEditorViewModel? route) { if (route is null) return; route.Enabled = !route.Enabled; await SaveRouteAsync(route); Status = "成员状态已保存"; }
@@ -322,8 +346,12 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
     private string reasoningEffort = GatewayEndpointSettings.DefaultReasoningEffort;
     private bool isHydrated;
     private bool reasoningEffortDirty;
+    private bool isComboPickerOpen;
     public string Key { get; init; } = ""; public string DisplayName { get; init; } = ""; public string PublicPath { get; init; } = ""; public string PublicUrl { get; init; } = "";
-    public ObservableCollection<GatewayComboEditorViewModel> Combos { get; } = [];
+    public ObservableCollection<GatewayComboBindingOption> ComboOptions { get; } = [];
+    public int SelectedComboCount => ComboOptions.Count(item => item.IsSelected);
+    public string SelectedComboSummary => SelectedComboCount == 0 ? "未暴露 Combo" : string.Join("、", ComboOptions.Where(item => item.IsSelected).Select(item => item.Name));
+    public bool IsComboPickerOpen { get => isComboPickerOpen; set => SetProperty(ref isComboPickerOpen, value); }
     public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); }
     public string ApiKey { get => apiKey; private set { if (SetProperty(ref apiKey, value)) OnPropertyChanged(nameof(MaskedApiKey)); } }
     public string MaskedApiKey => MaskApiKey(ApiKey);
@@ -341,22 +369,40 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
     }
     public bool IsHydrated => isHydrated;
     public bool HasPendingReasoningEffortChange => reasoningEffortDirty;
-    public static GatewayEndpointEditorViewModel FromResponse(GatewayEndpointResponse response, string baseUrl)
+    public static GatewayEndpointEditorViewModel FromResponse(GatewayEndpointResponse response, string baseUrl, IReadOnlyList<GatewayComboEditorViewModel> combos)
     {
         var normalizedBaseUrl = baseUrl.TrimEnd('/');
         var publicUrl = string.Equals(response.Key, "ollama", StringComparison.OrdinalIgnoreCase)
             ? normalizedBaseUrl
             : $"{normalizedBaseUrl}{response.PublicPath}";
         var value = new GatewayEndpointEditorViewModel { Key = response.Key, DisplayName = response.DisplayName, PublicPath = response.PublicPath, PublicUrl = publicUrl, Enabled = response.Enabled, ApiKey = response.ApiKey ?? "", reasoningEffort = GatewayEndpointSettings.NormalizeReasoningEffort(response.ReasoningEffort) };
-        foreach (var combo in response.Combos) value.Combos.Add(GatewayComboEditorViewModel.FromResponse(combo));
+        value.ApplyBindings(response, combos);
         value.isHydrated = true;
         return value;
     }
+    public static GatewayEndpointEditorViewModel FromResponse(GatewayEndpointResponse response, string baseUrl) => FromResponse(response, baseUrl, []);
     public void ApplyResponse(GatewayEndpointResponse response)
     {
         Enabled = response.Enabled;
         ApiKey = response.ApiKey ?? ApiKey;
         ReasoningEffort = response.ReasoningEffort;
+    }
+    public void ApplyBindings(GatewayEndpointResponse response, IReadOnlyList<GatewayComboEditorViewModel> combos)
+    {
+        var selected = response.Combos.ToDictionary(item => item.ComboId);
+        ComboOptions.Clear();
+        foreach (var combo in combos.OrderBy(item => item.SortOrder))
+        {
+            selected.TryGetValue(combo.Id, out var binding);
+            ComboOptions.Add(new GatewayComboBindingOption(this, combo.Id, combo.Name, combo.Enabled, binding is not null && binding.Enabled));
+        }
+        OnPropertyChanged(nameof(SelectedComboCount));
+        OnPropertyChanged(nameof(SelectedComboSummary));
+    }
+    internal void OnComboOptionChanged()
+    {
+        OnPropertyChanged(nameof(SelectedComboCount));
+        OnPropertyChanged(nameof(SelectedComboSummary));
     }
     public void MarkReasoningEffortSaved() => reasoningEffortDirty = false;
     private static string MaskApiKey(string value)
@@ -364,6 +410,24 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
         if (string.IsNullOrWhiteSpace(value)) return "未生成";
         if (value.Length <= 8) return new string('•', value.Length);
         return $"{value[..4]}••••{value[^4..]}";
+    }
+}
+public sealed class GatewayComboBindingOption : NotifyViewModel
+{
+    private bool isSelected;
+    public GatewayEndpointEditorViewModel Owner { get; }
+    public Guid ComboId { get; }
+    public string Name { get; }
+    public bool ComboEnabled { get; }
+    public bool IsSelected { get => isSelected; set { if (SetProperty(ref isSelected, value)) Owner.OnComboOptionChanged(); } }
+    public string StatusText => ComboEnabled ? "" : "全局停用";
+    public GatewayComboBindingOption(GatewayEndpointEditorViewModel owner, Guid comboId, string name, bool comboEnabled, bool isSelected)
+    {
+        Owner = owner;
+        ComboId = comboId;
+        Name = name;
+        ComboEnabled = comboEnabled;
+        this.isSelected = isSelected;
     }
 }
 public sealed class GatewayComboEditorViewModel : NotifyViewModel
