@@ -18,7 +18,7 @@
     <Style Selector="ToggleButton.graph-endpoint-link:checked TextBlock.graph-endpoint-link-text"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
   </UserControl.Styles>
   <Grid RowDefinitions="*,Auto" RowSpacing="16">
-    <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360" VerticalAlignment="Stretch">
+    <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" ClipToBounds="True" MinHeight="360" VerticalAlignment="Stretch">
       <Grid>
         <ItemsControl ItemsSource="{Binding Endpoints}">
           <ItemsControl.ItemsPanel>

@@ -21,6 +21,7 @@ public sealed class RuntimeGraphControl : Control
     public const double KindWatermarkMaxFontSize = 15;
     public const double PanStartThreshold = 4;
 
+    private const double GraphCornerRadius = 10;
     private const double KindWatermarkGap = 3;
 
     public static readonly StyledProperty<RuntimeGraphSnapshot?> SnapshotProperty =
@@ -95,7 +96,7 @@ public sealed class RuntimeGraphControl : Control
         base.Render(context);
 
         var background = ResolveBrush("SurfaceSubtleBrush", Brushes.Transparent);
-        using (context.PushClip(Bounds))
+        using (context.PushClip(new RoundedRect(Bounds, GraphCornerRadius)))
             context.DrawRectangle(background, null, new Rect(Bounds.Size));
 
         var layout = ResolveLayout();
@@ -111,7 +112,7 @@ public sealed class RuntimeGraphControl : Control
         var live = ResolveBrush("AccentBrush", Brushes.Teal);
         var zoom = EffectiveZoom;
 
-        using (context.PushClip(Bounds))
+        using (context.PushClip(new RoundedRect(Bounds, GraphCornerRadius)))
         {
             foreach (var edge in layout.Edges)
             {

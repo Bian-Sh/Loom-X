@@ -92,6 +92,17 @@ public sealed class OverviewGraphContractTests
     }
 
     [Fact]
+    public void OverviewGraphUsesSharedCornerRadiusForHostAndCanvas()
+    {
+        var viewSource = ReadDesktopFile("Views", "OverviewView.axaml");
+        var controlSource = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
+
+        Assert.Contains("BorderThickness=\"1\" CornerRadius=\"10\" ClipToBounds=\"True\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("private const double GraphCornerRadius = 10;", controlSource, StringComparison.Ordinal);
+        Assert.Contains("context.PushClip(new RoundedRect(Bounds, GraphCornerRadius))", controlSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RuntimeGraphRoundsProviderHeaderCorners()
     {
         var controlSource = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
