@@ -69,26 +69,32 @@ public sealed class GatewayViewContractTests
     }
 
     [Fact]
-    public void EndpointListUsesThemeResponsiveCellSpacing()
+    public void EndpointListUsesNonSelectingDisplayContainer()
     {
         var source = ReadDesktopFile("Views", "GatewayView.axaml");
 
-        Assert.Contains("Selector=\"ListBox.endpoint-list\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceBrush}\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Property=\"Margin\" Value=\"0,0,0,1\"", source, StringComparison.Ordinal);
+        Assert.Contains("<ItemsControl Classes=\"endpoint-list\" ItemsSource=\"{Binding Endpoints}\">", source, StringComparison.Ordinal);
+        Assert.Contains("<ScrollViewer Grid.Row=\"1\" VerticalScrollBarVisibility=\"Auto\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ItemsControl.endpoint-list\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ListBox.endpoint-list", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ListBoxItem:selected", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ListBoxItem:pointerover", source, StringComparison.Ordinal);
         Assert.Contains("BorderBrush=\"{DynamicResource BorderStrongBrush}\" BorderThickness=\"0,0,0,1\"", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/><Setter Property=\"BorderBrush\" Value=\"{DynamicResource AccentBrush}\"/><Setter Property=\"BorderThickness\" Value=\"3,0,0,0\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"3*,2*\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void EndpointListMatchesProviderSelectionInteraction()
+    public void EndpointListDoesNotExposeWholeRowSelectionInteraction()
     {
         var source = ReadDesktopFile("Views", "GatewayView.axaml");
 
-        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/><Setter Property=\"BorderBrush\" Value=\"{DynamicResource AccentBrush}\"/><Setter Property=\"BorderThickness\" Value=\"3,0,0,0\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/><Setter Property=\"Foreground\" Value=\"{DynamicResource TextPrimaryBrush}\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected:pointerover\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceMutedBrush}\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceMutedBrush}\"/><Setter Property=\"Foreground\" Value=\"{DynamicResource TextPrimaryBrush}\"/>", source, StringComparison.Ordinal);
+        var endpointStart = source.IndexOf("<ItemsControl Classes=\"endpoint-list\"", StringComparison.Ordinal);
+        var rightPanelStart = source.IndexOf("<Border Grid.Column=\"1\" Classes=\"panel\"", StringComparison.Ordinal);
+        Assert.True(endpointStart >= 0 && rightPanelStart > endpointStart);
+        var endpointSource = source[endpointStart..rightPanelStart];
+        Assert.DoesNotContain("ListBox", endpointSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectedItem=\"{Binding SelectedEndpoint", endpointSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("Pointer", endpointSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -100,7 +106,10 @@ public sealed class GatewayViewContractTests
         Assert.Contains("Text=\"{Binding MaskedApiKey}\"", source, StringComparison.Ordinal);
         Assert.Contains("ToolTip.Tip=\"复制 API Key\"", source, StringComparison.Ordinal);
         Assert.Contains("ToolTip.Tip=\"重新生成 API Key\"", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"Border.endpoint-key-row:pointerover Button.endpoint-refresh\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"icon endpoint-refresh\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Path Classes=\"icon-glyph\" Data=\"M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6\" Stroke=\"{DynamicResource TextSecondaryBrush}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Selector=\"Button.endpoint-refresh\"><Setter Property=\"IsVisible\" Value=\"False\"/>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("endpoint-key-row:pointerover", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"Reasoning effort\"", source, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding ReasoningEffortOptions}\"", source, StringComparison.Ordinal);
         Assert.Contains("SelectionChanged=\"ReasoningEffort_OnSelectionChanged\"", source, StringComparison.Ordinal);
@@ -232,6 +241,18 @@ public sealed class GatewayViewContractTests
         Assert.Contains("Classes=\"copy-log\" Content=\"⧉\"", consoleSource, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Button.copy-log\"", consoleSource, StringComparison.Ordinal);
         Assert.Contains("Property=\"FontSize\" Value=\"16\"", consoleSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GatewayDeleteButtonsReuseProviderCellTrashGlyph()
+    {
+        var gatewaySource = ReadDesktopFile("Views", "GatewayView.axaml");
+        var providerSource = ReadDesktopFile("Views", "ProvidersView.axaml");
+        const string trashGlyph = "M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6";
+
+        Assert.Contains($"Data=\"{trashGlyph}\"", providerSource, StringComparison.Ordinal);
+        Assert.Equal(2, gatewaySource.Split($"Data=\"{trashGlyph}\"", StringSplitOptions.None).Length - 1);
+        Assert.DoesNotContain("Data=\"M 10,8 L 22,8 L 21,27 L 11,27 Z", gatewaySource, StringComparison.Ordinal);
     }
 
     private static string ReadDesktopFile(params string[] segments)
