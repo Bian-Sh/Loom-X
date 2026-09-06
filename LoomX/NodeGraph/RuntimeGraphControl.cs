@@ -90,7 +90,7 @@ public sealed class RuntimeGraphControl : Control
     {
         base.Render(context);
 
-        var background = ResolveBrush("GraphCanvasBrush", Brushes.Transparent);
+        var background = ResolveBrush("SurfaceSubtleBrush", Brushes.Transparent);
         using (context.PushClip(Bounds))
             context.DrawRectangle(background, null, new Rect(Bounds.Size));
 
@@ -394,7 +394,8 @@ public sealed class RuntimeGraphControl : Control
             bounds.Y + headerInset,
             Math.Max(0, bounds.Width - headerInset * 2),
             Math.Max(0, 38 * zoom - headerInset));
-        context.DrawRectangle(headerFill, null, headerBounds);
+        using (context.PushClip(new RoundedRect(bounds, 10 * zoom)))
+            context.DrawRectangle(headerFill, null, headerBounds);
         context.DrawLine(
             new Pen(WithAlpha(groupBorder, 0.68), Math.Max(1, zoom)),
             new Point(headerBounds.Left, headerBounds.Bottom),

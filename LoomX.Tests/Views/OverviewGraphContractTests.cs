@@ -81,14 +81,22 @@ public sealed class OverviewGraphContractTests
     }
 
     [Fact]
-    public void RuntimeGraphKeepsTransparentInputSurface()
+    public void RuntimeGraphKeepsInteractiveSurface()
     {
         var controlSource = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
         var tokensSource = ReadDesktopFile("Styles", "VisualTokens.axaml");
 
-        Assert.Contains("ResolveBrush(\"GraphCanvasBrush\"", controlSource, StringComparison.Ordinal);
+        Assert.Contains("ResolveBrush(\"SurfaceSubtleBrush\", Brushes.Transparent)", controlSource, StringComparison.Ordinal);
         Assert.Contains("context.DrawRectangle(background, null, new Rect(Bounds.Size));", controlSource, StringComparison.Ordinal);
-        Assert.Contains("x:Key=\"GraphCanvasBrush\" Color=\"#00000000\"", tokensSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Key=\"GraphCanvasBrush\"", tokensSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RuntimeGraphRoundsProviderHeaderCorners()
+    {
+        var controlSource = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
+
+        Assert.Contains("context.PushClip(new RoundedRect(bounds, 10 * zoom))", controlSource, StringComparison.Ordinal);
     }
 
     [Fact]

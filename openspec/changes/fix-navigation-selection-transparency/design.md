@@ -6,6 +6,6 @@
 
 ## Runtime NodeGraph 透明画布
 
-Overview 的 Runtime NodeGraph 保留覆盖完整控件区域的透明绘制层，以维持空白区域的滚轮缩放和拖拽平移命中。外框使用共享 `BorderBrush`，不再使用深色 Graph 边框。
+Overview 的 Runtime NodeGraph 保留覆盖完整控件区域的 Surface 绘制层，以维持空白区域的滚轮缩放和拖拽平移命中，同时与页面其他 Surface 卡片保持一致。外框使用共享 `BorderBrush`，不再使用深色 Graph 边框。
 
-节点和 Provider 分组直接复用现有 Surface、Border、Text 与 Accent 资源，不对半透明边框资源二次降低 Alpha。Endpoint 使用 `AccentSoftBrush`，Combo、Model 和 Provider 分别使用现有 Surface 层级，以保证透明背景下仍有清晰的层级和文字对比度。
+节点和 Provider 分组直接复用现有 Surface、Border、Text 与 Accent 资源，不对半透明边框资源二次降低 Alpha。Endpoint 使用 `AccentSoftBrush`，Combo、Model 和 Provider 分别使用现有 Surface 层级，以保证 Surface 画布上仍有清晰的层级和文字对比度。Provider Header 在外层圆角裁剪内绘制，避免覆盖容器上方圆角。
