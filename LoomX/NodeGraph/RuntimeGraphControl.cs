@@ -135,7 +135,7 @@ public sealed class RuntimeGraphControl : Control
             foreach (var node in layout.Nodes.Values
                          .Where(item => item.Kind == RuntimeGraphNodeKind.Model)
                          .OrderBy(item => item.NodeId, StringComparer.OrdinalIgnoreCase))
-                DrawNode(context, node, NodeLabel(node.NodeId), surfaceSubtle, border, text, muted, zoom, 12);
+                DrawModelNode(context, node, surfaceSubtle, border, text, muted, zoom);
         }
     }
 
@@ -362,7 +362,8 @@ public sealed class RuntimeGraphControl : Control
         IBrush text,
         IBrush muted,
         double zoom,
-        double fontSize = 14)
+        double fontSize = 14,
+        string? secondaryLabel = null)
     {
         var bounds = ToViewport(node.Bounds);
         var selected = Selection is { Kind: RuntimeGraphSelectionKind.Node } selection
@@ -374,8 +375,60 @@ public sealed class RuntimeGraphControl : Control
         var watermarkHeight = watermarkVisible ? KindWatermarkTextHeight(zoom) : 0;
         var labelHeight = Math.Max(0, bounds.Height - watermarkHeight - KindWatermarkGap * zoom);
         if (zoom >= 0.25)
-            DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, Math.Max(0, bounds.Width - 24 * zoom), labelHeight), text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
+        {
+            var textWidth = Math.Max(0, bounds.Width - 24 * zoom);
+            if (string.IsNullOrWhiteSpace(secondaryLabel))
+            {
+                DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, textWidth, labelHeight), text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
+            }
+            else
+            {
+                var textTop = bounds.Y + 7 * zoom;
+                var lineGap = 2 * zoom;
+                var lineHeight = Math.Max(0, (labelHeight - 14 * zoom - lineGap) / 2);
+                var textBounds = new Rect(bounds.X + 12 * zoom, textTop, textWidth, lineHeight);
+                DrawText(context, label, textBounds, text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
+                DrawText(
+                    context,
+                    secondaryLabel,
+                    new Rect(textBounds.X, textBounds.Bottom + lineGap, textBounds.Width, lineHeight),
+                    muted,
+                    Math.Max(8, (fontSize - 1) * zoom),
+                    FontWeight.Normal,
+                    TextAlignment.Left);
+            }
+        }
         DrawKindWatermark(context, kindLabel, bounds, zoom, muted);
+    }
+
+    private void DrawModelNode(
+        DrawingContext context,
+        RuntimeGraphNodeLayout node,
+        IBrush fill,
+        IBrush border,
+        IBrush text,
+        IBrush muted,
+        double zoom)
+    {
+        var model = Snapshot?.Models.FirstOrDefault(item => string.Equals(item.Id, node.NodeId, StringComparison.OrdinalIgnoreCase));
+        var modelName = node.NodeId;
+        string? providerName = null;
+        if (model is not null)
+        {
+            modelName = model.DisplayName;
+            providerName = model.ProviderDisplayName;
+        }
+        DrawNode(
+            context,
+            node,
+            modelName,
+            fill,
+            border,
+            text,
+            muted,
+            zoom,
+            fontSize: 12,
+            secondaryLabel: providerName);
     }
 
     private static void DrawKindWatermark(
@@ -421,9 +474,7 @@ public sealed class RuntimeGraphControl : Control
         if (Snapshot is null) return nodeId;
         var endpointOrCombo = Snapshot.Endpoints.FirstOrDefault(item => string.Equals(item.Id, nodeId, StringComparison.OrdinalIgnoreCase))
             ?? Snapshot.Combos.FirstOrDefault(item => string.Equals(item.Id, nodeId, StringComparison.OrdinalIgnoreCase));
-        if (endpointOrCombo is not null) return endpointOrCombo.DisplayName;
-        var model = Snapshot.Models.FirstOrDefault(item => string.Equals(item.Id, nodeId, StringComparison.OrdinalIgnoreCase));
-        return model is null ? nodeId : $"{model.DisplayName} · {model.ProviderDisplayName}";
+        return endpointOrCombo?.DisplayName ?? nodeId;
     }
 
     private static void DrawText(

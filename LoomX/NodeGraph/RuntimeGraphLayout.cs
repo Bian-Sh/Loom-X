@@ -6,8 +6,8 @@ public sealed record RuntimeGraphLayoutOptions
 {
     public double NodeWidth { get; init; } = 180;
     public double NodeHeight { get; init; } = 58;
-    public double ModelWidth { get; init; } = 260;
-    public double ModelHeight { get; init; } = 50;
+    public double ModelWidth { get; init; } = 220;
+    public double ModelHeight { get; init; } = 58;
     public double RowGap { get; init; } = 18;
     public double ColumnGap { get; init; } = 140;
     public double OuterPadding { get; init; } = 40;

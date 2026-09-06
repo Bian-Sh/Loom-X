@@ -33,6 +33,16 @@ public sealed class RuntimeGraphLayoutTests
         Assert.All(layout.Edges, edge => Assert.True(edge.Source.X < edge.Target.X));
     }
 
+    [Fact]
+    public void ModelNodesUseCompactTwoLineDimensions()
+    {
+        var layout = RuntimeGraphLayout.Create(CreateSnapshot(false));
+        var model = layout.Nodes["model|provider-a|model-a"];
+
+        Assert.Equal(220, model.Bounds.Width);
+        Assert.Equal(58, model.Bounds.Height);
+    }
+
     private static RuntimeGraphSnapshot CreateSnapshot(bool reverse)
     {
         var endpoints = new[]

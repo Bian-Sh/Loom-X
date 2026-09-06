@@ -139,6 +139,17 @@ public sealed class OverviewGraphContractTests
     }
 
     [Fact]
+    public void RuntimeGraphModelNodeUsesTwoLineModelAndProviderLabels()
+    {
+        var source = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
+
+        Assert.Contains("DrawModelNode", source, StringComparison.Ordinal);
+        Assert.Contains("model.DisplayName", source, StringComparison.Ordinal);
+        Assert.Contains("model.ProviderDisplayName", source, StringComparison.Ordinal);
+        Assert.Contains("secondaryLabel", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OverviewProvidesEndpointNavigationButtons()
     {
         var source = ReadDesktopFile("Views", "OverviewView.axaml");
