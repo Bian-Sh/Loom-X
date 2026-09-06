@@ -14,13 +14,14 @@
 
 在 `GatewayView.axaml` 内增加仅供 Endpoint 列表使用的局部样式：
 
-- Endpoint 卡片使用现有的中性 `SurfaceBrush`，让卡片比外层玻璃面板更稳定、但不引入新的色相。
+- Endpoint 卡片使用与右侧全局 Combo Header 相同的 `SurfaceSubtleBrush`，统一透明度、色阶和玻璃感。
+- Endpoint 列表容器保持透明，避免额外的 `SurfaceBrush` 叠加导致卡片比 Combo Header 更不透明。
 - 保留现有分隔线、内边距和动态资源机制。
 
 不修改全局 `VisualTokens.axaml` 中的 `SurfaceSubtleBrush`，避免影响 Provider、模型选择器等其他界面。
 
 ## 验证
 
-- 更新 `GatewayViewContractTests`，断言 Endpoint 条目使用新的局部样式。
+- 更新 `GatewayViewContractTests`，断言 Endpoint 条目使用 `SurfaceSubtleBrush` 局部样式，并与全局 Combo Header 保持一致。
 - 运行 Gateway 视图契约测试、完整测试和 Release 构建。
 - 发布桌面包后检查左侧三张卡片在玻璃背景上的层级和对比度。
