@@ -153,13 +153,15 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     public async Task SaveComboChangesAsync(GatewayComboEditorViewModel? combo)
     {
         if (combo is null) return;
+        var comboId = combo.Id;
         var saved = false;
         try
         {
             await RunGatewayMutationAsync(async () =>
             {
                 if (!IsCurrentCombo(combo) || !combo.HasPendingChanges) return;
-                combo.ApplyResponse(await dataStore.UpdateGatewayComboAsync(combo.Id, new GatewayComboInput(combo.Name, combo.Enabled, combo.SortOrder)));
+                var response = await dataStore.UpdateGatewayComboAsync(comboId, new GatewayComboInput(combo.Name, combo.Enabled, combo.SortOrder));
+                FindCurrentCombo(comboId)?.ApplyResponse(response);
                 saved = true;
             });
             if (saved) Status = "Combo 模型已保存";
@@ -232,12 +234,12 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         combo.Routes.Insert(targetIndex, DraggingRoute);
         ClearRouteDragState();
         Renumber(combo);
+        var updates = CreateRouteSaveRequests(combo);
         try
         {
             await RunGatewayMutationAsync(async () =>
             {
-                if (!IsCurrentCombo(combo)) return;
-                foreach (var item in combo.Routes.Where(item => !item.IsPlaceholder)) await SaveRouteAsync(item);
+                foreach (var update in updates) await SaveRouteAsync(update.Id, update.Input);
             });
             Status = "故障转移顺序已保存";
         }
@@ -302,11 +304,12 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             GatewayRouteResponse? response = null;
             await RunGatewayMutationAsync(async () =>
             {
-                if (SelectedCombo is null || !IsCurrentCombo(SelectedCombo)) return;
-                response = await dataStore.CreateGatewayRouteAsync(SelectedCombo.Id, new GatewayRouteInput(option.Id, true, SelectedCombo.Routes.Count));
+                var combo = SelectedCombo is { } selected && FindCurrentCombo(selected.Id) is { } current ? current : null;
+                if (combo is null) return;
+                response = await dataStore.CreateGatewayRouteAsync(combo.Id, new GatewayRouteInput(option.Id, true, combo.Routes.Count));
             });
-            if (response is not null && SelectedCombo is not null && IsCurrentCombo(SelectedCombo) && !SelectedCombo.Routes.Any(item => item.Id == response.Id))
-                SelectedCombo.Routes.Add(GatewayRouteEditorViewModel.FromResponse(response));
+            if (response is not null && FindCurrentCombo(response.ComboId) is { } combo && !combo.Routes.Any(item => item.Id == response.Id))
+                combo.Routes.Add(GatewayRouteEditorViewModel.FromResponse(response));
             Status = "模型已加入 Combo";
         }
         catch (Exception exception) { Status = $"加入 Combo 失败：{exception.Message}"; }
@@ -356,28 +359,67 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             toastService.Show("Reasoning effort 保存失败", ToastLevel.Error);
         }
     }
-    private async Task ToggleComboAsync(GatewayComboEditorViewModel? combo) { if (combo is null || !IsCurrentCombo(combo)) return; combo.Enabled = !combo.Enabled; await SaveComboChangesAsync(combo); }
+    private async Task ToggleComboAsync(GatewayComboEditorViewModel? combo)
+    {
+        if (combo is null) return;
+        var saved = false;
+        try
+        {
+            await RunGatewayMutationAsync(async () =>
+            {
+                var current = FindCurrentCombo(combo.Id);
+                if (current is null) return;
+                current.Enabled = !current.Enabled;
+                var response = await dataStore.UpdateGatewayComboAsync(current.Id, new GatewayComboInput(current.Name, current.Enabled, current.SortOrder));
+                FindCurrentCombo(current.Id)?.ApplyResponse(response);
+                saved = true;
+            });
+            if (saved) Status = "Combo 模型已保存";
+        }
+        catch (Exception exception) { Status = $"保存 Combo 模型失败：{exception.Message}"; }
+    }
     private async Task RemoveComboAsync(GatewayComboEditorViewModel? combo)
     {
         if (combo is null || !IsCurrentCombo(combo)) return;
         try
         {
-            await RunGatewayMutationAsync(() => dataStore.DeleteGatewayComboAsync(combo.Id));
-            Combos.Remove(combo);
-            if (SelectedCombo == combo) SelectedCombo = null;
+            var comboId = combo.Id;
+            await RunGatewayMutationAsync(() => dataStore.DeleteGatewayComboAsync(comboId));
+            if (FindCurrentCombo(comboId) is { } current) Combos.Remove(current);
+            if (SelectedCombo?.Id == comboId) SelectedCombo = null;
             Status = "全局 Combo 已移除";
         }
         catch (Exception exception) { Status = $"移除 Combo 模型失败：{exception.Message}"; }
     }
-    private async Task ToggleRouteAsync(GatewayRouteEditorViewModel? route) { if (route is null || !IsCurrentRoute(route)) return; route.Enabled = !route.Enabled; try { await RunGatewayMutationAsync(() => SaveRouteAsync(route)); Status = "成员状态已保存"; } catch (Exception exception) { Status = $"成员状态保存失败：{exception.Message}"; } }
+    private async Task ToggleRouteAsync(GatewayRouteEditorViewModel? route)
+    {
+        if (route is null) return;
+        try
+        {
+            await RunGatewayMutationAsync(async () =>
+            {
+                var current = FindCurrentRoute(route.Id);
+                if (current is null) return;
+                current.Enabled = !current.Enabled;
+                await SaveRouteAsync(current);
+            });
+            Status = "成员状态已保存";
+        }
+        catch (Exception exception) { Status = $"成员保存失败：{exception.Message}"; }
+    }
     private async Task RemoveRouteAsync(GatewayRouteEditorViewModel? route)
     {
         if (route is null || SelectedCombo is null || !IsCurrentRoute(route)) return;
+        var comboId = SelectedCombo.Id;
+        var routeId = route.Id;
         try
         {
-            await RunGatewayMutationAsync(() => dataStore.DeleteGatewayRouteAsync(route.Id));
-            SelectedCombo.Routes.Remove(route);
-            Renumber(SelectedCombo);
+            await RunGatewayMutationAsync(() => dataStore.DeleteGatewayRouteAsync(routeId));
+            if (FindCurrentCombo(comboId) is { } combo)
+            {
+                if (FindCurrentRoute(routeId) is { } currentRoute) combo.Routes.Remove(currentRoute);
+                Renumber(combo);
+            }
             Status = "模型已从 Combo 移除";
         }
         catch (Exception exception) { Status = $"移除成员失败：{exception.Message}"; }
@@ -386,23 +428,31 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     {
         if (route is null || target is null || route == target || SelectedCombo is null || !IsCurrentCombo(SelectedCombo)) return;
         var from = SelectedCombo.Routes.IndexOf(route); var to = SelectedCombo.Routes.IndexOf(target); if (from < 0 || to < 0) return;
+        var combo = SelectedCombo;
         SelectedCombo.Routes.Move(from, to); Renumber(SelectedCombo);
+        var updates = CreateRouteSaveRequests(combo);
         try
         {
             await RunGatewayMutationAsync(async () =>
             {
-                if (SelectedCombo is null || !IsCurrentCombo(SelectedCombo)) return;
-                foreach (var item in SelectedCombo.Routes) await SaveRouteAsync(item);
+                foreach (var update in updates) await SaveRouteAsync(update.Id, update.Input);
             });
             Status = "故障转移顺序已保存";
         }
         catch (Exception exception) { Status = $"保存排序失败：{exception.Message}"; }
     }
-    private Task SaveRouteAsync(GatewayRouteEditorViewModel route) => !IsCurrentRoute(route) ? Task.CompletedTask : dataStore.UpdateGatewayRouteAsync(route.Id, new GatewayRouteInput(route.ModelId, route.Enabled, route.SortOrder));
+    private Task SaveRouteAsync(GatewayRouteEditorViewModel route) => SaveRouteAsync(route.Id, new GatewayRouteInput(route.ModelId, route.Enabled, route.SortOrder));
+    private Task SaveRouteAsync(Guid routeId, GatewayRouteInput input) => dataStore.UpdateGatewayRouteAsync(routeId, input);
+    private static IReadOnlyList<RouteSaveRequest> CreateRouteSaveRequests(GatewayComboEditorViewModel combo) =>
+        combo.Routes.Where(item => !item.IsPlaceholder)
+            .Select(item => new RouteSaveRequest(item.Id, new GatewayRouteInput(item.ModelId, item.Enabled, item.SortOrder)))
+            .ToArray();
     private static void Renumber(GatewayComboEditorViewModel combo) { for (var i = 0; i < combo.Routes.Count; i++) combo.Routes[i].SortOrder = i; }
 
-    private bool IsCurrentCombo(GatewayComboEditorViewModel combo) => Combos.Any(item => ReferenceEquals(item, combo));
-    private bool IsCurrentRoute(GatewayRouteEditorViewModel route) => SelectedCombo is { } combo && IsCurrentCombo(combo) && combo.Routes.Any(item => ReferenceEquals(item, route));
+    private GatewayComboEditorViewModel? FindCurrentCombo(Guid id) => Combos.FirstOrDefault(item => item.Id == id);
+    private GatewayRouteEditorViewModel? FindCurrentRoute(Guid id) => SelectedCombo?.Routes.FirstOrDefault(item => !item.IsPlaceholder && item.Id == id);
+    private bool IsCurrentCombo(GatewayComboEditorViewModel combo) => FindCurrentCombo(combo.Id) is not null;
+    private bool IsCurrentRoute(GatewayRouteEditorViewModel route) => FindCurrentRoute(route.Id) is not null;
 
     private async Task RunGatewayMutationAsync(Func<Task> operation)
     {
@@ -420,6 +470,7 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             gatewayMutationLock.Release();
         }
     }
+    private readonly record struct RouteSaveRequest(Guid Id, GatewayRouteInput Input);
     public void FilterModels(string? search)
     {
         modelSearchTerm = search?.Trim() ?? "";
