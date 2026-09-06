@@ -1,11 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:nodegraph="using:LoomX.NodeGraph" x:Class="LoomX.Views.OverviewView">
   <UserControl.Styles>
     <Style Selector="Border.surface-card"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/></Style>
-    <Style Selector="Button.graph-tool"><Setter Property="MinWidth" Value="32"/><Setter Property="Width" Value="32"/><Setter Property="MinHeight" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="{DynamicResource GraphBorderBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource GraphBorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="6"/><Setter Property="Foreground" Value="{DynamicResource GraphTextBrush}"/><Setter Property="Cursor" Value="Hand"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
-    <Style Selector="Button.graph-tool:pointerover"><Setter Property="Background" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="Foreground" Value="{DynamicResource GraphBackgroundBrush}"/></Style>
-    <Style Selector="Button.graph-tool:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="Foreground" Value="{DynamicResource GraphBackgroundBrush}"/></Style>
-    <Style Selector="Button.graph-tool:pressed"><Setter Property="Background" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="Foreground" Value="{DynamicResource GraphBackgroundBrush}"/></Style>
-    <Style Selector="Button.graph-tool:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource GraphLiveBrush}"/><Setter Property="Foreground" Value="{DynamicResource GraphBackgroundBrush}"/></Style>
+    <Style Selector="Button.graph-tool"><Setter Property="MinWidth" Value="32"/><Setter Property="Width" Value="32"/><Setter Property="MinHeight" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="6"/><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="Cursor" Value="Hand"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style Selector="Button.graph-tool:pointerover"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="Button.graph-tool:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="Button.graph-tool:pressed"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
+    <Style Selector="Button.graph-tool:pressed /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
     <Style Selector="ToggleButton.graph-endpoint-link"><Setter Property="MinHeight" Value="24"/><Setter Property="Padding" Value="4,2"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="FontSize" Value="11"/><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="Cursor" Value="Hand"/></Style>
     <Style Selector="ToggleButton.graph-endpoint-link:pointerover"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
     <Style Selector="ToggleButton.graph-endpoint-link:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
@@ -18,7 +18,7 @@
     <Style Selector="ToggleButton.graph-endpoint-link:checked TextBlock.graph-endpoint-link-text"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></Style>
   </UserControl.Styles>
   <Grid RowDefinitions="*,Auto" RowSpacing="16">
-    <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource GraphBorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360" VerticalAlignment="Stretch">
+    <Border Grid.Row="0" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="9" ClipToBounds="True" MinHeight="360" VerticalAlignment="Stretch">
       <Grid>
         <ItemsControl ItemsSource="{Binding Endpoints}">
           <ItemsControl.ItemsPanel>
@@ -44,7 +44,7 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <Button Classes="graph-tool" ToolTip.Tip="适应画布" AutomationProperties.Name="适应画布" Click="FitGraph_OnClick" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,12,12" IsHitTestVisible="True">
-          <PathIcon Data="M 4,10 L 4,4 L 10,4 M 20,4 L 26,4 L 26,10 M 26,20 L 26,26 L 20,26 M 10,26 L 4,26 L 4,20" Foreground="{DynamicResource GraphTextBrush}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          <PathIcon Data="M 4,10 L 4,4 L 10,4 M 20,4 L 26,4 L 26,10 M 26,20 L 26,26 L 20,26 M 10,26 L 4,26 L 4,20" Foreground="{DynamicResource TextSecondaryBrush}" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Button>
       </Grid>
     </Border>

@@ -97,7 +97,11 @@ public sealed class RuntimeGraphControl : Control
         var layout = ResolveLayout();
         if (layout is null) return;
 
-        var border = ResolveBrush("BorderBrush", Brushes.Gray);
+        var surface = ResolveBrush("SurfaceBrush", Brushes.White);
+        var surfaceSubtle = ResolveBrush("SurfaceSubtleBrush", Brushes.WhiteSmoke);
+        var surfaceMuted = ResolveBrush("SurfaceMutedBrush", Brushes.LightGray);
+        var accentSoft = ResolveBrush("AccentSoftBrush", Brushes.LightCyan);
+        var border = ResolveBrush("BorderStrongBrush", Brushes.Gray);
         var text = ResolveBrush("TextPrimaryBrush", Brushes.Black);
         var muted = ResolveBrush("TextSecondaryBrush", Brushes.Gray);
         var live = ResolveBrush("AccentBrush", Brushes.Teal);
@@ -114,22 +118,22 @@ public sealed class RuntimeGraphControl : Control
             }
 
             foreach (var provider in layout.ProviderGroups.Values.OrderBy(item => item.ProviderId, StringComparer.OrdinalIgnoreCase))
-                DrawProviderGroup(context, provider, text, muted, border, zoom);
+                DrawProviderGroup(context, provider, surfaceMuted, surfaceSubtle, text, muted, border, zoom);
 
             foreach (var node in layout.Nodes.Values
                          .Where(item => item.Kind is RuntimeGraphNodeKind.Endpoint or RuntimeGraphNodeKind.Combo)
                          .OrderBy(item => item.NodeId, StringComparer.OrdinalIgnoreCase))
             {
                 var fill = node.Kind == RuntimeGraphNodeKind.Endpoint
-                    ? WithAlpha(live, 0.16)
-                    : WithAlpha(border, 0.42);
+                    ? accentSoft
+                    : surface;
                 DrawNode(context, node, NodeLabel(node.NodeId), fill, border, text, zoom);
             }
 
             foreach (var node in layout.Nodes.Values
                          .Where(item => item.Kind == RuntimeGraphNodeKind.Model)
                          .OrderBy(item => item.NodeId, StringComparer.OrdinalIgnoreCase))
-                DrawNode(context, node, NodeLabel(node.NodeId), WithAlpha(border, 0.28), border, text, zoom, 12);
+                DrawNode(context, node, NodeLabel(node.NodeId), surfaceSubtle, border, text, zoom, 12);
         }
     }
 
@@ -371,13 +375,13 @@ public sealed class RuntimeGraphControl : Control
     private void DrawProviderGroup(
         DrawingContext context,
         RuntimeGraphProviderGroupLayout provider,
+        IBrush groupFill,
+        IBrush headerFill,
         IBrush text,
         IBrush muted,
         IBrush border,
         double zoom)
     {
-        var groupFill = WithAlpha(border, 0.16);
-        var headerFill = WithAlpha(border, 0.28);
         var bounds = ToViewport(provider.Bounds);
         var selected = Selection is { Kind: RuntimeGraphSelectionKind.ProviderGroup } selection
             && string.Equals(selection.Id, provider.ProviderId, StringComparison.OrdinalIgnoreCase);
@@ -436,7 +440,7 @@ public sealed class RuntimeGraphControl : Control
         var bounds = ToViewport(node.Bounds);
         var selected = Selection is { Kind: RuntimeGraphSelectionKind.Node } selection
             && string.Equals(selection.Id, node.NodeId, StringComparison.OrdinalIgnoreCase);
-        var nodeBorder = selected ? ResolveBrush("GraphLiveBrush", Brushes.LightGreen) : border;
+        var nodeBorder = selected ? ResolveBrush("AccentBrush", Brushes.Teal) : border;
         context.DrawRectangle(fill, new Pen(WithAlpha(nodeBorder, selected ? 1 : 0.9), selected ? 2 : 1), bounds, 8 * zoom, 8 * zoom, default);
         if (zoom >= 0.25)
             DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, Math.Max(0, bounds.Width - 24 * zoom), bounds.Height), text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);

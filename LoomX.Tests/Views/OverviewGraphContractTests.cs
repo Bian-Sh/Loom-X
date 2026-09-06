@@ -72,6 +72,42 @@ public sealed class OverviewGraphContractTests
     }
 
     [Fact]
+    public void OverviewGraphUsesSharedBorderResource()
+    {
+        var source = ReadDesktopFile("Views", "OverviewView.axaml");
+
+        Assert.Contains("BorderBrush=\"{DynamicResource BorderBrush}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("BorderBrush=\"{DynamicResource GraphBorderBrush}\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RuntimeGraphKeepsTransparentInputSurface()
+    {
+        var controlSource = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
+        var tokensSource = ReadDesktopFile("Styles", "VisualTokens.axaml");
+
+        Assert.Contains("ResolveBrush(\"GraphCanvasBrush\"", controlSource, StringComparison.Ordinal);
+        Assert.Contains("context.DrawRectangle(background, null, new Rect(Bounds.Size));", controlSource, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"GraphCanvasBrush\" Color=\"#00000000\"", tokensSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RuntimeGraphUsesSharedReadableSurfaceResources()
+    {
+        var controlSource = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
+        var viewSource = ReadDesktopFile("Views", "OverviewView.axaml");
+
+        Assert.Contains("ResolveBrush(\"SurfaceBrush\"", controlSource, StringComparison.Ordinal);
+        Assert.Contains("ResolveBrush(\"SurfaceSubtleBrush\"", controlSource, StringComparison.Ordinal);
+        Assert.Contains("ResolveBrush(\"SurfaceMutedBrush\"", controlSource, StringComparison.Ordinal);
+        Assert.Contains("ResolveBrush(\"AccentSoftBrush\"", controlSource, StringComparison.Ordinal);
+        Assert.Contains("ResolveBrush(\"BorderStrongBrush\"", controlSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResolveBrush(\"GraphLiveBrush\"", controlSource, StringComparison.Ordinal);
+        Assert.Contains("Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("Foreground=\"{DynamicResource TextSecondaryBrush}\"", viewSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OverviewProvidesEndpointNavigationButtons()
     {
         var source = ReadDesktopFile("Views", "OverviewView.axaml");
