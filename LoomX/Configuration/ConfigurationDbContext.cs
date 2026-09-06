@@ -251,6 +251,56 @@ public static class ConfigurationDatabase
         }
 
         await EnsureEndpointDefaultsAsync(dbContext, cancellationToken);
+        await NormalizeGuidTextColumnsAsync(dbContext, cancellationToken);
+    }
+
+    private static async Task NormalizeGuidTextColumnsAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        DbTransaction? transaction = null;
+        try
+        {
+            await ExecutePragmaAsync(connection, "PRAGMA foreign_keys = OFF", cancellationToken);
+            transaction = await connection.BeginTransactionAsync(cancellationToken);
+            foreach (var statement in new[]
+            {
+                "UPDATE Providers SET Id = lower(Id) WHERE Id <> lower(Id)",
+                "UPDATE Models SET Id = lower(Id), ProviderId = lower(ProviderId) WHERE Id <> lower(Id) OR ProviderId <> lower(ProviderId)",
+                "UPDATE GatewayCombos SET Id = lower(Id) WHERE Id <> lower(Id)",
+                "UPDATE GatewayEndpointComboBindings SET ComboId = lower(ComboId) WHERE ComboId <> lower(ComboId)",
+                "UPDATE GatewayRoutes SET Id = lower(Id), ComboId = lower(ComboId), ModelId = lower(ModelId) WHERE Id <> lower(Id) OR ComboId <> lower(ComboId) OR ModelId <> lower(ModelId)"
+            })
+            {
+                await ExecuteNonQueryAsync(connection, transaction, statement, cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            await transaction.DisposeAsync();
+            transaction = null;
+        }
+        catch
+        {
+            if (transaction is not null)
+            {
+                await transaction.RollbackAsync(CancellationToken.None);
+                await transaction.DisposeAsync();
+                transaction = null;
+            }
+            throw;
+        }
+        finally
+        {
+            try { await ExecutePragmaAsync(connection, "PRAGMA foreign_keys = ON", CancellationToken.None); }
+            finally { await dbContext.Database.CloseConnectionAsync(); }
+        }
+    }
+
+    private static async Task ExecutePragmaAsync(DbConnection connection, string sql, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<bool> IsSchemaReadyAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
