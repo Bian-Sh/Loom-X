@@ -22,6 +22,7 @@
 - 为开关添加 `ToolTip.Tip="启用 Provider"` 和无障碍名称，悬停及辅助技术仍可识别其用途。
 - 卡片右下角增加删除图标按钮，按钮操作对象为当前卡片对应的 Provider。
 - 删除详情标题右上角的重复删除入口，避免同一操作出现两处。
+- Provider 列表容器保持透明，卡片直接使用 `SurfaceSubtleBrush`；列表项自身不再叠加背景层，使桌面底色只经过与 Gateway Endpoint 卡片相同的透明层级。
 
 删除图标点击后由 View 创建原生确认窗口，显示 Provider 名称并提供取消/删除两个动作。确认后调用现有删除命令及 `ConfigSnapshotService.DeleteProviderAsync`，取消不修改集合或配置。
 

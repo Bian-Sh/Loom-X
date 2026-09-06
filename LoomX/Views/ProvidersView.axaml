@@ -2,12 +2,14 @@
   <UserControl.Styles>
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="FontSize" Value="10"/></Style>
     <Style Selector="Border.panel"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/></Style>
-    <Style Selector="ListBox.provider-list"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderThickness" Value="0"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,1"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem:selected"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="3,0,0,0"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem:selected:pointerover"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
+    <Style Selector="ListBox.provider-list"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
+    <Style Selector="Border.provider-card"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem"><Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,1"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:selected"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="3,0,0,0"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:pointerover Border.provider-card"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:selected:pointerover Border.provider-card"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
     <Style Selector="ListBox.model-list"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderThickness" Value="0"/></Style>
     <Style Selector="ListBox.model-list ListBoxItem"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,1"/></Style>
     <Style Selector="ListBox.model-list ListBoxItem:selected"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/></Style>
@@ -52,7 +54,7 @@
             <ListBox Grid.Row="2" Classes="provider-list" ItemsSource="{Binding FilteredProviders}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate>
                 <DataTemplate>
-                  <Border Padding="10,8" Background="Transparent" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
+                  <Border Classes="provider-card" Padding="10,8" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
                     <Panel>
                       <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
                         <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">

@@ -19,6 +19,13 @@ Provider 页面 MUST 将摘要区域固定在顶部，将目录与详情放入�
 ### Requirement: Provider 卡片提供启用与删除操作
 Provider 卡片 MUST 保留启用开关，开关 MUST 不显示 `On/Off` 文案且 MUST 提供悬停提示；卡片右下角 MUST 提供删除图标，删除 MUST 在实际执行前要求二次确认。
 
+### Requirement: Provider 卡片使用统一透明层级
+Provider 左侧列表容器 MUST 保持透明，Provider 卡片 MUST 直接使用 `SurfaceSubtleBrush`，不得通过列表项或列表容器重复叠加 `SurfaceBrush`。
+
+#### Scenario: Provider 卡片与 Gateway 卡片透明度一致
+- **WHEN** 用户打开 Provider 页面
+- **THEN** 左侧 Provider 卡片与 Gateway Endpoint 卡片使用相同的透明背景层级，桌面底色不会因列表容器额外叠加而变得浑浊
+
 #### Scenario: 取消删除
 - **WHEN** 用户点击卡片删除图标并在确认窗口选择取消
 - **THEN** Provider 集合和持久化配置保持不变
