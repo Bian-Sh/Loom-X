@@ -127,15 +127,17 @@ public sealed class OverviewGraphContractTests
     }
 
     [Fact]
-    public void RuntimeGraphWatermarkUsesReadableTextAndReservedLabelSpace()
+    public void RuntimeGraphWatermarkDoesNotAffectLabelAlignment()
     {
         var source = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
 
         Assert.Contains("var kindLabel = NodeKindLabel(node.Kind);", source, StringComparison.Ordinal);
-        Assert.Contains("var labelHeight = Math.Max(0, bounds.Height - watermarkHeight - KindWatermarkGap * zoom);", source, StringComparison.Ordinal);
         Assert.Contains("WithAlpha(brush, 0.92)", source, StringComparison.Ordinal);
         Assert.Contains("var textWidth = Math.Max(0, bounds.Width - 16 * zoom);", source, StringComparison.Ordinal);
         Assert.Contains("Math.Clamp(12 * zoom, KindWatermarkMinFontSize, KindWatermarkMaxFontSize)", source, StringComparison.Ordinal);
+        Assert.Contains("var textArea = new Rect(bounds.X + 12 * zoom, bounds.Y, textWidth, bounds.Height);", source, StringComparison.Ordinal);
+        Assert.Contains("var textBlockHeight = primaryFontSize + lineGap + secondaryFontSize;", source, StringComparison.Ordinal);
+        Assert.Contains("var textTop = textArea.Y + Math.Max(0, (textArea.Height - textBlockHeight) / 2);", source, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -22,7 +22,6 @@ public sealed class RuntimeGraphControl : Control
     public const double PanStartThreshold = 4;
 
     private const double GraphCornerRadius = 10;
-    private const double KindWatermarkGap = 3;
 
     public static readonly StyledProperty<RuntimeGraphSnapshot?> SnapshotProperty =
         AvaloniaProperty.Register<RuntimeGraphControl, RuntimeGraphSnapshot?>(nameof(Snapshot));
@@ -371,29 +370,29 @@ public sealed class RuntimeGraphControl : Control
         var nodeBorder = selected ? ResolveBrush("AccentBrush", Brushes.Teal) : border;
         context.DrawRectangle(fill, new Pen(WithAlpha(nodeBorder, selected ? 1 : 0.9), selected ? 2 : 1), bounds, 8 * zoom, 8 * zoom, default);
         var kindLabel = NodeKindLabel(node.Kind);
-        var watermarkVisible = zoom >= KindWatermarkMinZoom && !string.IsNullOrWhiteSpace(kindLabel);
-        var watermarkHeight = watermarkVisible ? KindWatermarkTextHeight(zoom) : 0;
-        var labelHeight = Math.Max(0, bounds.Height - watermarkHeight - KindWatermarkGap * zoom);
         if (zoom >= 0.25)
         {
             var textWidth = Math.Max(0, bounds.Width - 24 * zoom);
+            var textArea = new Rect(bounds.X + 12 * zoom, bounds.Y, textWidth, bounds.Height);
             if (string.IsNullOrWhiteSpace(secondaryLabel))
             {
-                DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, textWidth, labelHeight), text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
+                DrawText(context, label, textArea, text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
             }
             else
             {
-                var textTop = bounds.Y + 7 * zoom;
+                var primaryFontSize = Math.Max(8, fontSize * zoom);
+                var secondaryFontSize = Math.Max(8, (fontSize - 1) * zoom);
                 var lineGap = 2 * zoom;
-                var lineHeight = Math.Max(0, (labelHeight - 14 * zoom - lineGap) / 2);
-                var textBounds = new Rect(bounds.X + 12 * zoom, textTop, textWidth, lineHeight);
-                DrawText(context, label, textBounds, text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
+                var textBlockHeight = primaryFontSize + lineGap + secondaryFontSize;
+                var textTop = textArea.Y + Math.Max(0, (textArea.Height - textBlockHeight) / 2);
+                var primaryBounds = new Rect(textArea.X, textTop, textArea.Width, primaryFontSize);
+                DrawText(context, label, primaryBounds, text, primaryFontSize, FontWeight.SemiBold, TextAlignment.Left);
                 DrawText(
                     context,
                     secondaryLabel,
-                    new Rect(textBounds.X, textBounds.Bottom + lineGap, textBounds.Width, lineHeight),
+                    new Rect(textArea.X, primaryBounds.Bottom + lineGap, textArea.Width, secondaryFontSize),
                     muted,
-                    Math.Max(8, (fontSize - 1) * zoom),
+                    secondaryFontSize,
                     FontWeight.Normal,
                     TextAlignment.Left);
             }

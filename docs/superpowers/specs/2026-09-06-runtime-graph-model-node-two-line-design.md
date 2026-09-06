@@ -24,7 +24,7 @@ language: zh-CN
 - 第一行使用当前 Model 节点的主文本色和半粗字重；
 - 第二行使用 `TextSecondaryBrush`，字号略小，表现为 Provider 名称；
 - 两行均限制在节点内，沿用现有字符省略策略，避免长名称撑大布局；
-- Model 类型水印继续保留在右下角，并为文本区域预留水印空间。
+- Model 类型水印继续保留在右下角，但不参与两行文本的垂直对齐计算。
 
 ## 实现方案
 
@@ -33,7 +33,8 @@ language: zh-CN
 1. 根据节点 ID 找到完整的 Model 节点数据；
 2. 第一行绘制 `DisplayName`；
 3. 第二行绘制 `ProviderDisplayName`；
-4. Endpoint 和 Combo 节点继续使用现有单行绘制路径。
+4. 按两行实际字号和行距计算文本块，并在完整节点高度内垂直居中；
+5. Endpoint 和 Combo 节点继续使用现有单行绘制路径。
 
 不新增业务模型字段，也不引入 XAML 控件或新的布局抽象。
 
