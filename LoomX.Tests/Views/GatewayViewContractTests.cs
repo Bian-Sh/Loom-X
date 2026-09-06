@@ -149,6 +149,9 @@ public sealed class GatewayViewContractTests
         Assert.Contains("item.MatchesSearch(modelSearchTerm)", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("public bool CanDragRoutes => Routes.Count > 1;", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("IsDragEnabled", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("gatewayMutationLock", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("!IsCurrentCombo(combo) || !combo.HasPendingChanges", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("private bool IsCurrentRoute", viewModelSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -180,6 +183,26 @@ public sealed class GatewayViewContractTests
         combo.Routes.Remove(second);
         Assert.False(combo.CanDragRoutes);
         Assert.False(first.IsDragEnabled);
+    }
+
+    [Fact]
+    public void ComboEditorOnlyReportsPendingChangesAfterAnEdit()
+    {
+        var response = new GatewayComboResponse(Guid.NewGuid(), "共享模型", true, 0, [], []);
+        var combo = GatewayComboEditorViewModel.FromResponse(response);
+
+        Assert.False(combo.HasPendingChanges);
+
+        combo.Name = "共享模型（已修改）";
+        Assert.True(combo.HasPendingChanges);
+
+        combo.ApplyResponse(response with { Name = combo.Name });
+        Assert.False(combo.HasPendingChanges);
+
+        combo.Enabled = false;
+        Assert.True(combo.HasPendingChanges);
+        combo.ApplyResponse(response with { Enabled = false });
+        Assert.False(combo.HasPendingChanges);
     }
 
     [Fact]

@@ -1,0 +1,6 @@
+{
+  "openspec_proposal": "openspec/changes/fix-gateway-combo-save-race/proposal.md",
+  "openspec_design": "openspec/changes/fix-gateway-combo-save-race/design.md",
+  "openspec_tasks": "openspec/changes/fix-gateway-combo-save-race/tasks.md",
+  "build_tasks_complete": "openspec/changes/fix-gateway-combo-save-race/tasks.md"
+}
