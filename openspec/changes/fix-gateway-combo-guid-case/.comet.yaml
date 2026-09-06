@@ -1,6 +1,6 @@
 workflow: hotfix
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: 2fc4c6de25997fec01559534bbe170d435536d15
 design_doc: null
 plan: null
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-09-06-fix-gateway-combo-guid-case-verify.md
 branch_status: handled
 created_at: 2026-09-06
-verified_at: null
+verified_at: 2026-09-06
 archived: false
 direct_override: null
 handoff_context: null
