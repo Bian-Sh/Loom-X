@@ -36,6 +36,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
         modelBuilder.Entity<ProviderEntity>(entity =>
         {
             entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasConversion<string>();
             entity.HasIndex(item => item.BusinessId).IsUnique();
             entity.Property(item => item.BusinessId).HasMaxLength(128).IsRequired();
             entity.Property(item => item.DisplayName).HasMaxLength(256).IsRequired();
@@ -47,6 +48,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
         modelBuilder.Entity<ModelEntity>(entity =>
         {
             entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasConversion<string>();
+            entity.Property(item => item.ProviderId).HasConversion<string>();
             entity.HasIndex(item => new { item.ProviderId, item.ModelId }).IsUnique();
             entity.Property(item => item.ModelId).HasMaxLength(256).IsRequired();
             entity.Property(item => item.DisplayName).HasMaxLength(256).IsRequired();
@@ -64,6 +67,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
         modelBuilder.Entity<GatewayComboEntity>(entity =>
         {
             entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasConversion<string>();
             entity.HasIndex(item => item.Name).IsUnique();
             entity.Property(item => item.Name).HasMaxLength(256).IsRequired().UseCollation("NOCASE");
             entity.HasMany(item => item.Routes).WithOne(item => item.Combo).HasForeignKey(item => item.ComboId).OnDelete(DeleteBehavior.Cascade);
@@ -72,11 +76,15 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
         modelBuilder.Entity<GatewayEndpointComboBindingEntity>(entity =>
         {
             entity.HasKey(item => new { item.EndpointKey, item.ComboId });
+            entity.Property(item => item.ComboId).HasConversion<string>();
             entity.Property(item => item.EndpointKey).HasMaxLength(32).IsRequired();
         });
         modelBuilder.Entity<GatewayRouteEntity>(entity =>
         {
             entity.HasKey(item => item.Id);
+            entity.Property(item => item.Id).HasConversion<string>();
+            entity.Property(item => item.ComboId).HasConversion<string>();
+            entity.Property(item => item.ModelId).HasConversion<string>();
             entity.HasIndex(item => new { item.ComboId, item.ModelId }).IsUnique();
             entity.HasOne(item => item.Model).WithMany().HasForeignKey(item => item.ModelId).OnDelete(DeleteBehavior.Restrict);
         });

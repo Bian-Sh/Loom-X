@@ -4,11 +4,12 @@
 
 ## 根因
 
-`ComboName_OnLostFocus` 在没有实际编辑时也会触发保存；`AppDataStore` 每次写操作后都会刷新配置，`GatewayViewModel` 原先没有串行化写入与刷新，也没有确认编辑对象仍属于当前集合。
+`ComboName_OnLostFocus` 在没有实际编辑时也会触发保存；`AppDataStore` 每次写操作后都会刷新配置，`GatewayViewModel` 原先没有串行化写入与刷新，也没有确认编辑对象仍属于当前集合。真实 LoomX 数据库中的 Combo/Route Guid 已按文本存储，而 EF 默认 Guid 参数映射与旧文本行不一致，导致按 ID 更新时列表能读到对象、更新查询却返回不存在。
 
 ## 修复目标
 
 - 只有名称或启用状态发生实际变化时才保存 Combo。
 - 串行化 Combo/Route 写操作，并在整组写入完成后刷新一次。
 - 忽略刷新后脱离当前集合的旧 Combo/Route 对象，恢复刷新后的当前 Combo 选择。
+- 兼容现有配置库中的文本 Guid，确保 Combo/Route 按 ID 更新、删除和排序操作可查到旧数据。
 - 为上述脏状态和并发保护增加回归测试。

@@ -4,4 +4,6 @@
 
 Combo 编辑器记录最近一次服务端保存的名称和启用状态，通过 `HasPendingChanges` 判断 LostFocus 是否确实产生了修改。所有 Combo/Route 写入入口在调用数据层前校验对象仍在当前集合中，路由回填按 ID 去重。
 
+在 `ConfigurationDbContext` 中为 Provider、Model、Combo、Route 的 Guid 主键和外键显式配置字符串转换。数据库结构保持不变；该映射与现有 `TEXT` Guid 行一致，也让新写入继续使用相同格式，覆盖 Combo/Route 更新、删除和关联查询。
+
 不改变服务端 API、数据库结构或运行时配置路径。
