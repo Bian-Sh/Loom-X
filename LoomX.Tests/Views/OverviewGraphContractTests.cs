@@ -116,6 +116,18 @@ public sealed class OverviewGraphContractTests
     }
 
     [Fact]
+    public void RuntimeGraphWatermarkUsesReadableTextAndReservedLabelSpace()
+    {
+        var source = ReadDesktopFile("NodeGraph", "RuntimeGraphControl.cs");
+
+        Assert.Contains("var kindLabel = NodeKindLabel(node.Kind);", source, StringComparison.Ordinal);
+        Assert.Contains("var labelHeight = Math.Max(0, bounds.Height - watermarkHeight - KindWatermarkGap * zoom);", source, StringComparison.Ordinal);
+        Assert.Contains("WithAlpha(brush, 0.92)", source, StringComparison.Ordinal);
+        Assert.Contains("var textWidth = Math.Max(0, bounds.Width - 16 * zoom);", source, StringComparison.Ordinal);
+        Assert.Contains("Math.Clamp(12 * zoom, KindWatermarkMinFontSize, KindWatermarkMaxFontSize)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OverviewProvidesEndpointNavigationButtons()
     {
         var source = ReadDesktopFile("Views", "OverviewView.axaml");

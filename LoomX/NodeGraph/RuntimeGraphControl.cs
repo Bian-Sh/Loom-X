@@ -16,8 +16,12 @@ public sealed class RuntimeGraphControl : Control
     public const double MinZoom = 0.25;
     public const double MaxZoom = 2.5;
     public const double ZoomStep = 1.2;
-    public const double KindWatermarkMinZoom = 0.55;
+    public const double KindWatermarkMinZoom = 0.45;
+    public const double KindWatermarkMinFontSize = 10;
+    public const double KindWatermarkMaxFontSize = 15;
     public const double PanStartThreshold = 4;
+
+    private const double KindWatermarkGap = 3;
 
     public static readonly StyledProperty<RuntimeGraphSnapshot?> SnapshotProperty =
         AvaloniaProperty.Register<RuntimeGraphControl, RuntimeGraphSnapshot?>(nameof(Snapshot));
@@ -127,13 +131,13 @@ public sealed class RuntimeGraphControl : Control
                 var fill = node.Kind == RuntimeGraphNodeKind.Endpoint
                     ? accentSoft
                     : surface;
-                DrawNode(context, node, NodeLabel(node.NodeId), fill, border, text, zoom);
+                DrawNode(context, node, NodeLabel(node.NodeId), fill, border, text, muted, zoom);
             }
 
             foreach (var node in layout.Nodes.Values
                          .Where(item => item.Kind == RuntimeGraphNodeKind.Model)
                          .OrderBy(item => item.NodeId, StringComparer.OrdinalIgnoreCase))
-                DrawNode(context, node, NodeLabel(node.NodeId), surfaceSubtle, border, text, zoom, 12);
+                DrawNode(context, node, NodeLabel(node.NodeId), surfaceSubtle, border, text, muted, zoom, 12);
         }
     }
 
@@ -425,7 +429,7 @@ public sealed class RuntimeGraphControl : Control
                     TextAlignment.Right);
         }
 
-        DrawKindWatermark(context, "Provider", bounds, zoom, bottomInset: 3);
+        DrawKindWatermark(context, "Provider", bounds, zoom, muted, bottomInset: 3);
     }
 
     private void DrawNode(
@@ -435,6 +439,7 @@ public sealed class RuntimeGraphControl : Control
         IBrush fill,
         IBrush border,
         IBrush text,
+        IBrush muted,
         double zoom,
         double fontSize = 14)
     {
@@ -443,9 +448,13 @@ public sealed class RuntimeGraphControl : Control
             && string.Equals(selection.Id, node.NodeId, StringComparison.OrdinalIgnoreCase);
         var nodeBorder = selected ? ResolveBrush("AccentBrush", Brushes.Teal) : border;
         context.DrawRectangle(fill, new Pen(WithAlpha(nodeBorder, selected ? 1 : 0.9), selected ? 2 : 1), bounds, 8 * zoom, 8 * zoom, default);
+        var kindLabel = NodeKindLabel(node.Kind);
+        var watermarkVisible = zoom >= KindWatermarkMinZoom && !string.IsNullOrWhiteSpace(kindLabel);
+        var watermarkHeight = watermarkVisible ? KindWatermarkTextHeight(zoom) : 0;
+        var labelHeight = Math.Max(0, bounds.Height - watermarkHeight - KindWatermarkGap * zoom);
         if (zoom >= 0.25)
-            DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, Math.Max(0, bounds.Width - 24 * zoom), bounds.Height), text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
-        DrawKindWatermark(context, NodeKindLabel(node.Kind), bounds, zoom);
+            DrawText(context, label, new Rect(bounds.X + 12 * zoom, bounds.Y, Math.Max(0, bounds.Width - 24 * zoom), labelHeight), text, Math.Max(8, fontSize * zoom), FontWeight.SemiBold, TextAlignment.Left);
+        DrawKindWatermark(context, kindLabel, bounds, zoom, muted);
     }
 
     private static void DrawKindWatermark(
@@ -453,15 +462,15 @@ public sealed class RuntimeGraphControl : Control
         string label,
         Rect bounds,
         double zoom,
+        IBrush brush,
         double bottomInset = 5)
     {
         if (zoom < KindWatermarkMinZoom || string.IsNullOrWhiteSpace(label)) return;
 
-        var textHeight = Math.Max(10, 11 * zoom);
-        var textWidth = Math.Min(78 * zoom, Math.Max(0, bounds.Width - 16 * zoom));
+        var textHeight = KindWatermarkTextHeight(zoom);
+        var textWidth = Math.Max(0, bounds.Width - 16 * zoom);
         if (textWidth <= 0 || bounds.Height <= textHeight) return;
 
-        var brush = new SolidColorBrush(Color.FromArgb(125, 145, 167, 177));
         DrawText(
             context,
             label,
@@ -470,11 +479,13 @@ public sealed class RuntimeGraphControl : Control
                 bounds.Bottom - textHeight - bottomInset * zoom,
                 textWidth,
                 textHeight),
-            brush,
-            Math.Clamp(9 * zoom, 7, 11),
-            FontWeight.Normal,
+            WithAlpha(brush, 0.92),
+            Math.Clamp(12 * zoom, KindWatermarkMinFontSize, KindWatermarkMaxFontSize),
+            FontWeight.SemiBold,
             TextAlignment.Right);
     }
+
+    private static double KindWatermarkTextHeight(double zoom) => Math.Max(10, 12 * zoom);
 
     private static string NodeKindLabel(RuntimeGraphNodeKind kind) => kind switch
     {

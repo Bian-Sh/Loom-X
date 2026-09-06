@@ -114,9 +114,11 @@ public sealed class RuntimeGraphControlTests
     [Fact]
     public void KindWatermarksOnlyAppearAfterTheReadableZoomThreshold()
     {
-        Assert.Equal(0.55, RuntimeGraphControl.KindWatermarkMinZoom);
+        Assert.Equal(0.45, RuntimeGraphControl.KindWatermarkMinZoom);
         Assert.True(RuntimeGraphControl.KindWatermarkMinZoom > RuntimeGraphControl.MinZoom);
         Assert.True(RuntimeGraphControl.KindWatermarkMinZoom < RuntimeGraphControl.MaxZoom);
+        Assert.Equal(10, RuntimeGraphControl.KindWatermarkMinFontSize);
+        Assert.Equal(15, RuntimeGraphControl.KindWatermarkMaxFontSize);
     }
 
     private static RuntimeGraphSnapshot CreateSnapshot()
