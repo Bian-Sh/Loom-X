@@ -49,7 +49,7 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("ClipToBounds=\"True\"", source, StringComparison.Ordinal);
         Assert.Contains("Content=\"{Binding GatewayActionLabel}\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding ToggleGatewayCommand}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"刷新\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{l:Locale overview.refresh.button}\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -60,11 +60,11 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("xmlns:nodegraph=\"using:LoomX.NodeGraph\"", source, StringComparison.Ordinal);
         Assert.Contains("<nodegraph:RuntimeGraphControl", source, StringComparison.Ordinal);
         Assert.Contains("Snapshot=\"{Binding GraphSnapshot}\"", source, StringComparison.Ordinal);
-        Assert.Contains("滚轮缩放 · 拖动平移", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale overview.graph.hint}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("滚轮缩放 · 拖动平移 · 适应画布", source, StringComparison.Ordinal);
         Assert.Contains("Background=\"Transparent\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Background=\"{DynamicResource GraphBackgroundBrush}\"", source, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"适应画布\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale overview.graph.fit.tooltip}\"", source, StringComparison.Ordinal);
         Assert.Contains("<PathIcon Data=", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"Endpoint\"", source, StringComparison.Ordinal);

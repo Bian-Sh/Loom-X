@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
   <Window.Styles>
     <Style Selector="ToggleButton.nav-button">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -132,11 +132,11 @@
           </ScrollViewer>
           <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="8,16,8,0">
             <StackPanel Spacing="4">
-              <TextBlock Text="本地服务" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" />
-              <TextBlock Text="服务版本" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" />
+              <TextBlock Text="{l:Locale sidebar.service}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" />
+              <TextBlock Text="{l:Locale sidebar.version}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" />
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <Ellipse Width="7" Height="7" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" />
-                <TextBlock Text="本地服务" FontSize="11" Foreground="{DynamicResource SuccessBrush}" />
+                <TextBlock Text="{l:Locale sidebar.service}" FontSize="11" Foreground="{DynamicResource SuccessBrush}" />
               </StackPanel>
             </StackPanel>
           </Border>
@@ -156,13 +156,13 @@
       <!-- 标题栏覆盖两列，品牌区与内容区都可拖动；按钮位于同一层避免命中区被遮挡。 -->
       <Border Grid.ColumnSpan="2" Classes="window-chrome" Height="32" VerticalAlignment="Top" PointerPressed="WindowChrome_OnPointerPressed">
         <Grid ColumnDefinitions="*,42,42,42" ColumnSpacing="0" Margin="0">
-          <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="最小化" AutomationProperties.Name="最小化">
+          <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="{l:Locale window.minimize}" AutomationProperties.Name="{l:Locale window.minimize}">
             <Border Width="12" Height="1" Background="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0" />
           </Button>
-          <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="最大化或还原" AutomationProperties.Name="最大化或还原">
+          <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="{l:Locale window.maximize}" AutomationProperties.Name="{l:Locale window.maximize}">
             <Path Data="M 5,5 L 19,5 L 19,19 L 5,19 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
-          <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="关闭" AutomationProperties.Name="关闭">
+          <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="{l:Locale window.close}" AutomationProperties.Name="{l:Locale window.close}">
             <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
         </Grid>
@@ -172,11 +172,11 @@
       <StackPanel Spacing="10">
         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
           <PathIcon Data="M 12,2 L 12,14 M 7,9 L 12,14 L 17,9 M 4,16 L 20,16 L 20,20 L 4,20 Z" Foreground="{DynamicResource AccentBrush}" Width="18" Height="18" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Text="发现新版本" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <Button Grid.Column="2" Content="×" Command="{Binding Update.LaterCommand}" Padding="5,0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="稍后处理" />
+          <TextBlock Grid.Column="1" Text="{l:Locale update.card.title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button Grid.Column="2" Content="×" Command="{Binding Update.LaterCommand}" Padding="5,0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="{l:Locale update.card.later.tip}" />
         </Grid>
         <TextBlock Text="{Binding Update.VersionComparison}" Foreground="{DynamicResource TextSecondaryBrush}" />
-        <Button Content="更新日志" Command="{Binding Update.OpenReleaseNotesCommand}" HorizontalAlignment="Left" Padding="0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" Foreground="{DynamicResource AccentBrush}" />
+        <Button Content="{l:Locale update.card.release.notes}" Command="{Binding Update.OpenReleaseNotesCommand}" HorizontalAlignment="Left" Padding="0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" Foreground="{DynamicResource AccentBrush}" />
         <ProgressBar IsVisible="{Binding Update.IsBusy}" Value="{Binding Update.DownloadPercent}" Minimum="0" Maximum="100" Height="6" />
         <Grid IsVisible="{Binding Update.IsBusy}" ColumnDefinitions="*,*" ColumnSpacing="8">
           <TextBlock Text="{Binding Update.ProgressText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
@@ -184,8 +184,8 @@
         </Grid>
         <TextBlock IsVisible="{Binding Update.CanRetry}" Text="{Binding Update.ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap" FontSize="11" />
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-          <Button Content="稍后" Command="{Binding Update.LaterCommand}" />
-          <Button Grid.Column="1" Content="立即下载" Command="{Binding Update.DownloadCommand}" IsEnabled="{Binding Update.CanDownload}" Classes="primary" />
+          <Button Content="{l:Locale update.card.later}" Command="{Binding Update.LaterCommand}" />
+          <Button Grid.Column="1" Content="{l:Locale update.card.download}" Command="{Binding Update.DownloadCommand}" IsEnabled="{Binding Update.CanDownload}" Classes="primary" />
         </Grid>
       </StackPanel>
     </Border>
@@ -193,8 +193,8 @@
       <Border Width="650" MaxHeight="620" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
         <Grid RowDefinitions="Auto,*" RowSpacing="14">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="更新日志" FontSize="18" FontWeight="SemiBold" />
-            <Button Grid.Column="1" Content="×" Command="{Binding Update.CloseReleaseNotesCommand}" Padding="6,0" MinHeight="28" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="关闭" />
+            <TextBlock Text="{l:Locale update.card.release.notes}" FontSize="18" FontWeight="SemiBold" />
+            <Button Grid.Column="1" Content="×" Command="{Binding Update.CloseReleaseNotesCommand}" Padding="6,0" MinHeight="28" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="{l:Locale update.card.close}" />
           </Grid>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <TextBlock Text="{Binding Update.ReleaseNotes}" TextWrapping="Wrap" LineHeight="22" />

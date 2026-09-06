@@ -18,10 +18,10 @@ public sealed class SettingsViewContractTests
 
         Assert.Contains("<Slider Value=\"{Binding TransparencyOpacity, Mode=TwoWay}\" Minimum=\"0\" Maximum=\"100\" TickFrequency=\"1\" IsSnapToTickEnabled=\"True\"", source, StringComparison.Ordinal);
         Assert.Contains("<Slider Value=\"{Binding BlurAmount, Mode=TwoWay}\" Minimum=\"0\" Maximum=\"64\" TickFrequency=\"1\" IsSnapToTickEnabled=\"True\"", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"透明程度\"", source, StringComparison.Ordinal);
-        Assert.Contains("数值越高，内容区域越不透明。", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"磨砂程度\"", source, StringComparison.Ordinal);
-        Assert.Contains("控制材质的系统模糊强度（0-64）。", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.opacity.label}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.opacity.hint}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.blur.label}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.blur.hint}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding TransparencyOpacity, StringFormat='{}{0}%'}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding BlurAmount}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<NumericUpDown Grid.Column=\"1\" Value=\"{Binding TransparencyOpacity}\"", source, StringComparison.Ordinal);

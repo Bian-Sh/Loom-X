@@ -2,8 +2,10 @@ using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using LoomX;
+using LoomX.Localization;
 using LoomX.Logging;
 using LoomX.Services;
 
@@ -22,6 +24,7 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
     private readonly RuntimeLogBuffer buffer;
     private readonly ToastService toastService;
     private readonly EventHandler<RuntimeLogEntry> entryHandler;
+    private readonly IStringLocalizer<ConsoleViewModel> _loc;
     private string searchText = "";
     private bool showInfo = true;
     private bool showWarning = true;
@@ -43,15 +46,16 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
     public int InfoCount => infoCount;
     public int WarningCount => warningCount;
     public int ErrorCount => errorCount;
-    public string CountLabel => $"共 {VisibleLogs.Count} 条";
+    public string CountLabel => LocFormat("console.count.format", VisibleLogs.Count);
     public bool HasLogs => VisibleLogs.Count > 0;
     public ICommand ClearCommand { get; }
     public ICommand ClearSearchCommand { get; }
 
-    public ConsoleViewModel(RuntimeLogBuffer? buffer = null, ToastService? toastService = null)
+    public ConsoleViewModel(RuntimeLogBuffer? buffer = null, ToastService? toastService = null, IStringLocalizer<ConsoleViewModel>? localizer = null)
     {
         this.buffer = buffer ?? RuntimeLogBuffer.Default;
         this.toastService = toastService ?? new ToastService();
+        _loc = localizer ?? LocalizerFactory.Create<ConsoleViewModel>();
         entryHandler = (_, entry) => Dispatcher.UIThread.Post(() => AddEntry(entry));
         this.buffer.EntryAdded += entryHandler;
         ClearCommand = new DelegateCommand(Clear);
@@ -62,10 +66,23 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
             allLogs.Add(log);
             UpdateCounts(log, 1);
         }
+        LocaleService.CultureChanged += OnCultureChanged;
         ApplyFilter();
     }
 
-    public void NotifyCopied() => toastService.Show("日志已复制", ToastLevel.Success);
+    private string Loc(string key) => _loc[key]?.Value ?? key;
+    private string LocFormat(string key, params object[] args)
+    {
+        var value = Loc(key);
+        return args.Length == 0 ? value : string.Format(System.Globalization.CultureInfo.CurrentCulture, value, args);
+    }
+
+    private void OnCultureChanged(object? sender, System.Globalization.CultureInfo culture)
+    {
+        OnPropertyChanged(nameof(CountLabel));
+    }
+
+    public void NotifyCopied() => toastService.Show(Loc("console.copied"), ToastLevel.Success);
 
     public void UpdateScrollState(double offsetY, bool shouldFollowTail)
     {
@@ -184,7 +201,11 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
     };
     private static string Sanitize(string value) => SecretPattern.Replace(value, "$1[redacted]");
 
-    public void Dispose() => buffer.EntryAdded -= entryHandler;
+    public void Dispose()
+    {
+        buffer.EntryAdded -= entryHandler;
+        LocaleService.CultureChanged -= OnCultureChanged;
+    }
 }
 
 public sealed class ConsoleLogEntry

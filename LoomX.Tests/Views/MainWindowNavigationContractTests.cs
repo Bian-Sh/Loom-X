@@ -29,14 +29,14 @@ public sealed class MainWindowNavigationContractTests
         Assert.Contains("consoleViewModel = new ConsoleViewModel", source, StringComparison.Ordinal);
         Assert.Contains("settingsViewModel = new SettingsViewModel", source, StringComparison.Ordinal);
 
-        Assert.Contains("CurrentView = overviewViewModel", source, StringComparison.Ordinal);
-        Assert.Contains("CurrentView = providersViewModel", source, StringComparison.Ordinal);
-        Assert.Contains("CurrentView = gatewayViewModel", source, StringComparison.Ordinal);
-        Assert.Contains("CurrentView = activityViewModel", source, StringComparison.Ordinal);
-        Assert.Contains("CurrentView = consoleViewModel", source, StringComparison.Ordinal);
-        Assert.Contains("CurrentView = settingsViewModel", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("CurrentView = new OverviewViewModel", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("CurrentView = new ProvidersViewModel", source, StringComparison.Ordinal);
+        Assert.Contains("ShowView(\"nav.overview\", overviewViewModel)", source, StringComparison.Ordinal);
+        Assert.Contains("ShowView(\"nav.providers\", providersViewModel)", source, StringComparison.Ordinal);
+        Assert.Contains("ShowView(\"nav.gateway\", gatewayViewModel)", source, StringComparison.Ordinal);
+        Assert.Contains("ShowView(\"nav.activity\", activityViewModel)", source, StringComparison.Ordinal);
+        Assert.Contains("ShowView(\"nav.console\", consoleViewModel)", source, StringComparison.Ordinal);
+        Assert.Contains("ShowView(\"nav.settings\", settingsViewModel)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowView(\"nav.overview\", new OverviewViewModel", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowView(\"nav.providers\", new ProvidersViewModel", source, StringComparison.Ordinal);
         Assert.Contains("Dispatcher.UIThread.Post(() => _ = RefreshAsync())", source, StringComparison.Ordinal);
     }
 }

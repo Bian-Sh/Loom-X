@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using LoomX.Activity;
+using LoomX.Localization;
 using LoomX.Services;
 
 namespace LoomX.ViewModels;
@@ -12,6 +14,7 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     private readonly AppDataStore dataStore;
     private readonly ILogger<ActivityViewModel> logger;
     private readonly EventHandler storeActivityHandler;
+    private readonly IStringLocalizer<ActivityViewModel> _loc;
     private CancellationTokenSource? refreshCancellation;
     private string searchText = string.Empty;
     private string selectedStatus = "全部状态";
@@ -39,7 +42,7 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     public string SelectedProtocol { get => selectedProtocol; set { if (SetProperty(ref selectedProtocol, value ?? "全部入口协议")) QueueRefresh(); } }
     public ActivityItemViewModel? SelectedItem { get => selectedItem; private set => SetProperty(ref selectedItem, value); }
     public string Status { get => status; private set => SetProperty(ref status, value); }
-    public string ResultCountLabel => $"显示 {Items.Count} 条活动";
+    public string ResultCountLabel => LocFormat("activity.result.count", Items.Count);
     public int TotalCount { get => totalCount; private set => SetProperty(ref totalCount, value); }
     public int ConversionCount { get => conversionCount; private set => SetProperty(ref conversionCount, value); }
     public int FailureCount { get => failureCount; private set => SetProperty(ref failureCount, value); }
@@ -51,28 +54,47 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     public bool HasMore { get => hasMore; private set => SetProperty(ref hasMore, value); }
     public int PendingActivityCount { get => pendingActivityCount; private set { if (SetProperty(ref pendingActivityCount, value)) { OnPropertyChanged(nameof(HasPendingActivities)); OnPropertyChanged(nameof(PendingActivityLabel)); } } }
     public bool HasPendingActivities => PendingActivityCount > 0;
-    public string PendingActivityLabel => PendingActivityCount > 0 ? $"有 {PendingActivityCount} 条新活动，回到最新" : "回到最新";
+    public string PendingActivityLabel => PendingActivityCount > 0 ? LocFormat("activity.pending.count", PendingActivityCount) : Loc("activity.pending.back");
     public double PullDistance { get => pullDistance; private set { if (SetProperty(ref pullDistance, value)) OnPropertyChanged(nameof(IsPullToRefreshVisible)); } }
     public bool IsPullToRefreshVisible => PullDistance >= 24 || IsLoadingMore;
-    public string LoadMoreLabel => IsLoadingMore ? "正在加载历史活动…" : HasMore ? "继续上拉加载更早活动" : "已到活动历史末尾";
+    public string LoadMoreLabel => IsLoadingMore ? Loc("activity.loadmore.loading") : HasMore ? Loc("activity.loadmore.continue") : Loc("activity.loadmore.end");
     public ICommand SelectCommand { get; }
     public ICommand LoadMoreCommand { get; }
     public ICommand ReturnToLatestCommand { get; }
 
-    public ActivityViewModel(AppDataStore dataStore, ILogger<ActivityViewModel>? logger = null)
+    public ActivityViewModel(AppDataStore dataStore, ILogger<ActivityViewModel>? logger = null, IStringLocalizer<ActivityViewModel>? localizer = null)
     {
         this.dataStore = dataStore;
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<ActivityViewModel>.Instance;
+        _loc = localizer ?? LocalizerFactory.Create<ActivityViewModel>();
         SelectCommand = new AsyncCommand(parameter => { SelectedItem = parameter as ActivityItemViewModel; return Task.CompletedTask; });
         LoadMoreCommand = new AsyncCommand(_ => LoadMoreAsync());
         ReturnToLatestCommand = new AsyncCommand(_ => ReturnToLatestAsync());
         storeActivityHandler = (_, _) => OnStoreActivityChanged();
         dataStore.ActivityWindowChanged += storeActivityHandler;
+        LocaleService.CultureChanged += OnCultureChanged;
         _ = RefreshAsync();
     }
 
     public ActivityViewModel(GatewayProcessService gatewayService, ILogger<ActivityViewModel>? logger = null)
         : this(new AppDataStore(new ConfigSnapshotService(), gatewayService), logger) { }
+
+    private string Loc(string key) => _loc[key]?.Value ?? key;
+    private string LocFormat(string key, params object[] args)
+    {
+        var value = Loc(key);
+        return args.Length == 0 ? value : string.Format(System.Globalization.CultureInfo.CurrentCulture, value, args);
+    }
+
+    private void OnCultureChanged(object? sender, System.Globalization.CultureInfo culture)
+    {
+        Status = Loc("activity.status.loading");
+        OnPropertyChanged(nameof(ResultCountLabel));
+        OnPropertyChanged(nameof(PendingActivityLabel));
+        OnPropertyChanged(nameof(LoadMoreLabel));
+        OnPropertyChanged(nameof(StatusOptions));
+        OnPropertyChanged(nameof(ProtocolOptions));
+    }
 
     private void QueueRefresh()
     {
@@ -92,12 +114,12 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
             var page = await dataStore.LoadActivityPageAsync(BuildQuery(), cancellationToken);
             ApplyPage(page);
             RequestScrollToTop();
-            Status = page.Items.Count == 0 ? "暂无请求活动" : $"已加载 {page.Items.Count} 条活动";
+            Status = page.Items.Count == 0 ? Loc("activity.status.empty") : LocFormat("activity.status.loaded", page.Items.Count);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception)
         {
-            Status = $"活动加载失败：{exception.Message}";
+            Status = LocFormat("activity.status.load.failed", exception.Message);
             logger.LogError(exception, "活动加载失败");
         }
         finally
@@ -115,11 +137,11 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
             var page = await dataStore.LoadOlderActivityPageAsync(BuildQuery());
             IsHistoryMode = true;
             ApplyPage(page);
-            Status = page.HasMore ? $"已加载 {page.Items.Count} 条活动，可继续查看历史" : $"已加载 {page.Items.Count} 条活动，已到历史末尾";
+            Status = page.HasMore ? LocFormat("activity.status.history.more", page.Items.Count) : LocFormat("activity.status.history.end", page.Items.Count);
         }
         catch (Exception exception)
         {
-            Status = $"历史活动加载失败：{exception.Message}";
+            Status = LocFormat("activity.status.history.failed", exception.Message);
             logger.LogError(exception, "历史活动分页失败");
         }
         finally
@@ -137,11 +159,11 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
             IsHistoryMode = false;
             ApplyPage(page);
             RequestScrollToTop();
-            Status = page.Items.Count == 0 ? "暂无请求活动" : "已回到最新活动";
+            Status = page.Items.Count == 0 ? Loc("activity.status.empty") : Loc("activity.status.returned");
         }
         catch (Exception exception)
         {
-            Status = $"返回最新活动失败：{exception.Message}";
+            Status = LocFormat("activity.status.return.failed", exception.Message);
             logger.LogError(exception, "返回最新活动失败");
         }
     }
@@ -191,15 +213,22 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
         ConversionCount = records.Count(item => item.Route.Contains('→'));
         FailureCount = records.Count(item => item.StatusCode >= 500);
         var values = records.Select(item => item.ElapsedMs).OrderBy(item => item).ToArray();
-        P95Latency = values.Length == 0 ? "—" : $"{values[(int)Math.Ceiling(values.Length * .95) - 1]} ms";
+        P95Latency = values.Length == 0 ? ResourceLookup.Resolve("activity.dash") : LocFormat("activity.latency.format", values[(int)Math.Ceiling(values.Length * .95) - 1]);
     }
 
-    private static string? ToStatusValue(string value) => value switch { "成功" => "ok", "失败" => "fail", "警告" => "warn", _ => null };
+    private static string? ToStatusValue(string value) => value switch
+    {
+        "成功" => "ok",
+        "失败" => "fail",
+        "警告" => "warn",
+        _ => null
+    };
     private static string? ToProtocolValue(string value) => value is "全部入口协议" ? null : value;
 
     public void Dispose()
     {
         dataStore.ActivityWindowChanged -= storeActivityHandler;
+        LocaleService.CultureChanged -= OnCultureChanged;
         refreshCancellation?.Cancel();
         refreshCancellation?.Dispose();
     }
@@ -212,19 +241,31 @@ public sealed class ActivityItemViewModel : NotifyViewModel
         Id = record.Id;
         RequestId = record.RequestId;
         Time = record.CreatedAt.ToLocalTime().ToString("HH:mm:ss");
-        ModelId = string.IsNullOrWhiteSpace(record.ModelId) ? "未识别模型" : record.ModelId;
-        ProviderId = string.IsNullOrWhiteSpace(record.ProviderId) ? "未匹配 Provider" : record.ProviderId;
+        ModelId = string.IsNullOrWhiteSpace(record.ModelId) ? ResourceLookup.Resolve("activity.item.model.unknown") : record.ModelId;
+        ProviderId = string.IsNullOrWhiteSpace(record.ProviderId) ? ResourceLookup.Resolve("activity.item.provider.unknown") : record.ProviderId;
         Route = record.Route;
         Protocol = record.Protocol;
         StatusCode = record.StatusCode;
-        StatusLabel = record.StatusCode is >= 200 and < 300 ? "成功" : record.StatusCode is >= 400 and < 500 ? "警告" : "失败";
-        StatusColor = StatusLabel switch { "成功" => "#23835A", "警告" => "#A26B16", _ => "#B83E48" };
-        Latency = $"{record.ElapsedMs} ms";
+        var successKey = "activity.filter.status.success";
+        var warningKey = "activity.filter.status.warning";
+        var failKey = "activity.filter.status.failed";
+        StatusLabel = record.StatusCode is >= 200 and < 300
+            ? ResourceLookup.Resolve(successKey)
+            : record.StatusCode is >= 400 and < 500
+                ? ResourceLookup.Resolve(warningKey)
+                : ResourceLookup.Resolve(failKey);
+        StatusColor = StatusLabel switch
+        {
+            var label when string.Equals(label, ResourceLookup.Resolve(successKey), StringComparison.Ordinal) => "#23835A",
+            var label when string.Equals(label, ResourceLookup.Resolve(warningKey), StringComparison.Ordinal) => "#A26B16",
+            _ => "#B83E48"
+        };
+        Latency = ResourceLookup.Resolve("activity.dash") == "-" ? $"{record.ElapsedMs} ms" : string.Format(System.Globalization.CultureInfo.CurrentCulture, ResourceLookup.Resolve("activity.latency.format"), record.ElapsedMs);
         ElapsedMs = record.ElapsedMs;
         DetailRoute = record.IncomingPath;
         Transform = record.Route;
-        ResponseBytes = record.ResponseBytes > 0 ? $"{record.ResponseBytes:N0} B" : "—";
-        ErrorType = record.ErrorType ?? "—";
+        ResponseBytes = record.ResponseBytes > 0 ? string.Format(System.Globalization.CultureInfo.CurrentCulture, ResourceLookup.Resolve("activity.bytes.format"), record.ResponseBytes) : ResourceLookup.Resolve("activity.dash");
+        ErrorType = record.ErrorType ?? ResourceLookup.Resolve("activity.dash");
         LogSummary = $"{record.Method} {record.IncomingPath}\nmodel: {ModelId}\nroute: {Route}\nstatus: {StatusCode}\nrequest_id: {RequestId}\nresponse_bytes: {ResponseBytes}";
     }
 

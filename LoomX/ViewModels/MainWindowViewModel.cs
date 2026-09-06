@@ -1,16 +1,19 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Avalonia.Media;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using LoomX;
 using LoomX.Configuration;
 using LoomX.Activity;
+using LoomX.Localization;
 using LoomX.NodeGraph;
 using LoomX.Services;
 
@@ -30,17 +33,18 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private readonly ActivityViewModel activityViewModel;
     private readonly UpdateCoordinator updateCoordinator;
     private readonly Action<bool, int, int, string>? applyAppearance;
-    private object currentView = new PlaceholderViewModel("加载中", "正在加载 Loom-X。");
-    private string pageTitle = "概览";
-    private string pageDescription = "确认本地服务健康，快速查看网关与模型配置。";
+    private readonly IStringLocalizer<MainWindowViewModel> _loc;
+    private object currentView;
+    private string currentViewKey = "nav.overview";
+    private PlaceholderViewModel? currentError;
 
     public ObservableCollection<NavigationItemViewModel> NavigationItems { get; }
-    public object CurrentView { get => currentView; private set => SetProperty(ref currentView, value); }
-    public string PageTitle { get => pageTitle; private set => SetProperty(ref pageTitle, value); }
-    public string PageDescription { get => pageDescription; private set => SetProperty(ref pageDescription, value); }
+    public object CurrentView => currentView;
+    public string PageTitle => currentError?.Title ?? Loc(currentViewKey);
+    public string PageDescription => currentError?.Description ?? Loc(currentViewKey + ".description");
     public UpdateCoordinator Update => updateCoordinator;
 
-    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null, Action<bool, int, int, string>? applyAppearance = null, AppDataStore? dataStore = null)
+    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null, Action<bool, int, int, string>? applyAppearance = null, AppDataStore? dataStore = null, IStringLocalizer<MainWindowViewModel>? localizer = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
@@ -48,47 +52,74 @@ public sealed class MainWindowViewModel : NotifyViewModel
         var ownedConfigService = configService ?? new ConfigSnapshotService(this.loggerFactory.CreateLogger<ConfigSnapshotService>());
         this.dataStore = dataStore ?? new AppDataStore(ownedConfigService, gatewayService, this.loggerFactory.CreateLogger<AppDataStore>());
         this.applyAppearance = applyAppearance;
+        _loc = localizer ?? LocalizerFactory.Create<MainWindowViewModel>();
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService);
         overviewViewModel = new OverviewViewModel(gatewayService, this.dataStore, this.loggerFactory.CreateLogger<MainWindowViewModel>());
         providersViewModel = new ProvidersViewModel(this.dataStore, this.toastService, this.loggerFactory.CreateLogger<ProvidersViewModel>());
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
         activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
         updateCoordinator = new UpdateCoordinator(this.dataStore, logger: this.loggerFactory.CreateLogger<UpdateCoordinator>());
-        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator);
+        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, localizer: LocalizerFactory.Create<SettingsViewModel>());
+        currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
         NavigationItems = new([
-            new("概览", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
-            new("网关", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
-            new("Provider", "M 7,8 L 25,8 M 7,16 L 25,16 M 7,24 L 25,24 M 4,8 L 4,8 M 4,16 L 4,16 M 4,24 L 4,24", () => ShowProviders()),
-            new("活动", "M 7,28 L 7,5 M 8,6 C 13,4 18,8 25,6 L 25,18 C 18,20 13,16 8,18", () => ShowActivity()),
-            new("控制台", "M 5,6 L 27,6 L 27,26 L 5,26 Z M 9,12 L 13,16 L 9,20 M 16,20 L 23,20", () => ShowConsole()),
-            new("设置", "M 16,4 L 18,7 L 22,8 L 25,6 L 28,9 L 26,12 L 27,16 L 30,18 L 28,22 L 24,21 L 21,24 L 21,28 L 16,29 L 14,25 L 10,24 L 7,26 L 4,22 L 6,19 L 5,15 L 2,13 L 4,8 L 8,9 L 11,6 L 11,3 Z M 16,12 A 4,4 0 1,0 16,20 A 4,4 0 1,0 16,12 Z", () => ShowSettings())
+            new("nav.overview", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
+            new("nav.gateway", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
+            new("nav.providers", "M 7,8 L 25,8 M 7,16 L 25,16 M 7,24 L 25,24 M 4,8 L 4,8 M 4,16 L 4,16 M 4,24 L 4,24", () => ShowProviders()),
+            new("nav.activity", "M 7,28 L 7,5 M 8,6 C 13,4 18,8 25,6 L 25,18 C 18,20 13,16 8,18", () => ShowActivity()),
+            new("nav.console", "M 5,6 L 27,6 L 27,26 L 5,26 Z M 9,12 L 13,16 L 9,20 M 16,20 L 23,20", () => ShowConsole()),
+            new("nav.settings", "M 16,4 L 18,7 L 22,8 L 25,6 L 28,9 L 26,12 L 27,16 L 30,18 L 28,22 L 24,21 L 21,24 L 21,28 L 16,29 L 14,25 L 10,24 L 7,26 L 4,22 L 6,19 L 5,15 L 2,13 L 4,8 L 8,9 L 11,6 L 11,3 Z M 16,12 A 4,4 0 1,0 16,20 A 4,4 0 1,0 16,12 Z", () => ShowSettings())
         ]);
         this.dataStore.ConfigurationReady += OnConfigurationReady;
         this.dataStore.ConfigurationChanged += OnConfigurationChanged;
+        LocaleService.CultureChanged += OnCultureChanged;
         _ = InitializeDataStoreAsync();
     }
 
-    private void SetActive(string title)
+    private string Loc(string key) => _loc[key]?.Value ?? key;
+
+    private void SetActive(string titleKey)
     {
-        foreach (var item in NavigationItems) item.IsActive = item.Title == title;
+        foreach (var item in NavigationItems) item.IsActive = item.TitleKey == titleKey;
     }
 
-    private void ShowOverview() { SetActive("概览"); PageTitle = "概览"; PageDescription = "确认本地服务健康，快速查看网关与模型配置。"; CurrentView = overviewViewModel; }
-    private void ShowProviders() { SetActive("Provider"); PageTitle = "Provider"; PageDescription = "管理上游连接、请求协议、密钥与可用模型。"; CurrentView = providersViewModel; }
-    private void ShowGateway() { SetActive("网关"); PageTitle = "网关"; PageDescription = "组合对外 Endpoint 的模型路由，并按优先级自动故障转移。"; CurrentView = gatewayViewModel; }
-    private void ShowConsole() { SetActive("控制台"); PageTitle = "控制台"; PageDescription = "查看本地网关、协议转换与上游请求的脱敏运行日志。"; CurrentView = consoleViewModel; }
-    private void ShowActivity() { SetActive("活动"); PageTitle = "请求活动"; PageDescription = "定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。"; CurrentView = activityViewModel; }
-    private void ShowSettings() { SetActive("设置"); PageTitle = "设置"; PageDescription = "调整 Loom-X 的显示、连接、更新与隐私偏好。"; CurrentView = settingsViewModel; }
-    private void ShowPlaceholder(string title, string description) { SetActive(title); PageTitle = title; PageDescription = description; CurrentView = new PlaceholderViewModel(title, description); }
+    private void ShowView(string key, object view)
+    {
+        SetActive(key);
+        currentViewKey = key;
+        currentError = null;
+        currentView = view;
+        OnPropertyChanged(nameof(CurrentView));
+        OnPropertyChanged(nameof(PageTitle));
+        OnPropertyChanged(nameof(PageDescription));
+    }
+
+    private void ShowOverview() => ShowView("nav.overview", overviewViewModel);
+    private void ShowProviders() => ShowView("nav.providers", providersViewModel);
+    private void ShowGateway() => ShowView("nav.gateway", gatewayViewModel);
+    private void ShowConsole() => ShowView("nav.console", consoleViewModel);
+    private void ShowActivity() => ShowView("nav.activity", activityViewModel);
+    private void ShowSettings() => ShowView("nav.settings", settingsViewModel);
+    private void ShowPlaceholder(string title, string description)
+    {
+        var placeholder = new PlaceholderViewModel(title, description);
+        currentError = placeholder;
+        currentView = placeholder;
+        OnPropertyChanged(nameof(CurrentView));
+        OnPropertyChanged(nameof(PageTitle));
+        OnPropertyChanged(nameof(PageDescription));
+    }
 
     private void OnConfigurationReady(object? sender, EventArgs args)
     {
         void Apply()
         {
+            if (dataStore.Settings is { } settings)
+            {
+                LocaleService.SetCulture(settings.Language);
+                applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
+            }
             ShowOverview();
             updateCoordinator.Start();
-            if (dataStore.Settings is { } settings)
-                applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
         }
         if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
     }
@@ -98,9 +129,10 @@ public sealed class MainWindowViewModel : NotifyViewModel
         try { await dataStore.InitializeAsync(); }
         catch (Exception exception)
         {
-            var description = $"数据中心加载失败：{exception.Message}，请通过页面刷新重试。";
-            if (Dispatcher.UIThread.CheckAccess()) ShowPlaceholder("加载失败", description);
-            else Dispatcher.UIThread.Post(() => ShowPlaceholder("加载失败", description));
+            var title = Loc("app.loading.failed");
+            var description = string.Format(Loc("app.loading.failed.description"), exception.Message);
+            if (Dispatcher.UIThread.CheckAccess()) ShowPlaceholder(title, description);
+            else Dispatcher.UIThread.Post(() => ShowPlaceholder(title, description));
         }
     }
 
@@ -114,10 +146,17 @@ public sealed class MainWindowViewModel : NotifyViewModel
         if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
     }
 
+    private void OnCultureChanged(object? sender, CultureInfo culture)
+    {
+        OnPropertyChanged(nameof(PageTitle));
+        OnPropertyChanged(nameof(PageDescription));
+    }
+
     public void Dispose()
     {
         dataStore.ConfigurationReady -= OnConfigurationReady;
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
+        LocaleService.CultureChanged -= OnCultureChanged;
         overviewViewModel.Dispose();
         providersViewModel.Dispose();
         gatewayViewModel.Dispose();
@@ -131,13 +170,36 @@ public sealed class MainWindowViewModel : NotifyViewModel
 
 public sealed class NavigationItemViewModel : NotifyViewModel
 {
-    public string Title { get; }
+    private readonly string _titleKey;
+    private string title;
+    private bool isActive;
+
+    public string TitleKey => _titleKey;
+    public string Title { get => title; private set => SetProperty(ref title, value); }
     public string Icon { get; }
     public Geometry IconData { get; }
-    private bool isActive;
     public bool IsActive { get => isActive; set => SetProperty(ref isActive, value); }
     public ICommand NavigateCommand { get; }
-    public NavigationItemViewModel(string title, string icon, Action action) { Title = title; Icon = icon; IconData = Geometry.Parse(icon); NavigateCommand = new DelegateCommand(action); }
+
+    public NavigationItemViewModel(string titleKey, string icon, Action action)
+    {
+        _titleKey = titleKey;
+        title = ResourceLookup.Resolve(titleKey);
+        Icon = icon;
+        IconData = Geometry.Parse(icon);
+        NavigateCommand = new DelegateCommand(action);
+        LocaleService.CultureChanged += OnCultureChanged;
+    }
+
+    private void OnCultureChanged(object? sender, CultureInfo culture)
+    {
+        Title = ResourceLookup.Resolve(_titleKey);
+    }
+
+    public void Dispose()
+    {
+        LocaleService.CultureChanged -= OnCultureChanged;
+    }
 }
 
 public sealed class OverviewViewModel : NotifyViewModel, IDisposable
@@ -146,6 +208,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private readonly GatewayProcessService gatewayService;
     private readonly AppDataStore dataStore;
     private readonly ILogger<MainWindowViewModel>? logger;
+    private readonly IStringLocalizer<OverviewViewModel> _loc;
     private string gatewayStatus = "未运行";
     private string endpoint = "未配置";
     private string version = "未知";
@@ -182,6 +245,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public string P95Latency { get => p95Latency; private set => SetProperty(ref p95Latency, value); }
     public string GraphStatus { get => graphStatus; private set => SetProperty(ref graphStatus, value); }
     public string GatewayActionLabel { get => gatewayActionLabel; private set => SetProperty(ref gatewayActionLabel, value); }
+    public string RecentRequestsCountLabel => LocFormat("overview.recent.count", RecentRequests.Count);
     public RuntimeGraphSnapshot? GraphSnapshot { get => graphSnapshot; private set => SetProperty(ref graphSnapshot, value); }
     public OverviewEndpointViewModel? SelectedEndpoint { get => selectedEndpoint; private set => SetProperty(ref selectedEndpoint, value); }
     public ObservableCollection<OverviewEndpointViewModel> Endpoints { get; } = [];
@@ -202,11 +266,12 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public ICommand ToggleGatewayCommand { get; }
     public ICommand RefreshCommand { get; }
 
-    public OverviewViewModel(GatewayProcessService gatewayService, AppDataStore dataStore, ILogger<MainWindowViewModel>? logger = null)
+    public OverviewViewModel(GatewayProcessService gatewayService, AppDataStore dataStore, ILogger<MainWindowViewModel>? logger = null, IStringLocalizer<OverviewViewModel>? localizer = null)
     {
         this.gatewayService = gatewayService;
         this.dataStore = dataStore;
         this.logger = logger;
+        _loc = localizer ?? LocalizerFactory.Create<OverviewViewModel>();
         StartCommand = new AsyncCommand(StartAsync);
         StopCommand = new AsyncCommand(StopAsync);
         ToggleGatewayCommand = new AsyncCommand(ToggleGatewayAsync, CanToggleGateway);
@@ -214,11 +279,29 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         gatewayService.StateChanged += OnGatewayStateChanged;
         gatewayService.TelemetryPublished += OnTelemetryPublished;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
+        LocaleService.CultureChanged += OnCultureChanged;
         _ = RefreshAsync();
     }
 
     public OverviewViewModel(GatewayProcessService gatewayService, ConfigSnapshotService configService, ILogger<MainWindowViewModel>? logger = null)
         : this(gatewayService, new AppDataStore(configService, gatewayService), logger) { }
+
+    private string Loc(string key) => _loc[key]?.Value ?? key;
+    private string LocFormat(string key, params object[] args)
+    {
+        var value = Loc(key);
+        return args.Length == 0 ? value : string.Format(CultureInfo.CurrentCulture, value, args);
+    }
+
+    private void OnCultureChanged(object? sender, CultureInfo culture)
+    {
+        OnPropertyChanged(nameof(GatewayStatus));
+        OnPropertyChanged(nameof(Version));
+        OnPropertyChanged(nameof(LastChecked));
+        OnPropertyChanged(nameof(GraphStatus));
+        OnPropertyChanged(nameof(GatewayActionLabel));
+        OnPropertyChanged(nameof(RecentRequestsCountLabel));
+    }
 
     private async Task StartAsync()
     {
@@ -263,12 +346,12 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private void UpdateGatewayControls()
     {
         GatewayActionLabel = gatewayToggleInProgress
-            ? gatewayService.State == GatewayState.Running ? "停止中" : "启动中"
-            : gatewayService.State == GatewayState.Running ? "停止网关" : gatewayService.State switch
+            ? gatewayService.State == GatewayState.Running ? Loc("overview.gateway.action.stopping") : Loc("overview.gateway.action.starting")
+            : gatewayService.State == GatewayState.Running ? Loc("overview.gateway.action.stop") : gatewayService.State switch
             {
-                GatewayState.Starting => "启动中",
-                GatewayState.Stopping => "停止中",
-                _ => "启动网关"
+                GatewayState.Starting => Loc("overview.gateway.action.starting"),
+                GatewayState.Stopping => Loc("overview.gateway.action.stopping"),
+                _ => Loc("overview.gateway.action.start")
             };
         (ToggleGatewayCommand as AsyncCommand)?.RaiseCanExecuteChanged();
     }
@@ -288,15 +371,15 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             await RefreshRecentRequestsAsync();
             GatewayStatus = gatewayService.State switch
             {
-                GatewayState.Running => "运行中",
-                GatewayState.Starting => "启动中",
-                GatewayState.Stopping => "停止中",
-                GatewayState.Failed => $"异常：{gatewayService.Error}",
-                _ => "未运行"
+                GatewayState.Running => Loc("overview.gateway.status.running"),
+                GatewayState.Starting => Loc("overview.gateway.status.starting"),
+                GatewayState.Stopping => Loc("overview.gateway.status.stopping"),
+                GatewayState.Failed => LocFormat("overview.gateway.status.failed", gatewayService.Error),
+                _ => Loc("overview.gateway.status.not_running")
             };
-            LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "尚未检查";
-            Version = gatewayService.State == GatewayState.Running ? "Loom-X API 在线" : "未连接";
-            GraphStatus = gatewayService.State == GatewayState.Running ? "实时拓扑已连接" : "等待网关启动";
+            LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? Loc("overview.lastchecked.none");
+            Version = gatewayService.State == GatewayState.Running ? Loc("overview.version.online") : Loc("overview.version.disconnected");
+            GraphStatus = gatewayService.State == GatewayState.Running ? Loc("overview.graph.connected") : Loc("overview.graph.waiting");
             UpdateGatewayControls();
             GraphMetricsChanged?.Invoke(this, EventArgs.Empty);
             logger?.LogInformation("概览刷新完成 {ProviderCount} 个 Provider、{ModelCount} 个模型、{EndpointCount} 个 Endpoint、{RouteCount} 条路由，网关状态 {GatewayState}，配置库 {DatabasePath}，进程 {ProcessId}", ProviderCount, ModelCount, Endpoints.Count, Endpoints.Sum(item => item.Routes.Count), gatewayService.State, AppDataPaths.DatabasePath, Environment.ProcessId);
@@ -304,7 +387,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             logger?.LogError(exception, "概览刷新失败");
-            GraphStatus = "概览加载失败";
+            GraphStatus = Loc("overview.graph.failed");
         }
         finally
         {
@@ -481,7 +564,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             while (RecentRequests.Count > 8) RecentRequests.RemoveAt(RecentRequests.Count - 1);
             OnPropertyChanged(nameof(RecentRequestsEmpty));
         }
-        P95Latency = completionWindow.Count == 0 ? "—" : $"{completionWindow.Select(item => item.ElapsedMs).OrderBy(item => item).ElementAt(Math.Max(0, (int)Math.Ceiling(completionWindow.Count * .95) - 1))} ms";
+        P95Latency = completionWindow.Count == 0 ? "—" : LocFormat("overview.latency.format", completionWindow.Select(item => item.ElapsedMs).OrderBy(item => item).ElementAt(Math.Max(0, (int)Math.Ceiling(completionWindow.Count * .95) - 1)));
         GraphMetricsChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -508,6 +591,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         gatewayService.StateChanged -= OnGatewayStateChanged;
         gatewayService.TelemetryPublished -= OnTelemetryPublished;
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
+        LocaleService.CultureChanged -= OnCultureChanged;
         activeRequests.Clear();
         requestEdges.Clear();
         activeEdgeCounts.Clear();

@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="LoomX.Views.SettingsView">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" x:Class="LoomX.Views.SettingsView">
   <UserControl.Styles>
     <Style Selector="Border.panel"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/></Style>
     <Style Selector="TextBlock.label"><Setter Property="FontSize" Value="12"/><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
@@ -8,18 +8,18 @@
   </UserControl.Styles>
   <Grid MinHeight="450">
     <TabControl>
-      <TabItem Header="通用">
+      <TabItem Header="{l:Locale settings.tab.general}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="12" Margin="0,14,8,20">
             <Border Classes="panel" Padding="18">
               <StackPanel Spacing="14">
-                <StackPanel Spacing="4"><TextBlock Text="界面语言" FontWeight="SemiBold"/><TextBlock Text="切换界面显示语言。" Classes="hint"/><ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"/></StackPanel>
-                <StackPanel Spacing="4"><TextBlock Text="主题" FontWeight="SemiBold"/><TextBlock Text="选择适合当前工作环境的配色。" Classes="hint"/><ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"/></StackPanel>
+                <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.language.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.language.hint}" Classes="hint"/><ComboBox ItemsSource="{Binding LanguageOptions}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}"/></StackPanel>
+                <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.theme.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.theme.hint}" Classes="hint"/><ComboBox ItemsSource="{Binding ThemeOptions}" SelectedItem="{Binding SelectedTheme, Mode=TwoWay}"/></StackPanel>
                 <Border Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
                   <StackPanel Spacing="12">
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="3"><TextBlock Text="透明窗口" FontWeight="SemiBold"/><TextBlock Text="使用系统材质为窗口提供轻微的层次感。" Classes="hint"/></StackPanel><ToggleSwitch Grid.Column="1" IsChecked="{Binding TransparencyEnabled}" VerticalAlignment="Center"/></Grid>
-                    <Grid ColumnDefinitions="*,220" ColumnSpacing="12" IsEnabled="{Binding TransparencyEnabled}"><StackPanel Spacing="3"><TextBlock Text="透明程度" FontWeight="SemiBold"/><TextBlock Text="数值越高，内容区域越不透明。" Classes="hint"/></StackPanel><Grid Grid.Column="1" ColumnDefinitions="*,44" ColumnSpacing="8"><Slider Value="{Binding TransparencyOpacity, Mode=TwoWay}" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding TransparencyOpacity, StringFormat='{}{0}%'}" FontFamily="Consolas" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid></Grid>
-                    <Grid ColumnDefinitions="*,220" ColumnSpacing="12" IsEnabled="{Binding TransparencyEnabled}"><StackPanel Spacing="3"><TextBlock Text="磨砂程度" FontWeight="SemiBold"/><TextBlock Text="控制材质的系统模糊强度（0-64）。" Classes="hint"/></StackPanel><Grid Grid.Column="1" ColumnDefinitions="*,44" ColumnSpacing="8"><Slider Value="{Binding BlurAmount, Mode=TwoWay}" Minimum="0" Maximum="64" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding BlurAmount}" FontFamily="Consolas" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid></Grid>
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="3"><TextBlock Text="{l:Locale settings.transparency.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.transparency.hint}" Classes="hint"/></StackPanel><ToggleSwitch Grid.Column="1" IsChecked="{Binding TransparencyEnabled}" VerticalAlignment="Center"/></Grid>
+                    <Grid ColumnDefinitions="*,220" ColumnSpacing="12" IsEnabled="{Binding TransparencyEnabled}"><StackPanel Spacing="3"><TextBlock Text="{l:Locale settings.opacity.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.opacity.hint}" Classes="hint"/></StackPanel><Grid Grid.Column="1" ColumnDefinitions="*,44" ColumnSpacing="8"><Slider Value="{Binding TransparencyOpacity, Mode=TwoWay}" Minimum="0" Maximum="100" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding TransparencyOpacity, StringFormat='{}{0}%'}" FontFamily="Consolas" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid></Grid>
+                    <Grid ColumnDefinitions="*,220" ColumnSpacing="12" IsEnabled="{Binding TransparencyEnabled}"><StackPanel Spacing="3"><TextBlock Text="{l:Locale settings.blur.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.blur.hint}" Classes="hint"/></StackPanel><Grid Grid.Column="1" ColumnDefinitions="*,44" ColumnSpacing="8"><Slider Value="{Binding BlurAmount, Mode=TwoWay}" Minimum="0" Maximum="64" TickFrequency="1" IsSnapToTickEnabled="True" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding BlurAmount}" FontFamily="Consolas" Foreground="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Right" VerticalAlignment="Center"/></Grid></Grid>
                   </StackPanel>
                 </Border>
               </StackPanel>
@@ -27,63 +27,63 @@
           </StackPanel>
         </ScrollViewer>
       </TabItem>
-      <TabItem Header="连接">
+      <TabItem Header="{l:Locale settings.tab.proxy}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="12" Margin="0,14,8,20">
             <Border Classes="panel" Padding="18">
               <StackPanel Spacing="14">
-                <StackPanel Spacing="4"><TextBlock Text="代理模式" FontWeight="SemiBold"/><TextBlock Text="控制上游请求如何通过代理访问网络。" Classes="hint"/><ComboBox ItemsSource="{Binding ProxyModeOptions}" SelectedItem="{Binding SelectedProxyMode, Mode=TwoWay}"/></StackPanel>
+                <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.mode.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.proxy.mode.hint}" Classes="hint"/><ComboBox ItemsSource="{Binding ProxyModeOptions}" SelectedItem="{Binding SelectedProxyMode, Mode=TwoWay}"/></StackPanel>
                 <Grid ColumnDefinitions="*,120" ColumnSpacing="10" IsVisible="{Binding IsCustomProxyVisible}">
-                  <StackPanel Spacing="4"><TextBlock Text="代理地址" Classes="label"/><TextBox Text="{Binding ProxyHost}" Watermark="http://127.0.0.1"/></StackPanel>
-                  <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="端口" Classes="label"/><NumericUpDown Value="{Binding ProxyPort}" Minimum="1" Maximum="65535"/></StackPanel>
+                  <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.host.label}" Classes="label"/><TextBox Text="{Binding ProxyHost}" Watermark="http://127.0.0.1"/></StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="{l:Locale settings.proxy.port.label}" Classes="label"/><NumericUpDown Value="{Binding ProxyPort}" Minimum="1" Maximum="65535"/></StackPanel>
                 </Grid>
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding IsCustomProxyVisible}">
-                  <StackPanel Spacing="4"><TextBlock Text="用户名（可选）" Classes="label"/><TextBox Text="{Binding ProxyUsername}"/></StackPanel>
-                  <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="密码（可选）" Classes="label"/><TextBox Text="{Binding ProxyPassword}" PasswordChar="●"/></StackPanel>
+                  <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.username.label}" Classes="label"/><TextBox Text="{Binding ProxyUsername}"/></StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="{l:Locale settings.proxy.password.label}" Classes="label"/><TextBox Text="{Binding ProxyPassword}" PasswordChar="●"/></StackPanel>
                 </Grid>
-                <TextBlock Text="已有代理密码已保存，输入新密码后保存即可替换。" Classes="hint" IsVisible="{Binding HasProxyPassword}"/>
-                <CheckBox Content="清除已保存的代理密码" IsChecked="{Binding ClearProxyPassword}" IsVisible="{Binding HasProxyPassword}"/>
+                <TextBlock Text="{l:Locale settings.proxy.password.saved.hint}" Classes="hint" IsVisible="{Binding HasProxyPassword}"/>
+                <CheckBox Content="{l:Locale settings.proxy.password.clear}" IsChecked="{Binding ClearProxyPassword}" IsVisible="{Binding HasProxyPassword}"/>
                 <Border Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="11">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="2"><TextBlock Text="连接状态" FontWeight="SemiBold"/><TextBlock Text="{Binding ProxyStatus}" Classes="hint"/></StackPanel><Button Grid.Column="1" Content="测试连接" Command="{Binding TestProxyCommand}" Classes="outline" IsEnabled="{Binding IsNotBusy}"/></Grid>
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="2"><TextBlock Text="{l:Locale settings.proxy.status.label}" FontWeight="SemiBold"/><TextBlock Text="{Binding ProxyStatus}" Classes="hint"/></StackPanel><Button Grid.Column="1" Content="{l:Locale settings.proxy.test.button}" Command="{Binding TestProxyCommand}" Classes="outline" IsEnabled="{Binding IsNotBusy}"/></Grid>
                 </Border>
               </StackPanel>
             </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
-      <TabItem Header="更新">
+      <TabItem Header="{l:Locale settings.tab.updates}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="12" Margin="0,14,8,20">
             <Border Classes="panel" Padding="18">
               <StackPanel Spacing="14">
-                <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="3"><TextBlock Text="当前版本" FontWeight="SemiBold"/><TextBlock Text="本地桌面端版本信息。" Classes="hint"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding VersionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
-                <CheckBox Content="自动检查更新" IsChecked="{Binding AutoCheckUpdates}"/><TextBlock Text="启动后检查，并在应用运行期间每 24 小时检查一次；不会自动安装。" Classes="hint" Margin="24,-10,0,0"/>
-                <CheckBox Content="更新时使用代理" IsChecked="{Binding UseProxyForUpdates}"/><TextBlock Text="默认跟随上方代理模式；关闭后更新请求直连。" Classes="hint" Margin="24,-10,0,0"/>
-                <Button Content="检查更新" Command="{Binding CheckUpdateCommand}" Classes="outline" HorizontalAlignment="Left" IsEnabled="{Binding IsNotBusy}"/>
+                <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="3"><TextBlock Text="{l:Locale settings.update.version.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.update.version.hint}" Classes="hint"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding VersionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
+                <CheckBox Content="{l:Locale settings.update.auto.check}" IsChecked="{Binding AutoCheckUpdates}"/><TextBlock Text="{l:Locale settings.update.auto.check.hint}" Classes="hint" Margin="24,-10,0,0"/>
+                <CheckBox Content="{l:Locale settings.update.use.proxy}" IsChecked="{Binding UseProxyForUpdates}"/><TextBlock Text="{l:Locale settings.update.use.proxy.hint}" Classes="hint" Margin="24,-10,0,0"/>
+                <Button Content="{l:Locale settings.update.check.button}" Command="{Binding CheckUpdateCommand}" Classes="outline" HorizontalAlignment="Left" IsEnabled="{Binding IsNotBusy}"/>
               </StackPanel>
             </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
-      <TabItem Header="数据与隐私">
+      <TabItem Header="{l:Locale settings.tab.data}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="12" Margin="0,14,8,20">
             <Border Classes="panel" Padding="18">
               <StackPanel Spacing="14">
-                <CheckBox Content="发送匿名诊断数据" IsChecked="{Binding DiagnosticsEnabled}"/><TextBlock Text="不包含 API key、请求正文或模型内容。" Classes="hint" Margin="24,-10,0,0"/>
-                <CheckBox Content="记录日志堆栈信息" IsChecked="{Binding LogStackTrace}"/><TextBlock Text="默认关闭；开启后便于定位异常，但日志会包含更完整的调用路径。" Classes="hint" Margin="24,-10,0,0"/>
-                <StackPanel Spacing="4"><TextBlock Text="日志保留周期" FontWeight="SemiBold"/><TextBlock Text="控制台日志会在周期结束后自动清理。" Classes="hint"/><ComboBox ItemsSource="{Binding LogRetentionOptions}" SelectedItem="{Binding SelectedLogRetention, Mode=TwoWay}"/></StackPanel>
-                <StackPanel Spacing="8"><TextBlock Text="本地数据" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="数据目录：" Classes="hint"/><TextBlock Text="{Binding DataDirectory}" Classes="hint" TextWrapping="Wrap"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="10"><Button Content="打开数据目录" Command="{Binding OpenDataDirectoryCommand}" Classes="outline"/><Button Content="清除日志" Command="{Binding ClearLogsCommand}" Classes="outline"/></StackPanel></StackPanel>
+                <CheckBox Content="{l:Locale settings.diagnostic.send}" IsChecked="{Binding DiagnosticsEnabled}"/><TextBlock Text="{l:Locale settings.diagnostic.send.hint}" Classes="hint" Margin="24,-10,0,0"/>
+                <CheckBox Content="{l:Locale settings.log.stacktrace}" IsChecked="{Binding LogStackTrace}"/><TextBlock Text="{l:Locale settings.log.stacktrace.hint}" Classes="hint" Margin="24,-10,0,0"/>
+                <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.log.retention.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.log.retention.hint}" Classes="hint"/><ComboBox ItemsSource="{Binding LogRetentionOptions}" SelectedItem="{Binding SelectedLogRetention, Mode=TwoWay}"/></StackPanel>
+                <StackPanel Spacing="8"><TextBlock Text="{l:Locale settings.local.data}" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{l:Locale settings.local.data.path.label}" Classes="hint"/><TextBlock Text="{Binding DataDirectory}" Classes="hint" TextWrapping="Wrap"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="10"><Button Content="{l:Locale settings.local.data.open}" Command="{Binding OpenDataDirectoryCommand}" Classes="outline"/><Button Content="{l:Locale settings.local.data.clear}" Command="{Binding ClearLogsCommand}" Classes="outline"/></StackPanel></StackPanel>
               </StackPanel>
             </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
-      <TabItem Header="关于">
+      <TabItem Header="{l:Locale settings.tab.about}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="12" Margin="0,14,8,20">
-            <Border Classes="panel" Padding="18"><StackPanel Spacing="6"><TextBlock Text="Loom-X" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="{Binding VersionLabel}" Classes="hint"/><TextBlock Text="Loom-X 为本地与云端 AI 服务提供统一接入层，支持基于 OpenAI、Anthropic、Ollama 三种Endpoint，让 IDE 与 GitHub Copilot 能接入你选择的模型。把模型选择权交还给开发者，让日常编码更自由、更高效，不再 Token 焦虑。" Classes="hint" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="12" Margin="0,6,0,0"><Button Content="项目主页" Classes="outline" Click="ProjectHomeButton_OnClick"/><Button Content="反馈问题" Classes="outline" Click="IssuesButton_OnClick"/></StackPanel></StackPanel></Border>
-            <Border Classes="panel" Padding="18"><Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="3"><TextBlock Text="导出诊断信息" FontWeight="SemiBold"/><TextBlock Text="生成不含密钥和请求正文的诊断摘要。" Classes="hint"/></StackPanel><Button Grid.Column="1" Content="导出诊断" Command="{Binding ExportDiagnosticsCommand}" Classes="outline"/></Grid></Border>
+            <Border Classes="panel" Padding="18"><StackPanel Spacing="6"><TextBlock Text="Loom-X" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="{Binding VersionLabel}" Classes="hint"/><TextBlock Text="{l:Locale settings.about.description}" Classes="hint" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="12" Margin="0,6,0,0"><Button Content="{l:Locale settings.about.homepage}" Classes="outline" Click="ProjectHomeButton_OnClick"/><Button Content="{l:Locale settings.about.issues}" Classes="outline" Click="IssuesButton_OnClick"/></StackPanel></StackPanel></Border>
+            <Border Classes="panel" Padding="18"><Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="3"><TextBlock Text="{l:Locale settings.about.export.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.about.export.hint}" Classes="hint"/></StackPanel><Button Grid.Column="1" Content="{l:Locale settings.about.export.button}" Command="{Binding ExportDiagnosticsCommand}" Classes="outline"/></Grid></Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

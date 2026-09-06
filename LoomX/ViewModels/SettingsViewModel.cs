@@ -1,12 +1,15 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using LoomX;
 using LoomX.Configuration;
 using LoomX.Services;
+using LoomX.Localization;
 using LoomX.Logging;
 
 namespace LoomX.ViewModels;
@@ -25,6 +28,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private readonly bool ownsUpdateCoordinator;
     private readonly ILogger<SettingsViewModel> logger;
     private readonly Action<bool, int, int, string>? applyAppearance;
+    private readonly IStringLocalizer<SettingsViewModel> _loc;
     private SettingOption selectedLanguage = LanguageOptions[0];
     private SettingOption selectedTheme = ThemeOptions[0];
     private SettingOption selectedProxyMode = ProxyModeOptions[0];
@@ -42,7 +46,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private int blurAmount = 24;
     private SettingOption selectedLogRetention = LogRetentionOptions[1];
     private bool isBusy;
-    private string status = "正在加载设置…";
+    private string status;
     private bool hasProxyPassword;
     private bool suppressAutoSave;
     private CancellationTokenSource? autoSaveCancellation;
@@ -52,7 +56,16 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public static IReadOnlyList<SettingOption> ProxyModeOptions { get; } = [new("direct", "直连"), new("system", "系统代理"), new("custom", "自定义代理")];
     public static IReadOnlyList<SettingOption> LogRetentionOptions { get; } = [new("7", "7 天"), new("30", "30 天"), new("90", "90 天"), new("365", "365 天"), new("3650", "永久保留")];
 
-    public SettingOption SelectedLanguage { get => selectedLanguage; set { if (SetProperty(ref selectedLanguage, value)) QueueAutoSave(); } }
+    public SettingOption SelectedLanguage
+    {
+        get => selectedLanguage;
+        set
+        {
+            if (!SetProperty(ref selectedLanguage, value)) return;
+            LocaleService.SetCulture(value.Value);
+            QueueAutoSave();
+        }
+    }
     public SettingOption SelectedTheme { get => selectedTheme; set { if (SetProperty(ref selectedTheme, value)) QueueAutoSave(); } }
     public SettingOption SelectedProxyMode
     {
@@ -88,9 +101,9 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public bool IsCustomProxyVisible => SelectedProxyMode.Value == "custom";
     public string ProxyStatus => SelectedProxyMode.Value switch
     {
-        "direct" => "当前为直连模式。",
-        "system" => "当前跟随 Windows 系统代理。",
-        _ => $"当前使用自定义代理：{ProxyHost}:{ProxyPort}"
+        "direct" => Loc("settings.proxy.test.direct.success"),
+        "system" => Loc("settings.proxy.test.system.success"),
+        _ => $"{Loc("settings.proxy.mode.label")}：{ProxyHost}:{ProxyPort}"
     };
 
     public ICommand LoadCommand { get; }
@@ -100,7 +113,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public ICommand ClearLogsCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
 
-    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null)
+    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null, IStringLocalizer<SettingsViewModel>? localizer = null)
     {
         this.dataStore = dataStore;
         this.logger = logger ?? NullLogger<SettingsViewModel>.Instance;
@@ -108,6 +121,8 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         this.updateCoordinator = updateCoordinator ?? new UpdateCoordinator(dataStore);
         ownsUpdateCoordinator = updateCoordinator is null;
         this.applyAppearance = applyAppearance;
+        _loc = localizer ?? LocalizerFactory.Create<SettingsViewModel>();
+        Status = Loc("settings.status.loading");
         LoadCommand = new AsyncCommand(LoadAsync);
         TestProxyCommand = new AsyncCommand(TestProxyAsync);
         CheckUpdateCommand = new AsyncCommand(CheckUpdateAsync);
@@ -115,17 +130,20 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         ClearLogsCommand = new AsyncCommand(ClearLogsAsync);
         ExportDiagnosticsCommand = new AsyncCommand(ExportDiagnosticsAsync);
         dataStore.ConfigurationChanged += OnConfigurationChanged;
+        LocaleService.CultureChanged += OnCultureChanged;
         _ = LoadAsync();
     }
 
     public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null)
         : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance, null) { }
 
+    private string Loc(string key) => _loc[key]?.Value ?? key;
+
     private async Task LoadAsync()
     {
         if (IsBusy) return;
         IsBusy = true;
-        Status = "正在加载设置…";
+        Status = Loc("settings.status.loading");
         try
         {
             suppressAutoSave = true;
@@ -148,12 +166,12 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             TransparencyEnabled = settings.TransparencyEnabled;
             TransparencyOpacity = settings.TransparencyOpacity;
             BlurAmount = settings.BlurAmount;
-            Status = "设置已加载";
+            Status = Loc("settings.status.loaded");
             logger.LogInformation("设置加载完成 {ProxyMode} {AutoCheckUpdates} {UseProxyForUpdates}", settings.ProxyMode, settings.AutoCheckUpdates, settings.UseProxyForUpdates);
         }
         catch (Exception exception)
         {
-            Status = $"加载设置失败：{exception.Message}";
+            Status = string.Format(Loc("settings.status.load.failed"), exception.Message);
             logger.LogError(exception, "设置加载失败");
         }
         finally { suppressAutoSave = false; IsBusy = false; }
@@ -163,7 +181,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     {
         if (IsBusy) return;
         IsBusy = true;
-        Status = "正在保存设置…";
+        Status = Loc("settings.status.saving");
         try
         {
             var input = new AppSettingsInput(
@@ -189,12 +207,12 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             HasProxyPassword = response.HasProxyPassword;
             ProxyPassword = "";
             ClearProxyPassword = false;
-            Status = $"设置已保存 · {DateTime.Now:HH:mm:ss}";
+            Status = string.Format(Loc("settings.status.saved"), DateTime.Now.ToString("HH:mm:ss"));
             logger.LogInformation("设置保存完成 {ProxyMode} {AutoCheckUpdates} {UseProxyForUpdates} {DiagnosticsEnabled}", response.ProxyMode, response.AutoCheckUpdates, response.UseProxyForUpdates, response.DiagnosticsEnabled);
         }
         catch (Exception exception)
         {
-            Status = $"保存设置失败：{exception.Message}";
+            Status = string.Format(Loc("settings.status.save.failed"), exception.Message);
             logger.LogError(exception, "设置保存失败");
         }
         finally { IsBusy = false; }
@@ -207,7 +225,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         autoSaveCancellation?.Dispose();
         autoSaveCancellation = new CancellationTokenSource();
         var token = autoSaveCancellation.Token;
-        Status = "等待自动保存…";
+        Status = Loc("settings.status.waiting");
         _ = AutoSaveAfterDelayAsync(token);
     }
 
@@ -224,29 +242,34 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private async Task TestProxyAsync()
     {
         if (IsBusy) return;
-        if (SelectedProxyMode.Value == "direct") { Status = "直连模式配置有效。"; toastService.Show("直连模式配置有效", ToastLevel.Success); logger.LogInformation("代理测试完成 {ProxyMode}", SelectedProxyMode.Value); return; }
-        if (SelectedProxyMode.Value == "system") { Status = "系统代理模式已选择，将跟随 Windows 设置。"; toastService.Show("系统代理模式配置有效", ToastLevel.Success); logger.LogInformation("代理测试完成 {ProxyMode}", SelectedProxyMode.Value); return; }
+        if (SelectedProxyMode.Value == "direct") { Status = Loc("settings.proxy.test.direct.success"); toastService.Show(Loc("settings.proxy.test.toast.success"), ToastLevel.Success); logger.LogInformation("代理测试完成 {ProxyMode}", SelectedProxyMode.Value); return; }
+        if (SelectedProxyMode.Value == "system") { Status = Loc("settings.proxy.test.system.success"); toastService.Show(Loc("settings.proxy.test.toast.success"), ToastLevel.Success); logger.LogInformation("代理测试完成 {ProxyMode}", SelectedProxyMode.Value); return; }
         if (!Uri.TryCreate(ProxyHost?.Trim(), UriKind.Absolute, out var proxyUri) || proxyUri.Scheme is not ("http" or "https") || ProxyPort is < 1 or > 65535)
         {
-            Status = "代理测试失败：请填写有效的 HTTP/HTTPS 地址和端口。";
-            toastService.Show("代理测试配置无效", ToastLevel.Warning);
+            Status = Loc("settings.proxy.test.invalid");
+            toastService.Show(Loc("settings.proxy.test.invalid.toast"), ToastLevel.Warning);
             logger.LogWarning("代理测试配置无效 {ProxyMode}", SelectedProxyMode.Value);
             return;
         }
 
         IsBusy = true;
-        Status = "正在测试代理连接…";
+        Status = Loc("settings.proxy.test.running");
         try
         {
             using var handler = new HttpClientHandler { Proxy = new WebProxy($"{proxyUri.Scheme}://{proxyUri.Host}:{ProxyPort}"), UseProxy = true };
             if (!string.IsNullOrWhiteSpace(ProxyUsername)) handler.Proxy.Credentials = new NetworkCredential(ProxyUsername, ProxyPassword);
             using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
             using var response = await client.GetAsync("https://www.example.com", HttpCompletionOption.ResponseHeadersRead);
-            Status = response.IsSuccessStatusCode ? $"代理连接正常 · {(int)response.StatusCode}" : $"代理已响应 · {(int)response.StatusCode}";
-            toastService.Show(response.IsSuccessStatusCode ? "代理连接测试成功" : "代理已响应，请检查配置", response.IsSuccessStatusCode ? ToastLevel.Success : ToastLevel.Warning);
-            logger.LogInformation("代理测试完成 {ProxyMode} {StatusCode}", SelectedProxyMode.Value, (int)response.StatusCode);
+            var statusCode = (int)response.StatusCode;
+            Status = response.IsSuccessStatusCode
+                ? string.Format(Loc("settings.proxy.test.success"), statusCode)
+                : string.Format(Loc("settings.proxy.test.response"), statusCode);
+            toastService.Show(
+                response.IsSuccessStatusCode ? Loc("settings.proxy.test.toast.success") : Loc("settings.proxy.test.toast.response"),
+                response.IsSuccessStatusCode ? ToastLevel.Success : ToastLevel.Warning);
+            logger.LogInformation("代理测试完成 {ProxyMode} {StatusCode}", SelectedProxyMode.Value, statusCode);
         }
-        catch (Exception exception) { Status = $"代理测试失败：{exception.Message}"; toastService.Show("代理连接测试失败", ToastLevel.Error); logger.LogWarning(exception, "代理测试失败 {ProxyMode}", SelectedProxyMode.Value); }
+        catch (Exception exception) { Status = string.Format(Loc("settings.proxy.test.exception"), exception.Message); toastService.Show(Loc("settings.proxy.test.toast.failed"), ToastLevel.Error); logger.LogWarning(exception, "代理测试失败 {ProxyMode}", SelectedProxyMode.Value); }
         finally { IsBusy = false; }
     }
 
@@ -254,14 +277,16 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     {
         if (IsBusy) return;
         IsBusy = true;
-        Status = "正在检查更新…";
+        Status = Loc("settings.update.check.status.running");
         try
         {
             var result = await updateCoordinator.CheckNowAsync(true);
             Status = result?.Latest is null
-                ? $"当前版本 {VersionLabel}，已是最新版本。"
-                : $"发现新版本 v{result.Latest.Version}，请查看右下角更新提示。";
-            toastService.Show(result?.Latest is null ? "已是最新版本" : $"发现新版本 v{result.Latest.Version}", result?.Latest is null ? ToastLevel.Info : ToastLevel.Success);
+                ? string.Format(Loc("settings.update.check.status.latest"), VersionLabel)
+                : string.Format(Loc("settings.update.check.status.found"), result.Latest.Version);
+            toastService.Show(
+                result?.Latest is null ? Loc("settings.update.check.toast.latest") : string.Format(Loc("settings.update.check.toast.found"), result.Latest.Version),
+                result?.Latest is null ? ToastLevel.Info : ToastLevel.Success);
         }
         finally { IsBusy = false; }
     }
@@ -272,10 +297,10 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         {
             AppDataPaths.EnsureCreated();
             Process.Start(new ProcessStartInfo { FileName = AppDataPaths.RootDirectory, UseShellExecute = true });
-            Status = "已打开本地数据目录。";
+            Status = Loc("settings.local.data.opened");
             logger.LogInformation("本地数据目录已打开");
         }
-        catch (Exception exception) { Status = $"打开数据目录失败：{exception.Message}"; logger.LogError(exception, "打开本地数据目录失败"); }
+        catch (Exception exception) { Status = string.Format(Loc("settings.local.data.open.failed"), exception.Message); logger.LogError(exception, "打开数据目录失败"); }
         return Task.CompletedTask;
     }
 
@@ -286,10 +311,10 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             AppDataPaths.EnsureCreated();
             var files = Directory.EnumerateFiles(AppDataPaths.LogDirectory, "*.log").ToArray();
             foreach (var file in files) File.Delete(file);
-            Status = files.Length == 0 ? "没有可清理的日志。" : $"已清理 {files.Length} 个日志文件。";
+            Status = files.Length == 0 ? Loc("settings.local.data.logs.empty") : string.Format(Loc("settings.local.data.logs.cleared"), files.Length);
             logger.LogInformation("日志清理完成 {FileCount}", files.Length);
         }
-        catch (Exception exception) { Status = $"清理日志失败：{exception.Message}"; logger.LogError(exception, "日志清理失败"); }
+        catch (Exception exception) { Status = string.Format(Loc("settings.local.data.logs.clear.failed"), exception.Message); logger.LogError(exception, "清理日志失败"); }
         return Task.CompletedTask;
     }
 
@@ -299,13 +324,19 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         {
             AppDataPaths.EnsureCreated();
             var path = Path.Combine(AppDataPaths.RootDirectory, $"diagnostics-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
-            var content = $"Loom-X 诊断摘要\n版本：{VersionLabel}\n系统：{Environment.OSVersion}\n数据目录：{AppDataPaths.RootDirectory}\n代理模式：{SelectedProxyMode.DisplayName}\n日志保留：{LogRetentionDays} 天\n";
+            var content = string.Format(
+                Loc("settings.local.data.export.content"),
+                VersionLabel,
+                Environment.OSVersion,
+                AppDataPaths.RootDirectory,
+                SelectedProxyMode.DisplayName,
+                LogRetentionDays);
             await File.WriteAllTextAsync(path, content);
             Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
-            Status = "诊断摘要已导出。";
+            Status = Loc("settings.local.data.export.done");
             logger.LogInformation("诊断摘要已导出");
         }
-        catch (Exception exception) { Status = $"导出诊断失败：{exception.Message}"; logger.LogError(exception, "诊断摘要导出失败"); }
+        catch (Exception exception) { Status = string.Format(Loc("settings.local.data.export.failed"), exception.Message); logger.LogError(exception, "诊断摘要导出失败"); }
     }
 
     private static SettingOption FindOption(IReadOnlyList<SettingOption> options, string? value, SettingOption fallback) => options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)) ?? fallback;
@@ -318,9 +349,15 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         else Dispatcher.UIThread.Post(() => _ = LoadAsync());
     }
 
+    private void OnCultureChanged(object? sender, CultureInfo culture)
+    {
+        OnPropertyChanged(nameof(ProxyStatus));
+    }
+
     public void Dispose()
     {
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
+        LocaleService.CultureChanged -= OnCultureChanged;
         autoSaveCancellation?.Cancel();
         autoSaveCancellation?.Dispose();
         if (ownsUpdateCoordinator) updateCoordinator.Dispose();

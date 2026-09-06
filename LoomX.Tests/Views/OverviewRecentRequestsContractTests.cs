@@ -43,7 +43,7 @@ public sealed class OverviewRecentRequestsContractTests
         Assert.Contains("ActivityQueryService", File.ReadAllText(Path.Combine(Path.GetDirectoryName(path)!, "..", "ViewModels", "MainWindowViewModel.cs")), StringComparison.Ordinal);
         Assert.Contains("new ActivityQuery(Limit: 8)", File.ReadAllText(Path.Combine(Path.GetDirectoryName(path)!, "..", "ViewModels", "MainWindowViewModel.cs")), StringComparison.Ordinal);
         Assert.Contains("RecentRequestsEmpty", File.ReadAllText(Path.Combine(Path.GetDirectoryName(path)!, "..", "ViewModels", "MainWindowViewModel.cs")), StringComparison.Ordinal);
-        Assert.Contains("Text=\"暂无请求活动\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale overview.recent.empty}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Status}\"", source, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"0\" Text=\"{Binding Endpoint}\"", source, StringComparison.Ordinal);
         Assert.Contains("Grid.Column=\"1\" Text=\"{Binding Model}\"", source, StringComparison.Ordinal);

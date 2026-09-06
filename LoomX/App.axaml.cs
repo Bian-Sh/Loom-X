@@ -2,10 +2,14 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Localization;
 using LoomX;
+using LoomX.Localization;
 using LoomX.Logging;
 using LoomX.Services;
 using LoomX.ViewModels;
@@ -114,7 +118,14 @@ public partial class App : Application
             var toastService = new ToastService();
             dataStore = new AppDataStore(configService, gatewayService, loggerFactory.CreateLogger<AppDataStore>());
             var mainWindow = new MainWindow(toastService, loggerFactory.CreateLogger<MainWindow>());
-            mainWindow.DataContext = new MainWindowViewModel(gatewayService, toastService, loggerFactory, configService, mainWindow.ApplyAppearance, dataStore);
+            mainWindow.DataContext = new MainWindowViewModel(
+                gatewayService,
+                toastService,
+                loggerFactory,
+                configService,
+                mainWindow.ApplyAppearance,
+                dataStore,
+                LocalizerFactory.Create<MainWindowViewModel>());
             desktop.MainWindow = mainWindow;
             desktop.Exit += async (_, _) =>
             {

@@ -1,0 +1,795 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- ============================================================ -->
+  <!-- Application startup / shell                                  -->
+  <!-- ============================================================ -->
+  <data name="app.loading.title">
+    <value>加载中</value>
+  </data>
+  <data name="app.loading.description">
+    <value>正在加载 Loom-X。</value>
+  </data>
+  <data name="app.loading.failed">
+    <value>加载失败</value>
+  </data>
+  <data name="app.loading.failed.description">
+    <value>数据中心加载失败：{0}，请通过页面刷新重试。</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Main navigation                                              -->
+  <!-- ============================================================ -->
+  <data name="nav.overview">
+    <value>概览</value>
+  </data>
+  <data name="nav.overview.description">
+    <value>确认本地服务健康，快速查看网关与模型配置。</value>
+  </data>
+  <data name="nav.gateway">
+    <value>网关</value>
+  </data>
+  <data name="nav.gateway.description">
+    <value>组合对外 Endpoint 的模型路由，并按优先级自动故障转移。</value>
+  </data>
+  <data name="nav.providers">
+    <value>Provider</value>
+  </data>
+  <data name="nav.providers.description">
+    <value>管理上游连接、请求协议、密钥与可用模型。</value>
+  </data>
+  <data name="nav.activity">
+    <value>活动</value>
+  </data>
+  <data name="nav.activity.title">
+    <value>请求活动</value>
+  </data>
+  <data name="nav.activity.description">
+    <value>定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。</value>
+  </data>
+  <data name="nav.console">
+    <value>控制台</value>
+  </data>
+  <data name="nav.console.description">
+    <value>查看本地网关、协议转换与上游请求的脱敏运行日志。</value>
+  </data>
+  <data name="nav.settings">
+    <value>设置</value>
+  </data>
+  <data name="nav.settings.description">
+    <value>调整 Loom-X 的显示、连接、更新与隐私偏好。</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - tab headers                                       -->
+  <!-- ============================================================ -->
+  <data name="settings.tab.general">
+    <value>通用</value>
+  </data>
+  <data name="settings.tab.proxy">
+    <value>代理</value>
+  </data>
+  <data name="settings.tab.updates">
+    <value>更新</value>
+  </data>
+  <data name="settings.tab.data">
+    <value>数据与隐私</value>
+  </data>
+  <data name="settings.tab.about">
+    <value>关于</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - General                                           -->
+  <!-- ============================================================ -->
+  <data name="settings.language.label">
+    <value>界面语言</value>
+  </data>
+  <data name="settings.language.hint">
+    <value>切换界面显示语言。</value>
+  </data>
+  <data name="settings.theme.label">
+    <value>主题</value>
+  </data>
+  <data name="settings.theme.hint">
+    <value>选择适合当前工作环境的配色。</value>
+  </data>
+  <data name="settings.transparency.label">
+    <value>透明窗口</value>
+  </data>
+  <data name="settings.transparency.hint">
+    <value>使用系统材质为窗口提供轻微的层次感。</value>
+  </data>
+  <data name="settings.opacity.label">
+    <value>透明程度</value>
+  </data>
+  <data name="settings.opacity.hint">
+    <value>数值越高，内容区域越不透明。</value>
+  </data>
+  <data name="settings.blur.label">
+    <value>磨砂程度</value>
+  </data>
+  <data name="settings.blur.hint">
+    <value>控制材质的系统模糊强度（0-64）。</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - Proxy                                             -->
+  <!-- ============================================================ -->
+  <data name="settings.proxy.mode.label">
+    <value>代理模式</value>
+  </data>
+  <data name="settings.proxy.mode.hint">
+    <value>控制上游请求如何通过代理访问网络。</value>
+  </data>
+  <data name="settings.proxy.host.label">
+    <value>代理地址</value>
+  </data>
+  <data name="settings.proxy.port.label">
+    <value>端口</value>
+  </data>
+  <data name="settings.proxy.username.label">
+    <value>用户名（可选）</value>
+  </data>
+  <data name="settings.proxy.password.label">
+    <value>密码（可选）</value>
+  </data>
+  <data name="settings.proxy.password.saved.hint">
+    <value>已有代理密码已保存，输入新密码后保存即可替换。</value>
+  </data>
+  <data name="settings.proxy.password.clear">
+    <value>清除已保存的代理密码</value>
+  </data>
+  <data name="settings.proxy.status.label">
+    <value>连接状态</value>
+  </data>
+  <data name="settings.proxy.test.button">
+    <value>测试连接</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - Updates                                           -->
+  <!-- ============================================================ -->
+  <data name="settings.update.version.label">
+    <value>当前版本</value>
+  </data>
+  <data name="settings.update.version.hint">
+    <value>本地桌面端版本信息。</value>
+  </data>
+  <data name="settings.update.auto.check">
+    <value>自动检查更新</value>
+  </data>
+  <data name="settings.update.auto.check.hint">
+    <value>启动后检查，并在应用运行期间每 24 小时检查一次；不会自动安装。</value>
+  </data>
+  <data name="settings.update.use.proxy">
+    <value>更新时使用代理</value>
+  </data>
+  <data name="settings.update.use.proxy.hint">
+    <value>默认跟随上方代理模式；关闭后更新请求直连。</value>
+  </data>
+  <data name="settings.update.check.button">
+    <value>检查更新</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - Data &amp; Privacy                                  -->
+  <!-- ============================================================ -->
+  <data name="settings.diagnostic.send">
+    <value>发送匿名诊断数据</value>
+  </data>
+  <data name="settings.diagnostic.send.hint">
+    <value>不包含 API key、请求正文或模型内容。</value>
+  </data>
+  <data name="settings.log.stacktrace">
+    <value>记录日志堆栈信息</value>
+  </data>
+  <data name="settings.log.stacktrace.hint">
+    <value>默认关闭；开启后便于定位异常，但日志会包含更完整的调用路径。</value>
+  </data>
+  <data name="settings.log.retention.label">
+    <value>日志保留周期</value>
+  </data>
+  <data name="settings.log.retention.hint">
+    <value>控制台日志会在周期结束后自动清理。</value>
+  </data>
+  <data name="settings.local.data">
+    <value>本地数据</value>
+  </data>
+  <data name="settings.local.data.path.label">
+    <value>数据目录：</value>
+  </data>
+  <data name="settings.local.data.open">
+    <value>打开数据目录</value>
+  </data>
+  <data name="settings.local.data.clear">
+    <value>清除日志</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - About                                             -->
+  <!-- ============================================================ -->
+  <data name="settings.about.description">
+    <value>Loom-X 为本地与云端 AI 服务提供统一接入层，支持基于 OpenAI、Anthropic、Ollama 三种Endpoint，让 IDE 与 GitHub Copilot 能接入你选择的模型。把模型选择权交还给开发者，让日常编码更自由、更高效，不再 Token 焦虑。</value>
+  </data>
+  <data name="settings.about.homepage">
+    <value>项目主页</value>
+  </data>
+  <data name="settings.about.issues">
+    <value>反馈问题</value>
+  </data>
+  <data name="settings.about.export.label">
+    <value>导出诊断信息</value>
+  </data>
+  <data name="settings.about.export.hint">
+    <value>生成不含密钥和请求正文的诊断摘要。</value>
+  </data>
+  <data name="settings.about.export.button">
+    <value>导出诊断</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - Status messages (SettingsViewModel)               -->
+  <!-- ============================================================ -->
+  <data name="settings.status.loading">
+    <value>正在加载设置…</value>
+  </data>
+  <data name="settings.status.loaded">
+    <value>设置已加载</value>
+  </data>
+  <data name="settings.status.load.failed">
+    <value>加载设置失败：{0}</value>
+  </data>
+  <data name="settings.status.saving">
+    <value>正在保存设置…</value>
+  </data>
+  <data name="settings.status.saved">
+    <value>设置已保存 · {0}</value>
+  </data>
+  <data name="settings.status.save.failed">
+    <value>保存设置失败：{0}</value>
+  </data>
+  <data name="settings.status.waiting">
+    <value>等待自动保存…</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - Proxy test                                        -->
+  <!-- ============================================================ -->
+  <data name="settings.proxy.test.direct.success">
+    <value>直连模式配置有效。</value>
+  </data>
+  <data name="settings.proxy.test.system.success">
+    <value>系统代理模式已选择，将跟随 Windows 设置。</value>
+  </data>
+  <data name="settings.proxy.test.invalid">
+    <value>代理测试失败：请填写有效的 HTTP/HTTPS 地址和端口。</value>
+  </data>
+  <data name="settings.proxy.test.invalid.toast">
+    <value>代理测试配置无效</value>
+  </data>
+  <data name="settings.proxy.test.running">
+    <value>正在测试代理连接…</value>
+  </data>
+  <data name="settings.proxy.test.success">
+    <value>代理连接正常 · {0}</value>
+  </data>
+  <data name="settings.proxy.test.response">
+    <value>代理已响应 · {0}</value>
+  </data>
+  <data name="settings.proxy.test.toast.success">
+    <value>代理连接测试成功</value>
+  </data>
+  <data name="settings.proxy.test.toast.response">
+    <value>代理已响应，请检查配置</value>
+  </data>
+  <data name="settings.proxy.test.toast.failed">
+    <value>代理连接测试失败</value>
+  </data>
+  <data name="settings.proxy.test.exception">
+    <value>代理测试失败：{0}</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - Update messages                                   -->
+  <!-- ============================================================ -->
+  <data name="settings.update.check.status.running">
+    <value>正在检查更新…</value>
+  </data>
+  <data name="settings.update.check.status.latest">
+    <value>当前版本 {0}，已是最新版本。</value>
+  </data>
+  <data name="settings.update.check.status.found">
+    <value>发现新版本 v{0}，请查看右下角更新提示。</value>
+  </data>
+  <data name="settings.update.check.toast.latest">
+    <value>已是最新版本</value>
+  </data>
+  <data name="settings.update.check.toast.found">
+    <value>发现新版本 v{0}</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - Data/log operations                               -->
+  <!-- ============================================================ -->
+  <data name="settings.local.data.opened">
+    <value>已打开本地数据目录。</value>
+  </data>
+  <data name="settings.local.data.open.failed">
+    <value>打开数据目录失败：{0}</value>
+  </data>
+  <data name="settings.local.data.logs.empty">
+    <value>没有可清理的日志。</value>
+  </data>
+  <data name="settings.local.data.logs.cleared">
+    <value>已清理 {0} 个日志文件。</value>
+  </data>
+  <data name="settings.local.data.logs.clear.failed">
+    <value>清理日志失败：{0}</value>
+  </data>
+  <data name="settings.local.data.export.done">
+    <value>诊断摘要已导出。</value>
+  </data>
+  <data name="settings.local.data.export.failed">
+    <value>导出诊断失败：{0}</value>
+  </data>
+
+  <data name="settings.local.data.export.content" xml:space="preserve">
+    <value>Loom-X 诊断摘要
+版本：{0}
+系统：{1}
+数据目录：{2}
+代理模式：{3}
+日志保留：{4} 天</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Settings - Option display names                              -->
+  <!-- ============================================================ -->
+  <data name="settings.option.language.zh-CN">
+    <value>简体中文</value>
+  </data>
+  <data name="settings.option.language.en-US">
+    <value>English</value>
+  </data>
+  <data name="settings.option.language.ja-JP">
+    <value>日本語</value>
+  </data>
+  <data name="settings.option.theme.system">
+    <value>跟随系统</value>
+  </data>
+  <data name="settings.option.theme.dark">
+    <value>深色</value>
+  </data>
+  <data name="settings.option.theme.light">
+    <value>浅色</value>
+  </data>
+  <data name="settings.option.proxy.direct">
+    <value>直连</value>
+  </data>
+  <data name="settings.option.proxy.system">
+    <value>系统代理</value>
+  </data>
+  <data name="settings.option.proxy.custom">
+    <value>自定义代理</value>
+  </data>
+  <data name="settings.option.retention.7">
+    <value>7 天</value>
+  </data>
+  <data name="settings.option.retention.30">
+    <value>30 天</value>
+  </data>
+  <data name="settings.option.retention.90">
+    <value>90 天</value>
+  </data>
+  <data name="settings.option.retention.365">
+    <value>365 天</value>
+  </data>
+  <data name="settings.option.retention.3650">
+    <value>永久保留</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Window chrome                                                -->
+  <!-- ============================================================ -->
+  <data name="window.minimize">
+    <value>最小化</value>
+  </data>
+  <data name="window.maximize">
+    <value>最大化或还原</value>
+  </data>
+  <data name="window.close">
+    <value>关闭</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Sidebar                                                      -->
+  <!-- ============================================================ -->
+  <data name="sidebar.service">
+    <value>本地服务</value>
+  </data>
+  <data name="sidebar.version">
+    <value>服务版本</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Update card                                                  -->
+  <!-- ============================================================ -->
+  <data name="update.card.title">
+    <value>发现新版本</value>
+  </data>
+  <data name="update.card.release.notes">
+    <value>更新日志</value>
+  </data>
+  <data name="update.card.later">
+    <value>稍后</value>
+  </data>
+  <data name="update.card.download">
+    <value>立即下载</value>
+  </data>
+  <data name="update.card.later.tip">
+    <value>稍后处理</value>
+  </data>
+  <data name="update.card.close">
+    <value>关闭</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Overview - View strings                                      -->
+  <!-- ============================================================ -->
+  <data name="overview.graph.hint">
+    <value>滚轮缩放 · 拖动平移</value>
+  </data>
+  <data name="overview.endpoint.focus.tip">
+    <value>聚焦 Endpoint</value>
+  </data>
+  <data name="overview.graph.fit.tooltip">
+    <value>适应画布</value>
+  </data>
+  <data name="overview.gateway.label">
+    <value>本地网关</value>
+  </data>
+  <data name="overview.gateway.endpoint.label">
+    <value>监听地址</value>
+  </data>
+  <data name="overview.gateway.version.label">
+    <value>接口状态</value>
+  </data>
+  <data name="overview.gateway.lastchecked.label">
+    <value>最后检查</value>
+  </data>
+  <data name="overview.refresh.button">
+    <value>刷新</value>
+  </data>
+  <data name="overview.recent.label">
+    <value>最近请求</value>
+  </data>
+  <data name="overview.recent.count">
+    <value>最近 {0} 条</value>
+  </data>
+  <data name="overview.recent.empty">
+    <value>暂无请求活动</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Overview - Status values (OverviewViewModel)                 -->
+  <!-- ============================================================ -->
+  <data name="overview.gateway.status.not_running">
+    <value>未运行</value>
+  </data>
+  <data name="overview.gateway.status.running">
+    <value>运行中</value>
+  </data>
+  <data name="overview.gateway.status.starting">
+    <value>启动中</value>
+  </data>
+  <data name="overview.gateway.status.stopping">
+    <value>停止中</value>
+  </data>
+  <data name="overview.gateway.status.failed">
+    <value>异常：{0}</value>
+  </data>
+  <data name="overview.endpoint.unconfigured">
+    <value>未配置</value>
+  </data>
+  <data name="overview.version.unknown">
+    <value>未知</value>
+  </data>
+  <data name="overview.version.online">
+    <value>Loom-X API 在线</value>
+  </data>
+  <data name="overview.version.disconnected">
+    <value>未连接</value>
+  </data>
+  <data name="overview.lastchecked.none">
+    <value>尚未检查</value>
+  </data>
+  <data name="overview.graph.waiting">
+    <value>等待网关启动</value>
+  </data>
+  <data name="overview.graph.connected">
+    <value>实时拓扑已连接</value>
+  </data>
+  <data name="overview.graph.failed">
+    <value>概览加载失败</value>
+  </data>
+  <data name="overview.gateway.action.start">
+    <value>启动网关</value>
+  </data>
+  <data name="overview.gateway.action.stop">
+    <value>停止网关</value>
+  </data>
+  <data name="overview.gateway.action.starting">
+    <value>启动中</value>
+  </data>
+  <data name="overview.gateway.action.stopping">
+    <value>停止中</value>
+  </data>
+  <data name="overview.request.status.success">
+    <value>成功</value>
+  </data>
+  <data name="overview.request.status.failed">
+    <value>失败</value>
+  </data>
+  <data name="overview.request.model.unknown">
+    <value>未知模型</value>
+  </data>
+  <data name="overview.endpoint.status.disabled">
+    <value>已停用</value>
+  </data>
+  <data name="overview.endpoint.status.no_routes">
+    <value>无路由</value>
+  </data>
+  <data name="overview.endpoint.status.active">
+    <value>有请求</value>
+  </data>
+  <data name="overview.endpoint.status.ready">
+    <value>已就绪</value>
+  </data>
+  <data name="overview.route.status.active">
+    <value>活跃</value>
+  </data>
+  <data name="overview.route.status.idle">
+    <value>待命</value>
+  </data>
+
+  <data name="overview.lateness.dash">
+    <value>—</value>
+  </data>
+  <data name="overview.latency.format">
+    <value>{0} ms</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Activity - View strings                                      -->
+  <!-- ============================================================ -->
+  <data name="activity.stat.requestcount.label">
+    <value>请求数</value>
+  </data>
+  <data name="activity.stat.requestcount.sub">
+    <value>当前筛选结果</value>
+  </data>
+  <data name="activity.stat.conversion.label">
+    <value>协议转换</value>
+  </data>
+  <data name="activity.stat.conversion.sub">
+    <value>OpenAI → Anthropic</value>
+  </data>
+  <data name="activity.stat.failures.label">
+    <value>失败请求</value>
+  </data>
+  <data name="activity.stat.failures.sub">
+    <value>HTTP 5xx</value>
+  </data>
+  <data name="activity.stat.p95.label">
+    <value>P95 延迟</value>
+  </data>
+  <data name="activity.stat.p95.sub">
+    <value>最近活动</value>
+  </data>
+  <data name="activity.search.placeholder">
+    <value>搜索模型、Provider 或 request ID</value>
+  </data>
+  <data name="activity.column.time">
+    <value>时间 / request ID</value>
+  </data>
+  <data name="activity.column.model">
+    <value>模型 / Provider</value>
+  </data>
+  <data name="activity.column.route">
+    <value>入口与转换路径</value>
+  </data>
+  <data name="activity.column.status">
+    <value>状态</value>
+  </data>
+  <data name="activity.column.latency">
+    <value>延迟</value>
+  </data>
+  <data name="activity.detail.title">
+    <value>SELECTED REQUEST</value>
+  </data>
+  <data name="activity.detail.fallback.model">
+    <value>暂无选中请求</value>
+  </data>
+  <data name="activity.detail.fallback.requestid">
+    <value>选择左侧请求查看详情</value>
+  </data>
+  <data name="activity.detail.copy.requestid">
+    <value>复制 request ID</value>
+  </data>
+  <data name="activity.detail.field.protocol">
+    <value>入口协议</value>
+  </data>
+  <data name="activity.detail.field.route">
+    <value>转换路径</value>
+  </data>
+  <data name="activity.detail.field.upstream">
+    <value>上游响应</value>
+  </data>
+  <data name="activity.detail.field.size">
+    <value>响应大小</value>
+  </data>
+  <data name="activity.detail.field.error">
+    <value>错误分类</value>
+  </data>
+  <data name="activity.detail.summary.label">
+    <value>脱敏诊断摘要</value>
+  </data>
+  <data name="activity.detail.summary.fallback">
+    <value>暂无诊断摘要</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Activity - VM strings (ActivityViewModel + ActivityItemViewModel) -->
+  <!-- ============================================================ -->
+  <data name="activity.filter.status.all">
+    <value>全部状态</value>
+  </data>
+  <data name="activity.filter.status.success">
+    <value>成功</value>
+  </data>
+  <data name="activity.filter.status.failed">
+    <value>失败</value>
+  </data>
+  <data name="activity.filter.status.warning">
+    <value>警告</value>
+  </data>
+  <data name="activity.filter.protocol.all">
+    <value>全部入口协议</value>
+  </data>
+  <data name="activity.status.loading">
+    <value>正在加载活动…</value>
+  </data>
+  <data name="activity.status.empty">
+    <value>暂无请求活动</value>
+  </data>
+  <data name="activity.status.loaded">
+    <value>已加载 {0} 条活动</value>
+  </data>
+  <data name="activity.status.load.failed">
+    <value>活动加载失败：{0}</value>
+  </data>
+  <data name="activity.status.history.more">
+    <value>已加载 {0} 条活动，可继续查看历史</value>
+  </data>
+  <data name="activity.status.history.end">
+    <value>已加载 {0} 条活动，已到历史末尾</value>
+  </data>
+  <data name="activity.status.history.failed">
+    <value>历史活动加载失败：{0}</value>
+  </data>
+  <data name="activity.status.returned">
+    <value>已回到最新活动</value>
+  </data>
+  <data name="activity.status.return.failed">
+    <value>返回最新活动失败：{0}</value>
+  </data>
+  <data name="activity.result.count">
+    <value>显示 {0} 条活动</value>
+  </data>
+  <data name="activity.pending.count">
+    <value>有 {0} 条新活动，回到最新</value>
+  </data>
+  <data name="activity.pending.back">
+    <value>回到最新</value>
+  </data>
+  <data name="activity.loadmore.loading">
+    <value>正在加载历史活动…</value>
+  </data>
+  <data name="activity.loadmore.continue">
+    <value>继续上拉加载更早活动</value>
+  </data>
+  <data name="activity.loadmore.end">
+    <value>已到活动历史末尾</value>
+  </data>
+  <data name="activity.item.model.unknown">
+    <value>未识别模型</value>
+  </data>
+  <data name="activity.item.provider.unknown">
+    <value>未匹配 Provider</value>
+  </data>
+  <data name="activity.latency.format">
+    <value>{0} ms</value>
+  </data>
+  <data name="activity.bytes.format">
+    <value>{0:N0} B</value>
+  </data>
+  <data name="activity.dash">
+    <value>—</value>
+  </data>
+
+  <!-- ============================================================ -->
+  <!-- Console - View strings                                       -->
+  <!-- ============================================================ -->
+  <data name="console.search.placeholder">
+    <value>搜索 request ID、模型或错误信息</value>
+  </data>
+  <data name="console.toggle.info">
+    <value>普通日志</value>
+  </data>
+  <data name="console.toggle.warning">
+    <value>警告日志</value>
+  </data>
+  <data name="console.toggle.error">
+    <value>错误日志</value>
+  </data>
+  <data name="console.copy.tip">
+    <value>复制日志</value>
+  </data>
+  <data name="console.empty">
+    <value>没有匹配当前筛选条件的日志。</value>
+  </data>
+  <data name="console.jump.tip">
+    <value>跳转到底部</value>
+  </data>
+  <data name="console.clear">
+    <value>清空</value>
+  </data>
+  <data name="console.count.format">
+    <value>共 {0} 条</value>
+  </data>
+  <data name="console.copied">
+    <value>日志已复制</value>
+  </data>
+</root>
