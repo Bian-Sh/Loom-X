@@ -20,6 +20,15 @@ internal static class OpenAiResponsesBridge
         MoveProperty(responsesRequest, "max_completion_tokens", "max_output_tokens");
         responsesRequest.Remove("stream_options");
 
+        if (responsesRequest["reasoning_effort"] is JsonValue reasoningEffort
+            && reasoningEffort.TryGetValue<string>(out var effort)
+            && !string.IsNullOrWhiteSpace(effort))
+        {
+            if (responsesRequest["reasoning"] is null)
+                responsesRequest["reasoning"] = new JsonObject { ["effort"] = effort };
+            responsesRequest.Remove("reasoning_effort");
+        }
+
         if (hasMessages && responsesRequest["input"] is JsonArray input)
         {
             responsesRequest["input"] = ConvertInput(input);

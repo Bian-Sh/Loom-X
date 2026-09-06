@@ -4,16 +4,19 @@
     <Style Selector="Border.panel"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/></Style>
     <Style Selector="ListBox.provider-list"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderThickness" Value="0"/></Style>
     <Style Selector="ListBox.provider-list ListBoxItem"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,1"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem:selected"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:selected"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="3,0,0,0"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:selected:pointerover"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/></Style>
+    <Style Selector="ListBox.provider-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
     <Style Selector="ListBox.model-list"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderThickness" Value="0"/></Style>
     <Style Selector="ListBox.model-list ListBoxItem"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,1"/></Style>
     <Style Selector="ListBox.model-list ListBoxItem:selected"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/></Style>
     <Style Selector="Border.model-cell"><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="10,8"/></Style>
     <Style Selector="Border.model-cell.dragging"><Setter Property="Opacity" Value="0.45"/></Style>
     <Style Selector="Border.model-drag-handle"><Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Cursor" Value="SizeAll"/></Style>
-    <Style Selector="Border.model-drag-placeholder"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="0,1,0,1"/><Setter Property="Padding" Value="10,8"/><Setter Property="Opacity" Value="0.8"/></Style>
-    <Style Selector="Border.model-drag-preview"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="6"/><Setter Property="Padding" Value="10,8"/><Setter Property="Opacity" Value="0.98"/></Style>
-    <Style Selector="Ellipse.model-drag-dot"><Setter Property="Width" Value="3"/><Setter Property="Height" Value="3"/><Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+    <Style Selector="Path.model-drag-glyph"><Setter Property="StrokeThickness" Value="1"/></Style>
+    <Style Selector="Border.model-drag-placeholder"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="10,8"/><Setter Property="Opacity" Value="0.8"/></Style>
+    <Style Selector="Border.model-drag-preview"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="10,8"/><Setter Property="Opacity" Value="0.98"/></Style>
     <Style Selector="Border.stat"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="16,14"/></Style>
     <Style Selector="Button.icon-button"><Setter Property="Width" Value="36"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/><Setter Property="CornerRadius" Value="10"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
     <Style Selector="Button.small-button"><Setter Property="Padding" Value="11,7"/><Setter Property="MinHeight" Value="34"/></Style>
@@ -39,31 +42,33 @@
           <Grid RowDefinitions="Auto,Auto,*">
             <Border Padding="14,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
               <Grid ColumnDefinitions="*,Auto">
-                <StackPanel Spacing="2"><TextBlock Text="Provider 目录" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="按当前路由顺序显示" Classes="muted"/></StackPanel>
+                <StackPanel Spacing="2"><TextBlock Text="供应商列表" FontSize="15" FontWeight="SemiBold"/><TextBlock Text="按当前路由顺序显示" Classes="muted"/></StackPanel>
                 <Button Grid.Column="1" Command="{Binding NewProviderCommand}" Classes="icon-button" AutomationProperties.Name="新增 Provider"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z" Width="16" Height="16"/></Button>
               </Grid>
             </Border>
             <Border Grid.Row="1" Padding="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-              <TextBox Watermark="搜索 Provider"/>
+              <TextBox Text="{Binding ProviderSearchQuery, UpdateSourceTrigger=PropertyChanged}" Watermark="搜索 Provider"/>
             </Border>
-            <ListBox Grid.Row="2" Classes="provider-list" ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox Grid.Row="2" Classes="provider-list" ItemsSource="{Binding FilteredProviders}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate>
                 <DataTemplate>
-                  <Border Padding="14,12" Background="Transparent" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
-                    <Grid RowDefinitions="Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
-                      <StackPanel Orientation="Horizontal" Spacing="9">
-                        <Border Width="30" Height="30" Background="{DynamicResource AccentSoftBrush}" CornerRadius="9"><TextBlock Text="P" Foreground="{DynamicResource AccentBrush}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                        <StackPanel VerticalAlignment="Center" Spacing="1"><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><Ellipse Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" IsVisible="{Binding Enabled}"/></StackPanel></StackPanel>
-                      </StackPanel>
-                      <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="启用 Provider" AutomationProperties.Name="启用 Provider" VerticalAlignment="Center"/>
-                      <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding BaseUrl}" Classes="muted" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="39,7,0,0"/>
-                      <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="9" Margin="39,5,0,0">
-                        <TextBlock Text="{Binding ApiMode}" Classes="muted"/>
-                        <TextBlock Text="{Binding Models.Count, StringFormat='{}{0} 个模型'}" Classes="muted"/>
-                        <TextBlock Text="密钥已配置" Foreground="{DynamicResource SuccessBrush}" FontSize="10" IsVisible="{Binding HasApiKey}"/>
-                      </StackPanel>
-                      <Button Grid.Row="3" Grid.Column="1" Classes="icon-button" Click="DeleteProviderButton_OnClick" ToolTip.Tip="删除 Provider" AutomationProperties.Name="删除 Provider" HorizontalAlignment="Right" VerticalAlignment="Center"><PathIcon Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23" Width="14" Height="14"/></Button>
-                    </Grid>
+                  <Border Padding="10,8" Background="Transparent" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
+                    <Panel>
+                      <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                          <Ellipse Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" ToolTip.Tip="绿色表示已启用" IsVisible="{Binding Enabled}"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="启用 Provider" AutomationProperties.Name="启用 Provider" VerticalAlignment="Center"><ToggleSwitch.RenderTransform><TranslateTransform X="12"/></ToggleSwitch.RenderTransform></ToggleSwitch>
+                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding BaseUrl}" Classes="muted" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,5,0,0"/>
+                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="9" Margin="0,4,42,0">
+                          <TextBlock Text="{Binding ApiMode}" Classes="muted"/>
+                          <TextBlock Text="{Binding Models.Count, StringFormat='{}{0} 个模型'}" Classes="muted"/>
+                          <TextBlock Text="密钥已配置" Foreground="{DynamicResource SuccessBrush}" FontSize="10" IsVisible="{Binding HasApiKey}"/>
+                        </StackPanel>
+                      </Grid>
+                      <Button Classes="icon-button" Width="36" Click="DeleteProviderButton_OnClick" ToolTip.Tip="删除 Provider" AutomationProperties.Name="删除 Provider" HorizontalAlignment="Right" VerticalAlignment="Bottom"><Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="14" Height="14"/></Button>
+                    </Panel>
                   </Border>
                 </DataTemplate>
               </ListBox.ItemTemplate>
@@ -131,34 +136,39 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                       <StackPanel Spacing="12" Margin="0,16,0,18">
                         <StackPanel Spacing="4"><TextBlock Text="模型列表 URL（可选）" FontWeight="SemiBold"/><TextBox Text="{Binding SelectedProvider.ModelListUrl}" Watermark="例如：https://api.example.com/v1/models"/><TextBlock Text="留空时根据 Base URL 自动推导；填写后仅用此地址刷新模型，不影响聊天请求。" Classes="muted" TextWrapping="Wrap"/></StackPanel>
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Watermark="搜索模型"/><Button Grid.Column="1" Command="{Binding SyncModelsCommand}" Classes="small-button" AutomationProperties.Name="同步模型"><StackPanel Orientation="Horizontal" Spacing="6"><Path Classes="icon-glyph" Data="M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6" Width="12" Height="12" RenderTransformOrigin="50%,50%"><Path.RenderTransform><RotateTransform Angle="{Binding SyncIconAngle}"/></Path.RenderTransform></Path><TextBlock Text="同步模型" VerticalAlignment="Center"/></StackPanel></Button></Grid>
+                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding ModelSearchQuery, UpdateSourceTrigger=PropertyChanged}" Watermark="搜索模型"/><Button Grid.Column="1" Command="{Binding SyncModelsCommand}" Classes="small-button" AutomationProperties.Name="同步模型"><StackPanel Orientation="Horizontal" Spacing="6"><Path Classes="icon-glyph" Data="M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6" Width="12" Height="12" RenderTransformOrigin="50%,50%"><Path.RenderTransform><RotateTransform Angle="{Binding SyncIconAngle}"/></Path.RenderTransform></Path><TextBlock Text="同步模型" VerticalAlignment="Center"/></StackPanel></Button></Grid>
                         <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
                           <Grid>
                             <Grid RowDefinitions="Auto,*">
-                              <Border Background="{DynamicResource SurfaceSubtleBrush}" Padding="10,7" IsVisible="{Binding SelectedProvider.HasModels}">
-                                <Grid ColumnDefinitions="30,38,*" ColumnSpacing="5">
-                                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding AllModelsEnabled, Mode=OneWay}" Command="{Binding ToggleAllModelsCommand}" OnContent="" OffContent="" ToolTip.Tip="启用或停用全部模型" AutomationProperties.Name="启用或停用全部模型" VerticalAlignment="Center"/>
+                              <Border Background="{DynamicResource SurfaceSubtleBrush}" Padding="10,7" IsVisible="{Binding HasFilteredModels}">
+                                <Grid ColumnDefinitions="30,46,*" ColumnSpacing="5">
+                                  <ToggleSwitch Grid.Column="1" Width="40" IsChecked="{Binding AllModelsEnabled, Mode=OneWay}" Command="{Binding ToggleAllModelsCommand}" OnContent="" OffContent="" ToolTip.Tip="启用或停用全部模型" AutomationProperties.Name="启用或停用全部模型" VerticalAlignment="Center"/>
                                   <TextBlock Grid.Column="2" Text="{Binding EnabledModelSummary}" Classes="muted" VerticalAlignment="Center"/>
                                 </Grid>
                               </Border>
-                              <ListBox x:Name="modelList" Grid.Row="1" Classes="model-list" ItemsSource="{Binding SelectedProvider.Models}" MinHeight="110">
+                              <ListBox x:Name="modelList" Grid.Row="1" Classes="model-list" ItemsSource="{Binding FilteredModels}" MinHeight="110">
                                 <ListBox.ItemTemplate>
                                   <DataTemplate>
                                     <Panel>
-                                      <Border Classes="model-drag-placeholder" IsVisible="{Binding IsPlaceholder}"><Grid Height="40"/></Border>
+                                      <Border Classes="model-drag-placeholder" IsVisible="{Binding IsPlaceholder}"><Grid Height="28"/></Border>
+                                      <!-- 图标几何复制自 LiveAgent IconSet.tsx 使用的 lucide grip-vertical、image、trash-2。 -->
                                       <Border Classes="model-cell" Classes.dragging="{Binding IsDragging}" IsVisible="{Binding IsRealModel}" Tag="{Binding}">
-                                        <Grid ColumnDefinitions="30,38,*,Auto,40" ColumnSpacing="5">
-                                          <Border Classes="model-drag-handle" Grid.Column="0" Tag="{Binding}" PointerPressed="ModelHandle_OnPointerPressed" ToolTip.Tip="拖动调整模型顺序" AutomationProperties.Name="拖动调整模型顺序" Background="Transparent"><Grid Width="12" Height="20" RowDefinitions="*,*,*" ColumnDefinitions="*,*"><Ellipse Classes="model-drag-dot" Grid.Row="0" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="0" Grid.Column="1"/><Ellipse Classes="model-drag-dot" Grid.Row="1" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="1" Grid.Column="1"/><Ellipse Classes="model-drag-dot" Grid.Row="2" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="2" Grid.Column="1"/></Grid></Border>
-                                          <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="控制模型是否暴露给下游" AutomationProperties.Name="启用模型" VerticalAlignment="Center"/>
+                                        <Grid ColumnDefinitions="30,46,*,Auto,42" ColumnSpacing="5">
+                                          <Border Classes="model-drag-handle" Grid.Column="0" Tag="{Binding}" PointerPressed="ModelHandle_OnPointerPressed" ToolTip.Tip="拖动调整模型顺序" AutomationProperties.Name="拖动调整模型顺序" Background="Transparent"><Viewbox Width="16" Height="16" Stretch="Uniform"><Path Classes="icon-glyph model-drag-glyph" Data="M 10,5 A 1,1 0 1 1 8,5 A 1,1 0 1 1 10,5 M 10,12 A 1,1 0 1 1 8,12 A 1,1 0 1 1 10,12 M 10,19 A 1,1 0 1 1 8,19 A 1,1 0 1 1 10,19 M 16,5 A 1,1 0 1 1 14,5 A 1,1 0 1 1 16,5 M 16,12 A 1,1 0 1 1 14,12 A 1,1 0 1 1 16,12 M 16,19 A 1,1 0 1 1 14,19 A 1,1 0 1 1 16,19" Width="24" Height="24" Stretch="None"/></Viewbox></Border>
+                                          <ToggleSwitch Grid.Column="1" Width="40" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="控制模型是否暴露给下游" AutomationProperties.Name="启用模型" VerticalAlignment="Center"/>
                                           <TextBlock Grid.Column="2" Text="{Binding ModelId}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
-                                            <Path Classes="icon-glyph" Data="M 3,5 L 21,5 L 21,19 L 3,19 Z M 6,8 L 9,11 L 12,8 L 16,13 L 19,10" Width="14" Height="14" IsVisible="{Binding RemoteVision}" ToolTip.Tip="支持图片输入"/>
-                                            <TextBlock Text="{Binding ContextDisplay}" Classes="muted" FontSize="11"/>
-                                            <TextBlock Text=" ctx · " Classes="muted" FontSize="11"/>
-                                            <TextBlock Text="{Binding MaxTokensDisplay}" Classes="muted" FontSize="11"/>
-                                            <TextBlock Text=" out" Classes="muted" FontSize="11"/>
+                                          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <Path Classes="icon-glyph" Data="M 3,3 H 21 A 2,2 0 0 1 23,5 V 19 A 2,2 0 0 1 21,21 H 3 A 2,2 0 0 1 1,19 V 5 A 2,2 0 0 1 3,3 Z M 9,7 A 2,2 0 1 0 9,11 A 2,2 0 1 0 9,7 Z M 21,15 L 17.914,11.914 A 2,2 0 0 0 15.086,11.914 L 6,21" Width="14" Height="14" IsVisible="{Binding RemoteVision}" ToolTip.Tip="支持图片输入"/>
+                                            <Border ToolTip.Tip="{Binding MetadataToolTip}" HorizontalAlignment="Right">
+                                              <StackPanel Orientation="Horizontal" Spacing="0" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding ContextDisplay}" Classes="muted" FontSize="11" TextAlignment="Right"/>
+                                                <TextBlock Text=" ctx · " Classes="muted" FontSize="11" TextAlignment="Right"/>
+                                                <TextBlock Text="{Binding MaxTokensDisplay}" Classes="muted" FontSize="11" TextAlignment="Right"/>
+                                                <TextBlock Text=" out" Classes="muted" FontSize="11" TextAlignment="Right"/>
+                                              </StackPanel>
+                                            </Border>
                                           </StackPanel>
-                                          <Button Grid.Column="4" Classes="icon-button" Command="{Binding $parent[UserControl].DataContext.DeleteModelCommand}" CommandParameter="{Binding}" ToolTip.Tip="删除模型" AutomationProperties.Name="删除模型"><Path Classes="icon-glyph" Data="M 10,8 L 22,8 L 21,27 L 11,27 Z M 8,6 L 24,6 L 24,8 L 8,8 Z M 13,3 L 19,3 L 20,6 L 12,6 Z M 13,11 L 13,23 M 19,11 L 19,23" Width="14" Height="14"/></Button>
+                                          <Button Grid.Column="4" Classes="icon-button" Width="36" Command="{Binding $parent[UserControl].DataContext.DeleteModelCommand}" CommandParameter="{Binding}" ToolTip.Tip="删除模型" AutomationProperties.Name="删除模型"><Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="14" Height="14"/></Button>
                                         </Grid>
                                       </Border>
                                     </Panel>
@@ -167,13 +177,14 @@
                               </ListBox>
                             </Grid>
                             <Border x:Name="modelDragPreview" Classes="model-drag-preview" IsVisible="{Binding SelectedProvider.IsModelDragPreviewOwner}" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Top">
-                              <Grid ColumnDefinitions="30,38,*,Auto,40" ColumnSpacing="5">
-                                <Grid Grid.Column="0" Width="12" Height="20" RowDefinitions="*,*,*" ColumnDefinitions="*,*"><Ellipse Classes="model-drag-dot" Grid.Row="0" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="0" Grid.Column="1"/><Ellipse Classes="model-drag-dot" Grid.Row="1" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="1" Grid.Column="1"/><Ellipse Classes="model-drag-dot" Grid.Row="2" Grid.Column="0"/><Ellipse Classes="model-drag-dot" Grid.Row="2" Grid.Column="1"/></Grid>
-                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding DraggingModel.Enabled, Mode=OneWay}" OnContent="" OffContent="" IsHitTestVisible="False" VerticalAlignment="Center"/>
+                              <Grid Height="28" ColumnDefinitions="30,46,*,Auto,42" ColumnSpacing="5">
+                                <Viewbox Grid.Column="0" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center"><Path Classes="icon-glyph model-drag-glyph" Data="M 10,5 A 1,1 0 1 1 8,5 A 1,1 0 1 1 10,5 M 10,12 A 1,1 0 1 1 8,12 A 1,1 0 1 1 10,12 M 10,19 A 1,1 0 1 1 8,19 A 1,1 0 1 1 10,19 M 16,5 A 1,1 0 1 1 14,5 A 1,1 0 1 1 16,5 M 16,12 A 1,1 0 1 1 14,12 A 1,1 0 1 1 16,12 M 16,19 A 1,1 0 1 1 14,19 A 1,1 0 1 1 16,19" Width="24" Height="24" Stretch="None"/></Viewbox>
+                                <ToggleSwitch Grid.Column="1" Width="40" IsChecked="{Binding DraggingModel.Enabled, Mode=OneWay}" OnContent="" OffContent="" IsHitTestVisible="False" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="2" Text="{Binding DraggingModel.ModelId}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                                 <TextBlock Grid.Column="3" Text="拖动中" Foreground="{DynamicResource AccentBrush}" FontSize="11" VerticalAlignment="Center"/>
                               </Grid>
                             </Border>
+                            <TextBlock Grid.Row="1" Text="没有匹配的模型" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding HasNoFilteredModels}"/>
                           </Grid>
                         </Border>
                       </StackPanel>

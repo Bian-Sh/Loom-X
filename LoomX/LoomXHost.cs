@@ -93,6 +93,8 @@ public static class LoomXHost
         adminApi.MapDelete("/models/{id:guid}", async (Guid id, ConfigurationManagementService service, CancellationToken cancellationToken) => { await service.DeleteModelAsync(id, cancellationToken); return Results.NoContent(); });
         adminApi.MapGet("/gateway", (ConfigurationManagementService service, CancellationToken cancellationToken) => service.ListGatewayEndpointsAsync(cancellationToken));
         adminApi.MapPut("/gateway/{key}/enabled", async (string key, GatewayEndpointToggleInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.SetGatewayEndpointEnabledAsync(key, input.Enabled, cancellationToken)));
+        adminApi.MapPost("/gateway/{key}/api-key/rotate", async (string key, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.RotateGatewayApiKeyAsync(key, cancellationToken)));
+        adminApi.MapPut("/gateway/{key}/reasoning-effort", async (string key, GatewayEndpointReasoningInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.UpdateGatewayEndpointReasoningEffortAsync(key, input.ReasoningEffort, cancellationToken)));
         adminApi.MapPost("/gateway/{key}/combos", async (string key, GatewayComboInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.CreateGatewayComboAsync(key, input, cancellationToken)));
         adminApi.MapPut("/gateway/combos/{id:guid}", async (Guid id, GatewayComboInput input, ConfigurationManagementService service, CancellationToken cancellationToken) => Results.Ok(await service.UpdateGatewayComboAsync(id, input, cancellationToken)));
         adminApi.MapDelete("/gateway/combos/{id:guid}", async (Guid id, ConfigurationManagementService service, CancellationToken cancellationToken) => { await service.DeleteGatewayComboAsync(id, cancellationToken); return Results.NoContent(); });
@@ -128,8 +130,8 @@ public static class LoomXHost
         app.MapPost("/azure/v1/responses", HandleResponsesAsync);
         app.MapPost("/api/chat", HandleResponsesAsync);
         app.MapGet("/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "ollama")));
-        app.MapGet("/openai/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "openai")));
-        app.MapGet("/azure/v1/models", (IDatabaseConfigurationProvider provider) => Results.Ok(ListGatewayModels(provider, "azure")));
+        app.MapGet("/openai/v1/models", (HttpContext context, IDatabaseConfigurationProvider provider) => ListGatewayModelsResult(context, provider, "openai"));
+        app.MapGet("/azure/v1/models", (HttpContext context, IDatabaseConfigurationProvider provider) => ListGatewayModelsResult(context, provider, "azure"));
         app.MapPost("/v1/chat/completions", HandleResponsesAsync);
         app.MapPost("/openai/v1/chat/completions", HandleChatCompletionsAsync);
         app.MapFallback((HttpContext httpContext, ILoggerFactory loggerFactory) =>
@@ -193,6 +195,9 @@ public static class LoomXHost
         CancellationToken cancellationToken)
     {
         var logger = loggerFactory.CreateLogger("ChatCompletions");
+        var endpoint = configProvider.Current.GatewayEndpoints.FirstOrDefault(item => item.Key == "openai" && item.Enabled);
+        if (endpoint is null) return Results.NotFound(new OllamaErrorResponse { Error = "Endpoint is disabled or not configured." });
+        if (!GatewayEndpointAuthentication.IsAuthorized(httpContext, endpoint)) return Results.Unauthorized();
         if (requestJson is not JsonObject requestObject) return Results.BadRequest(new OllamaErrorResponse { Error = "Request body must be a JSON object." });
         var requestedModel = TryGetString(requestObject, "model", out var modelName) ? modelName : null;
         var combo = requestedModel is null
@@ -285,6 +290,7 @@ public static class LoomXHost
         if (endpointKey is null) return Results.NotFound(new OllamaErrorResponse { Error = "Endpoint is not configured for this URI." });
         var endpoint = configProvider.Current.GatewayEndpoints.FirstOrDefault(item => item.Key == endpointKey && item.Enabled);
         if (endpoint is null) return Results.NotFound(new OllamaErrorResponse { Error = "Endpoint is disabled or not configured." });
+        if (!GatewayEndpointAuthentication.IsAuthorized(httpContext, endpoint)) return Results.Unauthorized();
         if (requestJson is not JsonObject requestObject) return Results.BadRequest(new OllamaErrorResponse { Error = "Request body must be a JSON object." });
         var requestedModel = TryGetString(requestObject, "model", out var modelName) ? modelName : null;
         var combo = requestedModel is null
@@ -308,30 +314,58 @@ public static class LoomXHost
                 routeContext.ModelAlias = combo!.Name;
                 routeContext.Route = $"{GatewayEndpointRouting.ResolveLabel(httpContext.Request.Path)} → {route.Model.ProviderId}";
             }
-            var attemptRequest = BuildGatewayAttemptPayload(requestObject, route.Model);
-            if (endpointKey == "ollama"
+            var useResponsesBridge = endpointKey == "ollama"
                 && httpContext.Request.Path.StartsWithSegments("/v1/chat/completions")
                 && route.Model.SupportsApiMode("openai")
-                && !route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase))
+                && !route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase);
+            var upstreamPath = route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase) ? "/chat/completions" : "/responses";
+            if (route.Model.SupportsApiMode("ollama")) upstreamPath = "/api/chat";
+            var attemptRequest = BuildGatewayAttemptPayload(
+                requestObject,
+                route.Model,
+                endpointKey == "ollama"
+                    && route.Model.SupportsApiMode("openai")
+                    && (useResponsesBridge || !route.Model.SupportsApiMode("ollama"))
+                    ? endpoint.ReasoningEffort
+                    : null,
+                upstreamPath == "/responses");
+            if (useResponsesBridge)
             {
                 if (await passthroughClient.ProxyOpenAiResponsesGatewayAttemptAsync(httpContext, route.Model, attemptRequest, cancellationToken)) return Results.Empty;
                 continue;
             }
 
-            var upstreamPath = route.Model.EndpointFormat.Equals("chat_completions", StringComparison.OrdinalIgnoreCase) ? "/chat/completions" : "/responses";
-            if (route.Model.SupportsApiMode("ollama")) upstreamPath = "/api/chat";
             if (await passthroughClient.ProxyGatewayAttemptAsync(httpContext, route.Model, route.Model.SupportsApiMode("ollama") ? "ollama" : "openai", upstreamPath, attemptRequest, cancellationToken)) return Results.Empty;
         }
         return Results.StatusCode(StatusCodes.Status502BadGateway);
     }
 
     internal static JsonObject BuildGatewayAttemptPayload(JsonObject requestObject, ResolvedModelConfig model)
+        => BuildGatewayAttemptPayload(requestObject, model, null, false);
+
+    internal static JsonObject BuildGatewayAttemptPayload(JsonObject requestObject, ResolvedModelConfig model, string? defaultReasoningEffort, bool responsesFormat)
     {
         var attemptRequest = requestObject.DeepClone().AsObject();
         attemptRequest["model"] = model.ModelId;
         foreach (var kvp in model.Extra)
         {
             attemptRequest[kvp.Key] = kvp.Value?.DeepClone();
+        }
+
+        if (!string.IsNullOrWhiteSpace(defaultReasoningEffort)
+            && !requestObject.ContainsKey("reasoning_effort")
+            && requestObject["reasoning"] is null
+            && !model.Extra.ContainsKey("reasoning_effort")
+            && !model.Extra.ContainsKey("reasoning"))
+        {
+            if (responsesFormat)
+            {
+                attemptRequest["reasoning"] = new JsonObject { ["effort"] = defaultReasoningEffort };
+            }
+            else
+            {
+                attemptRequest["reasoning_effort"] = defaultReasoningEffort;
+            }
         }
 
         return attemptRequest;
@@ -341,6 +375,14 @@ public static class LoomXHost
     {
         var data = ListEnabledCombos(provider, endpointKey).Select(item => new { id = item.Name, @object = "model", owned_by = "loomx" }).ToArray();
         return new { @object = "list", data };
+    }
+
+    private static IResult ListGatewayModelsResult(HttpContext context, IDatabaseConfigurationProvider provider, string endpointKey)
+    {
+        var endpoint = provider.Current.GatewayEndpoints.FirstOrDefault(item => item.Key == endpointKey && item.Enabled);
+        if (endpoint is null) return Results.NotFound(new OllamaErrorResponse { Error = "Endpoint is disabled or not configured." });
+        if (!GatewayEndpointAuthentication.IsAuthorized(context, endpoint)) return Results.Unauthorized();
+        return Results.Ok(ListGatewayModels(provider, endpointKey));
     }
 
     private static IReadOnlyList<ResolvedGatewayComboConfig> ListEnabledCombos(IDatabaseConfigurationProvider provider, string endpointKey) =>

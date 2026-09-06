@@ -271,4 +271,19 @@ public partial class GatewayView : UserControl
         await clipboard.SetTextAsync(endpoint.PublicUrl);
         if (DataContext is GatewayViewModel viewModel) viewModel.NotifyCopied();
     }
+
+    private async void CopyEndpointApiKey_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is not Button { DataContext: GatewayEndpointEditorViewModel endpoint } || string.IsNullOrWhiteSpace(endpoint.ApiKey)) return;
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null) return;
+        await clipboard.SetTextAsync(endpoint.ApiKey);
+        if (DataContext is GatewayViewModel viewModel) viewModel.NotifyApiKeyCopied();
+    }
+
+    private async void ReasoningEffort_OnSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ComboBox { DataContext: GatewayEndpointEditorViewModel endpoint } || !endpoint.IsHydrated || !endpoint.HasPendingReasoningEffortChange || e.AddedItems.Count == 0) return;
+        if (DataContext is GatewayViewModel viewModel) await viewModel.SaveGatewayReasoningEffortAsync(endpoint);
+    }
 }

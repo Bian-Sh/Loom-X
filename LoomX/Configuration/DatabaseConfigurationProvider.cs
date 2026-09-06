@@ -87,6 +87,8 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                     Key = endpoint.Key,
                     PublicPath = endpoint.PublicPath,
                     Enabled = endpoint.Enabled,
+                    ApiKey = ReadEndpointApiKey(endpoint),
+                    ReasoningEffort = GatewayEndpointSettings.NormalizeReasoningEffort(endpoint.ReasoningEffort),
                     Combos = endpoint.Combos.OrderBy(combo => combo.SortOrder).Select(combo => new ResolvedGatewayComboConfig
                     {
                         Name = combo.Name,
@@ -117,6 +119,14 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
         {
             reloadLock.Release();
         }
+    }
+
+    private string ReadEndpointApiKey(GatewayEndpointEntity endpoint)
+    {
+        if (!GatewayEndpointSettings.RequiresApiKey(endpoint.Key) || string.IsNullOrWhiteSpace(endpoint.ProtectedApiKey)) return string.Empty;
+        if (ProtectedApiKeyStore.TryUnprotect(endpoint.ProtectedApiKey, out var apiKey)) return apiKey;
+        logger?.LogWarning("Endpoint 密钥解密失败，继续加载配置 {EndpointKey}", endpoint.Key);
+        return string.Empty;
     }
 
     private ResolvedModelConfig ResolveModel(ProviderEntity provider, ModelEntity model)

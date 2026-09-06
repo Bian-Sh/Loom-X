@@ -647,6 +647,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private DispatcherTimer? modelSyncAnimationTimer;
     private bool isModelSyncing;
     private double syncIconAngle;
+    private string providerSearchQuery = "";
+    private string modelSearchQuery = "";
     private CancellationTokenSource? providerAutoSaveCancellation;
     private CancellationTokenSource? modelAutoSaveCancellation;
     private ModelEditorViewModel? draggingModel;
@@ -665,8 +667,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         get => selectedProvider;
         set
         {
-            if (value is null && !suppressSelectionInvariant && Providers.Count > 0)
-                value = Providers[0];
+            if (value is null && !suppressSelectionInvariant)
+                value = FilteredProviders.FirstOrDefault();
             if (ReferenceEquals(selectedProvider, value)) return;
             DetachProvider(selectedProvider);
             SetProperty(ref selectedProvider, value);
@@ -674,6 +676,9 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             SelectedModel = null;
             OnPropertyChanged(nameof(HasSelectedProvider));
             OnPropertyChanged(nameof(HasNoSelectedProvider));
+            OnPropertyChanged(nameof(FilteredModels));
+            OnPropertyChanged(nameof(HasFilteredModels));
+            OnPropertyChanged(nameof(HasNoFilteredModels));
             OnPropertyChanged(nameof(EnabledModelCount));
             OnPropertyChanged(nameof(AllModelsEnabled));
             OnPropertyChanged(nameof(EnabledModelSummary));
@@ -681,6 +686,28 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     }
     public bool HasSelectedProvider => SelectedProvider is not null;
     public bool HasNoSelectedProvider => Providers.Count == 0;
+
+    public string ProviderSearchQuery
+    {
+        get => providerSearchQuery;
+        set
+        {
+            if (!SetProperty(ref providerSearchQuery, value ?? "")) return;
+            OnPropertyChanged(nameof(HasProviderSearchQuery));
+            OnPropertyChanged(nameof(FilteredProviders));
+        }
+    }
+    public bool HasProviderSearchQuery => !string.IsNullOrWhiteSpace(ProviderSearchQuery);
+    public IReadOnlyList<ProviderEditorViewModel> FilteredProviders
+    {
+        get
+        {
+            var query = ProviderSearchQuery.Trim();
+            return string.IsNullOrEmpty(query)
+                ? Providers.ToArray()
+                : Providers.Where(provider => MatchesProviderSearch(provider, query)).ToArray();
+        }
+    }
 
     public ModelEditorViewModel? SelectedModel
     {
@@ -695,16 +722,42 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         }
     }
     public bool HasSelectedModel => SelectedModel is not null;
-    public ModelEditorViewModel? DraggingModel { get => draggingModel; private set { if (ReferenceEquals(draggingModel, value)) return; draggingModel = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsModelDragActive)); } }
+    public string ModelSearchQuery
+    {
+        get => modelSearchQuery;
+        set
+        {
+            if (!SetProperty(ref modelSearchQuery, value ?? "")) return;
+            OnPropertyChanged(nameof(HasModelSearchQuery));
+            OnPropertyChanged(nameof(FilteredModels));
+            OnPropertyChanged(nameof(HasFilteredModels));
+            OnPropertyChanged(nameof(HasNoFilteredModels));
+        }
+    }
+    public bool HasModelSearchQuery => !string.IsNullOrWhiteSpace(ModelSearchQuery);
+    public IReadOnlyList<ModelEditorViewModel> FilteredModels
+    {
+        get
+        {
+            if (SelectedProvider is null) return [];
+            var query = ModelSearchQuery.Trim();
+            return string.IsNullOrEmpty(query)
+                ? SelectedProvider.Models.ToArray()
+                : SelectedProvider.Models.Where(model => model.IsRealModel && model.ModelId.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray();
+        }
+    }
+    public bool HasFilteredModels => FilteredModels.Count > 0;
+    public bool HasNoFilteredModels => SelectedProvider?.HasModels == true && !HasFilteredModels;
+    public ModelEditorViewModel? DraggingModel { get => draggingModel; private set { if (ReferenceEquals(draggingModel, value)) return; draggingModel = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsModelDragActive)); OnPropertyChanged(nameof(EnabledModelCount)); OnPropertyChanged(nameof(EnabledModelSummary)); OnPropertyChanged(nameof(AllModelsEnabled)); } }
     public bool IsModelDragActive => DraggingModel is not null;
-    public int EnabledModelCount => SelectedProvider?.Models.Count(model => model.IsRealModel && model.Enabled) ?? 0;
-    public string EnabledModelSummary => $"已启用 {EnabledModelCount} / {SelectedProvider?.Models.Count(model => model.IsRealModel) ?? 0} 个模型";
+    public int EnabledModelCount => GetSelectedProviderModelsForSummary().Count(model => model.Enabled);
+    public string EnabledModelSummary => $"已启用 {EnabledModelCount} / {GetSelectedProviderModelsForSummary().Count} 个模型";
     public bool AllModelsEnabled
     {
         get
         {
-            var models = SelectedProvider?.Models.Where(model => model.IsRealModel).ToArray() ?? [];
-            return models.Length > 0 && models.All(model => model.Enabled);
+            var models = GetSelectedProviderModelsForSummary();
+            return models.Count > 0 && models.All(model => model.Enabled);
         }
     }
     public string Status { get => status; private set => SetProperty(ref status, value); }
@@ -727,11 +780,22 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public ICommand TestConnectionCommand { get; }
     public ICommand SyncModelsCommand { get; }
 
+    private IReadOnlyList<ModelEditorViewModel> GetSelectedProviderModelsForSummary()
+    {
+        if (SelectedProvider is null) return [];
+
+        var models = SelectedProvider.Models.Where(model => model.IsRealModel).ToList();
+        if (ReferenceEquals(modelDragOwnerProvider, SelectedProvider) && DraggingModel is not null && !models.Contains(DraggingModel))
+            models.Add(DraggingModel);
+        return models;
+    }
+
     public ProvidersViewModel(AppDataStore dataStore, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null)
     {
         this.dataStore = dataStore;
         this.toastService = toastService ?? new ToastService();
         this.logger = logger;
+        Providers.CollectionChanged += ProvidersChanged;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(parameter => DeleteModelAsync(parameter as ModelEditorViewModel)); ToggleAllModelsCommand = new AsyncCommand(ToggleAllModelsAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
     }
@@ -798,6 +862,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     public void Dispose()
     {
+        Providers.CollectionChanged -= ProvidersChanged;
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
         providerAutoSaveCancellation?.Cancel();
         providerAutoSaveCancellation?.Dispose();
@@ -1097,18 +1162,18 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     public bool BeginModelDrag(ModelEditorViewModel? model)
     {
-        if (model is null || model.IsPlaceholder || SelectedProvider is null || DraggingModel is not null) return false;
+        if (model is null || model.IsPlaceholder || SelectedProvider is null || HasModelSearchQuery || DraggingModel is not null) return false;
         var provider = SelectedProvider;
         var index = provider.Models.IndexOf(model);
         if (index < 0 || provider.Models.Count(item => item.IsRealModel) < 2) return false;
         modelDragOwnerProvider = provider;
         draggingModelOriginIndex = index;
         modelDragPlaceholder = ModelEditorViewModel.CreatePlaceholder();
+        DraggingModel = model;
         provider.Models.RemoveAt(index);
         provider.Models.Insert(index, modelDragPlaceholder);
         provider.IsModelDragPreviewOwner = true;
         model.IsDragging = true;
-        DraggingModel = model;
         return true;
     }
 
@@ -1250,14 +1315,23 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private void ProviderChanged(object? sender, PropertyChangedEventArgs args)
     {
         UpdateSummary();
+        OnPropertyChanged(nameof(FilteredProviders));
         if (!suppressConfigurationRefresh && sender is ProviderEditorViewModel provider && provider.HasUnsavedChanges)
             QueueProviderAutoSave(provider);
+    }
+    private void ProvidersChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
+    {
+        OnPropertyChanged(nameof(FilteredProviders));
+        OnPropertyChanged(nameof(HasNoSelectedProvider));
     }
     private void ModelsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
         if (args.NewItems is not null) foreach (ModelEditorViewModel model in args.NewItems) model.PropertyChanged += ModelChanged;
         if (args.OldItems is not null) foreach (ModelEditorViewModel model in args.OldItems) model.PropertyChanged -= ModelChanged;
         UpdateSummary();
+        OnPropertyChanged(nameof(FilteredModels));
+        OnPropertyChanged(nameof(HasFilteredModels));
+        OnPropertyChanged(nameof(HasNoFilteredModels));
         OnPropertyChanged(nameof(EnabledModelCount));
         OnPropertyChanged(nameof(AllModelsEnabled));
         OnPropertyChanged(nameof(EnabledModelSummary));
@@ -1286,6 +1360,16 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         ProtectedKeyCount = Providers.Count(provider => provider.HasApiKey);
         EnabledProviderCount = Providers.Count(provider => provider.Enabled);
         HealthyProviderCount = Providers.Count(provider => provider.Enabled && !string.IsNullOrWhiteSpace(provider.BaseUrl));
+    }
+
+    internal static bool MatchesProviderSearch(ProviderEditorViewModel provider, string query)
+    {
+        query = query.Trim();
+        if (string.IsNullOrEmpty(query)) return true;
+        return provider.DisplayName.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || provider.BusinessId.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || provider.BaseUrl.Contains(query, StringComparison.OrdinalIgnoreCase)
+            || provider.ApiMode.Contains(query, StringComparison.OrdinalIgnoreCase);
     }
 
 }
@@ -1449,16 +1533,17 @@ public sealed class ModelEditorViewModel : NotifyViewModel
     public string ModelId { get => modelId; set => SetProperty(ref modelId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string Family { get => family; set => SetProperty(ref family, value); } public string ConfigId { get => configId; set => SetProperty(ref configId, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ApiMode { get => apiMode; set => SetProperty(ref apiMode, value); } public int ContextLength { get => contextLength; set => SetProperty(ref contextLength, value); } public int MaxTokens { get => maxTokens; set => SetProperty(ref maxTokens, value); } public bool Vision { get => vision; set => SetProperty(ref vision, value); } public double? Temperature { get => temperature; set => SetProperty(ref temperature, value); } public double? TopP { get => topP; set => SetProperty(ref topP, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool ClearApiKey { get => clearApiKey; set => SetProperty(ref clearApiKey, value); } public string HeadersJson { get => headersJson; set => SetProperty(ref headersJson, value); } public string ExtraJson { get => extraJson; set => SetProperty(ref extraJson, value); } public bool HasApiKey { get; private set; }
     public string? OwnedBy { get => ownedBy; private set => SetProperty(ref ownedBy, value); }
     public string? RemoteFamily { get => remoteFamily; private set => SetProperty(ref remoteFamily, value); }
-    public int? RemoteContextLength { get => remoteContextLength; private set { if (SetProperty(ref remoteContextLength, value)) OnPropertyChanged(nameof(ContextDisplay)); } }
-    public int? RemoteMaxTokens { get => remoteMaxTokens; private set { if (SetProperty(ref remoteMaxTokens, value)) OnPropertyChanged(nameof(MaxTokensDisplay)); } }
+    public int? RemoteContextLength { get => remoteContextLength; private set { if (SetProperty(ref remoteContextLength, value)) { OnPropertyChanged(nameof(ContextDisplay)); OnPropertyChanged(nameof(MetadataToolTip)); } } }
+    public int? RemoteMaxTokens { get => remoteMaxTokens; private set { if (SetProperty(ref remoteMaxTokens, value)) { OnPropertyChanged(nameof(MaxTokensDisplay)); OnPropertyChanged(nameof(MetadataToolTip)); } } }
     public bool? RemoteVision { get => remoteVision; private set { if (SetProperty(ref remoteVision, value)) OnPropertyChanged(nameof(CapabilitiesDisplay)); } }
     public int SortOrder { get => sortOrder; internal set => SetProperty(ref sortOrder, value); }
     public bool IsDragging { get => isDragging; set => SetProperty(ref isDragging, value); }
     public bool IsPlaceholder { get => isPlaceholder; private init => isPlaceholder = value; }
     public bool IsRealModel => !IsPlaceholder;
-    public string ContextDisplay => RemoteContextLength is int value ? value.ToString("N0") : "未提供";
-    public string MaxTokensDisplay => RemoteMaxTokens is int value ? value.ToString("N0") : "未提供";
-    public string CapabilitiesDisplay => RemoteVision is true ? "视觉" : RemoteVision is false ? "文本" : "未提供";
+    public string ContextDisplay => RemoteContextLength is int value ? value.ToString("N0") : "-";
+    public string MaxTokensDisplay => RemoteMaxTokens is int value ? value.ToString("N0") : "-";
+    public string MetadataToolTip => RemoteContextLength is null || RemoteMaxTokens is null ? "AI 提供商模型接口未返回上下文配置" : "";
+    public string CapabilitiesDisplay => RemoteVision is true ? "视觉" : RemoteVision is false ? "文本" : "-";
     public static ModelEditorViewModel FromResponse(ModelResponse response)
     {
         var value = new ModelEditorViewModel { Id = response.Id, ProviderId = response.ProviderId, ModelId = response.ModelId, DisplayName = response.DisplayName, ConfigId = response.ConfigId ?? "", Family = response.Family, BaseUrl = response.BaseUrl ?? "", ApiMode = response.ApiMode ?? "", ContextLength = response.ContextLength, MaxTokens = response.MaxTokens, Vision = response.Vision, Temperature = response.Temperature, TopP = response.TopP, Enabled = response.Enabled, HasApiKey = response.HasApiKey, HeadersJson = response.HeadersJson, ExtraJson = response.ExtraJson, ownedBy = response.OwnedBy, remoteFamily = response.RemoteFamily, remoteContextLength = response.RemoteContextLength, remoteMaxTokens = response.RemoteMaxTokens, remoteVision = response.RemoteVision, sortOrder = response.SortOrder };

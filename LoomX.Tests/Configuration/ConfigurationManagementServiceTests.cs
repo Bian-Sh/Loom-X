@@ -101,6 +101,21 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal("/", paths.Single(item => item.Key == "ollama").PublicPath);
             Assert.Equal("/azure", paths.Single(item => item.Key == "azure").PublicPath);
             Assert.Equal(3, paths.Select(item => item.PublicPath).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+            var endpoints = await service.ListGatewayEndpointsAsync();
+            Assert.All(endpoints.Where(item => item.Key is "openai" or "azure"), item => Assert.StartsWith("lx_", item.ApiKey));
+            Assert.Null(endpoints.Single(item => item.Key == "ollama").ApiKey);
+            Assert.Equal("medium", endpoints.Single(item => item.Key == "ollama").ReasoningEffort);
+
+            var originalKey = endpoints.Single(item => item.Key == "openai").ApiKey;
+            var rotated = await service.RotateGatewayApiKeyAsync("openai");
+            Assert.NotEqual(originalKey, rotated.ApiKey);
+            var updatedOllama = await service.UpdateGatewayEndpointReasoningEffortAsync("ollama", "high");
+            Assert.Equal("high", updatedOllama.ReasoningEffort);
+            await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateGatewayEndpointReasoningEffortAsync("ollama", "xhigh"));
         }
         finally
         {

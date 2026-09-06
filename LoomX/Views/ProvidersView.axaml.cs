@@ -81,8 +81,11 @@ public partial class ProvidersView : UserControl
 
     private void ModelHandle_OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Border modelBorder || modelBorder.Tag is not ModelEditorViewModel model || DataContext is not ProvidersViewModel viewModel) return;
-        var itemsControl = modelBorder.FindAncestorOfType<ItemsControl>();
+        if (sender is not Border handleBorder || handleBorder.Tag is not ModelEditorViewModel model || DataContext is not ProvidersViewModel viewModel) return;
+        if (viewModel.HasModelSearchQuery) return;
+        var modelBorder = handleBorder.FindAncestorOfType<Border>();
+        if (modelBorder is null || !modelBorder.Classes.Contains("model-cell")) return;
+        var itemsControl = handleBorder.FindAncestorOfType<ItemsControl>();
         if (itemsControl?.DataContext is not ModelEditorViewModel && itemsControl?.DataContext is not ProvidersViewModel) return;
         var host = FindModelDragHost(itemsControl);
         if (host is null)
@@ -97,7 +100,8 @@ public partial class ProvidersView : UserControl
         modelDragHost = host;
         modelDragPreviewBorder = preview;
         var pointerPosition = e.GetPosition(modelDragHost);
-        var modelTop = modelBorder.TranslatePoint(new Point(0, 0), modelDragHost)?.Y ?? pointerPosition.Y;
+        var pointerInModel = e.GetPosition(modelBorder);
+        var modelTop = pointerPosition.Y - pointerInModel.Y;
 
         e.Pointer.Capture(this);
         if (!viewModel.BeginModelDrag(model))
@@ -107,7 +111,8 @@ public partial class ProvidersView : UserControl
             return;
         }
 
-        modelDragPointerOffsetY = pointerPosition.Y - modelTop;
+        // 以手柄实际按下点为锚点，避免预览在按下时跳到行的另一侧。
+        modelDragPointerOffsetY = pointerInModel.Y;
         modelDragPreviewBorder.RenderTransform = new TranslateTransform(0, modelTop);
         e.Handled = true;
     }

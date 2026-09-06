@@ -98,6 +98,8 @@ public sealed class ResolvedGatewayEndpointConfig
     public required string Key { get; init; }
     public required string PublicPath { get; init; }
     public bool Enabled { get; init; }
+    public string ApiKey { get; init; } = string.Empty;
+    public string ReasoningEffort { get; init; } = GatewayEndpointSettings.DefaultReasoningEffort;
     public IReadOnlyList<ResolvedGatewayComboConfig> Combos { get; init; } = [];
 }
 

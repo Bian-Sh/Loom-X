@@ -1,4 +1,5 @@
 using System.IO;
+using LoomX.Configuration;
 using LoomX.ViewModels;
 using Xunit;
 
@@ -76,7 +77,33 @@ public sealed class GatewayViewContractTests
         Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/>", source, StringComparison.Ordinal);
         Assert.Contains("Property=\"Margin\" Value=\"0,0,0,1\"", source, StringComparison.Ordinal);
         Assert.Contains("BorderBrush=\"{DynamicResource BorderStrongBrush}\" BorderThickness=\"0,0,0,1\"", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected\"><Setter Property=\"Background\" Value=\"{DynamicResource AccentSoftBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/><Setter Property=\"BorderBrush\" Value=\"{DynamicResource AccentBrush}\"/><Setter Property=\"BorderThickness\" Value=\"3,0,0,0\"/>", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EndpointListMatchesProviderSelectionInteraction()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+
+        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/><Setter Property=\"BorderBrush\" Value=\"{DynamicResource AccentBrush}\"/><Setter Property=\"BorderThickness\" Value=\"3,0,0,0\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/><Setter Property=\"Foreground\" Value=\"{DynamicResource TextPrimaryBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected:pointerover\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceMutedBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.endpoint-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceMutedBrush}\"/><Setter Property=\"Foreground\" Value=\"{DynamicResource TextPrimaryBrush}\"/>", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EndpointCardsExposeCredentialAndReasoningControls()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+
+        Assert.Contains("Text=\"API Key\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding MaskedApiKey}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"复制 API Key\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"重新生成 API Key\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Border.endpoint-key-row:pointerover Button.endpoint-refresh\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Reasoning effort\"", source, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding ReasoningEffortOptions}\"", source, StringComparison.Ordinal);
+        Assert.Contains("SelectionChanged=\"ReasoningEffort_OnSelectionChanged\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -139,6 +166,19 @@ public sealed class GatewayViewContractTests
         combo.Routes.Remove(second);
         Assert.False(combo.CanDragRoutes);
         Assert.False(first.IsDragEnabled);
+    }
+
+    [Fact]
+    public void EndpointApiKeyIsMaskedAndOllamaExposesFourReasoningLevels()
+    {
+        var openAi = GatewayEndpointEditorViewModel.FromResponse(new GatewayEndpointResponse("openai", "OpenAI", "/openai", true, [], "lx_1234567890", "medium"), "http://127.0.0.1:11434");
+        var ollama = GatewayEndpointEditorViewModel.FromResponse(new GatewayEndpointResponse("ollama", "Ollama", "/", true, [], null, "high"), "http://127.0.0.1:11434");
+
+        Assert.Equal("lx_1••••7890", openAi.MaskedApiKey);
+        Assert.True(openAi.IsApiKeyVisible);
+        Assert.False(ollama.IsApiKeyVisible);
+        Assert.Equal(["minimal", "low", "medium", "high"], ollama.ReasoningEffortOptions);
+        Assert.Equal("high", ollama.ReasoningEffort);
     }
 
     [Fact]

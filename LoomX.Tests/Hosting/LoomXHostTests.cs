@@ -121,6 +121,7 @@ public sealed class LoomXHostTests
                     Key = "openai",
                     PublicPath = "/openai",
                     Enabled = true,
+                    ApiKey = "endpoint-key",
                     Combos =
                     [
                         new ResolvedGatewayComboConfig
@@ -137,6 +138,7 @@ public sealed class LoomXHostTests
         var context = new DefaultHttpContext();
         context.Request.Path = "/openai/v1/responses";
         context.Request.Method = HttpMethods.Post;
+        context.Request.Headers.Authorization = "Bearer endpoint-key";
         context.Response.Body = new MemoryStream();
         var request = JsonNode.Parse("""
         {
@@ -157,6 +159,32 @@ public sealed class LoomXHostTests
         Assert.NotNull(passthrough.Payload);
         Assert.Equal("deepseek-v4", passthrough.Payload!["model"]!.GetValue<string>());
         Assert.Equal("high", passthrough.Payload["reasoning_effort"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void BuildGatewayAttemptPayload_UsesOllamaEndpointReasoningDefaultWithoutOverwritingClientValue()
+    {
+        var model = CreateModel(new Dictionary<string, JsonNode?>());
+        var request = JsonNode.Parse("{\"model\":\"public-alias\"}")!.AsObject();
+
+        var defaulted = LoomXHost.BuildGatewayAttemptPayload(request, model, "medium", false);
+        Assert.Equal("medium", defaulted["reasoning_effort"]!.GetValue<string>());
+
+        request["reasoning_effort"] = "high";
+        var explicitValue = LoomXHost.BuildGatewayAttemptPayload(request, model, "medium", false);
+        Assert.Equal("high", explicitValue["reasoning_effort"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void BuildGatewayAttemptPayload_UsesResponsesReasoningShape()
+    {
+        var model = CreateModel(new Dictionary<string, JsonNode?>());
+        var request = JsonNode.Parse("{\"model\":\"public-alias\"}")!.AsObject();
+
+        var result = LoomXHost.BuildGatewayAttemptPayload(request, model, "low", true);
+
+        Assert.Equal("low", result["reasoning"]!["effort"]!.GetValue<string>());
+        Assert.Null(result["reasoning_effort"]);
     }
 
     private static ResolvedModelConfig CreateModel(IReadOnlyDictionary<string, JsonNode?> extra) => new()
