@@ -808,6 +808,48 @@
   <data name="providers.headers.empty">
     <value>尚未添加自定義請求頭</value>
   </data>
+  <data name="providers.cli.button">
+    <value>模擬 CLI</value>
+  </data>
+  <data name="providers.cli.button.tooltip">
+    <value>一鍵寫入官方 CLI 身份請求頭</value>
+  </data>
+  <data name="providers.cli.identity">
+    <value>CLI 身份</value>
+  </data>
+  <data name="providers.cli.apply">
+    <value>套用</value>
+  </data>
+  <data name="providers.cli.refresh">
+    <value>重新整理版本</value>
+  </data>
+  <data name="providers.cli.applied">
+    <value>已套用</value>
+  </data>
+  <data name="providers.cli.recommended">
+    <value>推薦</value>
+  </data>
+  <data name="providers.cli.newVersion">
+    <value>有新版本</value>
+  </data>
+  <data name="providers.cli.source.npmRegistry">
+    <value>npm 來源</value>
+  </data>
+  <data name="providers.cli.source.githubReleases">
+    <value>GitHub 來源</value>
+  </data>
+  <data name="providers.cli.source.default">
+    <value>預設</value>
+  </data>
+  <data name="providers.cli.source.cached">
+    <value>快取</value>
+  </data>
+  <data name="providers.cli.source.userOverridden">
+    <value>手動</value>
+  </data>
+  <data name="providers.cli.refreshing">
+    <value>重新整理中…</value>
+  </data>
   <data name="providers.connection.label">
     <value>連接狀態</value>
   </data>

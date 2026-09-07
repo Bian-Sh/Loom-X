@@ -44,6 +44,14 @@ public partial class ProvidersView : UserControl
             viewModel.SelectedProvider?.ToggleApiKeyVisibility();
     }
 
+    private void CliIdentityMenuButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not ProvidersViewModel viewModel) return;
+        // 切换 CLI 身份菜单开合；首次打开时若已有缓存/默认版本则同步显示。
+        viewModel.IsCliMenuOpen = !viewModel.IsCliMenuOpen;
+        if (viewModel.IsCliMenuOpen) viewModel.SelectedProvider?.LoadCliVersionsFromCache();
+    }
+
     private async void DeleteProviderButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { DataContext: ProviderEditorViewModel provider } || DataContext is not ProvidersViewModel viewModel) return;

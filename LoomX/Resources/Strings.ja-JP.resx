@@ -808,6 +808,48 @@
   <data name="providers.headers.empty">
     <value>カスタムリクエストヘッダーが追加されていません</value>
   </data>
+  <data name="providers.cli.button">
+    <value>CLI モック</value>
+  </data>
+  <data name="providers.cli.button.tooltip">
+    <value>公式 CLI 識別ヘッダーを一括挿入</value>
+  </data>
+  <data name="providers.cli.identity">
+    <value>CLI 識別</value>
+  </data>
+  <data name="providers.cli.apply">
+    <value>適用</value>
+  </data>
+  <data name="providers.cli.refresh">
+    <value>バージョン更新</value>
+  </data>
+  <data name="providers.cli.applied">
+    <value>適用済み</value>
+  </data>
+  <data name="providers.cli.recommended">
+    <value>推奨</value>
+  </data>
+  <data name="providers.cli.newVersion">
+    <value>新バージョンあり</value>
+  </data>
+  <data name="providers.cli.source.npmRegistry">
+    <value>npm</value>
+  </data>
+  <data name="providers.cli.source.githubReleases">
+    <value>GitHub</value>
+  </data>
+  <data name="providers.cli.source.default">
+    <value>デフォルト</value>
+  </data>
+  <data name="providers.cli.source.cached">
+    <value>キャッシュ</value>
+  </data>
+  <data name="providers.cli.source.userOverridden">
+    <value>カスタム</value>
+  </data>
+  <data name="providers.cli.refreshing">
+    <value>更新中…</value>
+  </data>
   <data name="providers.connection.label">
     <value>接続状態</value>
   </data>

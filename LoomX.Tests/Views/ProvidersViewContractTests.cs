@@ -213,7 +213,7 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("ToolTip.Tip=\"{l:Locale providers.toggle.tooltip.enabled}\"", source, StringComparison.Ordinal);
         Assert.Contains("<TranslateTransform X=\"12\"/>", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Right\" VerticalAlignment=\"Bottom\"", source, StringComparison.Ordinal);
-        Assert.Equal(2, source.Split(deletePath, StringSplitOptions.None).Length - 1);
+        Assert.Equal(3, source.Split(deletePath, StringSplitOptions.None).Length - 1);
         Assert.DoesNotContain("Text=\"P\" Foreground=\"{DynamicResource AccentBrush}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("RowDefinitions=\"Auto,Auto,Auto,Auto\"", source, StringComparison.Ordinal);
     }

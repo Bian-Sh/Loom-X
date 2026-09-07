@@ -754,6 +754,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private int healthyProviderCount;
     private int enabledProviderCount;
     private int activeTabIndex;
+    private bool isCliMenuOpen;
     private CancellationTokenSource? connectionCancellation;
     private CancellationTokenSource? modelSyncCancellation;
     private DispatcherTimer? modelSyncAnimationTimer;
@@ -881,6 +882,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public int HealthyProviderCount { get => healthyProviderCount; private set => SetProperty(ref healthyProviderCount, value); }
     public int EnabledProviderCount { get => enabledProviderCount; private set => SetProperty(ref enabledProviderCount, value); }
     public int ActiveTabIndex { get => activeTabIndex; set => SetProperty(ref activeTabIndex, value); }
+    /// <summary>CLI 身份菜单是否展开（供 View 层 Popup 的 IsOpen 绑定）。</summary>
+    public bool IsCliMenuOpen { get => isCliMenuOpen; set => SetProperty(ref isCliMenuOpen, value); }
     public ICommand RefreshCommand { get; }
     public ICommand NewProviderCommand { get; }
     public ICommand SaveProviderCommand { get; }
@@ -1541,6 +1544,11 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public bool HasNoHeaders => Headers.Count == 0;
     public int IncompleteHeaderCount => Headers.Count(IsIncomplete);
     public bool HasIncompleteHeaders => IncompleteHeaderCount > 0;
+    public ObservableCollection<CliIdentityItemViewModel> CliIdentities { get; } = [];
+    public CliIdentityType? CurrentCliIdentity { get; private set; }
+    public ICommand ApplyCliIdentityCommand { get; }
+    public ICommand RefreshCliVersionsCommand { get; }
+    public bool IsRefreshingCliVersions { get; private set; }
     internal void RefreshLocalization()
     {
         OnPropertyChanged(nameof(ApiKeyVisibilityToolTip));
@@ -1558,6 +1566,9 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
         };
         Headers.CollectionChanged += HeadersChanged;
         Models.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasModels));
+        ApplyCliIdentityCommand = CreateAsyncCommand((object? parameter) => ApplyCliIdentityAsync(parameter), (object? _) => true);
+        RefreshCliVersionsCommand = CreateAsyncCommand((object? _) => RefreshCliVersionsAsync(), (object? _) => !IsRefreshingCliVersions);
+        InitializeCliIdentities();
     }
     public static ProviderEditorViewModel FromResponse(ProviderResponse response) { var value = new ProviderEditorViewModel(); value.ApplyResponse(response); foreach (var model in response.Models) value.Models.Add(ModelEditorViewModel.FromResponse(model)); return value; }
     public ProviderInput ToInput() => new(BusinessId, DisplayName, BaseUrl, ApiMode, Enabled, apiKeyEdited ? ApiKey : null, false, ToHeaderDictionary(), UseProxy, string.IsNullOrWhiteSpace(ModelListUrl) ? null : ModelListUrl, EndpointFormat);
@@ -1572,6 +1583,7 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
             else
                 apiKeyEdited = false;
             SetHeadersFromJson(response.HeadersJson);
+            LoadCliVersionsFromCache();
         }
         finally
         {
@@ -1645,6 +1657,164 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     private static bool IsIncomplete(HeaderEditorViewModel header) => string.IsNullOrWhiteSpace(header.Name) || string.IsNullOrWhiteSpace(header.Value);
     private static bool IsPersistedProperty(string? propertyName) => propertyName is nameof(BusinessId) or nameof(DisplayName) or nameof(BaseUrl) or nameof(ModelListUrl) or nameof(ApiMode) or nameof(EndpointFormat) or nameof(Enabled) or nameof(UseProxy) or nameof(ApiKey) or nameof(HeadersJson) or nameof(Headers);
     internal static Dictionary<string, string>? ParseDictionary(string json) => string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+
+    // ---------- CLI 身份模拟 ----------
+
+    private static readonly Lazy<CliVersionService> CliVersionServiceLazy = new(() => new CliVersionService());
+
+    /// <summary>
+    /// 初始化三家 CLI 身份的默认条目（构造时执行一次）。
+    /// IsRecommended 依据 provider.ApiMode 判断：Claude 匹配 "anthropic"，Codex/Grok 匹配 "openai"。
+    /// </summary>
+    private void InitializeCliIdentities()
+    {
+        var mode = ApiMode ?? "";
+        foreach (var type in new[] { CliIdentityType.ClaudeCode, CliIdentityType.Codex, CliIdentityType.Grok })
+        {
+            var isRecommended = type switch
+            {
+                CliIdentityType.ClaudeCode => string.Equals(mode, "anthropic", StringComparison.OrdinalIgnoreCase),
+                CliIdentityType.Codex => string.Equals(mode, "openai", StringComparison.OrdinalIgnoreCase),
+                CliIdentityType.Grok => false,
+                _ => false,
+            };
+            CliIdentities.Add(new CliIdentityItemViewModel(type, isRecommended)
+            {
+                Version = CliVersionService.GetDefaultVersion(type)
+            });
+        }
+        ReconcileCliIdentitiesFromHeaders();
+    }
+
+    /// <summary>
+    /// 从现有 Headers 反推当前 CLI 身份并更新每条 item 的 IsApplied 标记。
+    /// 调用时机：ApplyResponse 后（载入 Provider 时）与 ApplyCliIdentityAsync 后。
+    /// </summary>
+    internal void ReconcileCliIdentitiesFromHeaders()
+    {
+        var headers = ToHeaderDictionary();
+        var detected = CliIdentityService.DetectCliIdentity(headers);
+        var detectedVersion = detected is null ? null : CliIdentityService.DetectCliVersion(headers, detected.Value);
+        CurrentCliIdentity = detected;
+        foreach (var item in CliIdentities)
+        {
+            item.IsApplied = item.Type == detected;
+            if (detected is not null && item.Type == detected && !string.IsNullOrEmpty(detectedVersion))
+                item.Version = detectedVersion;
+            else if (detected is null)
+                item.Version = CliVersionService.GetDefaultVersion(item.Type);
+        }
+        OnPropertyChanged(nameof(CurrentCliIdentity));
+    }
+
+    /// <summary>
+    /// 从缓存 / 默认值刷新 UI 上显示的版本号（不触发网络请求）。
+    /// </summary>
+    public void LoadCliVersionsFromCache()
+    {
+        var cache = new CliVersionCache();
+        foreach (var item in CliIdentities)
+        {
+            var cached = cache.Get(item.Type);
+            if (cached is not null)
+                item.ApplyVersion(cached.Version, CliVersionSource.Cached);
+            else
+                item.ApplyVersion(CliVersionService.GetDefaultVersion(item.Type), CliVersionSource.Default);
+        }
+        ReconcileCliIdentitiesFromHeaders();
+    }
+
+    /// <summary>
+    /// 强制刷新三家 CLI 版本（网络请求，失败降级到缓存→默认）。
+    /// </summary>
+    private async Task RefreshCliVersionsAsync(CancellationToken cancellationToken = default)
+    {
+        if (IsRefreshingCliVersions) return;
+        IsRefreshingCliVersions = true;
+        try
+        {
+            var service = CliVersionServiceLazy.Value;
+            var cache = new CliVersionCache();
+            var detected = CliIdentityService.DetectCliIdentity(ToHeaderDictionary());
+            foreach (var item in CliIdentities)
+            {
+                if (cancellationToken.IsCancellationRequested) return;
+                try
+                {
+                    var info = await service.GetVersionAsync(item.Type, forceRefresh: true, cancellationToken);
+                    item.ApplyVersion(info.Version, info.Source);
+                    if (detected is not null && item.Type == detected)
+                    {
+                        var applied = CliIdentityService.DetectCliVersion(ToHeaderDictionary(), item.Type);
+                        item.HasNewVersion = !string.IsNullOrEmpty(applied) && !string.Equals(applied, info.Version, StringComparison.Ordinal);
+                    }
+                }
+                catch
+                {
+                    // 单条失败不影响其他条目。
+                    var fallback = cache.Get(item.Type);
+                    item.ApplyVersion(fallback?.Version ?? CliVersionService.GetDefaultVersion(item.Type), fallback is null ? CliVersionSource.Default : CliVersionSource.Cached);
+                }
+            }
+        }
+        finally
+        {
+            IsRefreshingCliVersions = false;
+        }
+    }
+
+    /// <summary>
+    /// 应用 CLI 身份：CommandParameter 是 CliIdentityItemViewModel。
+    /// </summary>
+    private async Task ApplyCliIdentityAsync(object? parameter, CancellationToken cancellationToken = default)
+    {
+        if (parameter is not CliIdentityItemViewModel item) return;
+        if (string.IsNullOrWhiteSpace(item.Version)) return;
+
+        // 若已手改版本，写入用户覆盖缓存（避免下次被默认值覆盖）。
+        if (item.Source == CliVersionSource.UserOverridden || (item.Type == CliIdentityType.Grok && CliVersionService.GetDefaultVersion(item.Type) != item.Version))
+        {
+            var cache = new CliVersionCache();
+            cache.SetUserOverride(item.Type, item.Version);
+        }
+
+        // 剥除其他家族头 → 合并目标家族头。
+        var headers = ToHeaderDictionary();
+        var updated = CliIdentityService.ApplyCliIdentity(headers, item.Type, item.Version);
+        ApplyHeaders(updated);
+        ReconcileCliIdentitiesFromHeaders();
+    }
+
+    /// <summary>
+    /// 将 header 字典覆盖回 Headers 集合（供 CLI 身份应用后使用）。
+    /// 复用 Headers.CollectionChanged 的追踪逻辑。
+    /// </summary>
+    internal void ApplyHeaders(IDictionary<string, string> updatedHeaders)
+    {
+        var incomplete = Headers.Where(IsIncomplete).ToList();
+        Headers.CollectionChanged -= HeadersChanged;
+        foreach (var h in Headers) h.PropertyChanged -= HeaderChanged;
+        Headers.Clear();
+        foreach (var (key, val) in updatedHeaders)
+        {
+            var header = new HeaderEditorViewModel { Name = key, Value = val };
+            header.PropertyChanged += HeaderChanged;
+            Headers.Add(header);
+        }
+        foreach (var header in incomplete)
+        {
+            header.PropertyChanged += HeaderChanged;
+            Headers.Add(header);
+        }
+        Headers.CollectionChanged += HeadersChanged;
+        OnPropertyChanged(nameof(HasNoHeaders));
+        OnPropertyChanged(nameof(IncompleteHeaderCount));
+        OnPropertyChanged(nameof(HasIncompleteHeaders));
+        HeadersJson = JsonSerializer.Serialize(ToHeaderDictionary());
+    }
+
+    private static AsyncCommand CreateAsyncCommand(Func<object?, Task> action, Func<object?, bool> canExecute)
+        => new(action, canExecute);
 }
 
 public sealed record EndpointFormatOption(string Value, string DisplayName)
@@ -1653,6 +1823,48 @@ public sealed record EndpointFormatOption(string Value, string DisplayName)
     public static EndpointFormatOption FromValue(string? value) => All.FirstOrDefault(item => string.Equals(item.Value, value, StringComparison.OrdinalIgnoreCase)) ?? All[1];
     public static string Normalize(string? value) => FromValue(value).Value;
     public override string ToString() => DisplayName;
+}
+
+/// <summary>
+/// CLI 身份下拉菜单中单条项的 ViewModel。
+/// 承载显示名、版本（可手改）、来源标记、已应用标记与推荐标记。
+/// </summary>
+public sealed class CliIdentityItemViewModel : NotifyViewModel
+{
+    private string version = "";
+    private bool isApplied;
+    private bool hasNewVersion;
+    private CliVersionSource source;
+    public CliIdentityType Type { get; }
+    public string DisplayName { get; }
+    public bool IsRecommended { get; }
+    /// <summary>版本，可被用户手改（Grok 场景）。</summary>
+    public string Version { get => version; set => SetProperty(ref version, value); }
+    /// <summary>是否已应用该身份到当前 Provider 的 Headers。</summary>
+    public bool IsApplied { get => isApplied; set => SetProperty(ref isApplied, value); }
+    /// <summary>缓存/本地值是否与在线最新版本不同（触发「有新版本」标记）。</summary>
+    public bool HasNewVersion { get => hasNewVersion; set => SetProperty(ref hasNewVersion, value); }
+    /// <summary>版本来源标记（UI 上显示为标签）。</summary>
+    public CliVersionSource Source { get => source; set => SetProperty(ref source, value); }
+
+    /// <summary>UA 预览字符串，如 "claude-cli/2.1.263"。</summary>
+    public string ShortDescription => $"{CliIdentityService.GetProfile(Type).UaPrefix}{Version}";
+
+    public CliIdentityItemViewModel(CliIdentityType type, bool isRecommended = false)
+    {
+        Type = type;
+        DisplayName = CliIdentityService.GetProfile(type).DisplayName;
+        IsRecommended = isRecommended;
+        Source = CliVersionSource.Default;
+    }
+
+    public void ApplyVersion(string version, CliVersionSource source, bool hasNewVersion = false)
+    {
+        Version = version;
+        Source = source;
+        HasNewVersion = hasNewVersion;
+        OnPropertyChanged(nameof(ShortDescription));
+    }
 }
 
 public sealed class HeaderEditorViewModel : NotifyViewModel
