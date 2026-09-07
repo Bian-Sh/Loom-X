@@ -43,7 +43,7 @@ JA = {
     "settings.tab.proxy": "プロキシ",
     "settings.tab.updates": "更新",
     "settings.tab.data": "データとプライバシー",
-    "settings.tab.about": "About",
+    "settings.tab.about": "情報",
 
     # settings general
     "settings.language.label": "インターフェース言語",
