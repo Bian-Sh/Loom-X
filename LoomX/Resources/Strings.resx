@@ -679,6 +679,15 @@
   <data name="activity.detail.summary.fallback">
     <value>暂无诊断摘要</value>
   </data>
+  <data name="activity.route.openai.passthrough">
+    <value>OpenAI 直通</value>
+  </data>
+  <data name="activity.route.anthropic.passthrough">
+    <value>Anthropic 直通</value>
+  </data>
+  <data name="activity.route.ollama.passthrough">
+    <value>Ollama 直通</value>
+  </data>
 
   <!-- ============================================================ -->
   <!-- Activity - VM strings (ActivityViewModel + ActivityItemViewModel) -->

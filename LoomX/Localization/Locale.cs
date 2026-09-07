@@ -74,9 +74,12 @@ public static class ResourceLookup
         typeof(ResourceLookup).Assembly);
 
     public static string Resolve(string? key)
+        => Resolve(key, CultureInfo.CurrentUICulture);
+
+    public static string Resolve(string? key, CultureInfo culture)
     {
         if (string.IsNullOrEmpty(key)) return key ?? string.Empty;
-        try { return _res.GetString(key) ?? key; }
+        try { return _res.GetString(key, culture) ?? key; }
         catch (MissingManifestResourceException) { return key; }
         catch (MissingSatelliteAssemblyException) { return key; }
     }

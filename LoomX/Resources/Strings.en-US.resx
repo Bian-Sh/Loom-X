@@ -189,6 +189,9 @@
   <data name="activity.detail.field.error"><value>Error category</value></data>
   <data name="activity.detail.summary.label"><value>Redacted diagnostic summary</value></data>
   <data name="activity.detail.summary.fallback"><value>No diagnostic summary</value></data>
+  <data name="activity.route.openai.passthrough"><value>OpenAI passthrough</value></data>
+  <data name="activity.route.anthropic.passthrough"><value>Anthropic passthrough</value></data>
+  <data name="activity.route.ollama.passthrough"><value>Ollama passthrough</value></data>
   <data name="activity.filter.status.all"><value>All statuses</value></data>
   <data name="activity.filter.status.success"><value>Success</value></data>
   <data name="activity.filter.status.failed"><value>Failed</value></data>

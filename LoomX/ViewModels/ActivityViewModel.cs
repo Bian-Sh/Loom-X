@@ -9,6 +9,15 @@ using LoomX.Services;
 
 namespace LoomX.ViewModels;
 
+public sealed record ActivityFilterOption(string Value, string? LocalizationKey = null)
+{
+    public string DisplayName => GetDisplayName(System.Globalization.CultureInfo.CurrentUICulture);
+
+    internal string GetDisplayName(System.Globalization.CultureInfo culture) => LocalizationKey is null ? Value : ResourceLookup.Resolve(LocalizationKey, culture);
+
+    public override string ToString() => DisplayName;
+}
+
 public sealed class ActivityViewModel : NotifyViewModel, IDisposable
 {
     private readonly AppDataStore dataStore;
@@ -17,8 +26,8 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     private readonly IStringLocalizer<ActivityViewModel> _loc;
     private CancellationTokenSource? refreshCancellation;
     private string searchText = string.Empty;
-    private string selectedStatus = "全部状态";
-    private string selectedProtocol = "全部入口协议";
+    private ActivityFilterOption selectedStatus = StatusOptions[0];
+    private ActivityFilterOption selectedProtocol = ProtocolOptions[0];
     private ActivityItemViewModel? selectedItem;
     private string status = "正在加载活动…";
     private int totalCount;
@@ -34,14 +43,39 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
     private int refreshVersion;
 
     public ObservableCollection<ActivityItemViewModel> Items { get; } = [];
-    public IReadOnlyList<string> StatusOptions { get; } = ["全部状态", "成功", "失败", "警告"];
-    public IReadOnlyList<string> ProtocolOptions { get; } = ["全部入口协议", "OpenAI", "Anthropic", "Ollama"];
+    public static IReadOnlyList<ActivityFilterOption> StatusOptions { get; } =
+    [
+        new("all", "activity.filter.status.all"),
+        new("ok", "activity.filter.status.success"),
+        new("fail", "activity.filter.status.failed"),
+        new("warn", "activity.filter.status.warning")
+    ];
+    public static IReadOnlyList<ActivityFilterOption> ProtocolOptions { get; } =
+    [
+        new("all", "activity.filter.protocol.all"),
+        new("OpenAI"),
+        new("Anthropic"),
+        new("Ollama")
+    ];
     public event EventHandler? ScrollToTopRequested;
     public string SearchText { get => searchText; set { if (SetProperty(ref searchText, value ?? string.Empty)) QueueRefresh(); } }
-    public string SelectedStatus { get => selectedStatus; set { if (SetProperty(ref selectedStatus, value ?? "全部状态")) QueueRefresh(); } }
-    public string SelectedProtocol { get => selectedProtocol; set { if (SetProperty(ref selectedProtocol, value ?? "全部入口协议")) QueueRefresh(); } }
-    public ActivityItemViewModel? SelectedItem { get => selectedItem; private set => SetProperty(ref selectedItem, value); }
+    public ActivityFilterOption SelectedStatus { get => selectedStatus; set { if (SetProperty(ref selectedStatus, value ?? StatusOptions[0])) QueueRefresh(); } }
+    public ActivityFilterOption SelectedProtocol { get => selectedProtocol; set { if (SetProperty(ref selectedProtocol, value ?? ProtocolOptions[0])) QueueRefresh(); } }
+    public ActivityItemViewModel? SelectedItem
+    {
+        get => selectedItem;
+        private set
+        {
+            if (!SetProperty(ref selectedItem, value)) return;
+            OnPropertyChanged(nameof(SelectedModelLabel));
+            OnPropertyChanged(nameof(SelectedRequestIdLabel));
+            OnPropertyChanged(nameof(SelectedLogSummary));
+        }
+    }
     public string Status { get => status; private set => SetProperty(ref status, value); }
+    public string SelectedModelLabel => SelectedItem?.ModelId ?? Loc("activity.detail.fallback.model");
+    public string SelectedRequestIdLabel => SelectedItem?.RequestId ?? Loc("activity.detail.fallback.requestid");
+    public string SelectedLogSummary => SelectedItem?.LogSummary ?? Loc("activity.detail.summary.fallback");
     public string ResultCountLabel => LocFormat("activity.result.count", Items.Count);
     public int TotalCount { get => totalCount; private set => SetProperty(ref totalCount, value); }
     public int ConversionCount { get => conversionCount; private set => SetProperty(ref conversionCount, value); }
@@ -94,6 +128,12 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
         OnPropertyChanged(nameof(LoadMoreLabel));
         OnPropertyChanged(nameof(StatusOptions));
         OnPropertyChanged(nameof(ProtocolOptions));
+        OnPropertyChanged(nameof(SelectedStatus));
+        OnPropertyChanged(nameof(SelectedProtocol));
+        OnPropertyChanged(nameof(SelectedModelLabel));
+        OnPropertyChanged(nameof(SelectedRequestIdLabel));
+        OnPropertyChanged(nameof(SelectedLogSummary));
+        ApplyPage(new ActivityPage(dataStore.ActivityWindow, null, dataStore.ActivityHasMore));
     }
 
     private void QueueRefresh()
@@ -176,7 +216,11 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
             LoadMoreCommand.Execute(null);
     }
 
-    private ActivityQuery BuildQuery() => new(SearchText, ToStatusValue(SelectedStatus), ToProtocolValue(SelectedProtocol), AppDataStore.ActivityWindowLimit);
+    private ActivityQuery BuildQuery() => new(
+        SearchText,
+        SelectedStatus.Value is "all" ? null : SelectedStatus.Value,
+        SelectedProtocol.Value is "all" ? null : SelectedProtocol.Value,
+        AppDataStore.ActivityWindowLimit);
 
     private void ApplyPage(ActivityPage page)
     {
@@ -216,15 +260,6 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
         P95Latency = values.Length == 0 ? ResourceLookup.Resolve("activity.dash") : LocFormat("activity.latency.format", values[(int)Math.Ceiling(values.Length * .95) - 1]);
     }
 
-    private static string? ToStatusValue(string value) => value switch
-    {
-        "成功" => "ok",
-        "失败" => "fail",
-        "警告" => "warn",
-        _ => null
-    };
-    private static string? ToProtocolValue(string value) => value is "全部入口协议" ? null : value;
-
     public void Dispose()
     {
         dataStore.ActivityWindowChanged -= storeActivityHandler;
@@ -243,7 +278,7 @@ public sealed class ActivityItemViewModel : NotifyViewModel
         Time = record.CreatedAt.ToLocalTime().ToString("HH:mm:ss");
         ModelId = string.IsNullOrWhiteSpace(record.ModelId) ? ResourceLookup.Resolve("activity.item.model.unknown") : record.ModelId;
         ProviderId = string.IsNullOrWhiteSpace(record.ProviderId) ? ResourceLookup.Resolve("activity.item.provider.unknown") : record.ProviderId;
-        Route = record.Route;
+        Route = LocalizeRoute(record.Route, System.Globalization.CultureInfo.CurrentUICulture);
         Protocol = record.Protocol;
         StatusCode = record.StatusCode;
         var successKey = "activity.filter.status.success";
@@ -263,11 +298,19 @@ public sealed class ActivityItemViewModel : NotifyViewModel
         Latency = ResourceLookup.Resolve("activity.dash") == "-" ? $"{record.ElapsedMs} ms" : string.Format(System.Globalization.CultureInfo.CurrentCulture, ResourceLookup.Resolve("activity.latency.format"), record.ElapsedMs);
         ElapsedMs = record.ElapsedMs;
         DetailRoute = record.IncomingPath;
-        Transform = record.Route;
+        Transform = Route;
         ResponseBytes = record.ResponseBytes > 0 ? string.Format(System.Globalization.CultureInfo.CurrentCulture, ResourceLookup.Resolve("activity.bytes.format"), record.ResponseBytes) : ResourceLookup.Resolve("activity.dash");
         ErrorType = record.ErrorType ?? ResourceLookup.Resolve("activity.dash");
         LogSummary = $"{record.Method} {record.IncomingPath}\nmodel: {ModelId}\nroute: {Route}\nstatus: {StatusCode}\nrequest_id: {RequestId}\nresponse_bytes: {ResponseBytes}";
     }
+
+    internal static string LocalizeRoute(string route, System.Globalization.CultureInfo culture) => route switch
+    {
+        "OpenAI 直通" => ResourceLookup.Resolve("activity.route.openai.passthrough", culture),
+        "Anthropic 直通" => ResourceLookup.Resolve("activity.route.anthropic.passthrough", culture),
+        "Ollama 直通" => ResourceLookup.Resolve("activity.route.ollama.passthrough", culture),
+        _ => route
+    };
 
     public long Id { get; }
     public string RequestId { get; }

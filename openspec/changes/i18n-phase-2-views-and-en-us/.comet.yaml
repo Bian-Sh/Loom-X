@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: executing-plans
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: 7a66e9da1b4d07489efc2e7ea6d0a843164c796f
 design_doc: docs/superpowers/specs/2026-09-06-i18n-phase-2-design.md
 plan: docs/superpowers/plans/2026-09-06-i18n-phase-2.md
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-09-07-i18n-phase-2-views-and-en-us-verify.md
 branch_status: handled
 created_at: 2026-09-06
-verified_at: null
+verified_at: 2026-09-07
 archived: false
 direct_override: null
 handoff_context: openspec/changes/i18n-phase-2-views-and-en-us/.comet/handoff/design-context.json

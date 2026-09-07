@@ -14,8 +14,12 @@ using LoomX.Logging;
 
 namespace LoomX.ViewModels;
 
-public sealed record SettingOption(string Value, string DisplayName)
+public sealed record SettingOption(string Value, string LocalizationKey)
 {
+    public string DisplayName => GetDisplayName(CultureInfo.CurrentUICulture);
+
+    internal string GetDisplayName(CultureInfo culture) => ResourceLookup.Resolve(LocalizationKey, culture);
+
     public override string ToString() => DisplayName;
 }
 
@@ -51,10 +55,10 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private bool suppressAutoSave;
     private CancellationTokenSource? autoSaveCancellation;
 
-    public static IReadOnlyList<SettingOption> LanguageOptions { get; } = [new("zh-CN", "简体中文"), new("en-US", "English"), new("ja-JP", "日本語")];
-    public static IReadOnlyList<SettingOption> ThemeOptions { get; } = [new("system", "跟随系统"), new("dark", "深色"), new("light", "浅色")];
-    public static IReadOnlyList<SettingOption> ProxyModeOptions { get; } = [new("direct", "直连"), new("system", "系统代理"), new("custom", "自定义代理")];
-    public static IReadOnlyList<SettingOption> LogRetentionOptions { get; } = [new("7", "7 天"), new("30", "30 天"), new("90", "90 天"), new("365", "365 天"), new("3650", "永久保留")];
+    public static IReadOnlyList<SettingOption> LanguageOptions { get; } = [new("zh-CN", "settings.option.language.zh-CN"), new("en-US", "settings.option.language.en-US"), new("ja-JP", "settings.option.language.ja-JP")];
+    public static IReadOnlyList<SettingOption> ThemeOptions { get; } = [new("system", "settings.option.theme.system"), new("dark", "settings.option.theme.dark"), new("light", "settings.option.theme.light")];
+    public static IReadOnlyList<SettingOption> ProxyModeOptions { get; } = [new("direct", "settings.option.proxy.direct"), new("system", "settings.option.proxy.system"), new("custom", "settings.option.proxy.custom")];
+    public static IReadOnlyList<SettingOption> LogRetentionOptions { get; } = [new("7", "settings.option.retention.7"), new("30", "settings.option.retention.30"), new("90", "settings.option.retention.90"), new("365", "settings.option.retention.365"), new("3650", "settings.option.retention.3650")];
 
     public SettingOption SelectedLanguage
     {
@@ -103,7 +107,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     {
         "direct" => Loc("settings.proxy.test.direct.success"),
         "system" => Loc("settings.proxy.test.system.success"),
-        _ => $"{Loc("settings.proxy.mode.label")}：{ProxyHost}:{ProxyPort}"
+        _ => $"{Loc("settings.proxy.mode.label")}: {ProxyHost}:{ProxyPort}"
     };
 
     public ICommand LoadCommand { get; }
@@ -351,6 +355,14 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
 
     private void OnCultureChanged(object? sender, CultureInfo culture)
     {
+        OnPropertyChanged(nameof(LanguageOptions));
+        OnPropertyChanged(nameof(ThemeOptions));
+        OnPropertyChanged(nameof(ProxyModeOptions));
+        OnPropertyChanged(nameof(LogRetentionOptions));
+        OnPropertyChanged(nameof(SelectedLanguage));
+        OnPropertyChanged(nameof(SelectedTheme));
+        OnPropertyChanged(nameof(SelectedProxyMode));
+        OnPropertyChanged(nameof(SelectedLogRetention));
         OnPropertyChanged(nameof(ProxyStatus));
     }
 
