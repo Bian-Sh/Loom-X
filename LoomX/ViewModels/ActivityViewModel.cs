@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Microsoft.Extensions.Localization;
@@ -9,11 +10,25 @@ using LoomX.Services;
 
 namespace LoomX.ViewModels;
 
-public sealed record ActivityFilterOption(string Value, string? LocalizationKey = null)
+public sealed class ActivityFilterOption : INotifyPropertyChanged
 {
-    public string DisplayName => GetDisplayName(System.Globalization.CultureInfo.CurrentUICulture);
+    public ActivityFilterOption(string value, string? localizationKey = null)
+    {
+        Value = value;
+        LocalizationKey = localizationKey;
+        LocaleService.CultureChanged += OnCultureChanged;
+    }
+
+    public string Value { get; }
+    public string? LocalizationKey { get; }
+    public string DisplayName => GetDisplayName(LocaleService.CurrentCulture);
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     internal string GetDisplayName(System.Globalization.CultureInfo culture) => LocalizationKey is null ? Value : ResourceLookup.Resolve(LocalizationKey, culture);
+    internal void NotifyDisplayNameChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
+
+    private void OnCultureChanged(object? sender, System.Globalization.CultureInfo culture) => NotifyDisplayNameChanged();
 
     public override string ToString() => DisplayName;
 }
@@ -126,10 +141,6 @@ public sealed class ActivityViewModel : NotifyViewModel, IDisposable
         OnPropertyChanged(nameof(ResultCountLabel));
         OnPropertyChanged(nameof(PendingActivityLabel));
         OnPropertyChanged(nameof(LoadMoreLabel));
-        OnPropertyChanged(nameof(StatusOptions));
-        OnPropertyChanged(nameof(ProtocolOptions));
-        OnPropertyChanged(nameof(SelectedStatus));
-        OnPropertyChanged(nameof(SelectedProtocol));
         OnPropertyChanged(nameof(SelectedModelLabel));
         OnPropertyChanged(nameof(SelectedRequestIdLabel));
         OnPropertyChanged(nameof(SelectedLogSummary));

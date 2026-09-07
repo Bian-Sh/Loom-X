@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.ComponentModel;
 using System.Net;
 using System.Windows.Input;
 using Avalonia.Threading;
@@ -14,11 +15,25 @@ using LoomX.Logging;
 
 namespace LoomX.ViewModels;
 
-public sealed record SettingOption(string Value, string LocalizationKey)
+public sealed class SettingOption : INotifyPropertyChanged
 {
-    public string DisplayName => GetDisplayName(CultureInfo.CurrentUICulture);
+    public SettingOption(string value, string localizationKey)
+    {
+        Value = value;
+        LocalizationKey = localizationKey;
+        LocaleService.CultureChanged += OnCultureChanged;
+    }
+
+    public string Value { get; }
+    public string LocalizationKey { get; }
+    public string DisplayName => GetDisplayName(LocaleService.CurrentCulture);
+
+    public event PropertyChangedEventHandler? PropertyChanged;
 
     internal string GetDisplayName(CultureInfo culture) => ResourceLookup.Resolve(LocalizationKey, culture);
+    internal void NotifyDisplayNameChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
+
+    private void OnCultureChanged(object? sender, CultureInfo culture) => NotifyDisplayNameChanged();
 
     public override string ToString() => DisplayName;
 }
@@ -355,14 +370,6 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
 
     private void OnCultureChanged(object? sender, CultureInfo culture)
     {
-        OnPropertyChanged(nameof(LanguageOptions));
-        OnPropertyChanged(nameof(ThemeOptions));
-        OnPropertyChanged(nameof(ProxyModeOptions));
-        OnPropertyChanged(nameof(LogRetentionOptions));
-        OnPropertyChanged(nameof(SelectedLanguage));
-        OnPropertyChanged(nameof(SelectedTheme));
-        OnPropertyChanged(nameof(SelectedProxyMode));
-        OnPropertyChanged(nameof(SelectedLogRetention));
         OnPropertyChanged(nameof(ProxyStatus));
     }
 
