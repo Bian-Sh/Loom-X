@@ -11,36 +11,50 @@ public sealed class LocalizationResourceParityTest
         "LoomX",
         "Resources");
 
+    private static readonly string[] SatelliteCultures = ["en-US", "zh-TW", "ja-JP"];
+
     [Fact]
-    public void EnUsContainsExactlyTheZhCnKeys()
+    public void AllSatellitesContainExactlyTheZhCnKeys()
     {
         var zhCn = Load("Strings.resx");
-        var enUs = Load("Strings.en-US.resx");
-        Assert.Empty(zhCn.Keys.Except(enUs.Keys));
-        Assert.Empty(enUs.Keys.Except(zhCn.Keys));
-    }
-
-    [Fact]
-    public void EnUsValuesAreNotEmpty()
-    {
-        var empty = Load("Strings.en-US.resx")
-            .Where(item => string.IsNullOrWhiteSpace(item.Value))
-            .Select(item => item.Key)
-            .ToArray();
-        Assert.Empty(empty);
-    }
-
-    [Fact]
-    public void EnUsFormatPlaceholdersMatchZhCn()
-    {
-        var zhCn = Load("Strings.resx");
-        var enUs = Load("Strings.en-US.resx");
-
-        foreach (var key in zhCn.Keys)
+        foreach (var culture in SatelliteCultures)
         {
-            var zhPlaceholders = Placeholders(zhCn[key]);
-            var enPlaceholders = Placeholders(enUs[key]);
-            Assert.Equal(zhPlaceholders, enPlaceholders);
+            var satellite = Load($"Strings.{culture}.resx");
+            Assert.Empty(zhCn.Keys.Except(satellite.Keys));
+            Assert.Empty(satellite.Keys.Except(zhCn.Keys));
+        }
+    }
+
+    [Fact]
+    public void AllSatelliteValuesAreNotEmpty()
+    {
+        foreach (var culture in SatelliteCultures)
+        {
+            var empty = Load($"Strings.{culture}.resx")
+                .Where(item => string.IsNullOrWhiteSpace(item.Value))
+                .Select(item => item.Key)
+                .ToArray();
+            Assert.Empty(empty);
+        }
+    }
+
+    [Fact]
+    public void AllSatelliteFormatPlaceholdersMatchZhCn()
+    {
+        var zhCn = Load("Strings.resx");
+        foreach (var culture in SatelliteCultures)
+        {
+            var satellite = Load($"Strings.{culture}.resx");
+            foreach (var key in zhCn.Keys)
+            {
+                var zhPlaceholders = Placeholders(zhCn[key]);
+                var satPlaceholders = Placeholders(satellite[key]);
+                Assert.True(
+                    zhPlaceholders.SequenceEqual(satPlaceholders),
+                    $"Placeholder mismatch for '{key}' in '{culture}': " +
+                    $"[zh-CN] [{string.Join(", ", zhPlaceholders)}] " +
+                    $"[{culture}] [{string.Join(", ", satPlaceholders)}]");
+            }
         }
     }
 

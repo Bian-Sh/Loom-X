@@ -1,0 +1,1237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <!-- Japanese (ja-JP) -->
+  <data name="app.loading.title">
+    <value>読み込み中</value>
+  </data>
+  <data name="app.loading.description">
+    <value>Loom-X を読み込んでいます。</value>
+  </data>
+  <data name="app.loading.failed">
+    <value>読み込み失敗</value>
+  </data>
+  <data name="app.loading.failed.description">
+    <value>データセンターの読み込みに失敗しました：{0}。ページを更新して再試行してください。</value>
+  </data>
+  <data name="nav.overview">
+    <value>概要</value>
+  </data>
+  <data name="nav.overview.description">
+    <value>ローカルサービスの健全性を確認し、ゲートウェイとモデル設定を簡単に確認します。</value>
+  </data>
+  <data name="nav.gateway">
+    <value>ゲートウェイ</value>
+  </data>
+  <data name="nav.gateway.description">
+    <value>Endpoint のモデルルートを組み合わせ、優先順位に基づいて自動フェイルオーバーします。</value>
+  </data>
+  <data name="nav.providers">
+    <value>Provider</value>
+  </data>
+  <data name="nav.providers.description">
+    <value>アップストリーム接続、リクエストプロトコル、認証キー、利用可能なモデルを管理します。</value>
+  </data>
+  <data name="nav.activity">
+    <value>アクティビティ</value>
+  </data>
+  <data name="nav.activity.title">
+    <value>リクエストアクティビティ</value>
+  </data>
+  <data name="nav.activity.description">
+    <value>プロトコル変換、アップストリーム遅延、HTTP エラーを特定し、プライバシー保護された追跡可能なコンテキストを保持します。</value>
+  </data>
+  <data name="nav.console">
+    <value>コンソール</value>
+  </data>
+  <data name="nav.console.description">
+    <value>ローカルゲートウェイ、プロトコル変換、アップストリームリクエストのマスク済み実行ログを表示します。</value>
+  </data>
+  <data name="nav.settings">
+    <value>設定</value>
+  </data>
+  <data name="nav.settings.description">
+    <value>Loom-X の表示、接続、更新、プライバシー設定を調整します。</value>
+  </data>
+  <data name="settings.tab.general">
+    <value>一般</value>
+  </data>
+  <data name="settings.tab.proxy">
+    <value>プロキシ</value>
+  </data>
+  <data name="settings.tab.updates">
+    <value>更新</value>
+  </data>
+  <data name="settings.tab.data">
+    <value>データとプライバシー</value>
+  </data>
+  <data name="settings.tab.about">
+    <value>About</value>
+  </data>
+  <data name="settings.language.label">
+    <value>インターフェース言語</value>
+  </data>
+  <data name="settings.language.hint">
+    <value>インターフェースの表示言語を変更します。</value>
+  </data>
+  <data name="settings.theme.label">
+    <value>テーマ</value>
+  </data>
+  <data name="settings.theme.hint">
+    <value>現在の作業環境に適した配色を選択します。</value>
+  </data>
+  <data name="settings.transparency.label">
+    <value>半透明ウィンドウ</value>
+  </data>
+  <data name="settings.transparency.hint">
+    <value>システムマテリアルを使用してウィンドウにわずかな奥行きを与えます。</value>
+  </data>
+  <data name="settings.opacity.label">
+    <value>不透明度</value>
+  </data>
+  <data name="settings.opacity.hint">
+    <value>値が大きいほど、コンテンツ領域は不透明になります。</value>
+  </data>
+  <data name="settings.blur.label">
+    <value>ぼかし具合</value>
+  </data>
+  <data name="settings.blur.hint">
+    <value>マテリアルのシステムぼかし強度を制御します（0〜64）。</value>
+  </data>
+  <data name="settings.proxy.mode.label">
+    <value>プロキシモード</value>
+  </data>
+  <data name="settings.proxy.mode.hint">
+    <value>アップストリームリクエストがプロキシ経由でネットワークにアクセスする方法を制御します。</value>
+  </data>
+  <data name="settings.proxy.host.label">
+    <value>プロキシアドレス</value>
+  </data>
+  <data name="settings.proxy.port.label">
+    <value>ポート</value>
+  </data>
+  <data name="settings.proxy.username.label">
+    <value>ユーザー名（任意）</value>
+  </data>
+  <data name="settings.proxy.password.label">
+    <value>パスワード（任意）</value>
+  </data>
+  <data name="settings.proxy.password.saved.hint">
+    <value>プロキシパスワードが保存されています。新しいパスワードを入力して保存すると置き換わります。</value>
+  </data>
+  <data name="settings.proxy.password.clear">
+    <value>保存済みのプロキシパスワードを削除</value>
+  </data>
+  <data name="settings.proxy.status.label">
+    <value>接続状態</value>
+  </data>
+  <data name="settings.proxy.test.button">
+    <value>接続テスト</value>
+  </data>
+  <data name="settings.update.version.label">
+    <value>現在のバージョン</value>
+  </data>
+  <data name="settings.update.version.hint">
+    <value>ローカルデスクトップアプリのバージョン情報。</value>
+  </data>
+  <data name="settings.update.auto.check">
+    <value>自動更新チェック</value>
+  </data>
+  <data name="settings.update.auto.check.hint">
+    <value>起動時にチェックし、アプリ実行中は24時間ごとにチェックします。自動インストールはされません。</value>
+  </data>
+  <data name="settings.update.use.proxy">
+    <value>更新時にプロキシを使用</value>
+  </data>
+  <data name="settings.update.use.proxy.hint">
+    <value>既定では上部のプロキシモードに従います。無効にすると更新リクエストは直接接続します。</value>
+  </data>
+  <data name="settings.update.check.button">
+    <value>更新を確認</value>
+  </data>
+  <data name="settings.diagnostic.send">
+    <value>匿名診断データを送信</value>
+  </data>
+  <data name="settings.diagnostic.send.hint">
+    <value>API キー、リクエスト本文、モデル内容には含まれません。</value>
+  </data>
+  <data name="settings.log.stacktrace">
+    <value>ログスタックトレースを記録</value>
+  </data>
+  <data name="settings.log.stacktrace.hint">
+    <value>既定で無効です。有効にすると異常の特定が容易になりますが、ログに更完全な呼び出しパスが含まれます。</value>
+  </data>
+  <data name="settings.log.retention.label">
+    <value>ログ保持期間</value>
+  </data>
+  <data name="settings.log.retention.hint">
+    <value>コンソールログは期間終了後に自動でクリーンアップされます。</value>
+  </data>
+  <data name="settings.local.data">
+    <value>ローカルデータ</value>
+  </data>
+  <data name="settings.local.data.path.label">
+    <value>データディレクトリ：</value>
+  </data>
+  <data name="settings.local.data.open">
+    <value>データディレクトリを開く</value>
+  </data>
+  <data name="settings.local.data.clear">
+    <value>ログを削除</value>
+  </data>
+  <data name="settings.about.description">
+    <value>Loom-X は、OpenAI、Anthropic、Ollama エンドポイントに基づくローカルおよびクラウド AI サービス向けの統合アクセスレイヤーを提供します。IDE や GitHub Copilot で選択したモデルを使用できます。モデルの選択権を開発者に返し、日常のコーディングをもっと自由で、もっと効率的にします。</value>
+  </data>
+  <data name="settings.about.homepage">
+    <value>プロジェクトホームページ</value>
+  </data>
+  <data name="settings.about.issues">
+    <value>問題を報告</value>
+  </data>
+  <data name="settings.about.export.label">
+    <value>診断情報をエクスポート</value>
+  </data>
+  <data name="settings.about.export.hint">
+    <value>認証キーやリクエスト本文を含まない診断サマリーを生成します。</value>
+  </data>
+  <data name="settings.about.export.button">
+    <value>診断をエクスポート</value>
+  </data>
+  <data name="settings.status.loading">
+    <value>設定を読み込んでいます…</value>
+  </data>
+  <data name="settings.status.loaded">
+    <value>設定を読み込みました</value>
+  </data>
+  <data name="settings.status.load.failed">
+    <value>設定の読み込みに失敗しました：{0}</value>
+  </data>
+  <data name="settings.status.saving">
+    <value>設定を保存しています…</value>
+  </data>
+  <data name="settings.status.saved">
+    <value>設定を保存しました · {0}</value>
+  </data>
+  <data name="settings.status.save.failed">
+    <value>設定の保存に失敗しました：{0}</value>
+  </data>
+  <data name="settings.status.waiting">
+    <value>自動保存を待機中…</value>
+  </data>
+  <data name="settings.proxy.test.direct.success">
+    <value>直接接続モードの設定は有効です。</value>
+  </data>
+  <data name="settings.proxy.test.system.success">
+    <value>システムプロキシモードが選択されました。Windows 設定に従います。</value>
+  </data>
+  <data name="settings.proxy.test.invalid">
+    <value>プロキシテストに失敗しました：有効な HTTP/HTTPS アドレスとポートを入力してください。</value>
+  </data>
+  <data name="settings.proxy.test.invalid.toast">
+    <value>プロキシテストの設定が無効です</value>
+  </data>
+  <data name="settings.proxy.test.running">
+    <value>プロキシ接続をテストしています…</value>
+  </data>
+  <data name="settings.proxy.test.success">
+    <value>プロキシ接続正常 · {0}</value>
+  </data>
+  <data name="settings.proxy.test.response">
+    <value>プロキシ応答あり · {0}</value>
+  </data>
+  <data name="settings.proxy.test.toast.success">
+    <value>プロキシ接続テストに成功しました</value>
+  </data>
+  <data name="settings.proxy.test.toast.response">
+    <value>プロキシに応答がありました。設定を確認してください</value>
+  </data>
+  <data name="settings.proxy.test.toast.failed">
+    <value>プロキシ接続テストに失敗しました</value>
+  </data>
+  <data name="settings.proxy.test.exception">
+    <value>プロキシテストに失敗しました：{0}</value>
+  </data>
+  <data name="settings.update.check.status.running">
+    <value>更新を確認しています…</value>
+  </data>
+  <data name="settings.update.check.status.latest">
+    <value>現在のバージョン {0} は最新です。</value>
+  </data>
+  <data name="settings.update.check.status.found">
+    <value>新しいバージョン v{0} が見つかりました。右下の更新通知を確認してください。</value>
+  </data>
+  <data name="settings.update.check.toast.latest">
+    <value>最新バージョンです</value>
+  </data>
+  <data name="settings.update.check.toast.found">
+    <value>新しいバージョン v{0} が見つかりました</value>
+  </data>
+  <data name="settings.local.data.opened">
+    <value>ローカルデータディレクトリを開きました。</value>
+  </data>
+  <data name="settings.local.data.open.failed">
+    <value>データディレクトリの開きに失敗しました：{0}</value>
+  </data>
+  <data name="settings.local.data.logs.empty">
+    <value>クリーンアップ可能なログがありません。</value>
+  </data>
+  <data name="settings.local.data.logs.cleared">
+    <value>{0} 個のログファイルを削除しました。</value>
+  </data>
+  <data name="settings.local.data.logs.clear.failed">
+    <value>ログのクリーンアップに失敗しました：{0}</value>
+  </data>
+  <data name="settings.local.data.export.done">
+    <value>診断サマリーをエクスポートしました。</value>
+  </data>
+  <data name="settings.local.data.export.failed">
+    <value>診断のエクスポートに失敗しました：{0}</value>
+  </data>
+  <data name="settings.local.data.export.content" xml:space="preserve">
+    <value>Loom-X 診断サマリー
+バージョン：{0}
+システム：{1}
+データディレクトリ：{2}
+プロキシモード：{3}
+ログ保持：{4} 日</value>
+  </data>
+  <data name="settings.option.language.zh-CN">
+    <value>簡体字中国語</value>
+  </data>
+  <data name="settings.option.language.zh-TW">
+    <value>繁体字中国語</value>
+  </data>
+  <data name="settings.option.language.en-US">
+    <value>英語</value>
+  </data>
+  <data name="settings.option.language.ja-JP">
+    <value>日本語</value>
+  </data>
+  <data name="settings.option.theme.system">
+    <value>システムに従う</value>
+  </data>
+  <data name="settings.option.theme.dark">
+    <value>ダーク</value>
+  </data>
+  <data name="settings.option.theme.light">
+    <value>ライト</value>
+  </data>
+  <data name="settings.option.proxy.direct">
+    <value>直接接続</value>
+  </data>
+  <data name="settings.option.proxy.system">
+    <value>システムプロキシ</value>
+  </data>
+  <data name="settings.option.proxy.custom">
+    <value>カスタムプロキシ</value>
+  </data>
+  <data name="settings.option.retention.7">
+    <value>7 日</value>
+  </data>
+  <data name="settings.option.retention.30">
+    <value>30 日</value>
+  </data>
+  <data name="settings.option.retention.90">
+    <value>90 日</value>
+  </data>
+  <data name="settings.option.retention.365">
+    <value>365 日</value>
+  </data>
+  <data name="settings.option.retention.3650">
+    <value>永久保持</value>
+  </data>
+  <data name="window.minimize">
+    <value>最小化</value>
+  </data>
+  <data name="window.maximize">
+    <value>最大化または元に戻す</value>
+  </data>
+  <data name="window.close">
+    <value>閉じる</value>
+  </data>
+  <data name="sidebar.service">
+    <value>ローカルサービス</value>
+  </data>
+  <data name="sidebar.version">
+    <value>サービスバージョン</value>
+  </data>
+  <data name="update.card.title">
+    <value>新しいバージョンが見つかりました</value>
+  </data>
+  <data name="update.card.release.notes">
+    <value>リリースノート</value>
+  </data>
+  <data name="update.card.later">
+    <value>後で</value>
+  </data>
+  <data name="update.card.download">
+    <value>今すぐダウンロード</value>
+  </data>
+  <data name="update.card.later.tip">
+    <value>後で処理</value>
+  </data>
+  <data name="update.card.close">
+    <value>閉じる</value>
+  </data>
+  <data name="overview.graph.hint">
+    <value>ホイールでズーム · drag to pan</value>
+  </data>
+  <data name="overview.endpoint.focus.tip">
+    <value>Endpoint にフォーカス</value>
+  </data>
+  <data name="overview.graph.fit.tooltip">
+    <value>キャンバスに適合</value>
+  </data>
+  <data name="overview.gateway.label">
+    <value>ローカルゲートウェイ</value>
+  </data>
+  <data name="overview.gateway.endpoint.label">
+    <value>リスニングアドレス</value>
+  </data>
+  <data name="overview.gateway.version.label">
+    <value>インターフェース状態</value>
+  </data>
+  <data name="overview.gateway.lastchecked.label">
+    <value>最終確認</value>
+  </data>
+  <data name="overview.refresh.button">
+    <value>更新</value>
+  </data>
+  <data name="overview.recent.label">
+    <value>最近のリクエスト</value>
+  </data>
+  <data name="overview.recent.count">
+    <value>最近 {0} 件</value>
+  </data>
+  <data name="overview.recent.empty">
+    <value>リクエストアクティビティなし</value>
+  </data>
+  <data name="overview.gateway.status.not_running">
+    <value>実行されていない</value>
+  </data>
+  <data name="overview.gateway.status.running">
+    <value>実行中</value>
+  </data>
+  <data name="overview.gateway.status.starting">
+    <value>起動中</value>
+  </data>
+  <data name="overview.gateway.status.stopping">
+    <value>停止中</value>
+  </data>
+  <data name="overview.gateway.status.failed">
+    <value>エラー：{0}</value>
+  </data>
+  <data name="overview.endpoint.unconfigured">
+    <value>未設定</value>
+  </data>
+  <data name="overview.version.unknown">
+    <value>不明</value>
+  </data>
+  <data name="overview.version.online">
+    <value>Loom-X API オンライン</value>
+  </data>
+  <data name="overview.version.disconnected">
+    <value>未接続</value>
+  </data>
+  <data name="overview.lastchecked.none">
+    <value>未確認</value>
+  </data>
+  <data name="overview.graph.waiting">
+    <value>ゲートウェイ起動を待機中</value>
+  </data>
+  <data name="overview.graph.connected">
+    <value>リアルタイムトポロジー接続済み</value>
+  </data>
+  <data name="overview.graph.failed">
+    <value>概要の読み込みに失敗しました</value>
+  </data>
+  <data name="overview.gateway.action.start">
+    <value>ゲートウェイを起動</value>
+  </data>
+  <data name="overview.gateway.action.stop">
+    <value>ゲートウェイを停止</value>
+  </data>
+  <data name="overview.gateway.action.starting">
+    <value>起動中</value>
+  </data>
+  <data name="overview.gateway.action.stopping">
+    <value>停止中</value>
+  </data>
+  <data name="overview.request.status.success">
+    <value>成功</value>
+  </data>
+  <data name="overview.request.status.failed">
+    <value>失敗</value>
+  </data>
+  <data name="overview.request.model.unknown">
+    <value>不明なモデル</value>
+  </data>
+  <data name="overview.endpoint.status.disabled">
+    <value>無効</value>
+  </data>
+  <data name="overview.endpoint.status.no_routes">
+    <value>ルートなし</value>
+  </data>
+  <data name="overview.endpoint.status.active">
+    <value>リクエストあり</value>
+  </data>
+  <data name="overview.endpoint.status.ready">
+    <value>準備完了</value>
+  </data>
+  <data name="overview.route.status.active">
+    <value>アクティブ</value>
+  </data>
+  <data name="overview.route.status.idle">
+    <value>待機中</value>
+  </data>
+  <data name="overview.lateness.dash">
+    <value>—</value>
+  </data>
+  <data name="overview.latency.format">
+    <value>{0} ms</value>
+  </data>
+  <data name="activity.stat.requestcount.label">
+    <value>リクエスト数</value>
+  </data>
+  <data name="activity.stat.requestcount.sub">
+    <value>現在のフィルタ結果</value>
+  </data>
+  <data name="activity.stat.conversion.label">
+    <value>プロトコル変換</value>
+  </data>
+  <data name="activity.stat.conversion.sub">
+    <value>OpenAI → Anthropic</value>
+  </data>
+  <data name="activity.stat.failures.label">
+    <value>失敗リクエスト</value>
+  </data>
+  <data name="activity.stat.failures.sub">
+    <value>HTTP 5xx</value>
+  </data>
+  <data name="activity.stat.p95.label">
+    <value>P95 遅延</value>
+  </data>
+  <data name="activity.stat.p95.sub">
+    <value>最近のアクティビティ</value>
+  </data>
+  <data name="activity.search.placeholder">
+    <value>モデル、Provider、またはリクエスト ID を検索</value>
+  </data>
+  <data name="activity.column.time">
+    <value>時刻 / リクエスト ID</value>
+  </data>
+  <data name="activity.column.model">
+    <value>モデル / Provider</value>
+  </data>
+  <data name="activity.column.route">
+    <value>入口と変換パス</value>
+  </data>
+  <data name="activity.column.status">
+    <value>状態</value>
+  </data>
+  <data name="activity.column.latency">
+    <value>遅延</value>
+  </data>
+  <data name="activity.detail.title">
+    <value>選択されたリクエスト</value>
+  </data>
+  <data name="activity.detail.fallback.model">
+    <value>選択されたリクエストなし</value>
+  </data>
+  <data name="activity.detail.fallback.requestid">
+    <value>左側のリクエストを選択して詳細を表示</value>
+  </data>
+  <data name="activity.detail.copy.requestid">
+    <value>リクエスト ID をコピー</value>
+  </data>
+  <data name="activity.detail.field.protocol">
+    <value>入口プロトコル</value>
+  </data>
+  <data name="activity.detail.field.route">
+    <value>変換パス</value>
+  </data>
+  <data name="activity.detail.field.upstream">
+    <value>アップストリーム応答</value>
+  </data>
+  <data name="activity.detail.field.size">
+    <value>応答サイズ</value>
+  </data>
+  <data name="activity.detail.field.error">
+    <value>エラー分類</value>
+  </data>
+  <data name="activity.detail.summary.label">
+    <value>プライバシー保護済み診断サマリー</value>
+  </data>
+  <data name="activity.detail.summary.fallback">
+    <value>診断サマリーなし</value>
+  </data>
+  <data name="activity.route.openai.passthrough">
+    <value>OpenAI 透過</value>
+  </data>
+  <data name="activity.route.anthropic.passthrough">
+    <value>Anthropic 透過</value>
+  </data>
+  <data name="activity.route.ollama.passthrough">
+    <value>Ollama 透過</value>
+  </data>
+  <data name="activity.filter.status.all">
+    <value>すべての状態</value>
+  </data>
+  <data name="activity.filter.status.success">
+    <value>成功</value>
+  </data>
+  <data name="activity.filter.status.failed">
+    <value>失敗</value>
+  </data>
+  <data name="activity.filter.status.warning">
+    <value>警告</value>
+  </data>
+  <data name="activity.filter.protocol.all">
+    <value>すべての入口プロトコル</value>
+  </data>
+  <data name="activity.status.loading">
+    <value>アクティビティを読み込んでいます…</value>
+  </data>
+  <data name="activity.status.empty">
+    <value>リクエストアクティビティなし</value>
+  </data>
+  <data name="activity.status.loaded">
+    <value>{0} 件のアクティビティを読み込みました</value>
+  </data>
+  <data name="activity.status.load.failed">
+    <value>アクティビティの読み込みに失敗しました：{0}</value>
+  </data>
+  <data name="activity.status.history.more">
+    <value>{0} 件のアクティビティを読み込みました。履歴を続けて表示できます</value>
+  </data>
+  <data name="activity.status.history.end">
+    <value>{0} 件のアクティビティを読み込みました。履歴の末尾に達しました</value>
+  </data>
+  <data name="activity.status.history.failed">
+    <value>履歴アクティビティの読み込みに失敗しました：{0}</value>
+  </data>
+  <data name="activity.status.returned">
+    <value>最新アクティビティに戻りました</value>
+  </data>
+  <data name="activity.status.return.failed">
+    <value>最新アクティビティに戻ることに失敗しました：{0}</value>
+  </data>
+  <data name="activity.result.count">
+    <value>{0} 件のアクティビティを表示中</value>
+  </data>
+  <data name="activity.pending.count">
+    <value>{0} 件の新しいアクティビティがあります。最新に戻す</value>
+  </data>
+  <data name="activity.pending.back">
+    <value>最新に戻る</value>
+  </data>
+  <data name="activity.loadmore.loading">
+    <value>履歴アクティビティを読み込んでいます…</value>
+  </data>
+  <data name="activity.loadmore.continue">
+    <value>上方向にスワイプして古いアクティビティを読み込む</value>
+  </data>
+  <data name="activity.loadmore.end">
+    <value>アクティビティ履歴の末尾に達しました</value>
+  </data>
+  <data name="activity.item.model.unknown">
+    <value>未認識モデル</value>
+  </data>
+  <data name="activity.item.provider.unknown">
+    <value>未マッピング Provider</value>
+  </data>
+  <data name="activity.latency.format">
+    <value>{0} ms</value>
+  </data>
+  <data name="activity.bytes.format">
+    <value>{0:N0} B</value>
+  </data>
+  <data name="activity.dash">
+    <value>—</value>
+  </data>
+  <data name="console.search.placeholder">
+    <value>リクエスト ID、モデル、またはエラー情報を検索</value>
+  </data>
+  <data name="console.toggle.info">
+    <value>通常ログ</value>
+  </data>
+  <data name="console.toggle.warning">
+    <value>警告ログ</value>
+  </data>
+  <data name="console.toggle.error">
+    <value>エラーログ</value>
+  </data>
+  <data name="console.copy.tip">
+    <value>ログをコピー</value>
+  </data>
+  <data name="console.empty">
+    <value>現在のフィルタ条件に一致するログがありません。</value>
+  </data>
+  <data name="console.jump.tip">
+    <value>下へジャンプ</value>
+  </data>
+  <data name="console.clear">
+    <value>消去</value>
+  </data>
+  <data name="console.count.format">
+    <value>全 {0} 件</value>
+  </data>
+  <data name="console.copied">
+    <value>ログをコピーしました</value>
+  </data>
+  <data name="providers.header.list">
+    <value>プロバイダー一覧</value>
+  </data>
+  <data name="providers.header.list.hint">
+    <value>現在のルート順に表示</value>
+  </data>
+  <data name="providers.button.new">
+    <value>新規 Provider</value>
+  </data>
+  <data name="providers.search.watermark">
+    <value>Provider を検索</value>
+  </data>
+  <data name="providers.toggle.tooltip.enabled">
+    <value>緑色は有効を示します</value>
+  </data>
+  <data name="providers.toggle.tooltip">
+    <value>Provider を有効化</value>
+  </data>
+  <data name="providers.delete.tooltip">
+    <value>Provider を削除</value>
+  </data>
+  <data name="providers.count.enabled">
+    <value> 件有効</value>
+  </data>
+  <data name="providers.count.models">
+    <value> 件のモデル</value>
+  </data>
+  <data name="providers.count.models.suffix">
+    <value> 件のモデル ·</value>
+  </data>
+  <data name="providers.model.count.suffix">
+    <value> ·</value>
+  </data>
+  <data name="providers.key.configured">
+    <value>認証キー設定済み</value>
+  </data>
+  <data name="providers.key.protected">
+    <value>認証キー保護済み</value>
+  </data>
+  <data name="providers.card.providers.label">
+    <value>Provider</value>
+  </data>
+  <data name="providers.card.models.label">
+    <value>利用可能なモデル</value>
+  </data>
+  <data name="providers.card.models.status">
+    <value>リモートモデル検出済み</value>
+  </data>
+  <data name="providers.card.keys.label">
+    <value>保護済み認証キー</value>
+  </data>
+  <data name="providers.card.keys.status">
+    <value>DPAPI CurrentUser</value>
+  </data>
+  <data name="providers.card.health.label">
+    <value>接続健全性</value>
+  </data>
+  <data name="providers.card.health.status">
+    <value>検証待ち</value>
+  </data>
+  <data name="providers.tab.basic">
+    <value>基本</value>
+  </data>
+  <data name="providers.tab.request">
+    <value>リクエスト</value>
+  </data>
+  <data name="providers.tab.models">
+    <value>モデル</value>
+  </data>
+  <data name="providers.basic.header">
+    <value>アイデンティティとアップストリーム</value>
+  </data>
+  <data name="providers.request.header">
+    <value>認証とネットワーク</value>
+  </data>
+  <data name="providers.name.label">
+    <value>表示名</value>
+  </data>
+  <data name="providers.name.watermark">
+    <value>例：DeepSeek</value>
+  </data>
+  <data name="providers.id.label">
+    <value>Provider ID</value>
+  </data>
+  <data name="providers.id.watermark">
+    <value>一意な識別子</value>
+  </data>
+  <data name="providers.type.label">
+    <value>Provider タイプ</value>
+  </data>
+  <data name="providers.baseurl.label">
+    <value>Base URL</value>
+  </data>
+  <data name="providers.baseurl.tooltip">
+    <value>v1 を追加するかどうかに迷ったら、プロバイダーのドキュメントに従ってください</value>
+  </data>
+  <data name="providers.endpointformat.label">
+    <value>リクエスト形式</value>
+  </data>
+  <data name="providers.proxy.checkbox">
+    <value>プロキシを使用</value>
+  </data>
+  <data name="providers.headers.label">
+    <value>カスタムリクエストヘッダー</value>
+  </data>
+  <data name="providers.headers.add">
+    <value>追加</value>
+  </data>
+  <data name="providers.headers.name.watermark">
+    <value>ヘッダー名</value>
+  </data>
+  <data name="providers.headers.value.watermark">
+    <value>ヘッダー値</value>
+  </data>
+  <data name="providers.headers.remove.tooltip">
+    <value>リクエストヘッダーを削除</value>
+  </data>
+  <data name="providers.headers.incomplete">
+    <value>{0} 件のリクエストヘッダーが未完了です。名前と値を入力すると保存されます。</value>
+  </data>
+  <data name="providers.headers.incomplete.prefix">
+    <value>・</value>
+  </data>
+  <data name="providers.headers.incomplete.suffix">
+    <value> 件のリクエストヘッダーが未完了です。名前と値を入力すると保存されます。</value>
+  </data>
+  <data name="providers.headers.empty">
+    <value>カスタムリクエストヘッダーが追加されていません</value>
+  </data>
+  <data name="providers.connection.label">
+    <value>接続状態</value>
+  </data>
+  <data name="providers.connection.test">
+    <value>接続テスト</value>
+  </data>
+  <data name="providers.models.url.label">
+    <value>モデルリスト URL（任意）</value>
+  </data>
+  <data name="providers.models.url.watermark">
+    <value>例：https://api.example.com/v1/models</value>
+  </data>
+  <data name="providers.models.url.hint">
+    <value>空の場合は Base URL から自動推論します。入力後はこのアドレスのみでモデルを更新し、チャットリクエストには影響しません。</value>
+  </data>
+  <data name="providers.models.search.watermark">
+    <value>モデルを検索</value>
+  </data>
+  <data name="providers.models.sync.tooltip">
+    <value>モデルを同期</value>
+  </data>
+  <data name="providers.models.sync.button">
+    <value>モデルを同期</value>
+  </data>
+  <data name="providers.models.toggleAll.tooltip">
+    <value>すべてのモデルを有効または無効にする</value>
+  </data>
+  <data name="providers.models.sort.drag.tooltip">
+    <value>ドラッグしてモデルの順序を調整</value>
+  </data>
+  <data name="providers.models.sort.toggle.tooltip">
+    <value>モデルを下流に公開するか制御</value>
+  </data>
+  <data name="providers.models.sort.toggle.automation">
+    <value>モデルを有効化</value>
+  </data>
+  <data name="providers.models.vision.tooltip">
+    <value>画像入力をサポート</value>
+  </data>
+  <data name="providers.models.ctx.suffix">
+    <value> ctx · </value>
+  </data>
+  <data name="providers.models.delete.tooltip">
+    <value>モデルを削除</value>
+  </data>
+  <data name="providers.dragging">
+    <value>ドラッグ中</value>
+  </data>
+  <data name="providers.models.empty">
+    <value>一致するモデルがありません</value>
+  </data>
+  <data name="providers.empty.title">
+    <value>Provider なし</value>
+  </data>
+  <data name="providers.empty.hint">
+    <value>まず左側のディレクトリから Provider を追加してください。</value>
+  </data>
+  <data name="providers.edit.new.displayname">
+    <value>新しい Provider</value>
+  </data>
+  <data name="providers.status.edit.new">
+    <value>新しい Provider を編集中</value>
+  </data>
+  <data name="providers.status.loaded">
+    <value>{0} 件の Provider を読み込みました</value>
+  </data>
+  <data name="providers.loading.failure">
+    <value>読み込み失敗：{0}</value>
+  </data>
+  <data name="providers.save.success">
+    <value>Provider を保存しました</value>
+  </data>
+  <data name="providers.save.success.pendingHeaders">
+    <value>Provider を保存しました · {0} 件のヘッダーが未完了</value>
+  </data>
+  <data name="providers.save.failure">
+    <value>保存に失敗しました：{0}</value>
+  </data>
+  <data name="providers.delete.success">
+    <value>Provider を削除しました</value>
+  </data>
+  <data name="providers.delete.failure">
+    <value>削除に失敗しました：{0}</value>
+  </data>
+  <data name="providers.headers.pending">
+    <value>{0} 件のカスタムリクエストヘッダーを補完してください</value>
+  </data>
+  <data name="providers.sync.beforeProvider">
+    <value>まず Provider を保存してからモデルを追加してください</value>
+  </data>
+  <data name="providers.sync.beforeModel">
+    <value>まず Provider を保存してからモデルを同期してください</value>
+  </data>
+  <data name="providers.sync.invalidUrl">
+    <value>モデルリスト URL は HTTP または HTTPS の絶対アドレスである必要があります</value>
+  </data>
+  <data name="providers.sync.running">
+    <value>モデルを同期しています…</value>
+  </data>
+  <data name="providers.sync.failure.http">
+    <value>モデル同期に失敗しました · {0} {1}</value>
+  </data>
+  <data name="providers.sync.failure.toast.http">
+    <value>モデル同期に失敗しました · {0}</value>
+  </data>
+  <data name="providers.sync.failure.empty">
+    <value>モデル同期に失敗しました · 応答内に利用可能なモデルがありません</value>
+  </data>
+  <data name="providers.sync.failure.parse">
+    <value>モデル同期に失敗しました · 応答形式を解析できません</value>
+  </data>
+  <data name="providers.sync.failure.exception">
+    <value>モデル同期に失敗しました · {0}</value>
+  </data>
+  <data name="providers.sync.failure.toast.exception">
+    <value>モデル同期に失敗しました</value>
+  </data>
+  <data name="providers.sync.success">
+    <value>モデル同期完了 · 検出 {0} 件、新規 {1} 件、更新 {2} 件</value>
+  </data>
+  <data name="providers.test.baseurl.required">
+    <value>まず Base URL を入力してください</value>
+  </data>
+  <data name="providers.test.baseurl.required.toast">
+    <value>まず Provider の Base URL を入力してください</value>
+  </data>
+  <data name="providers.test.running">
+    <value>接続をテストしています…</value>
+  </data>
+  <data name="providers.test.success">
+    <value>接続正常 · {0} · {1} ms</value>
+  </data>
+  <data name="providers.test.failure">
+    <value>接続に失敗しました · {0} {1}</value>
+  </data>
+  <data name="providers.test.failure.exception">
+    <value>接続に失敗しました · {0}</value>
+  </data>
+  <data name="providers.test.toast.success">
+    <value>Provider 接続テストに成功しました</value>
+  </data>
+  <data name="providers.test.toast.failure">
+    <value>Provider 接続テストに失敗しました</value>
+  </data>
+  <data name="providers.model.edit.new">
+    <value>新しいモデルを編集中</value>
+  </data>
+  <data name="providers.model.save.success">
+    <value>モデルを保存しました</value>
+  </data>
+  <data name="providers.model.save.failure">
+    <value>モデルの保存に失敗しました：{0}</value>
+  </data>
+  <data name="providers.model.delete.success">
+    <value>モデルを削除しました</value>
+  </data>
+  <data name="providers.model.delete.failure">
+    <value>モデルの削除に失敗しました：{0}</value>
+  </data>
+  <data name="providers.model.order.saved">
+    <value>モデルの順序を保存しました</value>
+  </data>
+  <data name="providers.model.order.save.failure">
+    <value>モデルソート保存に失敗しました：{0}</value>
+  </data>
+  <data name="providers.model.order.save.failure.toast">
+    <value>モデルソート保存に失敗しました</value>
+  </data>
+  <data name="providers.model.enable.all">
+    <value>すべてのモデルを有効化しました</value>
+  </data>
+  <data name="providers.model.disable.all">
+    <value>すべてのモデルを無効化しました</value>
+  </data>
+  <data name="providers.model.summary">
+    <value>有効 {0} / {1} 件のモデル</value>
+  </data>
+  <data name="providers.model.unknown">
+    <value>不明なモデル</value>
+  </data>
+  <data name="providers.model.context.missing">
+    <value>AI プロバイダーのモデルインターフェースがコンテキスト設定を返していません</value>
+  </data>
+  <data name="providers.model.capability.vision">
+    <value>ビジョン</value>
+  </data>
+  <data name="providers.model.capability.text">
+    <value>テキスト</value>
+  </data>
+  <data name="providers.apikey.visibility.show">
+    <value>API Key を表示</value>
+  </data>
+  <data name="providers.apikey.visibility.hide">
+    <value>API Key を隠す</value>
+  </data>
+  <data name="providers.apikey.watermark">
+    <value>API Key を入力してください</value>
+  </data>
+  <data name="providers.apikey.configured">
+    <value>API Key 設定済み</value>
+  </data>
+  <data name="providers.apikey.notGenerated">
+    <value>未生成</value>
+  </data>
+  <data name="gateway.endpoint.header">
+    <value>Endpoint</value>
+  </data>
+  <data name="gateway.endpoint.header.hint">
+    <value>モデルの組み合わせとフェイルオーバー順序を独立して管理</value>
+  </data>
+  <data name="gateway.endpoint.copyUrl.tooltip">
+    <value>Base URL をコピー</value>
+  </data>
+  <data name="gateway.endpoint.rotateKey.tooltip">
+    <value>API Key を再生成</value>
+  </data>
+  <data name="gateway.endpoint.copyKey.tooltip">
+    <value>API Key をコピー</value>
+  </data>
+  <data name="gateway.endpoint.comboCount">
+    <value>公開された Combo {0} 件</value>
+  </data>
+  <data name="gateway.endpoint.comboCount.prefix">
+    <value>公開済み </value>
+  </data>
+  <data name="gateway.endpoint.comboCount.suffix">
+    <value> 件の Combo</value>
+  </data>
+  <data name="gateway.combo.header">
+    <value>グローバル Combo</value>
+  </data>
+  <data name="gateway.combo.header.hint">
+    <value>Endpoint 間で共有し、メンバー順にフェイルオーバー</value>
+  </data>
+  <data name="gateway.combo.add.tooltip">
+    <value>Combo モデルを追加</value>
+  </data>
+  <data name="gateway.combo.expand.tooltip">
+    <value>Combo を展開または折りたたむ</value>
+  </data>
+  <data name="gateway.combo.toggle.tooltip">
+    <value>Combo を有効または無効にする</value>
+  </data>
+  <data name="gateway.combo.remove.tooltip">
+    <value>Combo モデルを削除</value>
+  </data>
+  <data name="gateway.route.sort.drag.tooltip">
+    <value>ドラッグしてフェイルオーバー順序を調整</value>
+  </data>
+  <data name="gateway.route.sort.toggle.tooltip">
+    <value>メンバーを有効または無効にする</value>
+  </data>
+  <data name="gateway.route.sort.remove.tooltip">
+    <value>Combo からモデルを削除</value>
+  </data>
+  <data name="gateway.route.sort.dragging">
+    <value>ドラッグ中</value>
+  </data>
+  <data name="gateway.combo.memberOrder.hint">
+    <value>メンバーモデルは順番にフェイルオーバー</value>
+  </data>
+  <data name="gateway.combo.addModel.tooltip">
+    <value>Combo にモデルを追加</value>
+  </data>
+  <data name="gateway.combo.search.watermark">
+    <value>モデルを検索...</value>
+  </data>
+  <data name="gateway.sort.ascending.tooltip">
+    <value>アルファベット昇順でソート</value>
+  </data>
+  <data name="gateway.sort.descending.tooltip">
+    <value>アルファベット降順でソート</value>
+  </data>
+  <data name="gateway.url.copied">
+    <value>アドレスをコピーしました</value>
+  </data>
+  <data name="gateway.apikey.copied">
+    <value>API Key をコピーしました</value>
+  </data>
+  <data name="gateway.status.loaded">
+    <value>{0} 件の Provider、{1} 件のモデル、{2} 件の Endpoint、{3} 件の Combo を読み込みました</value>
+  </data>
+  <data name="gateway.status.load.failure">
+    <value>ゲートウェイの読み込みに失敗しました：{0}</value>
+  </data>
+  <data name="gateway.combo.new.name">
+    <value>新しい Combo</value>
+  </data>
+  <data name="gateway.combo.new.name.dup">
+    <value>新しい Combo {0}</value>
+  </data>
+  <data name="gateway.combo.add.success">
+    <value>グローバル Combo を追加しました</value>
+  </data>
+  <data name="gateway.combo.add.failure">
+    <value>Combo モデルの追加に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.combo.save.success">
+    <value>Combo モデルを保存しました</value>
+  </data>
+  <data name="gateway.combo.save.failure">
+    <value>Combo モデルの保存に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.combo.remove.success">
+    <value>グローバル Combo を削除しました</value>
+  </data>
+  <data name="gateway.combo.remove.failure">
+    <value>Combo モデルの削除に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.endpoint.comboScope.saved">
+    <value>{0} の Combo 公開範囲を保存しました</value>
+  </data>
+  <data name="gateway.endpoint.comboScope.failure">
+    <value>Endpoint Combo の更新に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.endpoint.comboScope.failure.toast">
+    <value>Endpoint Combo の更新に失敗しました</value>
+  </data>
+  <data name="gateway.route.reorder.saved">
+    <value>フェイルオーバー順序を保存しました</value>
+  </data>
+  <data name="gateway.route.reorder.failure">
+    <value>ソート保存に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.model.available.empty">
+    <value>追加可能な有効化モデルがありません。まず Provider でモデルを有効化してください</value>
+  </data>
+  <data name="gateway.model.available.loaded">
+    <value>{0} 件の追加可能モデルを読み込みました</value>
+  </data>
+  <data name="gateway.model.available.load.failure">
+    <value>追加可能モデルの読み込みに失敗しました：{0}</value>
+  </data>
+  <data name="gateway.model.combo.add.success">
+    <value>モデルを Combo に追加しました</value>
+  </data>
+  <data name="gateway.model.combo.add.failure">
+    <value>Combo への追加に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.model.combo.remove.success">
+    <value>モデルを Combo から削除しました</value>
+  </data>
+  <data name="gateway.model.combo.remove.failure">
+    <value>メンバーの削除に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.route.member.save.success">
+    <value>メンバー状態を保存しました</value>
+  </data>
+  <data name="gateway.route.member.save.failure">
+    <value>メンバーの保存に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.endpoint.toggle.success">
+    <value>{0} は{1}しました</value>
+  </data>
+  <data name="gateway.endpoint.toggle.failure">
+    <value>Endpoint の更新に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.endpoint.enable">
+    <value>有効</value>
+  </data>
+  <data name="gateway.endpoint.disable">
+    <value>無効</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerated">
+    <value>{0} の API Key を再生成しました</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerated.toast">
+    <value>API Key を再生成しました</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerate.failure">
+    <value>API Key 再生成に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerate.failure.toast">
+    <value>API Key 再生成に失敗しました</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.saved">
+    <value>{0} の Reasoning effort を保存しました</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.saved.toast">
+    <value>Reasoning effort を保存しました</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.failure">
+    <value>Reasoning effort 保存に失敗しました：{0}</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.failure.toast">
+    <value>Reasoning effort 保存に失敗しました</value>
+  </data>
+  <data name="gateway.combo.summary.empty">
+    <value>Combo 未公開</value>
+  </data>
+  <data name="gateway.combo.summary.separator">
+    <value>、</value>
+  </data>
+  <data name="gateway.combo.disabled">
+    <value>グローバル無効</value>
+  </data>
+  <data name="gateway.endpoint.noRoutes">
+    <value>ルートなし</value>
+  </data>
+  <data name="gateway.endpoint.hasRequests">
+    <value>リクエストあり</value>
+  </data>
+  <data name="gateway.endpoint.ready">
+    <value>準備完了</value>
+  </data>
+  <data name="gateway.endpoint.active">
+    <value>アクティブ</value>
+  </data>
+  <data name="gateway.endpoint.standby">
+    <value>待機中</value>
+  </data>
+  <data name="gateway.request.success">
+    <value>成功</value>
+  </data>
+  <data name="gateway.request.failure">
+    <value>失敗</value>
+  </data>
+  <data name="providers.connection.status.pending">
+    <value>接続未テスト</value>
+  </data>
+  <data name="placeholder.empty.body">
+    <value>このページはナビゲーションに接続済みです。業務機能は今後のイテレーションで段階的に実装されます。</value>
+  </data>
+</root>

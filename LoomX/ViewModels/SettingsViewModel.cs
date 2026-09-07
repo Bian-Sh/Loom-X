@@ -76,6 +76,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public static IReadOnlyList<SettingOption> LanguageOptions { get; } =
     [
         new("zh-CN", "settings.option.language.zh-CN", "简体中文"),
+        new("zh-TW", "settings.option.language.zh-TW", "繁體中文"),
         new("en-US", "settings.option.language.en-US", "English"),
         new("ja-JP", "settings.option.language.ja-JP", "日本語")
     ];

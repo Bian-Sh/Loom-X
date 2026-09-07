@@ -71,10 +71,12 @@ public sealed class LocalizationRegressionTests
 
         Assert.Equal("简体中文", SettingsViewModel.LanguageOptions[0].GetDisplayName(zhCn));
         Assert.Equal("简体中文", SettingsViewModel.LanguageOptions[0].GetDisplayName(enUs));
-        Assert.Equal("English", SettingsViewModel.LanguageOptions[1].GetDisplayName(zhCn));
-        Assert.Equal("English", SettingsViewModel.LanguageOptions[1].GetDisplayName(enUs));
-        Assert.Equal("日本語", SettingsViewModel.LanguageOptions[2].GetDisplayName(zhCn));
-        Assert.Equal("日本語", SettingsViewModel.LanguageOptions[2].GetDisplayName(enUs));
+        Assert.Equal("繁體中文", SettingsViewModel.LanguageOptions[1].GetDisplayName(zhCn));
+        Assert.Equal("繁體中文", SettingsViewModel.LanguageOptions[1].GetDisplayName(enUs));
+        Assert.Equal("English", SettingsViewModel.LanguageOptions[2].GetDisplayName(zhCn));
+        Assert.Equal("English", SettingsViewModel.LanguageOptions[2].GetDisplayName(enUs));
+        Assert.Equal("日本語", SettingsViewModel.LanguageOptions[3].GetDisplayName(zhCn));
+        Assert.Equal("日本語", SettingsViewModel.LanguageOptions[3].GetDisplayName(enUs));
     }
 
     [Fact]

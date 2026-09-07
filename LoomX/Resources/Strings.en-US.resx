@@ -101,6 +101,7 @@
   <data name="settings.local.data.export.failed"><value>Failed to export diagnostics: {0}</value></data>
   <data name="settings.local.data.export.content"><value>Loom-X diagnostic summary&#xA;Version: {0}&#xA;System: {1}&#xA;Data directory: {2}&#xA;Proxy mode: {3}&#xA;Log retention: {4} days</value></data>
   <data name="settings.option.language.zh-CN"><value>Simplified Chinese</value></data>
+  <data name="settings.option.language.zh-TW"><value>Traditional Chinese</value></data>
   <data name="settings.option.language.en-US"><value>English</value></data>
   <data name="settings.option.language.ja-JP"><value>Japanese</value></data>
   <data name="settings.option.theme.system"><value>System</value></data>
