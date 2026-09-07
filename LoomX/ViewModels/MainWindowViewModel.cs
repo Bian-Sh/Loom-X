@@ -296,14 +296,22 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 
     private void OnCultureChanged(object? sender, CultureInfo culture)
     {
-        RefreshLocalizedStatuses();
-        foreach (var endpoint in Endpoints)
+        void Apply()
         {
-            endpoint.RefreshLocalization();
-            foreach (var route in endpoint.Routes) route.RefreshLocalization();
+            CultureInfo.CurrentCulture = culture;
+            CultureInfo.CurrentUICulture = culture;
+            RefreshLocalizedStatuses();
+            foreach (var endpoint in Endpoints)
+            {
+                endpoint.RefreshLocalization();
+                foreach (var route in endpoint.Routes) route.RefreshLocalization();
+            }
+            foreach (var request in RecentRequests) request.RefreshLocalization();
+            OnPropertyChanged(nameof(RecentRequestsCountLabel));
         }
-        foreach (var request in RecentRequests) request.RefreshLocalization();
-        OnPropertyChanged(nameof(RecentRequestsCountLabel));
+
+        if (Dispatcher.UIThread.CheckAccess()) Apply();
+        else Dispatcher.UIThread.Post(Apply);
     }
 
     private void RefreshLocalizedStatuses()

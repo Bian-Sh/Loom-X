@@ -111,6 +111,16 @@ public sealed class LocalizationRegressionTests
     }
 
     [Fact]
+    public void OverviewCultureRefreshIsMarshaledToUiThread()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("Dispatcher.UIThread.CheckAccess()", source, StringComparison.Ordinal);
+        Assert.Contains("Dispatcher.UIThread.Post(Apply)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProxyStatusUsesAsciiPunctuation()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "SettingsViewModel.cs");
