@@ -36,10 +36,8 @@ public static class LocaleService
     public static event EventHandler<CultureInfo>? CultureChanged;
 
     /// <summary>
-    /// Switches the UI culture. No-op for blank input. Always refreshes
-    /// <see cref="CultureInfo.DefaultThreadCurrentUICulture"/> so satellite resource
-    /// lookup uses the new culture; raises <see cref="CultureChanged"/> only when the
-    /// culture actually changes.
+    /// 切换 UI 文化。空值不处理；同步默认线程与当前线程文化，确保资源解析和格式化立即使用同一文化。
+    /// 仅在文化实际变化时触发 <see cref="CultureChanged"/>。
     /// </summary>
     public static void SetCulture(string? cultureName)
     {
@@ -57,6 +55,8 @@ public static class LocaleService
 
         CultureInfo.DefaultThreadCurrentCulture = next;
         CultureInfo.DefaultThreadCurrentUICulture = next;
+        CultureInfo.CurrentCulture = next;
+        CultureInfo.CurrentUICulture = next;
 
         if (changed) CultureChanged?.Invoke(null, next);
     }
@@ -74,7 +74,7 @@ public static class ResourceLookup
         typeof(ResourceLookup).Assembly);
 
     public static string Resolve(string? key)
-        => Resolve(key, CultureInfo.CurrentUICulture);
+        => Resolve(key, LocaleService.CurrentCulture);
 
     public static string Resolve(string? key, CultureInfo culture)
     {
@@ -106,7 +106,7 @@ public sealed class LocaleBinding : INotifyPropertyChanged
 
     private void OnCultureChanged(object? sender, CultureInfo culture)
     {
-        var next = ResourceLookup.Resolve(Key);
+        var next = ResourceLookup.Resolve(Key, culture);
         if (string.Equals(Value, next, StringComparison.Ordinal)) return;
         Value = next;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));

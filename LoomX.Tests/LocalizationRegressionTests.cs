@@ -78,6 +78,39 @@ public sealed class LocalizationRegressionTests
     }
 
     [Fact]
+    public void ResourceLookupFollowsLocaleServiceCultureInsteadOfThreadCulture()
+    {
+        var previousLocale = LocaleService.CurrentCulture.Name;
+        var previousCulture = CultureInfo.CurrentCulture;
+        var previousUiCulture = CultureInfo.CurrentUICulture;
+
+        try
+        {
+            LocaleService.SetCulture("en-US");
+            Assert.Equal("en-US", CultureInfo.CurrentCulture.Name);
+            Assert.Equal("en-US", CultureInfo.CurrentUICulture.Name);
+            CultureInfo.CurrentUICulture = new CultureInfo("zh-CN");
+
+            Assert.Equal("Local gateway", ResourceLookup.Resolve("overview.gateway.label"));
+        }
+        finally
+        {
+            LocaleService.SetCulture(previousLocale);
+            CultureInfo.CurrentCulture = previousCulture;
+            CultureInfo.CurrentUICulture = previousUiCulture;
+        }
+    }
+
+    [Fact]
+    public void LocaleBindingResolvesUsingCultureChangeEvent()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Localization", "Locale.cs");
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("ResourceLookup.Resolve(Key, culture)", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProxyStatusUsesAsciiPunctuation()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "SettingsViewModel.cs");
