@@ -64,6 +64,20 @@ public sealed class LocalizationRegressionTests
     }
 
     [Fact]
+    public void LanguageOptionsKeepStableNativeNamesAcrossUiCultures()
+    {
+        var zhCn = new CultureInfo("zh-CN");
+        var enUs = new CultureInfo("en-US");
+
+        Assert.Equal("简体中文", SettingsViewModel.LanguageOptions[0].GetDisplayName(zhCn));
+        Assert.Equal("简体中文", SettingsViewModel.LanguageOptions[0].GetDisplayName(enUs));
+        Assert.Equal("English", SettingsViewModel.LanguageOptions[1].GetDisplayName(zhCn));
+        Assert.Equal("English", SettingsViewModel.LanguageOptions[1].GetDisplayName(enUs));
+        Assert.Equal("日本語", SettingsViewModel.LanguageOptions[2].GetDisplayName(zhCn));
+        Assert.Equal("日本語", SettingsViewModel.LanguageOptions[2].GetDisplayName(enUs));
+    }
+
+    [Fact]
     public void ProxyStatusUsesAsciiPunctuation()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "SettingsViewModel.cs");

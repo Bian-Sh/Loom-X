@@ -17,10 +17,13 @@ namespace LoomX.ViewModels;
 
 public sealed class SettingOption : INotifyPropertyChanged
 {
-    public SettingOption(string value, string localizationKey)
+    private readonly string? stableDisplayName;
+
+    public SettingOption(string value, string localizationKey, string? stableDisplayName = null)
     {
         Value = value;
         LocalizationKey = localizationKey;
+        this.stableDisplayName = stableDisplayName;
         LocaleService.CultureChanged += OnCultureChanged;
     }
 
@@ -30,7 +33,7 @@ public sealed class SettingOption : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    internal string GetDisplayName(CultureInfo culture) => ResourceLookup.Resolve(LocalizationKey, culture);
+    internal string GetDisplayName(CultureInfo culture) => stableDisplayName ?? ResourceLookup.Resolve(LocalizationKey, culture);
     internal void NotifyDisplayNameChanged() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
 
     private void OnCultureChanged(object? sender, CultureInfo culture) => NotifyDisplayNameChanged();
@@ -70,7 +73,12 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private bool suppressAutoSave;
     private CancellationTokenSource? autoSaveCancellation;
 
-    public static IReadOnlyList<SettingOption> LanguageOptions { get; } = [new("zh-CN", "settings.option.language.zh-CN"), new("en-US", "settings.option.language.en-US"), new("ja-JP", "settings.option.language.ja-JP")];
+    public static IReadOnlyList<SettingOption> LanguageOptions { get; } =
+    [
+        new("zh-CN", "settings.option.language.zh-CN", "简体中文"),
+        new("en-US", "settings.option.language.en-US", "English"),
+        new("ja-JP", "settings.option.language.ja-JP", "日本語")
+    ];
     public static IReadOnlyList<SettingOption> ThemeOptions { get; } = [new("system", "settings.option.theme.system"), new("dark", "settings.option.theme.dark"), new("light", "settings.option.theme.light")];
     public static IReadOnlyList<SettingOption> ProxyModeOptions { get; } = [new("direct", "settings.option.proxy.direct"), new("system", "settings.option.proxy.system"), new("custom", "settings.option.proxy.custom")];
     public static IReadOnlyList<SettingOption> LogRetentionOptions { get; } = [new("7", "settings.option.retention.7"), new("30", "settings.option.retention.30"), new("90", "settings.option.retention.90"), new("365", "settings.option.retention.365"), new("3650", "settings.option.retention.3650")];
