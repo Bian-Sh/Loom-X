@@ -792,4 +792,568 @@
   <data name="console.copied">
     <value>日志已复制</value>
   </data>
+
+  <!-- ========== Phase 2: Providers 视图 ========== -->
+  <data name="providers.header.list">
+    <value>供应商列表</value>
+  </data>
+  <data name="providers.header.list.hint">
+    <value>按当前路由顺序显示</value>
+  </data>
+  <data name="providers.button.new">
+    <value>新增 Provider</value>
+  </data>
+  <data name="providers.search.watermark">
+    <value>搜索 Provider</value>
+  </data>
+  <data name="providers.toggle.tooltip.enabled">
+    <value>绿色表示已启用</value>
+  </data>
+  <data name="providers.toggle.tooltip">
+    <value>启用 Provider</value>
+  </data>
+  <data name="providers.delete.tooltip">
+    <value>删除 Provider</value>
+  </data>
+  <data name="providers.count.enabled">
+    <value>个已启用</value>
+  </data>
+  <data name="providers.count.models">
+    <value>个模型</value>
+  </data>
+  <data name="providers.count.models.suffix">
+    <value>个模型 ·</value>
+  </data>
+  <data name="providers.model.count.suffix">
+    <value> ·</value>
+  </data>
+  <data name="providers.key.configured">
+    <value>密钥已配置</value>
+  </data>
+  <data name="providers.key.protected">
+    <value>密钥已保护</value>
+  </data>
+  <data name="providers.card.providers.label">
+    <value>Provider</value>
+  </data>
+  <data name="providers.card.models.label">
+    <value>可用模型</value>
+  </data>
+  <data name="providers.card.models.status">
+    <value>远程模型已发现</value>
+  </data>
+  <data name="providers.card.keys.label">
+    <value>受保护密钥</value>
+  </data>
+  <data name="providers.card.keys.status">
+    <value>DPAPI CurrentUser</value>
+  </data>
+  <data name="providers.card.health.label">
+    <value>连接健康</value>
+  </data>
+  <data name="providers.card.health.status">
+    <value>等待验证</value>
+  </data>
+  <data name="providers.tab.basic">
+    <value>基础</value>
+  </data>
+  <data name="providers.tab.request">
+    <value>请求</value>
+  </data>
+  <data name="providers.tab.models">
+    <value>模型</value>
+  </data>
+  <data name="providers.basic.header">
+    <value>身份与上游</value>
+  </data>
+  <data name="providers.request.header">
+    <value>鉴权与网络</value>
+  </data>
+  <data name="providers.name.label">
+    <value>显示名称</value>
+  </data>
+  <data name="providers.name.watermark">
+    <value>例如：DeepSeek</value>
+  </data>
+  <data name="providers.id.label">
+    <value>Provider ID</value>
+  </data>
+  <data name="providers.id.watermark">
+    <value>唯一标识</value>
+  </data>
+  <data name="providers.type.label">
+    <value>Provider 类型</value>
+  </data>
+  <data name="providers.baseurl.label">
+    <value>Base URL</value>
+  </data>
+  <data name="providers.baseurl.tooltip">
+    <value>加不加 v1 是个问题，请遵循供应商手册</value>
+  </data>
+  <data name="providers.endpointformat.label">
+    <value>请求格式</value>
+  </data>
+  <data name="providers.proxy.checkbox">
+    <value>使用代理</value>
+  </data>
+  <data name="providers.headers.label">
+    <value>自定义请求头</value>
+  </data>
+  <data name="providers.headers.add">
+    <value>添加</value>
+  </data>
+  <data name="providers.headers.name.watermark">
+    <value>Header 名称</value>
+  </data>
+  <data name="providers.headers.value.watermark">
+    <value>Header 值</value>
+  </data>
+  <data name="providers.headers.remove.tooltip">
+    <value>删除请求头</value>
+  </data>
+  <data name="providers.headers.incomplete">
+    <value>有 {0} 个请求头未完成，补全名称和值后才会保存。</value>
+  </data>
+  <data name="providers.headers.incomplete.prefix">
+    <value>有</value>
+  </data>
+  <data name="providers.headers.incomplete.suffix">
+    <value>个请求头未完成，补全名称和值后才会保存。</value>
+  </data>
+  <data name="providers.headers.empty">
+    <value>尚未添加自定义请求头</value>
+  </data>
+  <data name="providers.connection.label">
+    <value>连接状态</value>
+  </data>
+  <data name="providers.connection.test">
+    <value>测试连接</value>
+  </data>
+  <data name="providers.models.url.label">
+    <value>模型列表 URL（可选）</value>
+  </data>
+  <data name="providers.models.url.watermark">
+    <value>例如：https://api.example.com/v1/models</value>
+  </data>
+  <data name="providers.models.url.hint">
+    <value>留空时根据 Base URL 自动推导；填写后仅用此地址刷新模型，不影响聊天请求。</value>
+  </data>
+  <data name="providers.models.search.watermark">
+    <value>搜索模型</value>
+  </data>
+  <data name="providers.models.sync.tooltip">
+    <value>同步模型</value>
+  </data>
+  <data name="providers.models.sync.button">
+    <value>同步模型</value>
+  </data>
+  <data name="providers.models.toggleAll.tooltip">
+    <value>启用或停用全部模型</value>
+  </data>
+  <data name="providers.models.sort.drag.tooltip">
+    <value>拖动调整模型顺序</value>
+  </data>
+  <data name="providers.models.sort.toggle.tooltip">
+    <value>控制模型是否暴露给下游</value>
+  </data>
+  <data name="providers.models.sort.toggle.automation">
+    <value>启用模型</value>
+  </data>
+  <data name="providers.models.vision.tooltip">
+    <value>支持图片输入</value>
+  </data>
+  <data name="providers.models.ctx.suffix">
+    <value> ctx · </value>
+  </data>
+  <data name="providers.models.delete.tooltip">
+    <value>删除模型</value>
+  </data>
+  <data name="providers.dragging">
+    <value>拖动中</value>
+  </data>
+  <data name="providers.models.empty">
+    <value>没有匹配的模型</value>
+  </data>
+  <data name="providers.empty.title">
+    <value>暂无 Provider</value>
+  </data>
+  <data name="providers.empty.hint">
+    <value>请先从左侧目录添加 Provider。</value>
+  </data>
+
+  <!-- ========== Phase 2: Providers ViewModel ========== -->
+  <data name="providers.edit.new.displayname">
+    <value>新 Provider</value>
+  </data>
+  <data name="providers.status.edit.new">
+    <value>正在编辑新 Provider</value>
+  </data>
+  <data name="providers.status.loaded">
+    <value>已加载 {0} 个 Provider</value>
+  </data>
+  <data name="providers.loading.failure">
+    <value>加载失败：{0}</value>
+  </data>
+  <data name="providers.save.success">
+    <value>Provider 已保存</value>
+  </data>
+  <data name="providers.save.success.pendingHeaders">
+    <value>Provider 已保存 · {0} 个请求头待补全</value>
+  </data>
+  <data name="providers.save.failure">
+    <value>保存失败：{0}</value>
+  </data>
+  <data name="providers.delete.success">
+    <value>Provider 已删除</value>
+  </data>
+  <data name="providers.delete.failure">
+    <value>删除失败：{0}</value>
+  </data>
+  <data name="providers.headers.pending">
+    <value>请补全 {0} 个自定义请求头</value>
+  </data>
+  <data name="providers.sync.beforeProvider">
+    <value>请先保存 Provider，再添加模型</value>
+  </data>
+  <data name="providers.sync.beforeModel">
+    <value>请先保存 Provider，再同步模型</value>
+  </data>
+  <data name="providers.sync.invalidUrl">
+    <value>模型列表 URL 必须是 HTTP 或 HTTPS 绝对地址</value>
+  </data>
+  <data name="providers.sync.running">
+    <value>正在同步模型…</value>
+  </data>
+  <data name="providers.sync.failure.http">
+    <value>模型同步失败 · {0} {1}</value>
+  </data>
+  <data name="providers.sync.failure.toast.http">
+    <value>模型同步失败 · {0}</value>
+  </data>
+  <data name="providers.sync.failure.empty">
+    <value>模型同步失败 · 响应中没有可用模型</value>
+  </data>
+  <data name="providers.sync.failure.parse">
+    <value>模型同步失败 · 响应格式无法解析</value>
+  </data>
+  <data name="providers.sync.failure.exception">
+    <value>模型同步失败 · {0}</value>
+  </data>
+  <data name="providers.sync.failure.toast.exception">
+    <value>模型同步失败</value>
+  </data>
+  <data name="providers.sync.success">
+    <value>模型同步完成 · 发现 {0} 个，新增 {1} 个，更新 {2} 个</value>
+  </data>
+  <data name="providers.test.baseurl.required">
+    <value>请先填写 Base URL</value>
+  </data>
+  <data name="providers.test.baseurl.required.toast">
+    <value>请先填写 Provider Base URL</value>
+  </data>
+  <data name="providers.test.running">
+    <value>正在测试连接…</value>
+  </data>
+  <data name="providers.test.success">
+    <value>连接正常 · {0} · {1} ms</value>
+  </data>
+  <data name="providers.test.failure">
+    <value>连接失败 · {0} {1}</value>
+  </data>
+  <data name="providers.test.failure.exception">
+    <value>连接失败 · {0}</value>
+  </data>
+  <data name="providers.test.toast.success">
+    <value>Provider 连通性测试成功</value>
+  </data>
+  <data name="providers.test.toast.failure">
+    <value>Provider 连通性测试失败</value>
+  </data>
+  <data name="providers.model.edit.new">
+    <value>正在编辑新模型</value>
+  </data>
+  <data name="providers.model.save.success">
+    <value>模型已保存</value>
+  </data>
+  <data name="providers.model.save.failure">
+    <value>模型保存失败：{0}</value>
+  </data>
+  <data name="providers.model.delete.success">
+    <value>模型已删除</value>
+  </data>
+  <data name="providers.model.delete.failure">
+    <value>模型删除失败：{0}</value>
+  </data>
+  <data name="providers.model.order.saved">
+    <value>模型顺序已保存</value>
+  </data>
+  <data name="providers.model.order.save.failure">
+    <value>模型排序保存失败：{0}</value>
+  </data>
+  <data name="providers.model.order.save.failure.toast">
+    <value>模型排序保存失败</value>
+  </data>
+  <data name="providers.model.enable.all">
+    <value>已启用全部模型</value>
+  </data>
+  <data name="providers.model.disable.all">
+    <value>已停用全部模型</value>
+  </data>
+  <data name="providers.model.summary">
+    <value>已启用 {0} / {1} 个模型</value>
+  </data>
+  <data name="providers.model.unknown">
+    <value>未知模型</value>
+  </data>
+  <data name="providers.model.context.missing">
+    <value>AI 提供商模型接口未返回上下文配置</value>
+  </data>
+  <data name="providers.model.capability.vision">
+    <value>视觉</value>
+  </data>
+  <data name="providers.model.capability.text">
+    <value>文本</value>
+  </data>
+  <data name="providers.apikey.visibility.show">
+    <value>显示 API Key</value>
+  </data>
+  <data name="providers.apikey.visibility.hide">
+    <value>隐藏 API Key</value>
+  </data>
+  <data name="providers.apikey.watermark">
+    <value>请输入 API Key</value>
+  </data>
+  <data name="providers.apikey.configured">
+    <value>已配置 API Key</value>
+  </data>
+  <data name="providers.apikey.notGenerated">
+    <value>未生成</value>
+  </data>
+
+  <!-- ========== Phase 2: Gateway 视图 ========== -->
+  <data name="gateway.endpoint.header">
+    <value>Endpoint</value>
+  </data>
+  <data name="gateway.endpoint.header.hint">
+    <value>独立维护模型组合与故障转移顺序</value>
+  </data>
+  <data name="gateway.endpoint.copyUrl.tooltip">
+    <value>复制 Base URL</value>
+  </data>
+  <data name="gateway.endpoint.rotateKey.tooltip">
+    <value>重新生成 API Key</value>
+  </data>
+  <data name="gateway.endpoint.copyKey.tooltip">
+    <value>复制 API Key</value>
+  </data>
+  <data name="gateway.endpoint.comboCount">
+    <value>已暴露 {0} 个 Combo</value>
+  </data>
+  <data name="gateway.endpoint.comboCount.prefix">
+    <value>已暴露</value>
+  </data>
+  <data name="gateway.endpoint.comboCount.suffix">
+    <value>个 Combo</value>
+  </data>
+  <data name="gateway.combo.header">
+    <value>全局 Combo</value>
+  </data>
+  <data name="gateway.combo.header.hint">
+    <value>跨 Endpoint 共享，按成员顺序故障转移</value>
+  </data>
+  <data name="gateway.combo.add.tooltip">
+    <value>新增 Combo 模型</value>
+  </data>
+  <data name="gateway.combo.expand.tooltip">
+    <value>展开或折叠 Combo</value>
+  </data>
+  <data name="gateway.combo.toggle.tooltip">
+    <value>启用或停用 Combo</value>
+  </data>
+  <data name="gateway.combo.remove.tooltip">
+    <value>移除 Combo 模型</value>
+  </data>
+  <data name="gateway.route.sort.drag.tooltip">
+    <value>拖动调整故障转移顺序</value>
+  </data>
+  <data name="gateway.route.sort.toggle.tooltip">
+    <value>启用或停用成员</value>
+  </data>
+  <data name="gateway.route.sort.remove.tooltip">
+    <value>从 Combo 移除模型</value>
+  </data>
+  <data name="gateway.route.sort.dragging">
+    <value>拖动中</value>
+  </data>
+  <data name="gateway.combo.memberOrder.hint">
+    <value>成员模型按顺序故障转移</value>
+  </data>
+  <data name="gateway.combo.addModel.tooltip">
+    <value>向 Combo 添加模型</value>
+  </data>
+  <data name="gateway.combo.search.watermark">
+    <value>搜索模型...</value>
+  </data>
+
+  <!-- ========== Phase 2: Gateway ViewModel ========== -->
+  <data name="gateway.sort.ascending.tooltip">
+    <value>按字母升序排序</value>
+  </data>
+  <data name="gateway.sort.descending.tooltip">
+    <value>按字母降序排序</value>
+  </data>
+  <data name="gateway.url.copied">
+    <value>地址已复制</value>
+  </data>
+  <data name="gateway.apikey.copied">
+    <value>API Key 已复制</value>
+  </data>
+  <data name="gateway.status.loaded">
+    <value>已加载 {0} 个 Provider、{1} 个模型、{2} 个 Endpoint 和 {3} 个 Combo</value>
+  </data>
+  <data name="gateway.status.load.failure">
+    <value>网关加载失败：{0}</value>
+  </data>
+  <data name="gateway.combo.new.name">
+    <value>新 Combo</value>
+  </data>
+  <data name="gateway.combo.new.name.dup">
+    <value>新 Combo {0}</value>
+  </data>
+  <data name="gateway.combo.add.success">
+    <value>全局 Combo 已添加</value>
+  </data>
+  <data name="gateway.combo.add.failure">
+    <value>添加 Combo 模型失败：{0}</value>
+  </data>
+  <data name="gateway.combo.save.success">
+    <value>Combo 模型已保存</value>
+  </data>
+  <data name="gateway.combo.save.failure">
+    <value>保存 Combo 模型失败：{0}</value>
+  </data>
+  <data name="gateway.combo.remove.success">
+    <value>全局 Combo 已移除</value>
+  </data>
+  <data name="gateway.combo.remove.failure">
+    <value>移除 Combo 模型失败：{0}</value>
+  </data>
+  <data name="gateway.endpoint.comboScope.saved">
+    <value>{0} 的 Combo 暴露范围已保存</value>
+  </data>
+  <data name="gateway.endpoint.comboScope.failure">
+    <value>Endpoint Combo 更新失败：{0}</value>
+  </data>
+  <data name="gateway.endpoint.comboScope.failure.toast">
+    <value>Endpoint Combo 更新失败</value>
+  </data>
+  <data name="gateway.route.reorder.saved">
+    <value>故障转移顺序已保存</value>
+  </data>
+  <data name="gateway.route.reorder.failure">
+    <value>保存排序失败：{0}</value>
+  </data>
+  <data name="gateway.model.available.empty">
+    <value>没有可加入的已启用模型，请先在 Provider 中启用模型</value>
+  </data>
+  <data name="gateway.model.available.loaded">
+    <value>已加载 {0} 个可加入模型</value>
+  </data>
+  <data name="gateway.model.available.load.failure">
+    <value>加载可加入模型失败：{0}</value>
+  </data>
+  <data name="gateway.model.combo.add.success">
+    <value>模型已加入 Combo</value>
+  </data>
+  <data name="gateway.model.combo.add.failure">
+    <value>加入 Combo 失败：{0}</value>
+  </data>
+  <data name="gateway.model.combo.remove.success">
+    <value>模型已从 Combo 移除</value>
+  </data>
+  <data name="gateway.model.combo.remove.failure">
+    <value>移除成员失败：{0}</value>
+  </data>
+  <data name="gateway.route.member.save.success">
+    <value>成员状态已保存</value>
+  </data>
+  <data name="gateway.route.member.save.failure">
+    <value>成员保存失败：{0}</value>
+  </data>
+  <data name="gateway.endpoint.toggle.success">
+    <value>{0} 已{1}</value>
+  </data>
+  <data name="gateway.endpoint.toggle.failure">
+    <value>Endpoint 更新失败：{0}</value>
+  </data>
+  <data name="gateway.endpoint.enable">
+    <value>启用</value>
+  </data>
+  <data name="gateway.endpoint.disable">
+    <value>停用</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerated">
+    <value>{0} API Key 已重新生成</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerated.toast">
+    <value>API Key 已重新生成</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerate.failure">
+    <value>API Key 重新生成失败：{0}</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerate.failure.toast">
+    <value>API Key 重新生成失败</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.saved">
+    <value>{0} Reasoning effort 已保存</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.saved.toast">
+    <value>Reasoning effort 已保存</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.failure">
+    <value>Reasoning effort 保存失败：{0}</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.failure.toast">
+    <value>Reasoning effort 保存失败</value>
+  </data>
+  <data name="gateway.combo.summary.empty">
+    <value>未暴露 Combo</value>
+  </data>
+  <data name="gateway.combo.summary.separator">
+    <value>、</value>
+  </data>
+  <data name="gateway.combo.disabled">
+    <value>全局停用</value>
+  </data>
+
+  <!-- ========== Phase 2: GatewayRoute / RecentRequest 派生状态 ========== -->
+  <data name="gateway.endpoint.noRoutes">
+    <value>无路由</value>
+  </data>
+  <data name="gateway.endpoint.hasRequests">
+    <value>有请求</value>
+  </data>
+  <data name="gateway.endpoint.ready">
+    <value>已就绪</value>
+  </data>
+  <data name="gateway.endpoint.active">
+    <value>活跃</value>
+  </data>
+  <data name="gateway.endpoint.standby">
+    <value>待命</value>
+  </data>
+  <data name="gateway.request.success">
+    <value>成功</value>
+  </data>
+  <data name="gateway.request.failure">
+    <value>失败</value>
+  </data>
+  <data name="providers.connection.status.pending">
+    <value>尚未测试连接</value>
+  </data>
+
+  <!-- ========== Phase 2: Placeholder 视图 ========== -->
+  <data name="placeholder.empty.body">
+    <value>此页面已完成导航接入，业务功能将在后续迭代中逐步实现。</value>
+  </data>
 </root>

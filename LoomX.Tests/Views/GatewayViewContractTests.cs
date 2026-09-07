@@ -106,8 +106,8 @@ public sealed class GatewayViewContractTests
 
         Assert.Contains("Text=\"API Key\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding MaskedApiKey}\"", source, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"复制 API Key\"", source, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"重新生成 API Key\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale gateway.endpoint.copyKey.tooltip}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale gateway.endpoint.rotateKey.tooltip}\"", source, StringComparison.Ordinal);
         Assert.Contains("Classes=\"icon endpoint-refresh\"", source, StringComparison.Ordinal);
         Assert.Contains("<Path Classes=\"icon-glyph\" Data=\"M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6\" Stroke=\"{DynamicResource TextSecondaryBrush}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Selector=\"Button.endpoint-refresh\"><Setter Property=\"IsVisible\" Value=\"False\"/>", source, StringComparison.Ordinal);

@@ -209,17 +209,18 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private readonly AppDataStore dataStore;
     private readonly ILogger<MainWindowViewModel>? logger;
     private readonly IStringLocalizer<OverviewViewModel> _loc;
-    private string gatewayStatus = "未运行";
-    private string endpoint = "未配置";
-    private string version = "未知";
-    private string lastChecked = "尚未检查";
+    private string gatewayStatus = ResourceLookup.Resolve("overview.gateway.status.not_running");
+    private string endpoint = ResourceLookup.Resolve("overview.endpoint.unconfigured");
+    private string version = ResourceLookup.Resolve("overview.version.unknown");
+    private string lastChecked = ResourceLookup.Resolve("overview.lastchecked.none");
     private int providerCount;
     private int modelCount;
     private int activeRequestCount;
     private int throughput;
     private string p95Latency = "—";
-    private string graphStatus = "等待网关启动";
-    private string gatewayActionLabel = "启动网关";
+    private string graphStatus = ResourceLookup.Resolve("overview.graph.waiting");
+    private string gatewayActionLabel = ResourceLookup.Resolve("overview.gateway.action.start");
+    private bool graphLoadFailed;
     private RuntimeGraphSnapshot? graphSnapshot;
     private OverviewEndpointViewModel? selectedEndpoint;
     private bool gatewayToggleInProgress;
@@ -295,12 +296,32 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
 
     private void OnCultureChanged(object? sender, CultureInfo culture)
     {
-        OnPropertyChanged(nameof(GatewayStatus));
-        OnPropertyChanged(nameof(Version));
-        OnPropertyChanged(nameof(LastChecked));
-        OnPropertyChanged(nameof(GraphStatus));
-        OnPropertyChanged(nameof(GatewayActionLabel));
+        RefreshLocalizedStatuses();
+        foreach (var endpoint in Endpoints)
+        {
+            endpoint.RefreshLocalization();
+            foreach (var route in endpoint.Routes) route.RefreshLocalization();
+        }
+        foreach (var request in RecentRequests) request.RefreshLocalization();
         OnPropertyChanged(nameof(RecentRequestsCountLabel));
+    }
+
+    private void RefreshLocalizedStatuses()
+    {
+        GatewayStatus = gatewayService.State switch
+        {
+            GatewayState.Running => Loc("overview.gateway.status.running"),
+            GatewayState.Starting => Loc("overview.gateway.status.starting"),
+            GatewayState.Stopping => Loc("overview.gateway.status.stopping"),
+            GatewayState.Failed => LocFormat("overview.gateway.status.failed", gatewayService.Error ?? ""),
+            _ => Loc("overview.gateway.status.not_running")
+        };
+        LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? Loc("overview.lastchecked.none");
+        Version = gatewayService.State == GatewayState.Running ? Loc("overview.version.online") : Loc("overview.version.disconnected");
+        GraphStatus = graphLoadFailed
+            ? Loc("overview.graph.failed")
+            : gatewayService.State == GatewayState.Running ? Loc("overview.graph.connected") : Loc("overview.graph.waiting");
+        UpdateGatewayControls();
     }
 
     private async Task StartAsync()
@@ -363,6 +384,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         try
         {
             await dataStore.RefreshAsync();
+            graphLoadFailed = false;
             var config = dataStore.CurrentConfig;
             Endpoint = config.Server.Urls.Count > 0 ? config.Server.Urls[0] : "http://127.0.0.1:11434";
             ProviderCount = config.Providers.Count;
@@ -374,7 +396,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
                 GatewayState.Running => Loc("overview.gateway.status.running"),
                 GatewayState.Starting => Loc("overview.gateway.status.starting"),
                 GatewayState.Stopping => Loc("overview.gateway.status.stopping"),
-                GatewayState.Failed => LocFormat("overview.gateway.status.failed", gatewayService.Error),
+                GatewayState.Failed => LocFormat("overview.gateway.status.failed", gatewayService.Error ?? ""),
                 _ => Loc("overview.gateway.status.not_running")
             };
             LastChecked = gatewayService.LastCheckedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? Loc("overview.lastchecked.none");
@@ -387,6 +409,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             logger?.LogError(exception, "概览刷新失败");
+            graphLoadFailed = true;
             GraphStatus = Loc("overview.graph.failed");
         }
         finally
@@ -617,7 +640,8 @@ public sealed class OverviewEndpointViewModel : NotifyViewModel
     public bool IsGraphVisible { get => isGraphVisible; set => SetProperty(ref isGraphVisible, value); }
     public RuntimeGraphSnapshot? GraphSnapshot { get => graphSnapshot; internal set => SetProperty(ref graphSnapshot, value); }
     public int ActiveCount => Routes.Count(item => item.IsActive);
-    public string Status => !Enabled ? "已停用" : Routes.Count == 0 ? "无路由" : ActiveCount > 0 ? "有请求" : "已就绪";
+    public string Status => !Enabled ? ResourceLookup.Resolve("overview.endpoint.status.disabled") : Routes.Count == 0 ? ResourceLookup.Resolve("overview.endpoint.status.no_routes") : ActiveCount > 0 ? ResourceLookup.Resolve("overview.endpoint.status.active") : ResourceLookup.Resolve("overview.endpoint.status.ready");
+    internal void RefreshLocalization() => OnPropertyChanged(nameof(Status));
     public OverviewEndpointViewModel(string key, string displayName, string publicPath, bool enabled) => (Key, DisplayName, PublicPath, Enabled) = (key, displayName, publicPath, enabled);
 }
 
@@ -647,7 +671,8 @@ public sealed class OverviewRouteViewModel : NotifyViewModel
     public string ModelId { get; }
     public string ProviderId { get; }
     public bool IsActive { get => isActive; set { if (!SetProperty(ref isActive, value)) return; OnPropertyChanged(nameof(Status)); } }
-    public string Status => IsActive ? "活跃" : "待命";
+    public string Status => IsActive ? ResourceLookup.Resolve("overview.route.status.active") : ResourceLookup.Resolve("overview.route.status.idle");
+    internal void RefreshLocalization() => OnPropertyChanged(nameof(Status));
     public OverviewRouteViewModel(string alias, string modelName, string modelId, string providerId) => (Alias, ModelName, ModelId, ProviderId) = (alias, modelName, modelId, providerId);
 }
 
@@ -659,14 +684,15 @@ public sealed class OverviewModelViewModel
     public OverviewModelViewModel(string displayName, string modelId, string providerId) => (DisplayName, ModelId, ProviderId) = (displayName, modelId, providerId);
 }
 
-public sealed class OverviewRecentRequestViewModel
+public sealed class OverviewRecentRequestViewModel : NotifyViewModel
 {
     public string RequestId { get; }
     public DateTimeOffset CreatedAt { get; }
     public string Time { get; }
     public string Endpoint { get; }
     public string Model { get; }
-    public string Status { get; }
+    private readonly int statusCode;
+    public string Status => statusCode is >= 200 and < 300 ? ResourceLookup.Resolve("overview.request.status.success") : ResourceLookup.Resolve("overview.request.status.failed");
     public long ElapsedMs { get; }
     public string Latency => $"{ElapsedMs} ms";
     private OverviewRecentRequestViewModel(string requestId, DateTimeOffset createdAt, string endpoint, string model, int statusCode, long elapsedMs)
@@ -676,18 +702,20 @@ public sealed class OverviewRecentRequestViewModel
         Time = createdAt.ToLocalTime().ToString("HH:mm:ss");
         Endpoint = endpoint;
         Model = model;
-        Status = statusCode is >= 200 and < 300 ? "成功" : "失败";
+        this.statusCode = statusCode;
         ElapsedMs = elapsedMs;
     }
 
     private OverviewRecentRequestViewModel(RequestTelemetryEvent item)
-        : this(item.RequestId, item.Timestamp, item.EndpointKey, item.ModelId ?? item.ModelAlias ?? "未知模型", item.StatusCode ?? 0, item.ElapsedMs) { }
+        : this(item.RequestId, item.Timestamp, item.EndpointKey, item.ModelId ?? item.ModelAlias ?? ResourceLookup.Resolve("overview.request.model.unknown"), item.StatusCode ?? 0, item.ElapsedMs) { }
 
     private OverviewRecentRequestViewModel(ActivityEventRecord item)
-        : this(item.RequestId, item.CreatedAt, item.Protocol, string.IsNullOrWhiteSpace(item.ModelId) ? "未知模型" : item.ModelId, item.StatusCode, item.ElapsedMs) { }
+        : this(item.RequestId, item.CreatedAt, item.Protocol, string.IsNullOrWhiteSpace(item.ModelId) ? ResourceLookup.Resolve("overview.request.model.unknown") : item.ModelId, item.StatusCode, item.ElapsedMs) { }
 
     public static OverviewRecentRequestViewModel From(RequestTelemetryEvent item) => new(item);
     public static OverviewRecentRequestViewModel From(ActivityEventRecord item) => new(item);
+
+    internal void RefreshLocalization() => OnPropertyChanged(nameof(Status));
 
     internal static IReadOnlyList<OverviewRecentRequestViewModel> Merge(
         IEnumerable<OverviewRecentRequestViewModel> persistedRequests,
@@ -705,11 +733,16 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private readonly AppDataStore dataStore;
     private readonly ToastService toastService;
     private readonly ILogger<ProvidersViewModel>? logger;
+    private readonly IStringLocalizer<ProvidersViewModel> _loc;
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private ProviderEditorViewModel? selectedProvider;
     private ModelEditorViewModel? selectedModel;
     private string status = "";
-    private string connectionStatus = "尚未测试连接";
+    private string connectionStatus = ResourceLookup.Resolve("providers.connection.status.pending");
+    private string? statusKey;
+    private object[] statusArguments = [];
+    private string connectionStatusKey = "providers.connection.status.pending";
+    private object[] connectionStatusArguments = [];
     private int totalModelCount;
     private int protectedKeyCount;
     private int healthyProviderCount;
@@ -824,7 +857,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public ModelEditorViewModel? DraggingModel { get => draggingModel; private set { if (ReferenceEquals(draggingModel, value)) return; draggingModel = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsModelDragActive)); OnPropertyChanged(nameof(EnabledModelCount)); OnPropertyChanged(nameof(EnabledModelSummary)); OnPropertyChanged(nameof(AllModelsEnabled)); } }
     public bool IsModelDragActive => DraggingModel is not null;
     public int EnabledModelCount => GetSelectedProviderModelsForSummary().Count(model => model.Enabled);
-    public string EnabledModelSummary => $"已启用 {EnabledModelCount} / {GetSelectedProviderModelsForSummary().Count} 个模型";
+    public string EnabledModelSummary => LocFormat("providers.model.summary", EnabledModelCount, GetSelectedProviderModelsForSummary().Count);
     public bool AllModelsEnabled
     {
         get
@@ -863,18 +896,49 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         return models;
     }
 
-    public ProvidersViewModel(AppDataStore dataStore, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null)
+    public ProvidersViewModel(AppDataStore dataStore, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null, IStringLocalizer<ProvidersViewModel>? localizer = null)
     {
         this.dataStore = dataStore;
         this.toastService = toastService ?? new ToastService();
         this.logger = logger;
+        _loc = localizer ?? LocalizerFactory.Create<ProvidersViewModel>();
         Providers.CollectionChanged += ProvidersChanged;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
+        LocaleService.CultureChanged += OnCultureChanged;
         RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(parameter => DeleteModelAsync(parameter as ModelEditorViewModel)); ToggleAllModelsCommand = new AsyncCommand(ToggleAllModelsAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
     }
 
-    public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null)
-        : this(new AppDataStore(configService, new GatewayProcessService()), toastService, logger) { }
+    public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null, IStringLocalizer<ProvidersViewModel>? localizer = null)
+        : this(new AppDataStore(configService, new GatewayProcessService()), toastService, logger, localizer) { }
+
+    private string Loc(string key) => _loc[key]?.Value ?? key;
+    private string LocFormat(string key, params object[] args) => string.Format(CultureInfo.CurrentCulture, Loc(key), args);
+    private void SetStatus(string key, params object[] args)
+    {
+        statusKey = key;
+        statusArguments = args;
+        Status = LocFormat(key, args);
+    }
+
+    private void SetConnectionStatus(string key, params object[] args)
+    {
+        connectionStatusKey = key;
+        connectionStatusArguments = args;
+        ConnectionStatus = LocFormat(key, args);
+    }
+
+    private void OnCultureChanged(object? sender, CultureInfo culture)
+    {
+        if (statusKey is not null) Status = LocFormat(statusKey, statusArguments);
+        ConnectionStatus = LocFormat(connectionStatusKey, connectionStatusArguments);
+        OnPropertyChanged(nameof(EnabledModelSummary));
+        OnPropertyChanged(nameof(ConnectionStatus));
+        foreach (var provider in Providers)
+        {
+            provider.RefreshLocalization();
+            foreach (var model in provider.Models) model.RefreshLocalization();
+        }
+    }
 
     private Task RefreshAsync()
     {
@@ -920,10 +984,10 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             SelectedProvider = Providers.FirstOrDefault(provider => provider.Id == selectedId) ?? Providers.FirstOrDefault();
             OnPropertyChanged(nameof(HasNoSelectedProvider));
             UpdateSummary();
-            Status = $"已加载 {Providers.Count} 个 Provider";
+            SetStatus("providers.status.loaded", Providers.Count);
             logger?.LogInformation("Provider 页面刷新完成，Provider {ProviderCount}，模型 {ModelCount}，启用 Provider {EnabledProviderCount}，健康 Provider {HealthyProviderCount}", Providers.Count, TotalModelCount, EnabledProviderCount, HealthyProviderCount);
         }
-        catch (Exception exception) { suppressSelectionInvariant = false; logger?.LogError(exception, "Provider 页面刷新失败"); Status = $"加载失败：{exception.Message}"; }
+        catch (Exception exception) { suppressSelectionInvariant = false; logger?.LogError(exception, "Provider 页面刷新失败"); SetStatus("providers.loading.failure", exception.Message); }
     }
 
     private void OnConfigurationChanged(object? sender, EventArgs args)
@@ -946,9 +1010,10 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         modelSyncAnimationTimer?.Stop();
         modelSyncAnimationTimer = null;
         httpClient.Dispose();
+        LocaleService.CultureChanged -= OnCultureChanged;
     }
 
-    private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = "新 Provider", ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); Status = "正在编辑新 Provider"; }
+    private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = Loc("providers.edit.new.displayname"), ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); SetStatus("providers.status.edit.new"); }
 
     internal void QueueProviderAutoSave(ProviderEditorViewModel provider)
     {
@@ -1002,17 +1067,17 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             UpdateSummary();
             if (provider.IncompleteHeaderCount > 0)
             {
-                Status = $"Provider 已保存 · {provider.IncompleteHeaderCount} 个请求头待补全";
-                toastService.Show($"请补全 {provider.IncompleteHeaderCount} 个自定义请求头", ToastLevel.Warning);
+                SetStatus("providers.save.success.pendingHeaders", provider.IncompleteHeaderCount);
+                toastService.Show(LocFormat("providers.headers.pending", provider.IncompleteHeaderCount), ToastLevel.Warning);
                 logger?.LogWarning("Provider 保存完成但存在未完成请求头 {ProviderId} {IncompleteHeaderCount}", provider.BusinessId, provider.IncompleteHeaderCount);
             }
             else
             {
-                Status = "Provider 已保存";
+                SetStatus("providers.save.success");
                 logger?.LogInformation("Provider 保存完成 {ProviderId}", provider.BusinessId);
             }
         }
-        catch (Exception exception) { logger?.LogError(exception, "Provider 保存失败 {ProviderId}", provider.BusinessId); Status = $"保存失败：{exception.Message}"; }
+        catch (Exception exception) { logger?.LogError(exception, "Provider 保存失败 {ProviderId}", provider.BusinessId); SetStatus("providers.save.failure", exception.Message); }
         finally { suppressConfigurationRefresh = false; }
     }
 
@@ -1020,11 +1085,11 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     {
         provider ??= SelectedProvider;
         if (provider is null) return;
-        try { if (provider.Id != Guid.Empty) await dataStore.DeleteProviderAsync(provider.Id); Providers.Remove(provider); if (ReferenceEquals(SelectedProvider, provider)) SelectedProvider = Providers.FirstOrDefault(); UpdateSummary(); Status = "Provider 已删除"; }
-        catch (Exception exception) { Status = $"删除失败：{exception.Message}"; }
+        try { if (provider.Id != Guid.Empty) await dataStore.DeleteProviderAsync(provider.Id); Providers.Remove(provider); if (ReferenceEquals(SelectedProvider, provider)) SelectedProvider = Providers.FirstOrDefault(); UpdateSummary(); SetStatus("providers.delete.success"); }
+        catch (Exception exception) { SetStatus("providers.delete.failure", exception.Message); }
     }
 
-    private void NewModel() { if (SelectedProvider is null || SelectedProvider.Id == Guid.Empty) { Status = "请先保存 Provider，再添加模型"; return; } SelectedModel = new ModelEditorViewModel { ProviderId = SelectedProvider.BusinessId }; Status = "正在编辑新模型"; }
+    private void NewModel() { if (SelectedProvider is null || SelectedProvider.Id == Guid.Empty) { SetStatus("providers.sync.beforeProvider"); return; } SelectedModel = new ModelEditorViewModel { ProviderId = SelectedProvider.BusinessId }; SetStatus("providers.model.edit.new"); }
 
     private Task SaveModelAsync() => SaveModelAsync(SelectedProvider, SelectedModel);
 
@@ -1033,8 +1098,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         if (provider is null || model is null) return;
         if (!model.HasUnsavedChanges) return;
         suppressConfigurationRefresh = true;
-        try { var input = model.ToInput(); var response = model.Id == Guid.Empty ? await dataStore.CreateModelAsync(provider.Id, input) : await dataStore.UpdateModelAsync(model.Id, input); var index = provider.Models.IndexOf(model); var updated = ModelEditorViewModel.FromResponse(response); if (index < 0) provider.Models.Add(updated); else provider.Models[index] = updated; if (ReferenceEquals(SelectedModel, model)) SelectedModel = updated; Status = "模型已保存"; }
-        catch (Exception exception) { Status = $"模型保存失败：{exception.Message}"; }
+        try { var input = model.ToInput(); var response = model.Id == Guid.Empty ? await dataStore.CreateModelAsync(provider.Id, input) : await dataStore.UpdateModelAsync(model.Id, input); var index = provider.Models.IndexOf(model); var updated = ModelEditorViewModel.FromResponse(response); if (index < 0) provider.Models.Add(updated); else provider.Models[index] = updated; if (ReferenceEquals(SelectedModel, model)) SelectedModel = updated; SetStatus("providers.model.save.success"); }
+        catch (Exception exception) { SetStatus("providers.model.save.failure", exception.Message); }
         finally { suppressConfigurationRefresh = false; }
     }
 
@@ -1043,18 +1108,18 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private async Task DeleteModelAsync(ModelEditorViewModel? model)
     {
         if (model is null) return;
-        try { if (model.Id != Guid.Empty) await dataStore.DeleteModelAsync(model.Id); SelectedProvider?.Models.Remove(model); if (ReferenceEquals(SelectedModel, model)) SelectedModel = null; Status = "模型已删除"; }
-        catch (Exception exception) { Status = $"模型删除失败：{exception.Message}"; }
+        try { if (model.Id != Guid.Empty) await dataStore.DeleteModelAsync(model.Id); SelectedProvider?.Models.Remove(model); if (ReferenceEquals(SelectedModel, model)) SelectedModel = null; SetStatus("providers.model.delete.success"); }
+        catch (Exception exception) { SetStatus("providers.model.delete.failure", exception.Message); }
     }
 
     private async Task TestConnectionAsync()
     {
         var provider = SelectedProvider;
-        if (provider is null || string.IsNullOrWhiteSpace(provider.BaseUrl)) { ConnectionStatus = "请先填写 Base URL"; toastService.Show("请先填写 Provider Base URL", ToastLevel.Warning); return; }
+        if (provider is null || string.IsNullOrWhiteSpace(provider.BaseUrl)) { SetConnectionStatus("providers.test.baseurl.required"); toastService.Show(Loc("providers.test.baseurl.required.toast"), ToastLevel.Warning); return; }
         connectionCancellation?.Cancel();
         connectionCancellation = new CancellationTokenSource();
         var token = connectionCancellation.Token;
-        ConnectionStatus = "正在测试连接…";
+        SetConnectionStatus("providers.test.running");
         var stopwatch = Stopwatch.StartNew();
         try
         {
@@ -1065,11 +1130,12 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             foreach (var header in ProviderEditorViewModel.ParseDictionary(provider.HeadersJson) ?? []) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             stopwatch.Stop();
-            ConnectionStatus = response.IsSuccessStatusCode ? $"连接正常 · {(int)response.StatusCode} · {stopwatch.ElapsedMilliseconds} ms" : $"连接失败 · {(int)response.StatusCode} {response.ReasonPhrase}";
-            toastService.Show(response.IsSuccessStatusCode ? "Provider 连通性测试成功" : "Provider 连通性测试失败", response.IsSuccessStatusCode ? ToastLevel.Success : ToastLevel.Error);
+            if (response.IsSuccessStatusCode) SetConnectionStatus("providers.test.success", (int)response.StatusCode, stopwatch.ElapsedMilliseconds);
+            else SetConnectionStatus("providers.test.failure", (int)response.StatusCode, response.ReasonPhrase ?? "");
+            toastService.Show(response.IsSuccessStatusCode ? Loc("providers.test.toast.success") : Loc("providers.test.toast.failure"), response.IsSuccessStatusCode ? ToastLevel.Success : ToastLevel.Error);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
-        catch (Exception exception) { stopwatch.Stop(); ConnectionStatus = $"连接失败 · {exception.Message}"; toastService.Show("Provider 连通性测试失败", ToastLevel.Error); }
+        catch (Exception exception) { stopwatch.Stop(); SetConnectionStatus("providers.test.failure.exception", exception.Message); toastService.Show(Loc("providers.test.toast.failure"), ToastLevel.Error); }
     }
 
     private async Task SyncModelsAsync()
@@ -1078,14 +1144,14 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         if (provider is null) return;
         if (provider.Id == Guid.Empty)
         {
-            Status = "请先保存 Provider，再同步模型";
+            SetStatus("providers.sync.beforeModel");
             toastService.Show(Status, ToastLevel.Warning);
             return;
         }
 
         if (!Uri.TryCreate(BuildModelListEndpoint(provider), UriKind.Absolute, out var endpoint) || endpoint.Scheme is not ("http" or "https"))
         {
-            Status = "模型列表 URL 必须是 HTTP 或 HTTPS 绝对地址";
+            SetStatus("providers.sync.invalidUrl");
             toastService.Show(Status, ToastLevel.Warning);
             return;
         }
@@ -1094,7 +1160,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         var requestCancellation = new CancellationTokenSource();
         modelSyncCancellation = requestCancellation;
         var token = requestCancellation.Token;
-        Status = "正在同步模型…";
+        SetStatus("providers.sync.running");
         IsModelSyncing = true;
         StartModelSyncAnimation();
         logger?.LogInformation("模型同步开始 {ProviderId}", provider.BusinessId);
@@ -1106,8 +1172,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
             if (!response.IsSuccessStatusCode)
             {
-                Status = $"模型同步失败 · {(int)response.StatusCode} {response.ReasonPhrase}";
-                toastService.Show($"模型同步失败 · {(int)response.StatusCode}", ToastLevel.Error);
+                SetStatus("providers.sync.failure.http", (int)response.StatusCode, response.ReasonPhrase ?? "");
+                toastService.Show(LocFormat("providers.sync.failure.toast.http", (int)response.StatusCode), ToastLevel.Error);
                 logger?.LogWarning("模型同步失败 {ProviderId} {StatusCode}", provider.BusinessId, (int)response.StatusCode);
                 return;
             }
@@ -1119,7 +1185,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
                 .ToArray();
             if (descriptors.Length == 0)
             {
-                Status = "模型同步失败 · 响应中没有可用模型";
+                SetStatus("providers.sync.failure.empty");
                 toastService.Show(Status, ToastLevel.Error);
                 logger?.LogWarning("模型同步失败，响应中没有可用模型 {ProviderId}", provider.BusinessId);
                 return;
@@ -1146,21 +1212,21 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
                 }
             }
             suppressConfigurationRefresh = false;
-            Status = $"模型同步完成 · 发现 {descriptors.Length} 个，新增 {added} 个，更新 {updated} 个";
+            SetStatus("providers.sync.success", descriptors.Length, added, updated);
             toastService.Show(Status, ToastLevel.Success);
             logger?.LogInformation("模型同步完成 {ProviderId} {DiscoveredCount} {AddedCount} {UpdatedCount}", provider.BusinessId, descriptors.Length, added, updated);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested) { }
         catch (JsonException exception)
         {
-            Status = "模型同步失败 · 响应格式无法解析";
+            SetStatus("providers.sync.failure.parse");
             toastService.Show(Status, ToastLevel.Error);
             logger?.LogWarning(exception, "模型同步响应格式无法解析 {ProviderId}", provider.BusinessId);
         }
         catch (Exception exception)
         {
-            Status = $"模型同步失败 · {exception.Message}";
-            toastService.Show("模型同步失败", ToastLevel.Error);
+            SetStatus("providers.sync.failure.exception", exception.Message);
+            toastService.Show(Loc("providers.sync.failure.toast.exception"), ToastLevel.Error);
             logger?.LogError(exception, "模型同步异常 {ProviderId}", provider.BusinessId);
         }
         finally
@@ -1277,13 +1343,13 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         try
         {
             await dataStore.UpdateModelOrderAsync(provider.Id, new ModelOrderInput(provider.Models.Select(model => model.Id).ToArray()));
-            Status = "模型顺序已保存";
+            SetStatus("providers.model.order.saved");
             toastService.Show(Status, ToastLevel.Success);
         }
         catch (Exception exception)
         {
-            Status = $"模型排序保存失败：{exception.Message}";
-            toastService.Show("模型排序保存失败", ToastLevel.Error);
+            SetStatus("providers.model.order.save.failure", exception.Message);
+            toastService.Show(Loc("providers.model.order.save.failure.toast"), ToastLevel.Error);
             logger?.LogError(exception, "模型排序保存失败 {ProviderId}", provider.BusinessId);
         }
         finally { suppressConfigurationRefresh = false; }
@@ -1329,7 +1395,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
                 model.Enabled = enabled;
                 await SaveModelAsync(provider, model);
             }
-            Status = enabled ? "已启用全部模型" : "已停用全部模型";
+            SetStatus(enabled ? "providers.model.enable.all" : "providers.model.disable.all");
             toastService.Show(Status, ToastLevel.Success);
         }
         finally { suppressConfigurationRefresh = false; }
@@ -1460,7 +1526,7 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public IReadOnlyList<EndpointFormatOption> EndpointFormatOptions { get; } = EndpointFormatOption.All;
     public EndpointFormatOption SelectedEndpointFormat { get => EndpointFormatOption.FromValue(EndpointFormat); set { if (value is not null) EndpointFormat = value.Value; } }
     public bool IsEndpointFormatVisible => string.Equals(ApiMode, "openai", StringComparison.OrdinalIgnoreCase);
-    public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set { if (SetProperty(ref apiKey, value)) apiKeyEdited = true; } } public bool IsApiKeyVisible { get => isApiKeyVisible; private set { if (SetProperty(ref isApiKeyVisible, value)) { OnPropertyChanged(nameof(IsApiKeyHidden)); OnPropertyChanged(nameof(ApiKeyPasswordChar)); OnPropertyChanged(nameof(ApiKeyVisibilityToolTip)); } } } public bool IsApiKeyHidden => !IsApiKeyVisible; public char ApiKeyPasswordChar => IsApiKeyVisible ? '\0' : '●'; public string ApiKeyVisibilityToolTip => IsApiKeyVisible ? "隐藏 API Key" : "显示 API Key"; public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; } public string ApiKeyWatermark => HasApiKey ? "已配置 API Key" : "请输入 API Key";
+    public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set { if (SetProperty(ref apiKey, value)) apiKeyEdited = true; } } public bool IsApiKeyVisible { get => isApiKeyVisible; private set { if (SetProperty(ref isApiKeyVisible, value)) { OnPropertyChanged(nameof(IsApiKeyHidden)); OnPropertyChanged(nameof(ApiKeyPasswordChar)); OnPropertyChanged(nameof(ApiKeyVisibilityToolTip)); } } } public bool IsApiKeyHidden => !IsApiKeyVisible; public char ApiKeyPasswordChar => IsApiKeyVisible ? '\0' : '●'; public string ApiKeyVisibilityToolTip => IsApiKeyVisible ? ResourceLookup.Resolve("providers.apikey.visibility.hide") : ResourceLookup.Resolve("providers.apikey.visibility.show"); public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; } public string ApiKeyWatermark => HasApiKey ? ResourceLookup.Resolve("providers.apikey.configured") : ResourceLookup.Resolve("providers.apikey.watermark");
     public bool HasUnsavedChanges => Id == Guid.Empty || isDirty;
     public ObservableCollection<ModelEditorViewModel> Models { get; } = [];
     public bool IsModelDragPreviewOwner { get => isModelDragPreviewOwner; set => SetProperty(ref isModelDragPreviewOwner, value); }
@@ -1469,6 +1535,11 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public bool HasNoHeaders => Headers.Count == 0;
     public int IncompleteHeaderCount => Headers.Count(IsIncomplete);
     public bool HasIncompleteHeaders => IncompleteHeaderCount > 0;
+    internal void RefreshLocalization()
+    {
+        OnPropertyChanged(nameof(ApiKeyVisibilityToolTip));
+        OnPropertyChanged(nameof(ApiKeyWatermark));
+    }
     public ProviderEditorViewModel()
     {
         PropertyChanged += (_, args) =>
@@ -1615,8 +1686,13 @@ public sealed class ModelEditorViewModel : NotifyViewModel
     public bool IsRealModel => !IsPlaceholder;
     public string ContextDisplay => RemoteContextLength is int value ? value.ToString("N0") : "-";
     public string MaxTokensDisplay => RemoteMaxTokens is int value ? value.ToString("N0") : "-";
-    public string MetadataToolTip => RemoteContextLength is null || RemoteMaxTokens is null ? "AI 提供商模型接口未返回上下文配置" : "";
-    public string CapabilitiesDisplay => RemoteVision is true ? "视觉" : RemoteVision is false ? "文本" : "-";
+    public string MetadataToolTip => RemoteContextLength is null || RemoteMaxTokens is null ? ResourceLookup.Resolve("providers.model.context.missing") : "";
+    public string CapabilitiesDisplay => RemoteVision is true ? ResourceLookup.Resolve("providers.model.capability.vision") : RemoteVision is false ? ResourceLookup.Resolve("providers.model.capability.text") : "-";
+    internal void RefreshLocalization()
+    {
+        OnPropertyChanged(nameof(MetadataToolTip));
+        OnPropertyChanged(nameof(CapabilitiesDisplay));
+    }
     public static ModelEditorViewModel FromResponse(ModelResponse response)
     {
         var value = new ModelEditorViewModel { Id = response.Id, ProviderId = response.ProviderId, ModelId = response.ModelId, DisplayName = response.DisplayName, ConfigId = response.ConfigId ?? "", Family = response.Family, BaseUrl = response.BaseUrl ?? "", ApiMode = response.ApiMode ?? "", ContextLength = response.ContextLength, MaxTokens = response.MaxTokens, Vision = response.Vision, Temperature = response.Temperature, TopP = response.TopP, Enabled = response.Enabled, HasApiKey = response.HasApiKey, HeadersJson = response.HeadersJson, ExtraJson = response.ExtraJson, ownedBy = response.OwnedBy, remoteFamily = response.RemoteFamily, remoteContextLength = response.RemoteContextLength, remoteMaxTokens = response.RemoteMaxTokens, remoteVision = response.RemoteVision, sortOrder = response.SortOrder };

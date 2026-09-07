@@ -40,7 +40,7 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("EnabledModelSummary", source, StringComparison.Ordinal);
         Assert.Contains("RemoteVision", source, StringComparison.Ordinal);
         Assert.Contains("MetadataToolTip", source, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"支持图片输入\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale providers.models.vision.tooltip}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding ModelSearchQuery, UpdateSourceTrigger=PropertyChanged}\"", source, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding FilteredModels}\"", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Right\"", source, StringComparison.Ordinal);
@@ -90,7 +90,7 @@ public sealed class ProvidersViewContractTests
 
         Assert.Contains("SelectedProvider.HasIncompleteHeaders", source, StringComparison.Ordinal);
         Assert.Contains("SelectedProvider.IncompleteHeaderCount", source, StringComparison.Ordinal);
-        Assert.Contains("补全名称和值后才会保存", source, StringComparison.Ordinal);
+        Assert.Contains("{l:Locale providers.headers.incomplete.suffix}", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -169,7 +169,7 @@ public sealed class ProvidersViewContractTests
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
 
-        Assert.Contains("<StackPanel Orientation=\"Horizontal\" Spacing=\"4\"><TextBlock Text=\"Base URL\"", source, StringComparison.Ordinal);
+        Assert.Contains("<StackPanel Orientation=\"Horizontal\" Spacing=\"4\"><TextBlock Text=\"{l:Locale providers.baseurl.label}\"", source, StringComparison.Ordinal);
         Assert.Contains("Cursor=\"Help\"", source, StringComparison.Ordinal);
         Assert.Contains("<Border Width=\"16\" Height=\"16\"", source, StringComparison.Ordinal);
         Assert.Contains("<TextBlock Text=\"?\" FontSize=\"10\"", source, StringComparison.Ordinal);
@@ -203,14 +203,14 @@ public sealed class ProvidersViewContractTests
         var source = File.ReadAllText(path);
         const string deletePath = "M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6";
 
-        Assert.Contains("Text=\"供应商列表\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale providers.header.list}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding ProviderSearchQuery, UpdateSourceTrigger=PropertyChanged}\"", source, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding FilteredProviders}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<Grid ColumnDefinitions=\"3,*\">", source, StringComparison.Ordinal);
         Assert.DoesNotContain("IsVisible=\"{Binding $parent[ListBoxItem].IsSelected}\"", source, StringComparison.Ordinal);
         Assert.Contains("Grid RowDefinitions=\"Auto,Auto,Auto\"", source, StringComparison.Ordinal);
         Assert.Contains("Orientation=\"Horizontal\" Spacing=\"5\" VerticalAlignment=\"Center\"", source, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"绿色表示已启用\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale providers.toggle.tooltip.enabled}\"", source, StringComparison.Ordinal);
         Assert.Contains("<TranslateTransform X=\"12\"/>", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Right\" VerticalAlignment=\"Bottom\"", source, StringComparison.Ordinal);
         Assert.Equal(2, source.Split(deletePath, StringSplitOptions.None).Length - 1);

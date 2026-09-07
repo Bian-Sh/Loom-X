@@ -1,7 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Windows.Input;
 using Avalonia.Threading;
+using Microsoft.Extensions.Localization;
 using LoomX.Configuration;
+using LoomX.Localization;
 using LoomX.Services;
 
 namespace LoomX.ViewModels;
@@ -10,6 +13,7 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
 {
     private readonly AppDataStore dataStore;
     private readonly ToastService toastService;
+    private readonly IStringLocalizer<GatewayViewModel> _loc;
     private GatewayEndpointEditorViewModel? selectedEndpoint;
     private GatewayComboEditorViewModel? selectedCombo;
     private GatewayRouteEditorViewModel? draggingRoute;
@@ -23,6 +27,8 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     private int gatewayMutationDepth;
     private bool refreshPending;
     private bool isRefreshing;
+    private string? statusKey;
+    private object[] statusArguments = [];
     public ObservableCollection<GatewayEndpointEditorViewModel> Endpoints { get; } = [];
     public ObservableCollection<GatewayComboEditorViewModel> Combos { get; } = [];
     public ObservableCollection<GatewayModelOption> AvailableModels { get; } = [];
@@ -38,7 +44,7 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         }
     }
     public bool IsModelSortDescending => !IsModelSortAscending;
-    public string ModelSortToolTip => IsModelSortAscending ? "按字母降序排序" : "按字母升序排序";
+    public string ModelSortToolTip => IsModelSortAscending ? Loc("gateway.sort.descending.tooltip") : Loc("gateway.sort.ascending.tooltip");
     public GatewayEndpointEditorViewModel? SelectedEndpoint { get => selectedEndpoint; set { if (SetProperty(ref selectedEndpoint, value)) OnPropertyChanged(nameof(HasSelectedEndpoint)); } }
     public GatewayComboEditorViewModel? SelectedCombo { get => selectedCombo; private set { if (SetProperty(ref selectedCombo, value)) FilterModels(""); } }
     public GatewayRouteEditorViewModel? DraggingRoute { get => draggingRoute; private set { if (SetProperty(ref draggingRoute, value)) OnPropertyChanged(nameof(IsRouteDragActive)); } }
@@ -54,10 +60,11 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     public ICommand RotateGatewayApiKeyCommand { get; }
     public ICommand SaveGatewayReasoningEffortCommand { get; }
 
-    public GatewayViewModel(AppDataStore dataStore, ToastService? toastService = null)
+    public GatewayViewModel(AppDataStore dataStore, ToastService? toastService = null, IStringLocalizer<GatewayViewModel>? localizer = null)
     {
         this.dataStore = dataStore;
         this.toastService = toastService ?? new ToastService();
+        _loc = localizer ?? LocalizerFactory.Create<GatewayViewModel>();
         AddComboCommand = new AsyncCommand(_ => AddComboAsync());
         ToggleEndpointCommand = new AsyncCommand(parameter => ToggleEndpointAsync(parameter as GatewayEndpointEditorViewModel));
         ToggleComboCommand = new AsyncCommand(parameter => ToggleComboAsync(parameter as GatewayComboEditorViewModel));
@@ -67,14 +74,33 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         RotateGatewayApiKeyCommand = new AsyncCommand(parameter => RotateGatewayApiKeyAsync(parameter as GatewayEndpointEditorViewModel));
         SaveGatewayReasoningEffortCommand = new AsyncCommand(parameter => SaveGatewayReasoningEffortAsync(parameter as GatewayEndpointEditorViewModel));
         dataStore.ConfigurationChanged += OnConfigurationChanged;
+        LocaleService.CultureChanged += OnCultureChanged;
         _ = RefreshAsync();
     }
 
-    public GatewayViewModel(ConfigSnapshotService configService, ToastService? toastService = null)
-        : this(new AppDataStore(configService, new GatewayProcessService()), toastService) { }
+    public GatewayViewModel(ConfigSnapshotService configService, ToastService? toastService = null, IStringLocalizer<GatewayViewModel>? localizer = null)
+        : this(new AppDataStore(configService, new GatewayProcessService()), toastService, localizer) { }
 
-    public void NotifyCopied() => toastService.Show("地址已复制", ToastLevel.Success);
-    public void NotifyApiKeyCopied() => toastService.Show("API Key 已复制", ToastLevel.Success);
+    private string Loc(string key) => _loc[key]?.Value ?? key;
+    private string LocFormat(string key, params object[] args) => string.Format(CultureInfo.CurrentCulture, Loc(key), args);
+    private void SetStatus(string key, params object[] args)
+    {
+        statusKey = key;
+        statusArguments = args;
+        Status = LocFormat(key, args);
+    }
+
+    private void OnCultureChanged(object? sender, CultureInfo culture)
+    {
+        if (statusKey is not null) Status = LocFormat(statusKey, statusArguments);
+        OnPropertyChanged(nameof(ModelSortToolTip));
+        foreach (var endpoint in Endpoints) endpoint.RefreshLocalization();
+        foreach (var endpoint in Endpoints)
+            foreach (var option in endpoint.ComboOptions) option.RefreshLocalization();
+    }
+
+    public void NotifyCopied() => toastService.Show(Loc("gateway.url.copied"), ToastLevel.Success);
+    public void NotifyApiKeyCopied() => toastService.Show(Loc("gateway.apikey.copied"), ToastLevel.Success);
     private async Task RefreshAsync()
     {
         await gatewayMutationLock.WaitAsync();
@@ -113,9 +139,9 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             foreach (var endpoint in endpoints) Endpoints.Add(GatewayEndpointEditorViewModel.FromResponse(endpoint, baseUrl, Combos));
             SelectedEndpoint = Endpoints.FirstOrDefault(item => item.Key == selectedKey) ?? Endpoints.FirstOrDefault();
             FilterModels("");
-            Status = $"已加载 {dataStore.Providers.Count} 个 Provider、{AvailableModels.Count} 个模型、{Endpoints.Count} 个 Endpoint 和 {Combos.Count} 个 Combo";
+            SetStatus("gateway.status.loaded", dataStore.Providers.Count, AvailableModels.Count, Endpoints.Count, Combos.Count);
         }
-        catch (Exception exception) { Status = $"网关加载失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.status.load.failure", exception.Message); }
         finally
         {
             isRefreshing = false;
@@ -139,15 +165,15 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     {
         try
         {
-            var name = "新 Combo"; var index = 2;
-            while (Combos.Any(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))) name = $"新 Combo {index++}";
+            var name = Loc("gateway.combo.new.name"); var index = 2;
+            while (Combos.Any(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))) name = LocFormat("gateway.combo.new.name.dup", index++);
             GatewayComboResponse? response = null;
             await RunGatewayMutationAsync(async () => response = await dataStore.CreateGatewayComboAsync(new GatewayComboInput(name, true, Combos.Count)));
             SelectedCombo = response is null ? null : Combos.FirstOrDefault(item => item.Id == response.Id);
             if (SelectedCombo is not null) SelectedCombo.IsExpanded = true;
-            Status = "全局 Combo 已添加";
+            SetStatus("gateway.combo.add.success");
         }
-        catch (Exception exception) { Status = $"添加 Combo 模型失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.combo.add.failure", exception.Message); }
     }
 
     public async Task SaveComboChangesAsync(GatewayComboEditorViewModel? combo)
@@ -164,9 +190,9 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
                 FindCurrentCombo(comboId)?.ApplyResponse(response);
                 saved = true;
             });
-            if (saved) Status = "Combo 模型已保存";
+            if (saved) SetStatus("gateway.combo.save.success");
         }
-        catch (Exception exception) { Status = $"保存 Combo 模型失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.combo.save.failure", exception.Message); }
     }
     public void SelectCombo(GatewayComboEditorViewModel? combo) => SelectedCombo = combo;
     public GatewayRouteEditorViewModel? FindSelectedRoute(Guid id) => SelectedCombo?.Routes.FirstOrDefault(item => !item.IsPlaceholder && item.Id == id);
@@ -183,13 +209,13 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             await RunGatewayMutationAsync(async () => response = await dataStore.UpdateGatewayEndpointComboBindingsAsync(endpoint.Key, new GatewayEndpointComboSelectionInput(selected)));
             if (response is null) return;
             endpoint.ApplyBindings(response, Combos);
-            Status = $"{endpoint.DisplayName} 的 Combo 暴露范围已保存";
+            SetStatus("gateway.endpoint.comboScope.saved", endpoint.DisplayName);
         }
         catch (Exception exception)
         {
             option.IsSelected = previous;
-            Status = $"Endpoint Combo 更新失败：{exception.Message}";
-            toastService.Show("Endpoint Combo 更新失败", ToastLevel.Error);
+            SetStatus("gateway.endpoint.comboScope.failure", exception.Message);
+            toastService.Show(Loc("gateway.endpoint.comboScope.failure.toast"), ToastLevel.Error);
         }
     }
 
@@ -241,9 +267,9 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             {
                 foreach (var update in updates) await SaveRouteAsync(update.Id, update.Input);
             });
-            Status = "故障转移顺序已保存";
+            SetStatus("gateway.route.reorder.saved");
         }
-        catch (Exception exception) { Status = $"保存排序失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.route.reorder.failure", exception.Message); }
     }
 
     public void CancelRouteDrag()
@@ -278,14 +304,15 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         {
             await ReloadAvailableModelsAsync();
             FilterModels("");
-            Status = AvailableModels.Count == 0 ? "没有可加入的已启用模型，请先在 Provider 中启用模型" : $"已加载 {AvailableModels.Count} 个可加入模型";
+            if (AvailableModels.Count == 0) SetStatus("gateway.model.available.empty");
+            else SetStatus("gateway.model.available.loaded", AvailableModels.Count);
             return true;
         }
         catch (Exception exception)
         {
             AvailableModels.Clear();
             ModelGroups.Clear();
-            Status = $"加载可加入模型失败：{exception.Message}";
+            SetStatus("gateway.model.available.load.failure", exception.Message);
             return false;
         }
     }
@@ -310,9 +337,9 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             });
             if (response is not null && FindCurrentCombo(response.ComboId) is { } combo && !combo.Routes.Any(item => item.Id == response.Id))
                 combo.Routes.Add(GatewayRouteEditorViewModel.FromResponse(response));
-            Status = "模型已加入 Combo";
+            SetStatus("gateway.model.combo.add.success");
         }
-        catch (Exception exception) { Status = $"加入 Combo 失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.model.combo.add.failure", exception.Message); }
     }
     public async Task ToggleModelRouteAsync(GatewayModelOption? option)
     {
@@ -324,8 +351,8 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     private async Task ToggleEndpointAsync(GatewayEndpointEditorViewModel? endpoint)
     {
         if (endpoint is null) return;
-        try { endpoint.Enabled = (await dataStore.SetGatewayEndpointEnabledAsync(endpoint.Key, !endpoint.Enabled)).Enabled; Status = $"{endpoint.DisplayName} 已{(endpoint.Enabled ? "启用" : "停用")}"; }
-        catch (Exception exception) { Status = $"Endpoint 更新失败：{exception.Message}"; }
+        try { endpoint.Enabled = (await dataStore.SetGatewayEndpointEnabledAsync(endpoint.Key, !endpoint.Enabled)).Enabled; SetStatus("gateway.endpoint.toggle.success", endpoint.DisplayName, endpoint.Enabled ? Loc("gateway.endpoint.enable") : Loc("gateway.endpoint.disable")); }
+        catch (Exception exception) { SetStatus("gateway.endpoint.toggle.failure", exception.Message); }
     }
     private async Task RotateGatewayApiKeyAsync(GatewayEndpointEditorViewModel? endpoint)
     {
@@ -333,13 +360,13 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         try
         {
             endpoint.ApplyResponse(await dataStore.RotateGatewayApiKeyAsync(endpoint.Key));
-            Status = $"{endpoint.DisplayName} API Key 已重新生成";
-            toastService.Show("API Key 已重新生成", ToastLevel.Success);
+            SetStatus("gateway.endpoint.apikey.regenerated", endpoint.DisplayName);
+            toastService.Show(Loc("gateway.endpoint.apikey.regenerated.toast"), ToastLevel.Success);
         }
         catch (Exception exception)
         {
-            Status = $"API Key 重新生成失败：{exception.Message}";
-            toastService.Show("API Key 重新生成失败", ToastLevel.Error);
+            SetStatus("gateway.endpoint.apikey.regenerate.failure", exception.Message);
+            toastService.Show(Loc("gateway.endpoint.apikey.regenerate.failure.toast"), ToastLevel.Error);
         }
     }
 
@@ -350,13 +377,13 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         {
             endpoint.ApplyResponse(await dataStore.UpdateGatewayEndpointReasoningEffortAsync(endpoint.Key, endpoint.ReasoningEffort));
             endpoint.MarkReasoningEffortSaved();
-            Status = $"{endpoint.DisplayName} Reasoning effort 已保存";
-            toastService.Show("Reasoning effort 已保存", ToastLevel.Success);
+            SetStatus("gateway.endpoint.reasoning.saved", endpoint.DisplayName);
+            toastService.Show(Loc("gateway.endpoint.reasoning.saved.toast"), ToastLevel.Success);
         }
         catch (Exception exception)
         {
-            Status = $"Reasoning effort 保存失败：{exception.Message}";
-            toastService.Show("Reasoning effort 保存失败", ToastLevel.Error);
+            SetStatus("gateway.endpoint.reasoning.failure", exception.Message);
+            toastService.Show(Loc("gateway.endpoint.reasoning.failure.toast"), ToastLevel.Error);
         }
     }
     private async Task ToggleComboAsync(GatewayComboEditorViewModel? combo)
@@ -374,9 +401,9 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
                 FindCurrentCombo(current.Id)?.ApplyResponse(response);
                 saved = true;
             });
-            if (saved) Status = "Combo 模型已保存";
+            if (saved) SetStatus("gateway.combo.save.success");
         }
-        catch (Exception exception) { Status = $"保存 Combo 模型失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.combo.save.failure", exception.Message); }
     }
     private async Task RemoveComboAsync(GatewayComboEditorViewModel? combo)
     {
@@ -387,9 +414,9 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             await RunGatewayMutationAsync(() => dataStore.DeleteGatewayComboAsync(comboId));
             if (FindCurrentCombo(comboId) is { } current) Combos.Remove(current);
             if (SelectedCombo?.Id == comboId) SelectedCombo = null;
-            Status = "全局 Combo 已移除";
+            SetStatus("gateway.combo.remove.success");
         }
-        catch (Exception exception) { Status = $"移除 Combo 模型失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.combo.remove.failure", exception.Message); }
     }
     private async Task ToggleRouteAsync(GatewayRouteEditorViewModel? route)
     {
@@ -403,9 +430,9 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
                 current.Enabled = !current.Enabled;
                 await SaveRouteAsync(current);
             });
-            Status = "成员状态已保存";
+            SetStatus("gateway.route.member.save.success");
         }
-        catch (Exception exception) { Status = $"成员保存失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.route.member.save.failure", exception.Message); }
     }
     private async Task RemoveRouteAsync(GatewayRouteEditorViewModel? route)
     {
@@ -420,9 +447,9 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
                 if (FindCurrentRoute(routeId) is { } currentRoute) combo.Routes.Remove(currentRoute);
                 Renumber(combo);
             }
-            Status = "模型已从 Combo 移除";
+            SetStatus("gateway.model.combo.remove.success");
         }
-        catch (Exception exception) { Status = $"移除成员失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.model.combo.remove.failure", exception.Message); }
     }
     public async Task MoveRouteAsync(GatewayRouteEditorViewModel? route, GatewayRouteEditorViewModel? target)
     {
@@ -437,9 +464,9 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             {
                 foreach (var update in updates) await SaveRouteAsync(update.Id, update.Input);
             });
-            Status = "故障转移顺序已保存";
+            SetStatus("gateway.route.reorder.saved");
         }
-        catch (Exception exception) { Status = $"保存排序失败：{exception.Message}"; }
+        catch (Exception exception) { SetStatus("gateway.route.reorder.failure", exception.Message); }
     }
     private Task SaveRouteAsync(GatewayRouteEditorViewModel route) => SaveRouteAsync(route.Id, new GatewayRouteInput(route.ModelId, route.Enabled, route.SortOrder));
     private Task SaveRouteAsync(Guid routeId, GatewayRouteInput input) => dataStore.UpdateGatewayRouteAsync(routeId, input);
@@ -494,6 +521,7 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     public void Dispose()
     {
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
+        LocaleService.CultureChanged -= OnCultureChanged;
         gatewayMutationLock.Dispose();
     }
 }
@@ -509,7 +537,7 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
     public string Key { get; init; } = ""; public string DisplayName { get; init; } = ""; public string PublicPath { get; init; } = ""; public string PublicUrl { get; init; } = "";
     public ObservableCollection<GatewayComboBindingOption> ComboOptions { get; } = [];
     public int SelectedComboCount => ComboOptions.Count(item => item.IsSelected);
-    public string SelectedComboSummary => SelectedComboCount == 0 ? "未暴露 Combo" : string.Join("、", ComboOptions.Where(item => item.IsSelected).Select(item => item.Name));
+    public string SelectedComboSummary => SelectedComboCount == 0 ? ResourceLookup.Resolve("gateway.combo.summary.empty") : string.Join(ResourceLookup.Resolve("gateway.combo.summary.separator"), ComboOptions.Where(item => item.IsSelected).Select(item => item.Name));
     public bool IsComboPickerOpen { get => isComboPickerOpen; set => SetProperty(ref isComboPickerOpen, value); }
     public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); }
     public string ApiKey { get => apiKey; private set { if (SetProperty(ref apiKey, value)) OnPropertyChanged(nameof(MaskedApiKey)); } }
@@ -563,10 +591,11 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
         OnPropertyChanged(nameof(SelectedComboCount));
         OnPropertyChanged(nameof(SelectedComboSummary));
     }
+    internal void RefreshLocalization() => OnPropertyChanged(nameof(SelectedComboSummary));
     public void MarkReasoningEffortSaved() => reasoningEffortDirty = false;
     private static string MaskApiKey(string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return "未生成";
+        if (string.IsNullOrWhiteSpace(value)) return ResourceLookup.Resolve("providers.apikey.notGenerated");
         if (value.Length <= 8) return new string('•', value.Length);
         return $"{value[..4]}••••{value[^4..]}";
     }
@@ -579,7 +608,7 @@ public sealed class GatewayComboBindingOption : NotifyViewModel
     public string Name { get; }
     public bool ComboEnabled { get; }
     public bool IsSelected { get => isSelected; set { if (SetProperty(ref isSelected, value)) Owner.OnComboOptionChanged(); } }
-    public string StatusText => ComboEnabled ? "" : "全局停用";
+    public string StatusText => ComboEnabled ? "" : ResourceLookup.Resolve("gateway.combo.disabled");
     public GatewayComboBindingOption(GatewayEndpointEditorViewModel owner, Guid comboId, string name, bool comboEnabled, bool isSelected)
     {
         Owner = owner;
@@ -588,6 +617,7 @@ public sealed class GatewayComboBindingOption : NotifyViewModel
         ComboEnabled = comboEnabled;
         this.isSelected = isSelected;
     }
+    internal void RefreshLocalization() => OnPropertyChanged(nameof(StatusText));
 }
 public sealed class GatewayComboEditorViewModel : NotifyViewModel
 {
