@@ -1,3 +1,8 @@
+---
+archived-with: provider-panel-alignment
+status: archived
+---
+
 # Provider 面板对齐与卡片操作设计
 
 ## 目标

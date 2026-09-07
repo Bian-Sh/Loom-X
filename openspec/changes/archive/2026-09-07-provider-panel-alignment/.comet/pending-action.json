@@ -1,0 +1,6 @@
+{
+  "id": "classic-archive:provider-panel-alignment",
+  "stepId": "tweak.archive.confirm",
+  "type": "checkpoint",
+  "ref": "provider-panel-alignment"
+}
