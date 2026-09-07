@@ -15,7 +15,7 @@ design_doc: docs/superpowers/specs/2026-09-06-i18n-phase-2-design.md
 plan: docs/superpowers/plans/2026-09-06-i18n-phase-2.md
 verify_result: pending
 verification_report: docs/superpowers/reports/2026-09-07-i18n-phase-2-views-and-en-us-verify.md
-branch_status: pending
+branch_status: handled
 created_at: 2026-09-06
 verified_at: null
 archived: false
