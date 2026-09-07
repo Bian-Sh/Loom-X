@@ -30,7 +30,7 @@
     <value>組合對外 Endpoint 的模型路由，並按優先級自動故障轉移。</value>
   </data>
   <data name="nav.providers">
-    <value>Provider</value>
+    <value>提供商</value>
   </data>
   <data name="nav.providers.description">
     <value>管理上游連接、請求協議、密鑰與可用模型。</value>
@@ -1037,7 +1037,7 @@
     <value>個 Combo</value>
   </data>
   <data name="gateway.combo.header">
-    <value>全局 Combo</value>
+    <value>模型組合</value>
   </data>
   <data name="gateway.combo.header.hint">
     <value>跨 Endpoint 共享，按成員順序故障轉移</value>
@@ -1100,7 +1100,7 @@
     <value>新 Combo {0}</value>
   </data>
   <data name="gateway.combo.add.success">
-    <value>全局 Combo 已添加</value>
+    <value>模型組合已添加</value>
   </data>
   <data name="gateway.combo.add.failure">
     <value>添加 Combo 模型失敗：{0}</value>
@@ -1112,7 +1112,7 @@
     <value>保存 Combo 模型失敗：{0}</value>
   </data>
   <data name="gateway.combo.remove.success">
-    <value>全局 Combo 已移除</value>
+    <value>模型組合已移除</value>
   </data>
   <data name="gateway.combo.remove.failure">
     <value>移除 Combo 模型失敗：{0}</value>

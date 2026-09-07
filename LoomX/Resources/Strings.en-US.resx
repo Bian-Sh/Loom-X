@@ -11,8 +11,8 @@
   <data name="nav.overview"><value>Overview</value></data>
   <data name="nav.overview.description"><value>Review local service health and gateway configuration.</value></data>
   <data name="nav.gateway"><value>Gateway</value></data>
-  <data name="nav.gateway.description"><value>Manage endpoints and global combos.</value></data>
-  <data name="nav.providers"><value>Providers</value></data>
+  <data name="nav.gateway.description"><value>Manage endpoints and model combos.</value></data>
+  <data name="nav.providers"><value>Provider</value></data>
   <data name="nav.providers.description"><value>Manage providers and models.</value></data>
   <data name="nav.activity"><value>Activity</value></data>
   <data name="nav.activity.title"><value>Activity</value></data>
@@ -346,7 +346,7 @@
   <data name="gateway.endpoint.comboCount"><value>Exposed {0} combos</value></data>
   <data name="gateway.endpoint.comboCount.prefix"><value>Exposed</value></data>
   <data name="gateway.endpoint.comboCount.suffix"><value>combos</value></data>
-  <data name="gateway.combo.header"><value>Global Combo</value></data>
+  <data name="gateway.combo.header"><value>Model Combo</value></data>
   <data name="gateway.combo.header.hint"><value>Shared across endpoints, with failover by member order</value></data>
   <data name="gateway.combo.add.tooltip"><value>Add Combo model</value></data>
   <data name="gateway.combo.expand.tooltip"><value>Expand or collapse Combo</value></data>
@@ -367,11 +367,11 @@
   <data name="gateway.status.load.failure"><value>Gateway load failed: {0}</value></data>
   <data name="gateway.combo.new.name"><value>New Combo</value></data>
   <data name="gateway.combo.new.name.dup"><value>New Combo {0}</value></data>
-  <data name="gateway.combo.add.success"><value>Global Combo added</value></data>
+  <data name="gateway.combo.add.success"><value>Model Combo added</value></data>
   <data name="gateway.combo.add.failure"><value>Add Combo model failed: {0}</value></data>
   <data name="gateway.combo.save.success"><value>Combo model saved</value></data>
   <data name="gateway.combo.save.failure"><value>Save Combo model failed: {0}</value></data>
-  <data name="gateway.combo.remove.success"><value>Global Combo removed</value></data>
+  <data name="gateway.combo.remove.success"><value>Model Combo removed</value></data>
   <data name="gateway.combo.remove.failure"><value>Remove Combo model failed: {0}</value></data>
   <data name="gateway.endpoint.comboScope.saved"><value>Combo exposure scope saved for {0}</value></data>
   <data name="gateway.endpoint.comboScope.failure"><value>Endpoint Combo update failed: {0}</value></data>

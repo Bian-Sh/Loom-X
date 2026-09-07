@@ -30,7 +30,7 @@
     <value>Endpoint のモデルルートを組み合わせ、優先順位に基づいて自動フェイルオーバーします。</value>
   </data>
   <data name="nav.providers">
-    <value>Provider</value>
+    <value>プロバイダー</value>
   </data>
   <data name="nav.providers.description">
     <value>アップストリーム接続、リクエストプロトコル、認証キー、利用可能なモデルを管理します。</value>
@@ -1037,7 +1037,7 @@
     <value> 件の Combo</value>
   </data>
   <data name="gateway.combo.header">
-    <value>グローバル Combo</value>
+    <value>モデル Combo</value>
   </data>
   <data name="gateway.combo.header.hint">
     <value>Endpoint 間で共有し、メンバー順にフェイルオーバー</value>
@@ -1100,7 +1100,7 @@
     <value>新しい Combo {0}</value>
   </data>
   <data name="gateway.combo.add.success">
-    <value>グローバル Combo を追加しました</value>
+    <value>モデル Combo を追加しました</value>
   </data>
   <data name="gateway.combo.add.failure">
     <value>Combo モデルの追加に失敗しました：{0}</value>
@@ -1112,7 +1112,7 @@
     <value>Combo モデルの保存に失敗しました：{0}</value>
   </data>
   <data name="gateway.combo.remove.success">
-    <value>グローバル Combo を削除しました</value>
+    <value>モデル Combo を削除しました</value>
   </data>
   <data name="gateway.combo.remove.failure">
     <value>Combo モデルの削除に失敗しました：{0}</value>
