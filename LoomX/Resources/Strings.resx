@@ -502,9 +502,6 @@
   <data name="overview.gateway.lastchecked.label">
     <value>最后检查</value>
   </data>
-  <data name="overview.refresh.button">
-    <value>刷新</value>
-  </data>
   <data name="overview.recent.label">
     <value>最近请求</value>
   </data>

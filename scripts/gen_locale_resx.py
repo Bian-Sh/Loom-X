@@ -179,7 +179,6 @@ JA = {
     "overview.gateway.endpoint.label": "リスニングアドレス",
     "overview.gateway.version.label": "インターフェース状態",
     "overview.gateway.lastchecked.label": "最終確認",
-    "overview.refresh.button": "更新",
     "overview.recent.label": "最近のリクエスト",
     "overview.recent.count": "最近 {0} 件",
     "overview.recent.empty": "リクエストアクティビティなし",

@@ -49,7 +49,8 @@ public sealed class OverviewGraphContractTests
         Assert.Contains("ClipToBounds=\"True\"", source, StringComparison.Ordinal);
         Assert.Contains("Content=\"{Binding GatewayActionLabel}\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding ToggleGatewayCommand}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"{l:Locale overview.refresh.button}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("overview.refresh.button", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("RefreshCommand", source, StringComparison.Ordinal);
     }
 
     [Fact]

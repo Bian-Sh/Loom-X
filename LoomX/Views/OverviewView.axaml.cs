@@ -13,7 +13,6 @@ public partial class OverviewView : UserControl
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         AttachedToVisualTree += OnAttachedToVisualTree;
-        DetachedFromVisualTree += OnDetachedFromVisualTree;
     }
 
     private void OnDataContextChanged(object? sender, EventArgs args) => FitActiveGraph();
@@ -51,10 +50,5 @@ public partial class OverviewView : UserControl
             if (FindVisualDescendant(child, predicate) is { } nested) return nested;
         }
         return null;
-    }
-
-    private void OnDetachedFromVisualTree(object? sender, VisualTreeAttachmentEventArgs args)
-    {
-        (DataContext as OverviewViewModel)?.Dispose();
     }
 }

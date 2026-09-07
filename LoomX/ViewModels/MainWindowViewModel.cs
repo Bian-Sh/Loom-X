@@ -265,7 +265,6 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public ICommand StartCommand { get; }
     public ICommand StopCommand { get; }
     public ICommand ToggleGatewayCommand { get; }
-    public ICommand RefreshCommand { get; }
 
     public OverviewViewModel(GatewayProcessService gatewayService, AppDataStore dataStore, ILogger<MainWindowViewModel>? logger = null, IStringLocalizer<OverviewViewModel>? localizer = null)
     {
@@ -276,7 +275,6 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         StartCommand = new AsyncCommand(StartAsync);
         StopCommand = new AsyncCommand(StopAsync);
         ToggleGatewayCommand = new AsyncCommand(ToggleGatewayAsync, CanToggleGateway);
-        RefreshCommand = new AsyncCommand(RefreshAsync);
         gatewayService.StateChanged += OnGatewayStateChanged;
         gatewayService.TelemetryPublished += OnTelemetryPublished;
         dataStore.ConfigurationChanged += OnConfigurationChanged;

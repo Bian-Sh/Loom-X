@@ -133,7 +133,6 @@
   <data name="overview.gateway.endpoint.label"><value>Listening address</value></data>
   <data name="overview.gateway.version.label"><value>API status</value></data>
   <data name="overview.gateway.lastchecked.label"><value>Last checked</value></data>
-  <data name="overview.refresh.button"><value>Refresh</value></data>
   <data name="overview.recent.label"><value>Recent requests</value></data>
   <data name="overview.recent.count"><value>{0} requests</value></data>
   <data name="overview.recent.empty"><value>No recent requests</value></data>

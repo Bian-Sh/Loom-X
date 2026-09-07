@@ -397,9 +397,6 @@
   <data name="overview.gateway.lastchecked.label">
     <value>最後檢查</value>
   </data>
-  <data name="overview.refresh.button">
-    <value>刷新</value>
-  </data>
   <data name="overview.recent.label">
     <value>最近請求</value>
   </data>
