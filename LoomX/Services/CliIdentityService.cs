@@ -61,6 +61,7 @@ public static class CliIdentityService
             ["x-stainless-arch"] = "x64",
             ["x-stainless-runtime"] = "node",
             ["x-stainless-runtime-version"] = "22.14.0",
+            ["x-stainless-package-version"] = "{version}",
             ["x-stainless-timeout"] = "600000",
             ["x-stainless-retries"] = "2",
         },
@@ -135,6 +136,10 @@ public static class CliIdentityService
     public static IReadOnlyList<string> AllFamilyHeaderKeys { get; } =
         Profiles.Values.SelectMany(p => p.FamilyHeaderKeys).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
+    private static bool IsFamilyHeaderKey(string key) =>
+        key.StartsWith("x-stainless-", StringComparison.OrdinalIgnoreCase)
+        || AllFamilyHeaderKeys.Contains(key, StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// 给定 CLI 家族和版本号，构造该家族的完整头集合。
     /// 模板中的 {version} 占位符被替换为实际版本。
@@ -166,7 +171,7 @@ public static class CliIdentityService
         string version)
     {
         var result = new Dictionary<string, string>(headers, StringComparer.OrdinalIgnoreCase);
-        foreach (var key in AllFamilyHeaderKeys)
+        foreach (var key in result.Keys.Where(IsFamilyHeaderKey).ToArray())
             result.Remove(key);
 
         foreach (var (key, value) in BuildCliIdentityHeaders(targetType, version))

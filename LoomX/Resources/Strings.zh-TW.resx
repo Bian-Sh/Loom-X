@@ -850,6 +850,15 @@
   <data name="providers.cli.refreshing">
     <value>重新整理中…</value>
   </data>
+  <data name="providers.cli.current.prefix">
+    <value>目前：{0}</value>
+  </data>
+  <data name="providers.cli.current.none">
+    <value>目前：未套用 CLI 身分</value>
+  </data>
+  <data name="providers.cli.version.tooltip">
+    <value>Grok 版本可手動修改</value>
+  </data>
   <data name="providers.connection.label">
     <value>連接狀態</value>
   </data>

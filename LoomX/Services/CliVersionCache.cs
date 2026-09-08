@@ -16,7 +16,7 @@ public sealed class CliVersionCache
     private readonly string _path;
     private readonly TimeSpan _ttl;
     private readonly Func<DateTimeOffset> _now;
-    private readonly object _gate = new();
+    private static readonly object Gate = new();
 
     public CliVersionCache(string? path = null, TimeSpan? ttl = null, Func<DateTimeOffset>? now = null)
     {
@@ -33,7 +33,7 @@ public sealed class CliVersionCache
     /// </summary>
     public CliVersionInfo? Get(CliIdentityType type)
     {
-        lock (_gate)
+        lock (Gate)
         {
             var entry = LoadEntry(type);
             if (entry is null || string.IsNullOrWhiteSpace(entry.Version)) return null;
@@ -58,9 +58,11 @@ public sealed class CliVersionCache
     /// </summary>
     public void Set(CliIdentityType type, string version, CliVersionSource source, DateTimeOffset? fetchedAt = null)
     {
-        lock (_gate)
+        lock (Gate)
         {
             var entries = LoadAll();
+            if (entries.TryGetValue(type, out var existing) && existing.Source == CliVersionSource.UserOverridden && source != CliVersionSource.UserOverridden)
+                return;
             entries[type] = new CachedEntry
             {
                 Version = version,
@@ -91,7 +93,7 @@ public sealed class CliVersionCache
     /// </summary>
     public void ClearUserOverride(CliIdentityType type)
     {
-        lock (_gate)
+        lock (Gate)
         {
             var entries = LoadAll();
             if (entries.TryGetValue(type, out var entry) && entry.Source == CliVersionSource.UserOverridden)

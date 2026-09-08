@@ -974,6 +974,15 @@
   <data name="providers.cli.refreshing">
     <value>刷新中…</value>
   </data>
+  <data name="providers.cli.current.prefix">
+    <value>当前：{0}</value>
+  </data>
+  <data name="providers.cli.current.none">
+    <value>当前：未应用 CLI 身份</value>
+  </data>
+  <data name="providers.cli.version.tooltip">
+    <value>Grok 版本可手动修改</value>
+  </data>
   <data name="providers.connection.label">
     <value>连接状态</value>
   </data>

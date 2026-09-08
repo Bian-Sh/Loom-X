@@ -117,6 +117,24 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
+    public void CliIdentityPopupExposesApplyEditRefreshAndCurrentStatusControls()
+    {
+        var viewPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
+        var viewModelPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
+        var viewSource = File.ReadAllText(viewPath);
+        var viewModelSource = File.ReadAllText(viewModelPath);
+
+        Assert.Contains("ApplyCliIdentityCommand", viewSource, StringComparison.Ordinal);
+        Assert.Contains("CommandParameter=\"{Binding}\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding Version, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("IsVersionReadOnly", viewSource, StringComparison.Ordinal);
+        Assert.Contains("RefreshCliVersionsCommand", viewSource, StringComparison.Ordinal);
+        Assert.Contains("CurrentCliIdentitySummary", viewSource, StringComparison.Ordinal);
+        Assert.Contains("CurrentCliIdentitySummary", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("CliIdentityItemChanged", viewModelSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void LocalSavesSuppressConfigurationRefreshThatWouldReplaceEditorControls()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");

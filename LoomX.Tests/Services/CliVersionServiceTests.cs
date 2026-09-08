@@ -220,8 +220,8 @@ public sealed class CliVersionServiceTests : IDisposable
     [Fact]
     public static void GetDefaultVersion_ReturnsExpected()
     {
-        Assert.Equal("2.1.263", CliVersionService.GetDefaultVersion(CliIdentityType.ClaudeCode));
-        Assert.Equal("0.153.4", CliVersionService.GetDefaultVersion(CliIdentityType.Codex));
+        Assert.Equal("2.1.88", CliVersionService.GetDefaultVersion(CliIdentityType.ClaudeCode));
+        Assert.Equal("0.151.0", CliVersionService.GetDefaultVersion(CliIdentityType.Codex));
         Assert.Equal("1.0.6", CliVersionService.GetDefaultVersion(CliIdentityType.Grok));
     }
 

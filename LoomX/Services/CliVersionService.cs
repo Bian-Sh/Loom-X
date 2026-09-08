@@ -14,8 +14,8 @@ namespace LoomX.Services;
 /// </summary>
 public sealed class CliVersionService
 {
-    public const string ClaudeDefaultVersion = "2.1.263";
-    public const string CodexDefaultVersion = "0.153.4";
+    public const string ClaudeDefaultVersion = "2.1.88";
+    public const string CodexDefaultVersion = "0.151.0";
     public const string GrokDefaultVersion = "1.0.6";
 
     private const string ClaudeApiUrl = "https://registry.npmjs.org/@anthropic-ai/claude-code/latest";
@@ -85,7 +85,7 @@ public sealed class CliVersionService
         var version = document.RootElement.TryGetProperty("version", out var v) && v.ValueKind == JsonValueKind.String
             ? v.GetString()
             : null;
-        if (string.IsNullOrWhiteSpace(version))
+        if (string.IsNullOrWhiteSpace(version) || !IsValidVersion(version))
             throw new InvalidOperationException("npm registry 响应缺少 version 字段。");
         return (version.Trim(), CliVersionSource.NpmRegistry);
     }
@@ -111,6 +111,7 @@ public sealed class CliVersionService
         if (string.IsNullOrWhiteSpace(rawName))
             throw new InvalidOperationException("GitHub releases 响应缺少 name/tag_name 字段。");
         var version = ParseCodexVersion(rawName);
+        if (!IsValidVersion(version)) throw new InvalidOperationException("GitHub releases 响应中的版本号无效。");
         return (version, CliVersionSource.GitHubReleases);
     }
 
@@ -126,10 +127,17 @@ public sealed class CliVersionService
         var match = System.Text.RegularExpressions.Regex.Match(value, @"(\d+\.\d+\.\d+)");
         if (match.Success) return match.Groups[1].Value;
         // 否则按前缀去除
-        return value
+        var fallback = value
             .TrimStart('v', 'V')
             .TrimStart('r', 'R');
+        if (!IsValidVersion(fallback)) throw new FormatException("Codex 版本号无效。");
+        return fallback;
     }
+
+    internal static bool IsValidVersion(string? value) =>
+        !string.IsNullOrWhiteSpace(value)
+        && value.IndexOfAny(['\r', '\n', '\0']) < 0
+        && System.Text.RegularExpressions.Regex.IsMatch(value.Trim(), @"^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
     private async Task<(string Version, CliVersionSource Source)> FetchRemoteVersionAsync(CliIdentityType type, CancellationToken cancellationToken)
     {

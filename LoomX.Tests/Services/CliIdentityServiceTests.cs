@@ -16,6 +16,7 @@ public sealed class CliIdentityServiceTests
         Assert.Equal("Linux", headers["x-stainless-os"]);
         Assert.Equal("x64", headers["x-stainless-arch"]);
         Assert.Equal("node", headers["x-stainless-runtime"]);
+        Assert.Equal("2.1.263", headers["x-stainless-package-version"]);
         Assert.Equal("600000", headers["x-stainless-timeout"]);
         Assert.Equal("2", headers["x-stainless-retries"]);
     }
@@ -117,6 +118,17 @@ public sealed class CliIdentityServiceTests
         Assert.Equal("text/event-stream", result["Accept"]);
         Assert.Equal("application/json", result["Content-Type"]);
         Assert.Equal("claude-cli/2.1.263 (external, cli)", result["User-Agent"]);
+    }
+
+    [Fact]
+    public void ApplyCliIdentity_RemovesUnknownStainlessHeaders()
+    {
+        var result = CliIdentityService.ApplyCliIdentity(
+            new Dictionary<string, string> { ["x-stainless-future-header"] = "old" },
+            CliIdentityType.Codex,
+            "0.153.4");
+
+        Assert.False(result.ContainsKey("x-stainless-future-header"));
     }
 
     [Theory]

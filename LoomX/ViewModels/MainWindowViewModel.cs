@@ -1529,8 +1529,9 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     private bool isDirty;
     private bool isModelDragPreviewOwner;
     private bool suppressDirtyTracking;
+    private bool suppressCliIdentityVersionChange;
     public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ModelListUrl { get => modelListUrl; set => SetProperty(ref modelListUrl, value); }
-    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); } }
+    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); UpdateCliIdentityRecommendations(); } }
     public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); } }
     public IReadOnlyList<EndpointFormatOption> EndpointFormatOptions { get; } = EndpointFormatOption.All;
     public EndpointFormatOption SelectedEndpointFormat { get => EndpointFormatOption.FromValue(EndpointFormat); set { if (value is not null) EndpointFormat = value.Value; } }
@@ -1546,13 +1547,28 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public bool HasIncompleteHeaders => IncompleteHeaderCount > 0;
     public ObservableCollection<CliIdentityItemViewModel> CliIdentities { get; } = [];
     public CliIdentityType? CurrentCliIdentity { get; private set; }
+    public string CurrentCliIdentitySummary
+    {
+        get
+        {
+            if (CurrentCliIdentity is not { } type)
+                return ResourceLookup.Resolve("providers.cli.current.none");
+
+            var item = CliIdentities.FirstOrDefault(candidate => candidate.Type == type);
+            var label = CliIdentityService.GetProfile(type).DisplayName;
+            var version = string.IsNullOrWhiteSpace(item?.Version) ? "-" : item.Version;
+            return string.Format(CultureInfo.CurrentCulture, ResourceLookup.Resolve("providers.cli.current.prefix"), $"{label} {version}");
+        }
+    }
     public ICommand ApplyCliIdentityCommand { get; }
     public ICommand RefreshCliVersionsCommand { get; }
-    public bool IsRefreshingCliVersions { get; private set; }
+    private bool isRefreshingCliVersions;
+    public bool IsRefreshingCliVersions { get => isRefreshingCliVersions; private set { if (!SetProperty(ref isRefreshingCliVersions, value)) return; (RefreshCliVersionsCommand as AsyncCommand)?.RaiseCanExecuteChanged(); } }
     internal void RefreshLocalization()
     {
         OnPropertyChanged(nameof(ApiKeyVisibilityToolTip));
         OnPropertyChanged(nameof(ApiKeyWatermark));
+        OnPropertyChanged(nameof(CurrentCliIdentitySummary));
     }
     public ProviderEditorViewModel()
     {
@@ -1678,12 +1694,44 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
                 CliIdentityType.Grok => false,
                 _ => false,
             };
-            CliIdentities.Add(new CliIdentityItemViewModel(type, isRecommended)
+            var item = new CliIdentityItemViewModel(type, isRecommended)
             {
                 Version = CliVersionService.GetDefaultVersion(type)
-            });
+            };
+            item.PropertyChanged += CliIdentityItemChanged;
+            CliIdentities.Add(item);
         }
         ReconcileCliIdentitiesFromHeaders();
+    }
+
+    private void UpdateCliIdentityRecommendations()
+    {
+        foreach (var item in CliIdentities)
+        {
+            var isRecommended = item.Type switch
+            {
+                CliIdentityType.ClaudeCode => string.Equals(ApiMode, "anthropic", StringComparison.OrdinalIgnoreCase),
+                CliIdentityType.Codex => string.Equals(ApiMode, "openai", StringComparison.OrdinalIgnoreCase),
+                CliIdentityType.Grok => false,
+                _ => false,
+            };
+            item.SetRecommended(isRecommended);
+        }
+    }
+
+    private void CliIdentityItemChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (sender is not CliIdentityItemViewModel item || args.PropertyName != nameof(CliIdentityItemViewModel.Version)) return;
+        OnPropertyChanged(nameof(CurrentCliIdentitySummary));
+        if (suppressCliIdentityVersionChange || !item.IsApplied || string.IsNullOrWhiteSpace(item.Version)) return;
+
+        if (item.Type == CliIdentityType.Grok)
+        {
+            item.Source = CliVersionSource.UserOverridden;
+            new CliVersionCache().SetUserOverride(item.Type, item.Version);
+        }
+
+        _ = ApplyCliIdentityAsync(item);
     }
 
     /// <summary>
@@ -1696,15 +1744,22 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
         var detected = CliIdentityService.DetectCliIdentity(headers);
         var detectedVersion = detected is null ? null : CliIdentityService.DetectCliVersion(headers, detected.Value);
         CurrentCliIdentity = detected;
-        foreach (var item in CliIdentities)
+        suppressCliIdentityVersionChange = true;
+        try
         {
-            item.IsApplied = item.Type == detected;
-            if (detected is not null && item.Type == detected && !string.IsNullOrEmpty(detectedVersion))
-                item.Version = detectedVersion;
-            else if (detected is null)
-                item.Version = CliVersionService.GetDefaultVersion(item.Type);
+            foreach (var item in CliIdentities)
+            {
+                item.IsApplied = item.Type == detected;
+                if (detected is not null && item.Type == detected && !string.IsNullOrEmpty(detectedVersion))
+                    item.Version = detectedVersion;
+            }
+        }
+        finally
+        {
+            suppressCliIdentityVersionChange = false;
         }
         OnPropertyChanged(nameof(CurrentCliIdentity));
+        OnPropertyChanged(nameof(CurrentCliIdentitySummary));
     }
 
     /// <summary>
@@ -1713,15 +1768,30 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public void LoadCliVersionsFromCache()
     {
         var cache = new CliVersionCache();
-        foreach (var item in CliIdentities)
+        suppressCliIdentityVersionChange = true;
+        try
         {
-            var cached = cache.Get(item.Type);
-            if (cached is not null)
-                item.ApplyVersion(cached.Version, CliVersionSource.Cached);
-            else
-                item.ApplyVersion(CliVersionService.GetDefaultVersion(item.Type), CliVersionSource.Default);
+            foreach (var item in CliIdentities)
+            {
+                var cached = cache.Get(item.Type);
+                if (cached is not null)
+                    item.ApplyVersion(cached.Version, cached.Source);
+                else
+                    item.ApplyVersion(CliVersionService.GetDefaultVersion(item.Type), CliVersionSource.Default);
+            }
+        }
+        finally
+        {
+            suppressCliIdentityVersionChange = false;
         }
         ReconcileCliIdentitiesFromHeaders();
+    }
+
+    public void RefreshCliVersionsIfStale()
+    {
+        var cache = new CliVersionCache();
+        if (CliIdentities.Any(item => cache.IsStale(item.Type)))
+            RefreshCliVersionsCommand.Execute(null);
     }
 
     /// <summary>
@@ -1766,10 +1836,9 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     /// <summary>
     /// 应用 CLI 身份：CommandParameter 是 CliIdentityItemViewModel。
     /// </summary>
-    private async Task ApplyCliIdentityAsync(object? parameter, CancellationToken cancellationToken = default)
+    private Task ApplyCliIdentityAsync(object? parameter, CancellationToken cancellationToken = default)
     {
-        if (parameter is not CliIdentityItemViewModel item) return;
-        if (string.IsNullOrWhiteSpace(item.Version)) return;
+        if (parameter is not CliIdentityItemViewModel item || string.IsNullOrWhiteSpace(item.Version)) return Task.CompletedTask;
 
         // 若已手改版本，写入用户覆盖缓存（避免下次被默认值覆盖）。
         if (item.Source == CliVersionSource.UserOverridden || (item.Type == CliIdentityType.Grok && CliVersionService.GetDefaultVersion(item.Type) != item.Version))
@@ -1783,6 +1852,7 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
         var updated = CliIdentityService.ApplyCliIdentity(headers, item.Type, item.Version);
         ApplyHeaders(updated);
         ReconcileCliIdentitiesFromHeaders();
+        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -1829,7 +1899,7 @@ public sealed record EndpointFormatOption(string Value, string DisplayName)
 /// CLI 身份下拉菜单中单条项的 ViewModel。
 /// 承载显示名、版本（可手改）、来源标记、已应用标记与推荐标记。
 /// </summary>
-public sealed class CliIdentityItemViewModel : NotifyViewModel
+    public sealed class CliIdentityItemViewModel : NotifyViewModel
 {
     private string version = "";
     private bool isApplied;
@@ -1837,7 +1907,9 @@ public sealed class CliIdentityItemViewModel : NotifyViewModel
     private CliVersionSource source;
     public CliIdentityType Type { get; }
     public string DisplayName { get; }
-    public bool IsRecommended { get; }
+    private bool isRecommended;
+    public bool IsRecommended { get => isRecommended; private set => SetProperty(ref isRecommended, value); }
+    public bool IsVersionReadOnly => Type != CliIdentityType.Grok;
     /// <summary>版本，可被用户手改（Grok 场景）。</summary>
     public string Version { get => version; set => SetProperty(ref version, value); }
     /// <summary>是否已应用该身份到当前 Provider 的 Headers。</summary>
@@ -1857,6 +1929,8 @@ public sealed class CliIdentityItemViewModel : NotifyViewModel
         IsRecommended = isRecommended;
         Source = CliVersionSource.Default;
     }
+
+    internal void SetRecommended(bool value) => IsRecommended = value;
 
     public void ApplyVersion(string version, CliVersionSource source, bool hasNewVersion = false)
     {

@@ -284,6 +284,9 @@
   <data name="providers.cli.source.cached"><value>Cached</value></data>
   <data name="providers.cli.source.userOverridden"><value>Custom</value></data>
   <data name="providers.cli.refreshing"><value>Refreshing…</value></data>
+  <data name="providers.cli.current.prefix"><value>Current: {0}</value></data>
+  <data name="providers.cli.current.none"><value>Current: no CLI identity</value></data>
+  <data name="providers.cli.version.tooltip"><value>Grok version can be edited manually</value></data>
   <data name="providers.connection.label"><value>Connection status</value></data>
   <data name="providers.connection.test"><value>Test connection</value></data>
   <data name="providers.models.url.label"><value>Model list URL (optional)</value></data>
