@@ -36,7 +36,7 @@
             <Border Classes="panel" Padding="18">
               <StackPanel Spacing="14">
                 <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.mode.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.proxy.mode.hint}" Classes="hint"/><ComboBox ItemsSource="{Binding ProxyModeOptions}" ItemTemplate="{StaticResource SettingsOptionTemplate}" SelectionBoxItemTemplate="{StaticResource SettingsOptionTemplate}" SelectedItem="{Binding SelectedProxyMode, Mode=TwoWay}"/></StackPanel>
-                <Grid ColumnDefinitions="*,120" ColumnSpacing="10" IsVisible="{Binding IsCustomProxyVisible}">
+                <Grid ColumnDefinitions="*,140" ColumnSpacing="10" IsVisible="{Binding IsCustomProxyVisible}">
                   <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.host.label}" Classes="label"/><TextBox Text="{Binding ProxyHost}" Watermark="http://127.0.0.1"/></StackPanel>
                   <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="{l:Locale settings.proxy.port.label}" Classes="label"/><NumericUpDown Value="{Binding ProxyPort}" Minimum="1" Maximum="65535"/></StackPanel>
                 </Grid>
