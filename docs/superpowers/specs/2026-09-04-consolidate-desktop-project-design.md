@@ -2,6 +2,8 @@
 comet_change: consolidate-desktop-project
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-09-consolidate-desktop-project
+status: final
 ---
 
 # OllamaHub 源码整合到桌面工程技术设计
@@ -99,3 +101,4 @@ OllamaHub.Tests -> OllamaHub.Desktop
 ## Spec Patch
 
 无。OpenSpec 规格已明确桌面端唯一入口和旧 CLI 移除，迁移实现不需要补充行为场景。
+

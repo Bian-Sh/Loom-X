@@ -2,6 +2,7 @@
 change: app-data-center
 design-doc: docs/superpowers/specs/2026-09-03-app-data-center-design.md
 base-ref: 0213e0cdc67816f70d4255415b8240102e2d86f5
+archived-with: 2026-09-09-app-data-center
 ---
 
 # AppDataStore 数据中心实施计划
@@ -26,3 +27,4 @@ base-ref: 0213e0cdc67816f70d4255415b8240102e2d86f5
 - 不修改控制台缓冲、清空、跟随滚动和日志实时显示逻辑。
 - 不创建第二份设置数据库；配置数据库始终来自 `AppDataPaths.DatabasePath`。
 - 失败修复遵循先最小复现、再根因定位、最后验证的调试门禁。
+

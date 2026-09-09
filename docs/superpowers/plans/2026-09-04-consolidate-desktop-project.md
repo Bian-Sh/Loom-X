@@ -2,6 +2,7 @@
 change: consolidate-desktop-project
 design-doc: docs/superpowers/specs/2026-09-04-consolidate-desktop-project-design.md
 base-ref: b31fb3b813d257dfad0a1cee875801e9cba5fe5f
+archived-with: 2026-09-09-consolidate-desktop-project
 ---
 
 # 整合 OllamaHub 源码到桌面工程实施计划
@@ -72,3 +73,4 @@ base-ref: b31fb3b813d257dfad0a1cee875801e9cba5fe5f
 **失败处理：**
 - 先根据编译或测试错误定位遗漏的源文件、包引用或硬编码路径；不增加临时兼容工程。
 - 若发布验证失败，修复桌面项目的直接依赖或发布配置后重新运行完整验证。
+

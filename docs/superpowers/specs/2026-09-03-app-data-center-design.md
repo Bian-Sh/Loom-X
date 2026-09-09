@@ -1,3 +1,8 @@
+---
+archived-with: 2026-09-09-app-data-center
+status: final
+status: final
+---
 # AppDataStore 数据中心设计
 
 ## 目标

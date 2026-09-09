@@ -2,6 +2,8 @@
 comet_change: i18n-phase-2-views-and-en-us
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-09-i18n-phase-2-views-and-en-us
+status: final
 ---
 
 # i18n Phase 2 技术设计
@@ -254,3 +256,4 @@ Phase 3 待办：
 - `dotnet build` 生成 `en-US/LoomX.resources.dll`
 - `dotnet test` 全绿，包括新增的 `LocalizationNoCjkTest` 与 `LocalizationResourceParityTest`
 - 手工走查：Settings → Language 切到 `en-US` 后 UI 无中文残留、无 `[key]` 占位回退
+
