@@ -17,6 +17,8 @@
   <data name="nav.activity"><value>Activity</value></data>
   <data name="nav.activity.title"><value>Activity</value></data>
   <data name="nav.activity.description"><value>Review recent request activity.</value></data>
+  <data name="nav.assistant"><value>Assistant</value></data>
+  <data name="nav.assistant.description"><value>Configure providers, diagnose connectivity, and onboard relays in natural language.</value></data>
   <data name="nav.console"><value>Console</value></data>
   <data name="nav.console.description"><value>Inspect runtime diagnostics.</value></data>
   <data name="nav.settings"><value>Settings</value></data>
@@ -428,4 +430,9 @@
   <data name="gateway.request.failure"><value>Failed</value></data>
   <data name="providers.connection.status.pending"><value>Connection not tested</value></data>
   <data name="placeholder.empty.body"><value>No additional details.</value></data>
+  <data name="assistant.history.placeholder"><value>History…</value></data>
+  <data name="assistant.new_session"><value>＋ New chat</value></data>
+  <data name="assistant.send"><value>Send</value></data>
+  <data name="assistant.cancel"><value>Cancel</value></data>
+  <data name="assistant.input.watermark"><value>Type a message, Enter to send…</value></data>
 </root>

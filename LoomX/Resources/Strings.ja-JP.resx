@@ -44,6 +44,12 @@
   <data name="nav.activity.description">
     <value>プロトコル変換、アップストリーム遅延、HTTP エラーを特定し、プライバシー保護された追跡可能なコンテキストを保持します。</value>
   </data>
+  <data name="nav.assistant">
+    <value>アシスタント</value>
+  </data>
+  <data name="nav.assistant.description">
+    <value>自然言語で Provider の設定・疎通診断・リレー接続を行います。</value>
+  </data>
   <data name="nav.console">
     <value>コンソール</value>
   </data>
@@ -1281,5 +1287,20 @@
   </data>
   <data name="placeholder.empty.body">
     <value>このページはナビゲーションに接続済みです。業務機能は今後のイテレーションで段階的に実装されます。</value>
+  </data>
+  <data name="assistant.history.placeholder">
+    <value>履歴…</value>
+  </data>
+  <data name="assistant.new_session">
+    <value>＋ 新規チャット</value>
+  </data>
+  <data name="assistant.send">
+    <value>送信</value>
+  </data>
+  <data name="assistant.cancel">
+    <value>キャンセル</value>
+  </data>
+  <data name="assistant.input.watermark">
+    <value>メッセージを入力、Enter で送信…</value>
   </data>
 </root>

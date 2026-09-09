@@ -20,3 +20,5 @@
 - 如果 `test_provider` 返回 `endpoint_not_found`，尝试调整 base_url（多一层或少一层 `/v1`）。
 - `auth_failed` 优先确认 Key 是否复制完整、是否有 IP 白名单。
 - 部分兼容服务的 `/models` 不需要鉴权但 chat 需要，`test_provider` 通过不代表模型可用，务必再跑 `test_model`。
+- 服务需要代理才能连通时设 `use_proxy: true`；按 User-Agent / 自定义头校验客户端时用 `headers` 补齐——
+  具体识别信号与处理流程见 relays/new-api Skill 的"需要代理的中转站"与"卡客户端的中转站"两节。

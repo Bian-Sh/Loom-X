@@ -79,6 +79,12 @@ public sealed class GatewayProcessService : IDisposable
         finally { lifecycleLock.Release(); }
     }
 
+    /// <summary>
+    /// 网关在进程内运行时解析其 DI 容器中的服务（如小助手 AssistantService）；
+    /// 网关未在进程内运行（停止或连接外部实例）时返回 null。
+    /// </summary>
+    public T? GetHostedService<T>() where T : class => app?.Services.GetService(typeof(T)) as T;
+
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         await lifecycleLock.WaitAsync(cancellationToken);

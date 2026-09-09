@@ -70,6 +70,7 @@ public static class LoomXHost
         builder.Services.AddSingleton<Assistant.Browser.BrowserSecretVault>();
         builder.Services.AddSingleton<Assistant.NetworkProbe>();
         builder.Services.AddSingleton<Assistant.DiagnosticSubagent>();
+        builder.Services.AddSingleton<Assistant.AssistantModelClientFactory>();
         builder.Services.AddSingleton(services => new Assistant.Browser.BrowserBridge(
             port: 17831,
             services.GetRequiredService<ILogger<Assistant.Browser.BrowserBridge>>()));
@@ -93,10 +94,13 @@ public static class LoomXHost
             Assistant.LoomXTools.RegisterDiagnosticTool(
                 registry,
                 services.GetRequiredService<Assistant.DiagnosticSubagent>(),
-                // 助手模型尚未接入配置（Phase 4 接线），先返回 null，工具会给出明确错误
-                () => services.GetService<Assistant.IModelClient>());
+                services.GetRequiredService<Assistant.AssistantModelClientFactory>().TryCreateAsync);
             return registry;
         });
+
+        // 小助手（Phase 4）：会话门面与持久化
+        builder.Services.AddSingleton<Assistant.AssistantSessionStore>();
+        builder.Services.AddSingleton<Assistant.AssistantService>();
 
         var app = builder.Build();
         app.Lifetime.ApplicationStopped.Register(startupDb.Dispose);

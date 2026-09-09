@@ -50,7 +50,7 @@ public static class LoomXTools
     public static void RegisterDiagnosticTool(
         ToolRegistry registry,
         DiagnosticSubagent subagent,
-        Func<IModelClient?> modelClientFactory)
+        Func<CancellationToken, Task<IModelClient?>> modelClientFactory)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(subagent);
@@ -65,13 +65,13 @@ public static class LoomXTools
             Timeout = TimeSpan.FromMinutes(5),
             Handler = async (args, cancellationToken) => await GuardAsync(async () =>
             {
-                var modelClient = modelClientFactory();
+                var modelClient = await modelClientFactory(cancellationToken);
                 if (modelClient is null)
                 {
                     return ToolResult.Fail(new JsonObject
                     {
                         ["error"] = "assistant_model_not_configured",
-                        ["message"] = "小助手模型尚未配置，无法调起诊断工人。",
+                        ["message"] = "小助手模型尚未配置，无法调起诊断工人。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。",
                     }.ToJsonString(OutputJsonOptions));
                 }
 

@@ -44,6 +44,12 @@
   <data name="nav.activity.description">
     <value>定位協議轉換、上游延遲與 HTTP 錯誤，保留可追溯的脫敏上下文。</value>
   </data>
+  <data name="nav.assistant">
+    <value>小助手</value>
+  </data>
+  <data name="nav.assistant.description">
+    <value>用自然語言配置 Provider、診斷連通性、接入中轉站。</value>
+  </data>
   <data name="nav.console">
     <value>控制檯</value>
   </data>
@@ -1281,5 +1287,20 @@
   </data>
   <data name="placeholder.empty.body">
     <value>此頁面已完成導航接入，業務功能將在後續迭代中逐步實現。</value>
+  </data>
+  <data name="assistant.history.placeholder">
+    <value>歷史會話…</value>
+  </data>
+  <data name="assistant.new_session">
+    <value>＋ 新會話</value>
+  </data>
+  <data name="assistant.send">
+    <value>傳送</value>
+  </data>
+  <data name="assistant.cancel">
+    <value>取消</value>
+  </data>
+  <data name="assistant.input.watermark">
+    <value>輸入訊息，Enter 傳送…</value>
   </data>
 </root>

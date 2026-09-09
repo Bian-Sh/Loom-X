@@ -159,7 +159,7 @@ public sealed class DiagnosticSubagentTests : IAsyncLifetime
     public async Task DiagnoseTool_NoModelClient_ReturnsClearError()
     {
         var registry = new ToolRegistry();
-        LoomXTools.RegisterDiagnosticTool(registry, subagent, () => null);
+        LoomXTools.RegisterDiagnosticTool(registry, subagent, _ => Task.FromResult<IModelClient?>(null));
 
         var tool = registry.All.Single(item => item.Name == "loomx.diagnose");
         var result = await tool.Handler(JsonNode.Parse("""{"id":"diag-target"}"""), CancellationToken.None);
@@ -175,7 +175,7 @@ public sealed class DiagnosticSubagentTests : IAsyncLifetime
             [new TextDeltaEvent("""{"reachable":true,"authenticated":true,"models_found":1,"chat_test":true,"proxy_required":false,"diagnosis":"provider_ok","summary":"正常。"}"""),
              new ModelCompletedEvent("stop")]);
         var registry = new ToolRegistry();
-        LoomXTools.RegisterDiagnosticTool(registry, subagent, () => model);
+        LoomXTools.RegisterDiagnosticTool(registry, subagent, _ => Task.FromResult<IModelClient?>(model));
 
         var tool = registry.All.Single(item => item.Name == "loomx.diagnose");
         var result = await tool.Handler(JsonNode.Parse("""{"id":"diag-target"}"""), CancellationToken.None);

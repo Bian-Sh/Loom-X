@@ -88,6 +88,12 @@
   <data name="nav.activity.description">
     <value>定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。</value>
   </data>
+  <data name="nav.assistant">
+    <value>小助手</value>
+  </data>
+  <data name="nav.assistant.description">
+    <value>用自然语言配置 Provider、诊断连通性、接入中转站。</value>
+  </data>
   <data name="nav.console">
     <value>控制台</value>
   </data>
@@ -1415,5 +1421,20 @@
   <!-- ========== Phase 2: Placeholder 视图 ========== -->
   <data name="placeholder.empty.body">
     <value>此页面已完成导航接入，业务功能将在后续迭代中逐步实现。</value>
+  </data>
+  <data name="assistant.history.placeholder">
+    <value>历史会话…</value>
+  </data>
+  <data name="assistant.new_session">
+    <value>＋ 新会话</value>
+  </data>
+  <data name="assistant.send">
+    <value>发送</value>
+  </data>
+  <data name="assistant.cancel">
+    <value>取消</value>
+  </data>
+  <data name="assistant.input.watermark">
+    <value>输入消息，Enter 发送…</value>
   </data>
 </root>
