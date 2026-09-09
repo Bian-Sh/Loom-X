@@ -15,6 +15,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     public DbSet<GatewayEndpointComboBindingEntity> GatewayEndpointComboBindings => Set<GatewayEndpointComboBindingEntity>();
     public DbSet<GatewayRouteEntity> GatewayRoutes => Set<GatewayRouteEntity>();
     public DbSet<AssistantPreferencesEntity> AssistantPreferences => Set<AssistantPreferencesEntity>();
+    public DbSet<CliVersionEntryEntity> CliVersionEntries => Set<CliVersionEntryEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,6 +98,13 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.Property(item => item.ReasoningEffort).HasMaxLength(32).IsRequired();
             entity.Property(item => item.PermissionMode).HasMaxLength(32).IsRequired();
         });
+        modelBuilder.Entity<CliVersionEntryEntity>(entity =>
+        {
+            entity.HasKey(item => item.CliType);
+            entity.Property(item => item.CliType).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.Version).HasMaxLength(128).IsRequired();
+            entity.Property(item => item.Source).HasMaxLength(32).IsRequired();
+        });
     }
 }
 
@@ -136,6 +144,15 @@ public sealed class AssistantPreferencesEntity
     public string? ModelId { get; set; }
     public string ReasoningEffort { get; set; } = "default";
     public string PermissionMode { get; set; } = "AutoApprove";
+}
+
+/// <summary>CLI 版本缓存条目。主键为 CLI 类型名称，一类型一行；版本、来源与用户覆盖标记都持久化到 LoomX.db。</summary>
+public sealed class CliVersionEntryEntity
+{
+    public string CliType { get; set; } = "";
+    public string Version { get; set; } = "";
+    public string? FetchedAt { get; set; }
+    public string Source { get; set; } = "Default";
 }
 
 public sealed class ProviderEntity
@@ -530,6 +547,14 @@ public static class ConfigurationDatabase
             dbContext.AssistantPreferences.Add(new AssistantPreferencesEntity());
             await dbContext.SaveChangesAsync(cancellationToken);
         }
+        await dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS CliVersionEntries (
+                CliType TEXT NOT NULL CONSTRAINT PK_CliVersionEntries PRIMARY KEY,
+                Version TEXT NOT NULL,
+                FetchedAt TEXT NULL,
+                Source TEXT NOT NULL DEFAULT 'Default'
+            )
+            """, cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/openai' WHERE Key = 'openai' AND PublicPath IN ('/v1', '/openai/v1', '/v1/responses')", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/' WHERE Key = 'ollama' AND (PublicPath = '/api' OR PublicPath = '')", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/azure' WHERE Key = 'azure' AND PublicPath IN ('/azure/v1', '/azure/v1/responses')", cancellationToken);
