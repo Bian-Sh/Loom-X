@@ -225,15 +225,11 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private OverviewEndpointViewModel? selectedEndpoint;
     private bool gatewayToggleInProgress;
     private bool refreshInProgress;
-    private string topologyJson = "{\"endpoints\":[],\"combos\":[],\"providers\":[],\"models\":[],\"edges\":[]}";
     private readonly Dictionary<string, RequestTelemetryEvent> activeRequests = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> activeEdgeCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HashSet<string>> requestEdges = new(StringComparer.Ordinal);
     private readonly List<RequestTelemetryEvent> completionWindow = [];
 
-    public event EventHandler? TopologyChanged;
-    public event EventHandler? GraphMetricsChanged;
-    public event EventHandler<RequestTelemetryEvent>? GraphTelemetryPublished;
 
     public string GatewayStatus { get => gatewayStatus; private set => SetProperty(ref gatewayStatus, value); }
     public string Endpoint { get => endpoint; private set => SetProperty(ref endpoint, value); }
@@ -255,13 +251,6 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     public ObservableCollection<OverviewModelViewModel> Models { get; } = [];
     public ObservableCollection<OverviewRecentRequestViewModel> RecentRequests { get; } = [];
     public bool RecentRequestsEmpty => RecentRequests.Count == 0;
-    public string TopologyJson => topologyJson;
-    public string MetricsJson => JsonSerializer.Serialize(new
-    {
-        activeRequests = ActiveRequestCount,
-        throughput = Throughput,
-        p95Latency = P95Latency
-    });
     public ICommand StartCommand { get; }
     public ICommand StopCommand { get; }
     public ICommand ToggleGatewayCommand { get; }
@@ -409,7 +398,6 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             Version = gatewayService.State == GatewayState.Running ? Loc("overview.version.online") : Loc("overview.version.disconnected");
             GraphStatus = gatewayService.State == GatewayState.Running ? Loc("overview.graph.connected") : Loc("overview.graph.waiting");
             UpdateGatewayControls();
-            GraphMetricsChanged?.Invoke(this, EventArgs.Empty);
             logger?.LogInformation("概览刷新完成 {ProviderCount} 个 Provider、{ModelCount} 个模型、{EndpointCount} 个 Endpoint、{RouteCount} 条路由，网关状态 {GatewayState}，配置库 {DatabasePath}，进程 {ProcessId}", ProviderCount, ModelCount, Endpoints.Count, Endpoints.Sum(item => item.Routes.Count), gatewayService.State, AppDataPaths.DatabasePath, Environment.ProcessId);
         }
         catch (Exception exception)
@@ -484,8 +472,6 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             Endpoints.Add(endpointVm);
         }
         SelectEndpoint(Endpoints.FirstOrDefault());
-        topologyJson = CreateTopologyJson(config, dataStore.Providers);
-        TopologyChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public void SelectEndpoint(OverviewEndpointViewModel? endpoint)
@@ -493,41 +479,6 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         if (endpoint is null || !Endpoints.Contains(endpoint)) return;
         SelectedEndpoint = endpoint;
         foreach (var item in Endpoints) item.IsGraphVisible = ReferenceEquals(item, endpoint);
-    }
-
-    internal static string CreateTopologyJson(ResolvedAppConfig config, IReadOnlyList<ProviderResponse> providerResponses)
-    {
-        var providers = providerResponses
-            .GroupBy(item => item.BusinessId, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .ToDictionary(item => item.BusinessId, StringComparer.OrdinalIgnoreCase);
-        var models = config.Models
-            .GroupBy(item => $"{item.ProviderId}:{item.ModelId}", StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.First())
-            .Select(item => new { displayName = item.DisplayName, modelId = item.ModelId, providerId = item.ProviderId, providerName = providers.GetValueOrDefault(item.ProviderId)?.DisplayName ?? item.ProviderId })
-            .ToArray();
-        var endpoints = config.GatewayEndpoints.OrderBy(item => item.Key)
-            .Select(item => new { key = item.Key, displayName = EndpointLabel(item.Key), publicPath = item.PublicPath, enabled = item.Enabled })
-            .ToArray();
-        var combos = config.GatewayCombos.OrderBy(combo => combo.SortOrder)
-            .Select(combo => new { id = RuntimeGraphIds.Combo(combo.Id), displayName = combo.Name, enabled = combo.Enabled })
-            .ToArray();
-        var edges = new List<object>();
-        foreach (var endpoint in config.GatewayEndpoints)
-        foreach (var binding in endpoint.ComboBindings)
-        {
-            var combo = config.GatewayCombos.FirstOrDefault(item => item.Id == binding.ComboId);
-            if (combo is null) continue;
-            var comboId = RuntimeGraphIds.Combo(combo.Id);
-            edges.Add(new { type = "endpoint-combo", sourceType = "endpoint", sourceId = endpoint.Key, targetType = "combo", targetId = comboId, endpointKey = endpoint.Key, comboId, enabled = endpoint.Enabled && binding.Enabled && combo.Enabled });
-        }
-        foreach (var combo in config.GatewayCombos)
-        foreach (var route in combo.Routes.Where(item => item.Enabled))
-        {
-            var comboId = RuntimeGraphIds.Combo(combo.Id);
-            edges.Add(new { type = "combo-model", sourceType = "combo", sourceId = comboId, targetType = "model", targetId = RuntimeGraphIds.Model(route.Model.ProviderId, route.Model.ModelId), endpointKey = "", comboId, providerId = route.Model.ProviderId, modelId = route.Model.ModelId, providerName = providers.GetValueOrDefault(route.Model.ProviderId)?.DisplayName ?? route.Model.ProviderId, enabled = combo.Enabled });
-        }
-        return JsonSerializer.Serialize(new { endpoints, combos, models, edges });
     }
 
     private string LoadEndpoint()
@@ -550,11 +501,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         else Dispatcher.UIThread.Post(() => { if (!refreshInProgress) _ = RefreshAsync(); });
     }
 
-    private void OnTelemetryPublished(object? sender, RequestTelemetryEvent telemetryEvent) => Dispatcher.UIThread.Post(() =>
-    {
-        ApplyTelemetry(telemetryEvent);
-        GraphTelemetryPublished?.Invoke(this, telemetryEvent);
-    });
+    private void OnTelemetryPublished(object? sender, RequestTelemetryEvent telemetryEvent) => Dispatcher.UIThread.Post(() => ApplyTelemetry(telemetryEvent));
 
     private void ApplyTelemetry(RequestTelemetryEvent telemetryEvent)
     {
@@ -563,7 +510,6 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             activeRequests[telemetryEvent.RequestId] = telemetryEvent;
             requestEdges.TryAdd(telemetryEvent.RequestId, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
             ActiveRequestCount = activeRequests.Count;
-            GraphMetricsChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
         if (telemetryEvent.Kind == TelemetryEventKind.EdgeAttemptStarted)
@@ -594,7 +540,6 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
             OnPropertyChanged(nameof(RecentRequestsEmpty));
         }
         P95Latency = completionWindow.Count == 0 ? "—" : LocFormat("overview.latency.format", completionWindow.Select(item => item.ElapsedMs).OrderBy(item => item).ElementAt(Math.Max(0, (int)Math.Ceiling(completionWindow.Count * .95) - 1)));
-        GraphMetricsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void SetRouteActive(string edgeKey, bool active)
