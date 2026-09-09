@@ -57,6 +57,26 @@ public static class LoomXHost
         builder.Services.AddSingleton<RequestTelemetryHub>();
         builder.Services.AddHostedService(services => services.GetRequiredService<ActivityStore>());
 
+        // 小助手（Phase 2）：诊断测试器、Skill 仓库与 loomx.* 工具注册表
+        builder.Services.AddHttpClient("loomx-assistant");
+        builder.Services.AddSingleton<Assistant.AssistantTester>(services => new Assistant.AssistantTester(
+            services.GetRequiredService<IHttpClientFactory>().CreateClient("loomx-assistant"),
+            services.GetRequiredService<ConfigurationManagementService>(),
+            services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
+            services.GetRequiredService<ILogger<Assistant.AssistantTester>>()));
+        builder.Services.AddSingleton(_ => Assistant.SkillStore.ForInstallDirectory());
+        builder.Services.AddSingleton(services =>
+        {
+            var registry = new Assistant.ToolRegistry();
+            Assistant.LoomXTools.RegisterAll(
+                registry,
+                services.GetRequiredService<ConfigurationManagementService>(),
+                services.GetRequiredService<IDatabaseConfigurationProvider>(),
+                services.GetRequiredService<Assistant.AssistantTester>(),
+                services.GetRequiredService<Assistant.SkillStore>());
+            return registry;
+        });
+
         var app = builder.Build();
         app.Lifetime.ApplicationStopped.Register(startupDb.Dispose);
         app.UseMiddleware<ActivityMiddleware>();
