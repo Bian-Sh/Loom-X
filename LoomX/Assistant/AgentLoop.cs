@@ -60,6 +60,7 @@ public sealed class AgentLoop
             var textBuilder = new StringBuilder();
             var toolCalls = new List<ToolCall>();
             var finishReason = "stop";
+            var completionReceived = false;
 
             // 逐条拉取模型流。yield 不允许出现在带 catch 的 try 内，因此仅在 try 中移动枚举器，事件在 try 外处理。
             await using var enumerator = modelClient
@@ -113,11 +114,21 @@ public sealed class AgentLoop
                         break;
                     case ModelCompletedEvent completedEvent:
                         finishReason = completedEvent.FinishReason;
+                        completionReceived = true;
                         break;
                 }
             }
 
             if (cancelled || failedDetail is not null) break;
+
+            if (!completionReceived)
+            {
+                failedDetail = ModelErrorFormatter.Format(
+                    ModelErrorKind.Unknown,
+                    upstreamMessage: "模型响应无效：服务未返回完成事件。请检查 Provider 协议、余额或额度。");
+                logger.LogWarning("小助手模型响应缺少完成事件 {SessionId} 步骤 {Step}", session.Id, step + 1);
+                break;
+            }
 
             // 纵深防御：极少数上游会把同一 tool_call_id 扇出成多份重复 delta；
             // 即使解析端已按 id 去重，这里再做一次兜底——同一 assistant 消息内

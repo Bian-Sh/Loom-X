@@ -40,7 +40,7 @@ public sealed class AssistantViewModel : NotifyViewModel
         this.loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
         logger = this.loggerFactory.CreateLogger<AssistantViewModel>();
 
-        SendCommand = new AsyncCommand(SendAsync, () => IsRunning || !string.IsNullOrWhiteSpace(InputText));
+        SendCommand = new AsyncCommand(SendAsync, () => !IsRunning && !string.IsNullOrWhiteSpace(InputText));
         CancelCommand = new DelegateCommand(Cancel);
         NewSessionCommand = new DelegateCommand(NewSession);
         LoadSessionCommand = new AsyncCommand(parameter => LoadSessionAsync(parameter as AssistantSessionSummary));

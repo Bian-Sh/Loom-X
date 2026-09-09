@@ -150,44 +150,54 @@ public sealed class AssistantService
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userMessage);
-        if (IsRunning)
+        if (!runLock.Wait(0))
         {
             throw new InvalidOperationException("小助手正在运行中，请先等待或取消。");
         }
 
-        var modelClient = await modelClientFactory.TryCreateAsync(cancellationToken);
-        if (modelClient is null)
-        {
-            throw new InvalidOperationException("小助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
-        }
-
-        await runLock.WaitAsync(cancellationToken);
-        currentRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
-            var approvalGate = PermissionMode == AssistantPermissionMode.AskEachTime
-                ? BuildApprovalGate()
-                : null;
-            var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate);
-            await foreach (var agentEvent in loop.RunAsync(CurrentSession, userMessage, currentRun.Token))
+            if (IsRunning)
             {
-                yield return agentEvent;
+                throw new InvalidOperationException("小助手正在运行中，请先等待或取消。");
+            }
+
+            var modelClient = await modelClientFactory.TryCreateAsync(cancellationToken);
+            if (modelClient is null)
+            {
+                throw new InvalidOperationException("小助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
+            }
+
+            currentRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            try
+            {
+                var approvalGate = PermissionMode == AssistantPermissionMode.AskEachTime
+                    ? BuildApprovalGate()
+                    : null;
+                var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate);
+                await foreach (var agentEvent in loop.RunAsync(CurrentSession, userMessage, currentRun.Token))
+                {
+                    yield return agentEvent;
+                }
+            }
+            finally
+            {
+                currentRun.Dispose();
+                currentRun = null;
+
+                try
+                {
+                    await sessionStore.SaveAsync(CurrentSession, cancellationToken);
+                }
+                catch (Exception exception)
+                {
+                    logger.LogError(exception, "小助手会话保存失败 {SessionId}", CurrentSession.Id);
+                }
             }
         }
         finally
         {
-            currentRun.Dispose();
-            currentRun = null;
             runLock.Release();
-
-            try
-            {
-                await sessionStore.SaveAsync(CurrentSession, cancellationToken);
-            }
-            catch (Exception exception)
-            {
-                logger.LogError(exception, "小助手会话保存失败 {SessionId}", CurrentSession.Id);
-            }
         }
     }
 }

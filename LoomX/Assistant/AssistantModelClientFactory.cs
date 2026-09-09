@@ -139,7 +139,8 @@ public class AssistantModelClientFactory
             selection.ApiKey,
             clientLogger,
             MergeHeaders(selection.Provider, selection.Model),
-            ResolveReasoningEffort());
+            ResolveReasoningEffort(),
+            selection.Provider.EndpointFormat);
     }
 
     private async Task<ModelSelection?> SelectModelAsync(CancellationToken cancellationToken)

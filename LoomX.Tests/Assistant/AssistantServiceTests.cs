@@ -79,6 +79,31 @@ public sealed class AssistantServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SendAsync_ConcurrentRequest_IsRejectedBeforeModelCreationCompletes()
+    {
+        var model = new ScriptedModelClient(
+            [new TextDeltaEvent("第一条完成"), new ModelCompletedEvent("stop")]);
+        var factory = new BlockingModelClientFactory(model);
+        var service = CreateService(factory);
+
+        var firstTask = Task.Run(async () =>
+        {
+            await foreach (var unused in service.SendAsync("第一条")) { }
+        });
+        await factory.FirstCreateStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var exception = await Record.ExceptionAsync(async () =>
+        {
+            await foreach (var unused in service.SendAsync("第二条")) { }
+        }).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.IsType<InvalidOperationException>(exception);
+        factory.ReleaseFirstCreate.TrySetResult(true);
+        await firstTask;
+        Assert.DoesNotContain(service.CurrentSession.Messages, message => message.Content == "第二条");
+    }
+
+    [Fact]
     public async Task LoadSession_RestoresHistory_AsCurrentSession()
     {
         var model = new ScriptedModelClient(
@@ -190,7 +215,7 @@ public sealed class AssistantServiceTests : IDisposable
     }
 
     private AssistantService CreateService(
-        StubModelClientFactory factory,
+        AssistantModelClientFactory factory,
         ToolRegistry? registry = null,
         AssistantPermissionMode? permissionMode = null)
     {
@@ -222,6 +247,33 @@ public sealed class AssistantServiceTests : IDisposable
 
         public override Task<AssistantModelInfo?> DescribeAsync(CancellationToken cancellationToken) =>
             Task.FromResult<AssistantModelInfo?>(client is null ? null : new AssistantModelInfo("stub", "stub-model", "https://stub.example.com/v1"));
+    }
+
+    private sealed class BlockingModelClientFactory(IModelClient client)
+        : AssistantModelClientFactory(
+            new ThrowingHttpClientFactory(),
+            null!,
+            NullLogger<OpenAiCompatibleModelClient>.Instance,
+            NullLogger<AssistantModelClientFactory>.Instance)
+    {
+        public TaskCompletionSource<bool> FirstCreateStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> ReleaseFirstCreate { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private int createCount;
+
+        public override async Task<IModelClient?> TryCreateAsync(CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref createCount) == 1)
+            {
+                FirstCreateStarted.TrySetResult(true);
+                await ReleaseFirstCreate.Task.WaitAsync(cancellationToken);
+            }
+
+            return client;
+        }
     }
 
     private sealed class ThrowingHttpClientFactory : IHttpClientFactory

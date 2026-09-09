@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LoomX.Services;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
@@ -20,6 +21,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
     private readonly IReadOnlyDictionary<string, string>? extraHeaders;
     private readonly string? reasoningEffort;
     private readonly ILogger<OpenAiCompatibleModelClient>? logger;
+    private readonly bool useResponsesEndpoint;
 
     public OpenAiCompatibleModelClient(
         HttpClient httpClient,
@@ -28,7 +30,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         string? apiKey = null,
         ILogger<OpenAiCompatibleModelClient>? logger = null,
         IReadOnlyDictionary<string, string>? extraHeaders = null,
-        string? reasoningEffort = null)
+        string? reasoningEffort = null,
+        string? endpointFormat = "chat_completions")
     {
         this.httpClient = httpClient;
         this.baseUrl = baseUrl.TrimEnd('/');
@@ -37,15 +40,21 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         this.logger = logger;
         this.extraHeaders = extraHeaders;
         this.reasoningEffort = string.IsNullOrWhiteSpace(reasoningEffort) ? null : reasoningEffort.Trim();
+        useResponsesEndpoint = string.Equals(endpointFormat, "responses", StringComparison.OrdinalIgnoreCase);
     }
 
     public async IAsyncEnumerable<ModelStreamEvent> StreamAsync(
         ModelRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/chat/completions")
+        var chatPayload = BuildPayload(request);
+        var payload = useResponsesEndpoint
+            ? OpenAiResponsesBridge.CreateResponsesRequest(chatPayload)
+            : chatPayload;
+        var endpoint = useResponsesEndpoint ? "/responses" : "/chat/completions";
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}{endpoint}")
         {
-            Content = new StringContent(BuildPayload(request).ToJsonString(), Encoding.UTF8, "application/json"),
+            Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json"),
         };
         if (!string.IsNullOrEmpty(apiKey))
         {
@@ -87,6 +96,157 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var reader = new StreamReader(stream);
+            if (useResponsesEndpoint)
+            {
+                var responsesBody = await reader.ReadToEndAsync(cancellationToken);
+                var chatSse = ConvertResponsesBody(responsesBody, response.Content.Headers.ContentType?.MediaType);
+                using var translatedReader = new StringReader(chatSse);
+                await foreach (var streamEvent in ParseChatCompletionsSseAsync(translatedReader, cancellationToken))
+                {
+                    yield return streamEvent;
+                }
+
+                yield break;
+            }
+
+            await foreach (var streamEvent in ParseChatCompletionsBodyAsync(reader, cancellationToken))
+            {
+                yield return streamEvent;
+            }
+        }
+    }
+
+    private string ConvertResponsesBody(string body, string? contentType)
+    {
+        if (string.IsNullOrWhiteSpace(body))
+        {
+            throw new ModelClientException(
+                "模型服务返回空响应。",
+                ModelErrorKind.Unknown,
+                upstreamMessage: "模型响应无效。请检查 Provider 协议与账户额度。");
+        }
+
+        try
+        {
+            var trimmedBody = body.TrimStart();
+            var isSse = trimmedBody.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+                || trimmedBody.StartsWith("event:", StringComparison.OrdinalIgnoreCase)
+                || (string.Equals(contentType, "text/event-stream", StringComparison.OrdinalIgnoreCase)
+                    && !trimmedBody.StartsWith("{", StringComparison.Ordinal)
+                    && !trimmedBody.StartsWith("[", StringComparison.Ordinal));
+            if (isSse)
+            {
+                var chatSse = OpenAiResponsesBridge.CreateChatCompletionsSse(body, model);
+                if (!chatSse.Contains("\"content\":", StringComparison.Ordinal)
+                    && !chatSse.Contains("\"tool_calls\":", StringComparison.Ordinal))
+                {
+                    throw InvalidResponsesException("模型响应没有文本或工具调用。");
+                }
+
+                return chatSse;
+            }
+
+            if (JsonNode.Parse(body) is JsonObject responsesResponse)
+            {
+                ThrowIfStructuredError(body);
+                if (responsesResponse["output"] is not JsonArray { Count: > 0 })
+                {
+                    throw InvalidResponsesException("模型响应没有输出内容。");
+                }
+
+                var chatResponse = OpenAiResponsesBridge.CreateChatCompletionsResponse(responsesResponse, model);
+                var choice = chatResponse["choices"]?[0];
+                var message = choice?["message"];
+                if (message?["content"] is null && message?["tool_calls"] is not JsonArray { Count: > 0 })
+                {
+                    throw InvalidResponsesException("模型响应没有文本或工具调用。");
+                }
+
+                return $"data: {chatResponse.ToJsonString()}\n\ndata: [DONE]\n\n";
+            }
+        }
+        catch (ModelClientException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is InvalidDataException or JsonException)
+        {
+            logger?.LogWarning(exception, "小助手模型 Responses 响应无法转换 {BaseUrl}", baseUrl);
+        }
+
+        throw new ModelClientException(
+            "模型服务返回无效响应。",
+            ModelErrorKind.Unknown,
+            upstreamMessage: "模型响应格式无效。请检查 Provider 的 Responses API 配置。");
+    }
+
+    private static void ThrowIfStructuredError(string body)
+    {
+        var (errorCode, upstreamMessage) = ModelErrorClassifier.ParseErrorBody(body);
+        if (string.IsNullOrWhiteSpace(errorCode) && string.IsNullOrWhiteSpace(upstreamMessage)) return;
+
+        var kind = ModelErrorClassifier.Classify(null, errorCode);
+        throw new ModelClientException(
+            "模型服务返回错误响应。",
+            kind,
+            errorCode: errorCode,
+            upstreamMessage: ModelErrorClassifier.SanitizeUpstreamMessage(upstreamMessage));
+    }
+
+    private static ModelClientException InvalidResponsesException(string detail) => new(
+        "模型服务返回无效响应。",
+        ModelErrorKind.Unknown,
+        upstreamMessage: detail);
+
+    private static async IAsyncEnumerable<ModelStreamEvent> ParseChatCompletionsBodyAsync(
+        TextReader reader,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        string? firstLine;
+        do
+        {
+            firstLine = await reader.ReadLineAsync(cancellationToken);
+        }
+        while (firstLine is not null && string.IsNullOrWhiteSpace(firstLine));
+
+        if (firstLine is null)
+        {
+            throw new ModelClientException(
+                "模型服务返回空响应。",
+                ModelErrorKind.Unknown,
+                upstreamMessage: "模型响应无效。请检查 Provider 协议与账户额度。");
+        }
+
+        var trimmed = firstLine.TrimStart();
+        if (trimmed.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith("event:", StringComparison.OrdinalIgnoreCase)
+            || trimmed.StartsWith(":", StringComparison.Ordinal))
+        {
+            await foreach (var streamEvent in ParseChatCompletionsSseAsync(
+                new PrefixedTextReader(firstLine, reader),
+                cancellationToken))
+            {
+                yield return streamEvent;
+            }
+
+            yield break;
+        }
+
+        var body = new StringBuilder(firstLine);
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            body.AppendLine(line);
+        }
+
+        // 部分中转站会用 HTTP 200 携带 JSON 错误，不能被当成空的成功流吞掉。
+        ThrowIfStructuredError(body.ToString());
+        throw InvalidResponsesException("模型响应格式无效。请检查 Provider 的 Chat Completions API 配置。");
+    }
+
+    private static async IAsyncEnumerable<ModelStreamEvent> ParseChatCompletionsSseAsync(
+        TextReader reader,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
             var toolCallBuilders = new Dictionary<int, ToolCallBuilder>();
             // 按 tool_call_id 去重：上游（如 sensenova）有时会把同一批 tool_call 扇出成多份，
             // 每份都带相同的 id 但 index 递增；按 index 累积会把同一 id 复制成 N 份进而把历史撑爆、
@@ -196,7 +356,6 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                     idToBuilder.Clear();
                 }
             }
-        }
     }
 
     private JsonObject BuildPayload(ModelRequest request)
@@ -325,5 +484,28 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         public readonly StringBuilder Arguments = new();
 
         public ToolCall ToToolCall() => new(Id, Name, Arguments.ToString());
+    }
+
+    private sealed class PrefixedTextReader(string firstLine, TextReader inner) : TextReader
+    {
+        private string? pendingLine = firstLine;
+
+        public override ValueTask<string?> ReadLineAsync(CancellationToken cancellationToken = default)
+        {
+            if (pendingLine is not null)
+            {
+                var line = pendingLine;
+                pendingLine = null;
+                return ValueTask.FromResult<string?>(line);
+            }
+
+            return inner.ReadLineAsync(cancellationToken);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing) inner.Dispose();
+            base.Dispose(disposing);
+        }
     }
 }

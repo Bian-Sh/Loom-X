@@ -76,6 +76,102 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public async Task StreamAsync_ResponsesEndpoint_ConvertsRequestAndParsesToolCall()
+    {
+        const string responsesSse = """
+        event: response.created
+        data: {"type":"response.created","response":{"id":"resp_123","created_at":123}}
+
+        event: response.output_item.added
+        data: {"type":"response.output_item.added","item":{"id":"msg_1","type":"message","role":"assistant"}}
+
+        event: response.output_text.delta
+        data: {"type":"response.output_text.delta","delta":"先查一下"}
+
+        event: response.output_item.added
+        data: {"type":"response.output_item.added","item":{"id":"fc_1","type":"function_call","call_id":"call_1","name":"mock.list_providers"}}
+
+        event: response.function_call_arguments.delta
+        data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","delta":"{}"}
+
+        event: response.completed
+        data: {"type":"response.completed","response":{"id":"resp_123"}}
+
+        data: [DONE]
+
+        """;
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, responsesSse);
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler), "https://api.example.com/v1", "test-model",
+            endpointFormat: "responses");
+        var request = new ModelRequest([ChatMessage.User("查询")], [CreateTool()]);
+
+        var events = await CollectAsync(client.StreamAsync(request, CancellationToken.None));
+
+        Assert.Equal("https://api.example.com/v1/responses", handler.LastRequest?.RequestUri?.ToString());
+        var body = JsonNode.Parse(handler.LastRequestBody!)!.AsObject();
+        Assert.Null(body["messages"]);
+        Assert.Equal("查询", body["input"]![0]!["content"]!.GetValue<string>());
+        Assert.Equal("function", body["tools"]![0]!["type"]!.GetValue<string>());
+        Assert.Equal("mock.list_providers", body["tools"]![0]!["name"]!.GetValue<string>());
+        Assert.Equal("先查一下", Assert.IsType<TextDeltaEvent>(events[0]).Text);
+        Assert.Equal("mock.list_providers", Assert.IsType<ModelToolCallEvent>(events[1]).ToolCall.Name);
+        Assert.Equal("{}", Assert.IsType<ModelToolCallEvent>(events[1]).ToolCall.ArgumentsJson);
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[2]).FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ResponsesEndpoint_EmptyBodyThrowsVisibleModelError()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, string.Empty);
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler), "https://api.example.com/v1", "test-model",
+            endpointFormat: "responses");
+
+        var exception = await Assert.ThrowsAsync<ModelClientException>(async () =>
+            await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None)));
+
+        Assert.Equal(ModelErrorKind.Unknown, exception.Kind);
+        Assert.Contains("模型服务返回空响应", exception.Message);
+        Assert.Contains("模型响应无效", exception.UpstreamMessage);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ResponsesEndpoint_Status200QuotaErrorIsClassified()
+    {
+        var handler = new FakeHttpHandler(
+            HttpStatusCode.OK,
+            """{"error":{"code":"insufficient_quota","message":"余额不足，请充值"}}""");
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler), "https://api.example.com/v1", "test-model",
+            endpointFormat: "responses");
+
+        var exception = await Assert.ThrowsAsync<ModelClientException>(async () =>
+            await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None)));
+
+        Assert.Equal(ModelErrorKind.InsufficientQuota, exception.Kind);
+        Assert.Equal("insufficient_quota", exception.ErrorCode);
+        Assert.Contains("余额不足", exception.UpstreamMessage);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ChatCompletionsEndpoint_Status200QuotaErrorIsClassified()
+    {
+        var handler = new FakeHttpHandler(
+            HttpStatusCode.OK,
+            "{\"error\":{\"code\":\"INSUFFICIENT_BALANCE\",\"message\":\"余额不足，请充值\"}}\n");
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler), "https://api.example.com/v1", "test-model");
+
+        var exception = await Assert.ThrowsAsync<ModelClientException>(async () =>
+            await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None)));
+
+        Assert.Equal(ModelErrorKind.InsufficientQuota, exception.Kind);
+        Assert.Equal("INSUFFICIENT_BALANCE", exception.ErrorCode);
+        Assert.Contains("余额不足", exception.UpstreamMessage);
+    }
+
+    [Fact]
     public async Task StreamAsync_AssemblesFragmentedToolCall()
     {
         var sse = string.Join('\n',

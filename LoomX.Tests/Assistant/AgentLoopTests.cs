@@ -220,6 +220,20 @@ public sealed class AgentLoopTests
     }
 
     [Fact]
+    public async Task ModelWithoutCompletionEvent_FailsInsteadOfCompletingSilently()
+    {
+        var modelClient = new ScriptedModelClient([new TextDeltaEvent("不完整响应")]);
+        var session = new AgentSession();
+
+        var events = await CollectAsync(CreateLoop(modelClient).RunAsync(session, "触发空响应"));
+
+        Assert.Equal(AgentSessionState.Failed, session.State);
+        var failed = Assert.Single(events, item => item.Kind == AgentEventKind.TaskFailed);
+        Assert.Contains("模型响应无效", failed.Detail);
+        Assert.DoesNotContain(events, item => item.Kind == AgentEventKind.TaskCompleted);
+    }
+
+    [Fact]
     public async Task ModelClientException_FailedDetailCarriesStructuredErrorInfo()
     {
         var modelClient = new ThrowingModelClient(new ModelClientException(
