@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using LoomX.Configuration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
@@ -14,7 +15,7 @@ public enum AssistantPermissionMode
 
 /// <summary>
 /// 小助手用户偏好：选定的 Provider 模型（只走 Provider 模型，不走 combo）、
-/// 思考等级与修改权限模式。持久化在应用数据目录，跨会话保留。
+/// 思考等级与修改权限模式。持久化在配置库（LoomX.db）的 AssistantPreferences 单行表，跨会话保留。
 /// </summary>
 public sealed record AssistantPreferences
 {
@@ -38,23 +39,33 @@ public sealed record AssistantPreferences
         ReasoningEfforts.Contains(value?.Trim() ?? string.Empty, StringComparer.OrdinalIgnoreCase)
             ? value!.Trim().ToLowerInvariant()
             : DefaultReasoningEffort;
+
+    internal static string NormalizePermissionMode(AssistantPermissionMode mode) => mode switch
+    {
+        AssistantPermissionMode.AskEachTime => nameof(AssistantPermissionMode.AskEachTime),
+        _ => nameof(AssistantPermissionMode.AutoApprove),
+    };
 }
 
 /// <summary>
-/// 偏好持久化：原子写 JSON，损坏时回落默认值而不是崩溃。
-/// 只存安全元数据（标识与枚举），永不存 Secret。
+/// 偏好持久化：读写配置库 LoomX.db 的 AssistantPreferences 单行表（Id=1）。
+/// 损坏/缺表时回落默认值而不是崩溃。只存安全元数据（标识与枚举），永不存 Secret。
+/// 接口保持同步（调用方在 UI/服务线程直接读取，无 async 上下文）。
 /// </summary>
 public sealed class AssistantPreferencesStore
 {
-    private static readonly JsonSerializerOptions StoreJsonOptions = new() { WriteIndented = false };
-
-    private readonly string filePath;
+    private readonly IDbContextFactory<ConfigurationDbContext> dbContextFactory;
     private readonly ILogger<AssistantPreferencesStore>? logger;
     private readonly object sync = new();
 
-    public AssistantPreferencesStore(string? filePath = null, ILogger<AssistantPreferencesStore>? logger = null)
+    /// <summary>旧版 JSON 文件路径；存在时作为一次性迁移源（迁移后不再使用）。</summary>
+    internal static string LegacyJsonPath => System.IO.Path.Combine(AppDataPaths.RootDirectory, "assistant-preferences.json");
+
+    public AssistantPreferencesStore(
+        IDbContextFactory<ConfigurationDbContext> dbContextFactory,
+        ILogger<AssistantPreferencesStore>? logger = null)
     {
-        this.filePath = filePath ?? Path.Combine(AppDataPaths.RootDirectory, "assistant-preferences.json");
+        this.dbContextFactory = dbContextFactory ?? throw new ArgumentNullException(nameof(dbContextFactory));
         this.logger = logger;
     }
 
@@ -64,21 +75,19 @@ public sealed class AssistantPreferencesStore
         {
             try
             {
-                if (!File.Exists(filePath)) return new AssistantPreferences();
-                var payload = JsonNode.Parse(File.ReadAllText(filePath)) as JsonObject;
-                if (payload is null) return new AssistantPreferences();
+                using var db = dbContextFactory.CreateDbContext();
+                var entity = db.AssistantPreferences.AsNoTracking().SingleOrDefault();
+                if (entity is null) return new AssistantPreferences();
 
                 return new AssistantPreferences
                 {
-                    ProviderBusinessId = ReadString(payload, "provider_business_id"),
-                    ModelId = ReadString(payload, "model_id"),
-                    ReasoningEffort = AssistantPreferences.NormalizeReasoningEffort(ReadString(payload, "reasoning_effort")),
-                    PermissionMode = Enum.TryParse<AssistantPermissionMode>(ReadString(payload, "permission_mode"), out var mode)
-                        ? mode
-                        : AssistantPermissionMode.AutoApprove,
+                    ProviderBusinessId = NormalizeString(entity.ProviderBusinessId),
+                    ModelId = NormalizeString(entity.ModelId),
+                    ReasoningEffort = AssistantPreferences.NormalizeReasoningEffort(entity.ReasoningEffort),
+                    PermissionMode = ParsePermissionMode(entity.PermissionMode),
                 };
             }
-            catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
+            catch (Exception exception) when (IsRecoverable(exception))
             {
                 logger?.LogWarning(exception, "小助手偏好读取失败，使用默认值");
                 return new AssistantPreferences();
@@ -91,20 +100,19 @@ public sealed class AssistantPreferencesStore
         ArgumentNullException.ThrowIfNull(preferences);
         lock (sync)
         {
-            var payload = new JsonObject
+            using var db = dbContextFactory.CreateDbContext();
+            var entity = db.AssistantPreferences.SingleOrDefault();
+            if (entity is null)
             {
-                ["version"] = 1,
-                ["provider_business_id"] = preferences.ProviderBusinessId,
-                ["model_id"] = preferences.ModelId,
-                ["reasoning_effort"] = AssistantPreferences.NormalizeReasoningEffort(preferences.ReasoningEffort),
-                ["permission_mode"] = preferences.PermissionMode.ToString(),
-            };
+                entity = new AssistantPreferencesEntity();
+                db.AssistantPreferences.Add(entity);
+            }
 
-            var directory = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
-            var tempPath = filePath + ".tmp";
-            File.WriteAllText(tempPath, payload.ToJsonString(StoreJsonOptions));
-            File.Move(tempPath, filePath, overwrite: true);
+            entity.ProviderBusinessId = NormalizeString(preferences.ProviderBusinessId);
+            entity.ModelId = NormalizeString(preferences.ModelId);
+            entity.ReasoningEffort = AssistantPreferences.NormalizeReasoningEffort(preferences.ReasoningEffort);
+            entity.PermissionMode = AssistantPreferences.NormalizePermissionMode(preferences.PermissionMode);
+            db.SaveChanges();
         }
     }
 
@@ -115,6 +123,47 @@ public sealed class AssistantPreferencesStore
         Save(updated);
         return updated;
     }
+
+    /// <summary>若存在旧版 JSON 偏好文件，将其一次性迁入配置库（迁移失败保留原文件不覆盖）。</summary>
+    public void MigrateLegacyIfNeeded()
+    {
+        lock (sync)
+        {
+            var legacyPath = LegacyJsonPath;
+            if (!File.Exists(legacyPath)) return;
+
+            try
+            {
+                var payload = JsonNode.Parse(File.ReadAllText(legacyPath)) as JsonObject;
+                if (payload is null) return;
+                var legacy = new AssistantPreferences
+                {
+                    ProviderBusinessId = ReadString(payload, "provider_business_id"),
+                    ModelId = ReadString(payload, "model_id"),
+                    ReasoningEffort = AssistantPreferences.NormalizeReasoningEffort(ReadString(payload, "reasoning_effort")),
+                    PermissionMode = Enum.TryParse<AssistantPermissionMode>(ReadString(payload, "permission_mode"), out var mode)
+                        ? mode
+                        : AssistantPermissionMode.AutoApprove,
+                };
+                Save(legacy);
+                File.Delete(legacyPath);
+                logger?.LogInformation("小助手偏好已从旧版 JSON 迁入配置库");
+            }
+            catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
+            {
+                logger?.LogWarning(exception, "小助手偏好旧版 JSON 迁移失败，保留原文件");
+            }
+        }
+    }
+
+    private static bool IsRecoverable(Exception exception) =>
+        exception is Microsoft.Data.Sqlite.SqliteException or InvalidOperationException or JsonException or IOException or UnauthorizedAccessException;
+
+    private static string? NormalizeString(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static AssistantPermissionMode ParsePermissionMode(string? value) =>
+        Enum.TryParse<AssistantPermissionMode>(value, out var mode) ? mode : AssistantPermissionMode.AutoApprove;
 
     private static string? ReadString(JsonObject payload, string key) =>
         payload[key]?.GetValue<string>() is { Length: > 0 } value ? value : null;

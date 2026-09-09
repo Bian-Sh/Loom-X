@@ -12,7 +12,6 @@ namespace LoomX.Tests.Assistant;
 public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
 {
     private string databasePath = string.Empty;
-    private string preferencesPath = string.Empty;
     private ConfigurationDbContext startupContext = null!;
     private ConfigurationManagementService configuration = null!;
     private AssistantPreferencesStore preferencesStore = null!;
@@ -21,7 +20,6 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         databasePath = Path.Combine(Path.GetTempPath(), $"loomx-modelfactory-{Guid.NewGuid():N}.db");
-        preferencesPath = Path.Combine(Path.GetTempPath(), $"loomx-modelfactory-prefs-{Guid.NewGuid():N}.json");
         var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
         await using (var context = new ConfigurationDbContext(options))
         {
@@ -31,8 +29,9 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
         startupContext = new ConfigurationDbContext(options);
         var configurationProvider = new DatabaseConfigurationProvider(startupContext);
         await configurationProvider.ReloadAsync();
-        configuration = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
-        preferencesStore = new AssistantPreferencesStore(preferencesPath);
+        var dbContextFactory = new TestDbContextFactory(options);
+        configuration = new ConfigurationManagementService(dbContextFactory, configurationProvider);
+        preferencesStore = new AssistantPreferencesStore(dbContextFactory);
         factory = new AssistantModelClientFactory(
             new DelegateHttpClientFactory(),
             configuration,
@@ -48,8 +47,6 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
         {
             try { if (File.Exists(databasePath + suffix)) File.Delete(databasePath + suffix); } catch (IOException) { }
         }
-
-        try { if (File.Exists(preferencesPath)) File.Delete(preferencesPath); } catch (IOException) { }
     }
 
     [Fact]

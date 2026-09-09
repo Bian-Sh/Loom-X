@@ -1,24 +1,42 @@
 using Xunit;
 using LoomX.Assistant;
+using LoomX.Configuration;
+using Microsoft.EntityFrameworkCore;
 
 namespace LoomX.Tests.Assistant;
 
 /// <summary>
-/// 助手偏好持久化：读写往返、损坏回落默认、思考等级归一化。
+/// 助手偏好持久化：读写往返、缺表回落默认、思考等级归一化。
 /// </summary>
-public sealed class AssistantPreferencesStoreTests : IDisposable
+public sealed class AssistantPreferencesStoreTests : IAsyncLifetime
 {
-    private readonly string filePath = Path.Combine(Path.GetTempPath(), $"loomx-assistant-prefs-{Guid.NewGuid():N}.json");
+    private string databasePath = string.Empty;
+    private TestDbContextFactory dbContextFactory = null!;
 
-    public void Dispose()
+    public async Task InitializeAsync()
     {
-        try { if (File.Exists(filePath)) File.Delete(filePath); } catch (IOException) { }
+        databasePath = Path.Combine(Path.GetTempPath(), $"loomx-assistant-prefs-{Guid.NewGuid():N}.db");
+        var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+        await using (var context = new ConfigurationDbContext(options))
+        {
+            await ConfigurationDatabase.InitializeAsync(context);
+        }
+        dbContextFactory = new TestDbContextFactory(options);
+    }
+
+    public Task DisposeAsync()
+    {
+        foreach (var suffix in new[] { "", "-wal", "-shm" })
+        {
+            try { if (File.Exists(databasePath + suffix)) File.Delete(databasePath + suffix); } catch (IOException) { }
+        }
+        return Task.CompletedTask;
     }
 
     [Fact]
-    public void MissingFile_ReturnsDefaults()
+    public void MissingRow_ReturnsDefaults()
     {
-        var store = new AssistantPreferencesStore(filePath);
+        var store = new AssistantPreferencesStore(dbContextFactory);
 
         var preferences = store.Load();
 
@@ -31,7 +49,7 @@ public sealed class AssistantPreferencesStoreTests : IDisposable
     [Fact]
     public void SaveLoad_RoundTrips()
     {
-        var store = new AssistantPreferencesStore(filePath);
+        var store = new AssistantPreferencesStore(dbContextFactory);
         store.Save(new AssistantPreferences
         {
             ProviderBusinessId = "main-openai",
@@ -49,21 +67,9 @@ public sealed class AssistantPreferencesStoreTests : IDisposable
     }
 
     [Fact]
-    public void CorruptedFile_ReturnsDefaults()
-    {
-        File.WriteAllText(filePath, "{ not json !!!");
-        var store = new AssistantPreferencesStore(filePath);
-
-        var preferences = store.Load();
-
-        Assert.Equal(AssistantPermissionMode.AutoApprove, preferences.PermissionMode);
-        Assert.Null(preferences.ModelId);
-    }
-
-    [Fact]
     public void Update_MutatesAtomically()
     {
-        var store = new AssistantPreferencesStore(filePath);
+        var store = new AssistantPreferencesStore(dbContextFactory);
         store.Save(new AssistantPreferences { ModelId = "gpt-4o", ProviderBusinessId = "p1" });
 
         var updated = store.Update(current => current with { PermissionMode = AssistantPermissionMode.AskEachTime });
@@ -72,6 +78,19 @@ public sealed class AssistantPreferencesStoreTests : IDisposable
         var loaded = store.Load();
         Assert.Equal(AssistantPermissionMode.AskEachTime, loaded.PermissionMode);
         Assert.Equal("gpt-4o", loaded.ModelId);
+    }
+
+    [Fact]
+    public void ClearModelSelection_PersistsNulls()
+    {
+        var store = new AssistantPreferencesStore(dbContextFactory);
+        store.Save(new AssistantPreferences { ModelId = "gpt-4o", ProviderBusinessId = "p1" });
+        store.Save(new AssistantPreferences { ModelId = null, ProviderBusinessId = null });
+
+        var loaded = store.Load();
+
+        Assert.Null(loaded.ProviderBusinessId);
+        Assert.Null(loaded.ModelId);
     }
 
     [Theory]

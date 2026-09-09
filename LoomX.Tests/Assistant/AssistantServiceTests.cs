@@ -1,6 +1,7 @@
 using Xunit;
 using LoomX.Assistant;
 using LoomX.Configuration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LoomX.Tests.Assistant;
@@ -11,6 +12,17 @@ namespace LoomX.Tests.Assistant;
 public sealed class AssistantServiceTests : IDisposable
 {
     private readonly string rootDirectory = Path.Combine(Path.GetTempPath(), $"loomx-svc-sessions-{Guid.NewGuid():N}");
+    private readonly TestDbContextFactory dbContextFactory;
+
+    public AssistantServiceTests()
+    {
+        Directory.CreateDirectory(rootDirectory);
+        var databasePath = Path.Combine(rootDirectory, "LoomX.db");
+        var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+        dbContextFactory = new TestDbContextFactory(options);
+        using var context = new ConfigurationDbContext(options);
+        ConfigurationDatabase.InitializeAsync(context).GetAwaiter().GetResult();
+    }
 
     public void Dispose()
     {
@@ -185,7 +197,7 @@ public sealed class AssistantServiceTests : IDisposable
         AssistantPreferencesStore? preferencesStore = null;
         if (permissionMode is not null)
         {
-            preferencesStore = new AssistantPreferencesStore(Path.Combine(rootDirectory, $"prefs-{Guid.NewGuid():N}.json"));
+            preferencesStore = new AssistantPreferencesStore(dbContextFactory);
             preferencesStore.Save(new AssistantPreferences { PermissionMode = permissionMode.Value });
         }
 

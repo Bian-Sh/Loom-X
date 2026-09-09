@@ -100,7 +100,9 @@ public static class LoomXHost
 
         // 小助手（Phase 4）：会话门面与持久化
         builder.Services.AddSingleton<Assistant.AssistantSessionStore>();
-        builder.Services.AddSingleton<Assistant.AssistantPreferencesStore>();
+        builder.Services.AddSingleton(services => new Assistant.AssistantPreferencesStore(
+            services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
+            services.GetRequiredService<ILogger<Assistant.AssistantPreferencesStore>>()));
         builder.Services.AddSingleton<Assistant.AssistantService>();
 
         var app = builder.Build();
@@ -193,6 +195,14 @@ public static class LoomXHost
             var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
             var configuredUrls = app.Services.GetRequiredService<IDatabaseConfigurationProvider>().Current.Server.Urls;
             logger.LogInformation("Loom-x 网关监听 {Urls}", configuredUrls.Count > 0 ? string.Join(", ", configuredUrls) : "默认 ASP.NET Core 地址");
+            try
+            {
+                app.Services.GetRequiredService<Assistant.AssistantPreferencesStore>().MigrateLegacyIfNeeded();
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "小助手偏好旧版 JSON 迁移检查失败");
+            }
         });
     }
 
