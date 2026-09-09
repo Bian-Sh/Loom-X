@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Text;
 using LoomX.Services;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace LoomX.Tests.Services;
@@ -9,11 +10,17 @@ namespace LoomX.Tests.Services;
 public sealed class CliVersionServiceTests : IDisposable
 {
     private readonly string _cachePath;
+    private readonly string _connectionString;
 
     public CliVersionServiceTests()
     {
-        _cachePath = Path.Combine(Path.GetTempPath(), "loomx-tests", Guid.NewGuid().ToString("N") + ".json");
+        _cachePath = Path.Combine(Path.GetTempPath(), "loomx-tests", Guid.NewGuid().ToString("N") + ".db");
         Directory.CreateDirectory(Path.GetDirectoryName(_cachePath)!);
+        _connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = _cachePath,
+            Pooling = true,
+        }.ToString();
     }
 
     public void Dispose()
@@ -33,7 +40,7 @@ public sealed class CliVersionServiceTests : IDisposable
 
         var service = new CliVersionService(
             _ => new HttpClient(handler),
-            new CliVersionCache(_cachePath, now: () => DateTimeOffset.UtcNow));
+            new CliVersionCache(_connectionString, now: () => DateTimeOffset.UtcNow));
 
         var info = await service.GetVersionAsync(CliIdentityType.ClaudeCode);
 
@@ -54,7 +61,7 @@ public sealed class CliVersionServiceTests : IDisposable
 
         var service = new CliVersionService(
             _ => new HttpClient(handler),
-            new CliVersionCache(_cachePath, now: () => DateTimeOffset.UtcNow));
+            new CliVersionCache(_connectionString, now: () => DateTimeOffset.UtcNow));
 
         var info = await service.GetVersionAsync(CliIdentityType.Codex);
 
@@ -74,7 +81,7 @@ public sealed class CliVersionServiceTests : IDisposable
 
         var service = new CliVersionService(
             _ => new HttpClient(handler),
-            new CliVersionCache(_cachePath, now: () => DateTimeOffset.UtcNow));
+            new CliVersionCache(_connectionString, now: () => DateTimeOffset.UtcNow));
 
         var info = await service.GetVersionAsync(CliIdentityType.Codex);
 
@@ -93,7 +100,7 @@ public sealed class CliVersionServiceTests : IDisposable
 
         var service = new CliVersionService(
             _ => new HttpClient(handler),
-            new CliVersionCache(_cachePath, now: () => DateTimeOffset.UtcNow));
+            new CliVersionCache(_connectionString, now: () => DateTimeOffset.UtcNow));
 
         var info = await service.GetVersionAsync(CliIdentityType.Codex);
 
@@ -106,7 +113,7 @@ public sealed class CliVersionServiceTests : IDisposable
         // Grok 无公开版本源，不触发 HTTP 请求；返回默认版本。
         var service = new CliVersionService(
             _ => new HttpClient(new StubHandler(_ => throw new InvalidOperationException("Grok should not fetch"))),
-            new CliVersionCache(_cachePath, now: () => DateTimeOffset.UtcNow));
+            new CliVersionCache(_connectionString, now: () => DateTimeOffset.UtcNow));
 
         var info = await service.GetVersionAsync(CliIdentityType.Grok);
 
@@ -117,9 +124,9 @@ public sealed class CliVersionServiceTests : IDisposable
     [Fact]
     public async Task GetVersionAsync_FetchFailure_ReturnsCachedValue()
     {
-        var cachePath = _cachePath;
+        var cacheCs = _connectionString;
         var now = DateTimeOffset.UtcNow;
-        var cache = new CliVersionCache(cachePath, now: () => now);
+        var cache = new CliVersionCache(cacheCs, now: () => now);
         cache.Set(CliIdentityType.ClaudeCode, "2.1.260", CliVersionSource.NpmRegistry);
 
         var service = new CliVersionService(
@@ -137,7 +144,7 @@ public sealed class CliVersionServiceTests : IDisposable
     {
         var service = new CliVersionService(
             _ => new HttpClient(new StubHandler(_ => throw new HttpRequestException("network down"))),
-            new CliVersionCache(_cachePath, now: () => DateTimeOffset.UtcNow));
+            new CliVersionCache(_connectionString, now: () => DateTimeOffset.UtcNow));
 
         var info = await service.GetVersionAsync(CliIdentityType.Codex);
 
@@ -148,9 +155,9 @@ public sealed class CliVersionServiceTests : IDisposable
     [Fact]
     public async Task GetVersionAsync_UserOverride_SkipsNetworkAndReturnsOverride()
     {
-        var cachePath = _cachePath;
+        var cacheCs = _connectionString;
         var now = DateTimeOffset.UtcNow;
-        var cache = new CliVersionCache(cachePath, now: () => now);
+        var cache = new CliVersionCache(cacheCs, now: () => now);
         cache.SetUserOverride(CliIdentityType.Grok, "9.9.9");
 
         var service = new CliVersionService(
@@ -166,9 +173,9 @@ public sealed class CliVersionServiceTests : IDisposable
     [Fact]
     public async Task GetVersionAsync_FreshCache_SkipsNetwork()
     {
-        var cachePath = _cachePath;
+        var cacheCs = _connectionString;
         var now = new DateTimeOffset(2026, 9, 7, 2, 0, 0, TimeSpan.Zero);
-        var cache = new CliVersionCache(cachePath, now: () => now);
+        var cache = new CliVersionCache(cacheCs, now: () => now);
         cache.Set(CliIdentityType.ClaudeCode, "2.1.260", CliVersionSource.NpmRegistry);
 
         var service = new CliVersionService(
@@ -184,9 +191,9 @@ public sealed class CliVersionServiceTests : IDisposable
     [Fact]
     public async Task GetVersionAsync_ExpiredCache_TriggersRefreshAndPersists()
     {
-        var cachePath = _cachePath;
+        var cacheCs = _connectionString;
         var startTime = new DateTimeOffset(2026, 9, 7, 2, 0, 0, TimeSpan.Zero);
-        var cache = new CliVersionCache(cachePath, ttl: TimeSpan.FromHours(24), now: () => startTime);
+        var cache = new CliVersionCache(cacheCs, ttl: TimeSpan.FromHours(24), now: () => startTime);
         cache.Set(CliIdentityType.ClaudeCode, "2.1.260", CliVersionSource.NpmRegistry);
 
         // 时间推进超过 TTL，缓存过期
@@ -196,7 +203,7 @@ public sealed class CliVersionServiceTests : IDisposable
                 {"version":"2.1.263"}
                 """, Encoding.UTF8, "application/json")
         });
-        var laterCache = new CliVersionCache(cachePath, ttl: TimeSpan.FromHours(24), now: () => startTime.AddHours(25));
+        var laterCache = new CliVersionCache(cacheCs, ttl: TimeSpan.FromHours(24), now: () => startTime.AddHours(25));
         var service = new CliVersionService(_ => new HttpClient(handler), laterCache);
 
         var info = await service.GetVersionAsync(CliIdentityType.ClaudeCode);
