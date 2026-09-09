@@ -84,13 +84,13 @@ public sealed class AgentLoop
                     else
                     {
                         logger.LogWarning("小助手模型请求超时 {SessionId} 步骤 {Step}", session.Id, step + 1);
-                        failedDetail = "模型请求超时。";
+                        failedDetail = ModelErrorFormatter.Format(ModelErrorKind.Timeout);
                     }
                 }
                 catch (Exception exception)
                 {
                     logger.LogError(exception, "小助手模型请求失败 {SessionId} 步骤 {Step}", session.Id, step + 1);
-                    failedDetail = "模型请求失败。";
+                    failedDetail = ModelErrorFormatter.FormatException(exception);
                 }
 
                 if (!moved || streamEvent is null) break;
@@ -205,7 +205,7 @@ public sealed class AgentLoop
         session.MarkFailed();
         yield return AgentEvent.Create(session.Id, AgentEventKind.TaskFailed) with
         {
-            Detail = failedDetail ?? $"超过最大步骤数 {session.Options.MaxSteps}。",
+            Detail = failedDetail ?? ModelErrorFormatter.FormatMaxStepsExceeded(session.Options.MaxSteps),
         };
     }
 

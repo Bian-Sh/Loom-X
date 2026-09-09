@@ -184,6 +184,53 @@ public sealed class AgentLoopTests
     }
 
     [Fact]
+    public async Task ModelClientException_FailedDetailCarriesStructuredErrorInfo()
+    {
+        var modelClient = new ThrowingModelClient(new ModelClientException(
+            "模型服务返回错误状态 429。",
+            ModelErrorKind.RateLimited,
+            statusCode: 429,
+            errorCode: "rate_limit_exceeded",
+            upstreamMessage: "Rate limit reached, retry after 20s."));
+        var session = new AgentSession();
+
+        var events = await CollectAsync(CreateLoop(modelClient).RunAsync(session, "触发限流"));
+
+        Assert.Equal(AgentSessionState.Failed, session.State);
+        var failed = Assert.Single(events, item => item.Kind == AgentEventKind.TaskFailed);
+        // 默认文化 zh-CN：本地化描述 + 状态码 + Provider 错误码 + 上游描述
+        Assert.Contains("速率限制", failed.Detail);
+        Assert.Contains("429", failed.Detail);
+        Assert.Contains("rate_limit_exceeded", failed.Detail);
+        Assert.Contains("retry after 20s", failed.Detail);
+    }
+
+    [Fact]
+    public async Task ModelClientException_WithoutStructuredInfo_FallsBackToUnknownKind()
+    {
+        var modelClient = new ThrowingModelClient(new ModelClientException("老格式的失败。"));
+        var session = new AgentSession();
+
+        var events = await CollectAsync(CreateLoop(modelClient).RunAsync(session, "触发失败"));
+
+        var failed = Assert.Single(events, item => item.Kind == AgentEventKind.TaskFailed);
+        Assert.Contains("模型请求失败", failed.Detail);
+    }
+
+    /// <summary>总是抛出指定异常的模型客户端。</summary>
+    private sealed class ThrowingModelClient(Exception exception) : IModelClient
+    {
+        public async IAsyncEnumerable<ModelStreamEvent> StreamAsync(
+            ModelRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.CompletedTask;
+            if (exception is not null) throw exception;
+            yield break;
+        }
+    }
+
+    [Fact]
     public async Task ToolTimeout_ErrorIsFedBackToModel()
     {
         var registry = new ToolRegistry();

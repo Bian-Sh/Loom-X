@@ -264,7 +264,8 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             case AgentEventKind.TaskFailed:
                 streamingMessage = null;
-                Messages.Add(ChatMessageViewModel.Status($"⚠ 任务失败：{agentEvent.Detail}"));
+                // Detail 为 ModelErrorFormatter 组装的多行详情（本地化描述 + 状态码/错误码/上游描述）
+                Messages.Add(ChatMessageViewModel.Status($"⚠ {ResourceLookup.Resolve("assistant.task.failed")}：\n{agentEvent.Detail}"));
                 break;
 
             case AgentEventKind.WaitingForUser:

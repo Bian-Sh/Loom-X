@@ -163,6 +163,55 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public async Task StreamAsync_ErrorStatus_ParsesOpenAiErrorBodyIntoStructuredException()
+    {
+        var handler = new FakeHttpHandler(
+            HttpStatusCode.TooManyRequests,
+            """{"error":{"message":"Rate limit reached for gpt-4o. Please retry after 20s.","type":"tokens","code":"rate_limit_exceeded"}}""");
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "gpt-4o");
+
+        var exception = await Assert.ThrowsAsync<ModelClientException>(async () =>
+            await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None)));
+
+        Assert.Equal(ModelErrorKind.RateLimited, exception.Kind);
+        Assert.Equal(429, exception.StatusCode);
+        Assert.Equal("rate_limit_exceeded", exception.ErrorCode);
+        Assert.Contains("Rate limit reached", exception.UpstreamMessage);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ErrorBodyWithSecret_IsRedactedBeforeThrowing()
+    {
+        var handler = new FakeHttpHandler(
+            HttpStatusCode.Unauthorized,
+            """{"error":{"message":"Incorrect API key provided: sk-liveAbc123456789Secret","code":"invalid_api_key"}}""");
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+
+        var exception = await Assert.ThrowsAsync<ModelClientException>(async () =>
+            await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None)));
+
+        Assert.Equal(ModelErrorKind.Authentication, exception.Kind);
+        Assert.NotNull(exception.UpstreamMessage);
+        Assert.DoesNotContain("liveAbc123456789Secret", exception.UpstreamMessage);
+        Assert.DoesNotContain("liveAbc123456789Secret", exception.Message);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ErrorStatusWithoutBody_StillClassifiesByStatusCode()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.ServiceUnavailable, "");
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+
+        var exception = await Assert.ThrowsAsync<ModelClientException>(async () =>
+            await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None)));
+
+        Assert.Equal(ModelErrorKind.ServerOverloaded, exception.Kind);
+        Assert.Equal(503, exception.StatusCode);
+        Assert.Null(exception.ErrorCode);
+        Assert.Null(exception.UpstreamMessage);
+    }
+
+    [Fact]
     public async Task StreamAsync_ExtraHeaders_AreSentWithRequest()
     {
         var handler = new FakeHttpHandler(HttpStatusCode.OK, "data: [DONE]\n");

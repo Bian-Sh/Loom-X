@@ -1485,4 +1485,58 @@
   <data name="assistant.approval.reject">
     <value>拒绝</value>
   </data>
+  <data name="assistant.task.failed">
+    <value>任务失败</value>
+  </data>
+  <data name="assistant.error.max_steps">
+    <value>已超过最大步骤数 {0}，任务中止。</value>
+  </data>
+  <data name="assistant.error.kind.unknown">
+    <value>模型请求失败，原因未知。</value>
+  </data>
+  <data name="assistant.error.kind.connection_failed">
+    <value>无法连接模型服务，请检查 Base URL 与网络连接。</value>
+  </data>
+  <data name="assistant.error.kind.timeout">
+    <value>模型请求超时，请稍后重试或检查网络。</value>
+  </data>
+  <data name="assistant.error.kind.authentication">
+    <value>API Key 无效、缺失或已过期，请在 Provider 设置中检查密钥。</value>
+  </data>
+  <data name="assistant.error.kind.permission_denied">
+    <value>当前密钥没有访问该模型或资源的权限，请检查账户权限。</value>
+  </data>
+  <data name="assistant.error.kind.model_not_found">
+    <value>模型不存在或已下线，请检查模型 ID 或改选其他模型。</value>
+  </data>
+  <data name="assistant.error.kind.invalid_request">
+    <value>请求被模型服务拒绝（参数无效）。</value>
+  </data>
+  <data name="assistant.error.kind.context_length">
+    <value>对话内容超出模型上下文长度限制，请开启新会话或精简上下文。</value>
+  </data>
+  <data name="assistant.error.kind.rate_limited">
+    <value>请求过于频繁，已触发速率限制，请稍后重试。</value>
+  </data>
+  <data name="assistant.error.kind.insufficient_quota">
+    <value>账户额度不足或已欠费，请检查 Provider 账户余额。</value>
+  </data>
+  <data name="assistant.error.kind.content_filtered">
+    <value>内容被模型服务的安全策略过滤，请调整输入后重试。</value>
+  </data>
+  <data name="assistant.error.kind.overloaded">
+    <value>模型服务当前过载，请稍后重试。</value>
+  </data>
+  <data name="assistant.error.kind.server_error">
+    <value>模型服务内部错误，请稍后重试。</value>
+  </data>
+  <data name="assistant.error.status">
+    <value>HTTP 状态码：{0}</value>
+  </data>
+  <data name="assistant.error.code">
+    <value>错误码：{0}</value>
+  </data>
+  <data name="assistant.error.upstream">
+    <value>服务描述：{0}</value>
+  </data>
 </root>

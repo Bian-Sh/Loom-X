@@ -61,15 +61,28 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             logger?.LogError(exception, "小助手模型连接失败 {BaseUrl}", baseUrl);
-            throw new ModelClientException("无法连接模型服务。", exception);
+            throw new ModelClientException(
+                "无法连接模型服务。",
+                ModelErrorKind.ConnectionFailed,
+                innerException: exception);
         }
 
         using (response)
         {
             if (!response.IsSuccessStatusCode)
             {
-                logger?.LogWarning("小助手模型服务返回错误 {BaseUrl} {StatusCode}", baseUrl, (int)response.StatusCode);
-                throw new ModelClientException($"模型服务返回错误状态 {(int)response.StatusCode}。");
+                var statusCode = (int)response.StatusCode;
+                var (errorCode, upstreamMessage) = await ReadErrorBodyAsync(response, cancellationToken);
+                var kind = ModelErrorClassifier.Classify(statusCode, errorCode);
+                logger?.LogWarning(
+                    "小助手模型服务返回错误 {BaseUrl} {StatusCode} {ErrorCode} {Kind}",
+                    baseUrl, statusCode, errorCode ?? "-", kind);
+                throw new ModelClientException(
+                    $"模型服务返回错误状态 {statusCode}。",
+                    kind,
+                    statusCode,
+                    errorCode,
+                    upstreamMessage);
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -200,6 +213,36 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         }
 
         return payload;
+    }
+
+    /// <summary>
+    /// 读取并解析错误响应体（限量 <see cref="ModelErrorClassifier.MaxErrorBodyBytes"/>），
+    /// 返回 Provider 错误码与脱敏后的上游描述。读取失败静默降级为 null，不掩盖原始状态码。
+    /// </summary>
+    private static async Task<(string? ErrorCode, string? UpstreamMessage)> ReadErrorBodyAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            var buffer = new byte[ModelErrorClassifier.MaxErrorBodyBytes];
+            var totalRead = 0;
+            while (totalRead < buffer.Length)
+            {
+                var read = await stream.ReadAsync(buffer.AsMemory(totalRead, buffer.Length - totalRead), cancellationToken);
+                if (read == 0) break;
+                totalRead += read;
+            }
+
+            var body = Encoding.UTF8.GetString(buffer, 0, totalRead);
+            var (code, message) = ModelErrorClassifier.ParseErrorBody(body);
+            return (code, ModelErrorClassifier.SanitizeUpstreamMessage(message));
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return (null, null);
+        }
     }
 
     /// <summary>

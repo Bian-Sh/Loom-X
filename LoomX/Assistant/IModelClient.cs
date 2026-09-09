@@ -28,6 +28,8 @@ public interface IModelClient
 
 /// <summary>
 /// 模型调用失败。Message 只允许安全摘要，禁止包含 Secret 或请求/响应正文。
+/// 结构化字段（StatusCode/ErrorCode/Kind/UpstreamMessage）供 UI 组装多语言错误详情；
+/// UpstreamMessage 必须已过 <see cref="ModelErrorClassifier.SanitizeUpstreamMessage"/> 脱敏。
 /// </summary>
 public sealed class ModelClientException : Exception
 {
@@ -38,4 +40,30 @@ public sealed class ModelClientException : Exception
     public ModelClientException(string message, Exception innerException) : base(message, innerException)
     {
     }
+
+    public ModelClientException(
+        string message,
+        ModelErrorKind kind,
+        int? statusCode = null,
+        string? errorCode = null,
+        string? upstreamMessage = null,
+        Exception? innerException = null) : base(message, innerException)
+    {
+        Kind = kind;
+        StatusCode = statusCode;
+        ErrorCode = errorCode;
+        UpstreamMessage = upstreamMessage;
+    }
+
+    /// <summary>错误类别，用于映射多语言文案（assistant.error.kind.*）。</summary>
+    public ModelErrorKind Kind { get; init; } = ModelErrorKind.Unknown;
+
+    /// <summary>HTTP 状态码；网络层失败时为 null。</summary>
+    public int? StatusCode { get; init; }
+
+    /// <summary>Provider 返回的错误码/类型（如 invalid_api_key、rate_limit_exceeded）。</summary>
+    public string? ErrorCode { get; init; }
+
+    /// <summary>脱敏后的上游错误描述（截断、遮蔽 Key 片段）。</summary>
+    public string? UpstreamMessage { get; init; }
 }

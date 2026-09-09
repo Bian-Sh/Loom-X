@@ -1351,4 +1351,58 @@
   <data name="assistant.approval.reject">
     <value>拒否</value>
   </data>
+  <data name="assistant.task.failed">
+    <value>タスク失敗</value>
+  </data>
+  <data name="assistant.error.max_steps">
+    <value>最大ステップ数 {0} を超えたため、タスクを中止しました。</value>
+  </data>
+  <data name="assistant.error.kind.unknown">
+    <value>モデルリクエストが失敗しました。原因は不明です。</value>
+  </data>
+  <data name="assistant.error.kind.connection_failed">
+    <value>モデルサービスに接続できません。Base URL とネットワーク接続を確認してください。</value>
+  </data>
+  <data name="assistant.error.kind.timeout">
+    <value>モデルリクエストがタイムアウトしました。後で再試行するか、ネットワークを確認してください。</value>
+  </data>
+  <data name="assistant.error.kind.authentication">
+    <value>API キーが無効、未設定、または期限切れです。Provider 設定でキーを確認してください。</value>
+  </data>
+  <data name="assistant.error.kind.permission_denied">
+    <value>現在のキーにはこのモデルまたはリソースへのアクセス権がありません。アカウントの権限を確認してください。</value>
+  </data>
+  <data name="assistant.error.kind.model_not_found">
+    <value>モデルが存在しないか、提供終了しています。モデル ID を確認するか、別のモデルを選択してください。</value>
+  </data>
+  <data name="assistant.error.kind.invalid_request">
+    <value>リクエストはモデルサービスに拒否されました（パラメータが無効です）。</value>
+  </data>
+  <data name="assistant.error.kind.context_length">
+    <value>会話内容がモデルのコンテキスト長制限を超えています。新しいセッションを開始するか、コンテキストを減らしてください。</value>
+  </data>
+  <data name="assistant.error.kind.rate_limited">
+    <value>リクエストが多すぎます。レート制限に達しました。しばらくしてから再試行してください。</value>
+  </data>
+  <data name="assistant.error.kind.insufficient_quota">
+    <value>アカウントのクォータ不足または未払いです。Provider アカウントの残高を確認してください。</value>
+  </data>
+  <data name="assistant.error.kind.content_filtered">
+    <value>コンテンツがプロバイダーの安全ポリシーによりフィルタリングされました。入力を調整して再試行してください。</value>
+  </data>
+  <data name="assistant.error.kind.overloaded">
+    <value>モデルサービスが過負荷状態です。しばらくしてから再試行してください。</value>
+  </data>
+  <data name="assistant.error.kind.server_error">
+    <value>モデルサービスで内部エラーが発生しました。しばらくしてから再試行してください。</value>
+  </data>
+  <data name="assistant.error.status">
+    <value>HTTP ステータス：{0}</value>
+  </data>
+  <data name="assistant.error.code">
+    <value>エラーコード：{0}</value>
+  </data>
+  <data name="assistant.error.upstream">
+    <value>サービスメッセージ：{0}</value>
+  </data>
 </root>

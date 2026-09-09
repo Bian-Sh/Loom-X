@@ -451,4 +451,22 @@
   <data name="assistant.approval.title"><value>Assistant requests a change</value></data>
   <data name="assistant.approval.approve"><value>Approve</value></data>
   <data name="assistant.approval.reject"><value>Reject</value></data>
+  <data name="assistant.task.failed"><value>Task failed</value></data>
+  <data name="assistant.error.max_steps"><value>Exceeded the maximum step count of {0}; task aborted.</value></data>
+  <data name="assistant.error.kind.unknown"><value>The model request failed for an unknown reason.</value></data>
+  <data name="assistant.error.kind.connection_failed"><value>Unable to connect to the model service. Check the base URL and your network connection.</value></data>
+  <data name="assistant.error.kind.timeout"><value>The model request timed out. Try again later or check your network.</value></data>
+  <data name="assistant.error.kind.authentication"><value>The API key is invalid, missing, or expired. Check the key in the provider settings.</value></data>
+  <data name="assistant.error.kind.permission_denied"><value>The current key does not have access to this model or resource. Check the account permissions.</value></data>
+  <data name="assistant.error.kind.model_not_found"><value>The model does not exist or has been retired. Check the model ID or pick another model.</value></data>
+  <data name="assistant.error.kind.invalid_request"><value>The request was rejected by the model service (invalid parameters).</value></data>
+  <data name="assistant.error.kind.context_length"><value>The conversation exceeds the model's context length. Start a new session or trim the context.</value></data>
+  <data name="assistant.error.kind.rate_limited"><value>Too many requests; the rate limit was hit. Try again later.</value></data>
+  <data name="assistant.error.kind.insufficient_quota"><value>Insufficient quota or an unpaid balance. Check the provider account balance.</value></data>
+  <data name="assistant.error.kind.content_filtered"><value>The content was blocked by the provider's safety policy. Adjust the input and try again.</value></data>
+  <data name="assistant.error.kind.overloaded"><value>The model service is overloaded. Try again later.</value></data>
+  <data name="assistant.error.kind.server_error"><value>The model service hit an internal error. Try again later.</value></data>
+  <data name="assistant.error.status"><value>HTTP status: {0}</value></data>
+  <data name="assistant.error.code"><value>Error code: {0}</value></data>
+  <data name="assistant.error.upstream"><value>Service message: {0}</value></data>
 </root>

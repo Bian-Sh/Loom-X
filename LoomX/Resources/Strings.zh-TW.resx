@@ -1351,4 +1351,58 @@
   <data name="assistant.approval.reject">
     <value>拒絕</value>
   </data>
+  <data name="assistant.task.failed">
+    <value>任務失敗</value>
+  </data>
+  <data name="assistant.error.max_steps">
+    <value>已超過最大步驟數 {0}，任務中止。</value>
+  </data>
+  <data name="assistant.error.kind.unknown">
+    <value>模型請求失敗，原因未知。</value>
+  </data>
+  <data name="assistant.error.kind.connection_failed">
+    <value>無法連線模型服務，請檢查 Base URL 與網路連線。</value>
+  </data>
+  <data name="assistant.error.kind.timeout">
+    <value>模型請求逾時，請稍後重試或檢查網路。</value>
+  </data>
+  <data name="assistant.error.kind.authentication">
+    <value>API Key 無效、缺失或已過期，請在 Provider 設定中檢查金鑰。</value>
+  </data>
+  <data name="assistant.error.kind.permission_denied">
+    <value>目前金鑰沒有存取該模型或資源的權限，請檢查帳戶權限。</value>
+  </data>
+  <data name="assistant.error.kind.model_not_found">
+    <value>模型不存在或已下線，請檢查模型 ID 或改選其他模型。</value>
+  </data>
+  <data name="assistant.error.kind.invalid_request">
+    <value>請求被模型服務拒絕（參數無效）。</value>
+  </data>
+  <data name="assistant.error.kind.context_length">
+    <value>對話內容超出模型上下文長度限制，請開啟新對話或精簡上下文。</value>
+  </data>
+  <data name="assistant.error.kind.rate_limited">
+    <value>請求過於頻繁，已觸發速率限制，請稍後重試。</value>
+  </data>
+  <data name="assistant.error.kind.insufficient_quota">
+    <value>帳戶額度不足或已欠費，請檢查 Provider 帳戶餘額。</value>
+  </data>
+  <data name="assistant.error.kind.content_filtered">
+    <value>內容被模型服務的安全策略過濾，請調整輸入後重試。</value>
+  </data>
+  <data name="assistant.error.kind.overloaded">
+    <value>模型服務目前過載，請稍後重試。</value>
+  </data>
+  <data name="assistant.error.kind.server_error">
+    <value>模型服務內部錯誤，請稍後重試。</value>
+  </data>
+  <data name="assistant.error.status">
+    <value>HTTP 狀態碼：{0}</value>
+  </data>
+  <data name="assistant.error.code">
+    <value>錯誤碼：{0}</value>
+  </data>
+  <data name="assistant.error.upstream">
+    <value>服務描述：{0}</value>
+  </data>
 </root>
