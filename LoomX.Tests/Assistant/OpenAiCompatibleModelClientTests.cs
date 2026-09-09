@@ -161,4 +161,58 @@ public sealed class OpenAiCompatibleModelClientTests
 
         Assert.Contains("401", exception.Message);
     }
+
+    [Fact]
+    public async Task StreamAsync_ExtraHeaders_AreSentWithRequest()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, "data: [DONE]\n");
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler), "http://localhost/v1", "test-model",
+            extraHeaders: new Dictionary<string, string>
+            {
+                ["User-Agent"] = "custom-relay-client/1.0",
+                ["X-Client"] = "loomx-assistant",
+            });
+
+        await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None));
+
+        Assert.Equal("custom-relay-client/1.0", string.Join(",", handler.LastRequest!.Headers.GetValues("User-Agent")));
+        Assert.Equal("loomx-assistant", string.Join(",", handler.LastRequest.Headers.GetValues("X-Client")));
+    }
+
+    [Fact]
+    public async Task StreamAsync_ExtraHeaders_CannotOverrideAuthorization()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, "data: [DONE]\n");
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler), "http://localhost/v1", "test-model", apiKey: "sk-real",
+            extraHeaders: new Dictionary<string, string> { ["Authorization"] = "Bearer attacker" });
+
+        await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None));
+
+        Assert.Equal("Bearer sk-real", handler.LastRequest?.Headers.Authorization?.ToString());
+    }
+
+    [Fact]
+    public async Task StreamAsync_ReasoningEffort_WrittenToPayload()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, "data: [DONE]\n");
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler), "http://localhost/v1", "test-model", reasoningEffort: "high");
+
+        await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None));
+
+        Assert.Equal("high", JsonNode.Parse(handler.LastRequestBody!)!["reasoning_effort"]?.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task StreamAsync_NoReasoningEffort_FieldOmitted()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, "data: [DONE]\n");
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+
+        await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None));
+
+        Assert.Null(JsonNode.Parse(handler.LastRequestBody!)!.AsObject()["reasoning_effort"]);
+    }
 }

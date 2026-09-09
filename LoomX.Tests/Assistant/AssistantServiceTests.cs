@@ -96,11 +96,106 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.DoesNotContain(service.CurrentSession.Messages, message => message.Content == "问题");
     }
 
-    private AssistantService CreateService(StubModelClientFactory factory) => new(
-        factory,
-        new ToolRegistry(),
-        new AssistantSessionStore(rootDirectory),
-        NullLoggerFactory.Instance);
+    [Fact]
+    public async Task AskEachTime_RejectedWriteTool_NotExecuted()
+    {
+        var executed = false;
+        var registry = CreateWriteToolRegistry(() => executed = true);
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("call_1", "mock.write_thing", """{"value":1}""")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("好的。"), new ModelCompletedEvent("stop")]);
+        var service = CreateService(new StubModelClientFactory(model), registry, AssistantPermissionMode.AskEachTime);
+        service.ApprovalHandler = _ => Task.FromResult(false);
+
+        var events = new List<AgentEvent>();
+        await foreach (var agentEvent in service.SendAsync("改一下")) events.Add(agentEvent);
+
+        Assert.False(executed);
+        Assert.Contains(events, item => item.Kind == AgentEventKind.ToolApprovalRequested && item.ToolName == "mock.write_thing");
+        Assert.Contains(events, item => item.Kind == AgentEventKind.ToolCallCompleted && item.Success == false);
+        Assert.Contains(service.CurrentSession.Messages, message => message.Role == ChatRole.Tool && message.Content!.Contains("拒绝"));
+    }
+
+    [Fact]
+    public async Task AskEachTime_ApprovedWriteTool_Executed()
+    {
+        var executed = false;
+        var registry = CreateWriteToolRegistry(() => executed = true);
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("call_1", "mock.write_thing", """{"value":1}""")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("改好了。"), new ModelCompletedEvent("stop")]);
+        var service = CreateService(new StubModelClientFactory(model), registry, AssistantPermissionMode.AskEachTime);
+
+        ToolApprovalRequest? captured = null;
+        service.ApprovalHandler = request =>
+        {
+            captured = request;
+            return Task.FromResult(true);
+        };
+
+        var events = new List<AgentEvent>();
+        await foreach (var agentEvent in service.SendAsync("改一下")) events.Add(agentEvent);
+
+        Assert.True(executed);
+        Assert.NotNull(captured);
+        Assert.Equal("mock.write_thing", captured!.ToolName);
+        Assert.Contains(events, item => item.Kind == AgentEventKind.ToolCallCompleted && item.Success == true);
+    }
+
+    [Fact]
+    public async Task AutoApprove_WriteToolRunsWithoutApproval()
+    {
+        var executed = false;
+        var registry = CreateWriteToolRegistry(() => executed = true);
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("call_1", "mock.write_thing", "{}")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("改好了。"), new ModelCompletedEvent("stop")]);
+        var service = CreateService(new StubModelClientFactory(model), registry, AssistantPermissionMode.AutoApprove);
+
+        var events = new List<AgentEvent>();
+        await foreach (var agentEvent in service.SendAsync("改一下")) events.Add(agentEvent);
+
+        Assert.True(executed);
+        Assert.DoesNotContain(events, item => item.Kind == AgentEventKind.ToolApprovalRequested);
+    }
+
+    private static ToolRegistry CreateWriteToolRegistry(Action onExecuted)
+    {
+        var registry = new ToolRegistry();
+        registry.Register(new ToolDefinition
+        {
+            Name = "mock.write_thing",
+            Description = "模拟写操作",
+            ParametersSchema = System.Text.Json.Nodes.JsonNode.Parse("""{"type":"object","properties":{}}""")!,
+            RiskLevel = ToolRiskLevel.Write,
+            Handler = (_, _) =>
+            {
+                onExecuted();
+                return Task.FromResult(ToolResult.Ok("""{"ok":true}"""));
+            },
+        });
+        return registry;
+    }
+
+    private AssistantService CreateService(
+        StubModelClientFactory factory,
+        ToolRegistry? registry = null,
+        AssistantPermissionMode? permissionMode = null)
+    {
+        AssistantPreferencesStore? preferencesStore = null;
+        if (permissionMode is not null)
+        {
+            preferencesStore = new AssistantPreferencesStore(Path.Combine(rootDirectory, $"prefs-{Guid.NewGuid():N}.json"));
+            preferencesStore.Save(new AssistantPreferences { PermissionMode = permissionMode.Value });
+        }
+
+        return new AssistantService(
+            factory,
+            registry ?? new ToolRegistry(),
+            new AssistantSessionStore(Path.Combine(rootDirectory, $"sessions-{Guid.NewGuid():N}")),
+            NullLoggerFactory.Instance,
+            preferencesStore);
+    }
 
     /// <summary>剧本式模型工厂：TryCreateAsync 返回预置客户端（或 null 模拟未配置）。</summary>
     private sealed class StubModelClientFactory(IModelClient? client)

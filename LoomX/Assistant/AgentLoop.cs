@@ -6,6 +6,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
 
+/// <summary>工具审批门：返回 true 批准执行，false 拒绝。仅在逐条批准模式下对写/删工具触发。</summary>
+public delegate Task<bool> ToolApprovalGate(ToolCall toolCall, ToolDefinition tool, CancellationToken cancellationToken);
+
 /// <summary>
 /// 小助手最小 Agent 循环：
 /// 用户 → 模型 →（工具调用 → 工具结果 → 模型）→ 回答。
@@ -16,12 +19,18 @@ public sealed class AgentLoop
     private readonly IModelClient modelClient;
     private readonly ToolRegistry toolRegistry;
     private readonly ILogger<AgentLoop> logger;
+    private readonly ToolApprovalGate? approvalGate;
 
-    public AgentLoop(IModelClient modelClient, ToolRegistry toolRegistry, ILogger<AgentLoop> logger)
+    public AgentLoop(
+        IModelClient modelClient,
+        ToolRegistry toolRegistry,
+        ILogger<AgentLoop> logger,
+        ToolApprovalGate? approvalGate = null)
     {
         this.modelClient = modelClient;
         this.toolRegistry = toolRegistry;
         this.logger = logger;
+        this.approvalGate = approvalGate;
     }
 
     public async IAsyncEnumerable<AgentEvent> RunAsync(
@@ -122,6 +131,45 @@ public sealed class AgentLoop
                     ToolCallId = toolCall.Id,
                 };
 
+                // 逐条批准模式：写/删工具先等用户批准
+                if (approvalGate is not null
+                    && toolRegistry.TryGet(toolCall.Name, out var pendingTool)
+                    && pendingTool is not null
+                    && RequiresApproval(pendingTool.RiskLevel))
+                {
+                    yield return AgentEvent.Create(session.Id, AgentEventKind.ToolApprovalRequested) with
+                    {
+                        ToolName = toolCall.Name,
+                        ToolCallId = toolCall.Id,
+                        Detail = SummarizeArguments(toolCall.ArgumentsJson),
+                    };
+
+                    bool approved;
+                    try
+                    {
+                        approved = await approvalGate(toolCall, pendingTool, cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        cancelled = true;
+                        break;
+                    }
+
+                    if (!approved)
+                    {
+                        logger.LogInformation("小助手工具调用被用户拒绝 {ToolName}", toolCall.Name);
+                        session.AddMessage(ChatMessage.ToolResult(toolCall, "用户拒绝了这次修改操作，没有执行。"));
+                        yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallCompleted) with
+                        {
+                            ToolName = toolCall.Name,
+                            ToolCallId = toolCall.Id,
+                            Success = false,
+                            Detail = "已被你拒绝，未执行。",
+                        };
+                        continue;
+                    }
+                }
+
                 var (result, toolCancelled) = await ExecuteToolAsync(toolCall, cancellationToken);
                 if (toolCancelled)
                 {
@@ -159,6 +207,18 @@ public sealed class AgentLoop
         {
             Detail = failedDetail ?? $"超过最大步骤数 {session.Options.MaxSteps}。",
         };
+    }
+
+    /// <summary>修改类操作（写/删）才需要逐条批准；只读与外部测试直接放行。</summary>
+    private static bool RequiresApproval(ToolRiskLevel riskLevel) =>
+        riskLevel is ToolRiskLevel.Write or ToolRiskLevel.Destructive;
+
+    /// <summary>审批卡片展示的参数摘要：截断过长的参数 JSON，仅用于 UI 展示。</summary>
+    private static string SummarizeArguments(string? argumentsJson)
+    {
+        if (string.IsNullOrWhiteSpace(argumentsJson)) return string.Empty;
+        var compact = argumentsJson.Replace('\n', ' ').Replace('\r', ' ').Trim();
+        return compact.Length <= 300 ? compact : compact[..300] + "…";
     }
 
     /// <summary>

@@ -435,4 +435,20 @@
   <data name="assistant.send"><value>Send</value></data>
   <data name="assistant.cancel"><value>Cancel</value></data>
   <data name="assistant.input.watermark"><value>Type a message, Enter to send…</value></data>
+  <data name="assistant.history.delete.tooltip"><value>Delete this chat</value></data>
+  <data name="assistant.permission.auto"><value>Auto-approve</value></data>
+  <data name="assistant.permission.ask"><value>Approve each</value></data>
+  <data name="assistant.model.auto"><value>Auto select</value></data>
+  <data name="assistant.model.select.tooltip"><value>Pick assistant model (provider models only)</value></data>
+  <data name="assistant.model.search.watermark"><value>Search models…</value></data>
+  <data name="assistant.model.empty"><value>No models available. Enable an OpenAI-compatible model in a provider first.</value></data>
+  <data name="assistant.reasoning.label"><value>Thinking</value></data>
+  <data name="assistant.reasoning.default"><value>Default</value></data>
+  <data name="assistant.reasoning.minimal"><value>Minimal</value></data>
+  <data name="assistant.reasoning.low"><value>Low</value></data>
+  <data name="assistant.reasoning.medium"><value>Medium</value></data>
+  <data name="assistant.reasoning.high"><value>High</value></data>
+  <data name="assistant.approval.title"><value>Assistant requests a change</value></data>
+  <data name="assistant.approval.approve"><value>Approve</value></data>
+  <data name="assistant.approval.reject"><value>Reject</value></data>
 </root>

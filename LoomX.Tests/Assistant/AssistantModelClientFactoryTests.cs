@@ -12,13 +12,16 @@ namespace LoomX.Tests.Assistant;
 public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
 {
     private string databasePath = string.Empty;
+    private string preferencesPath = string.Empty;
     private ConfigurationDbContext startupContext = null!;
     private ConfigurationManagementService configuration = null!;
+    private AssistantPreferencesStore preferencesStore = null!;
     private AssistantModelClientFactory factory = null!;
 
     public async Task InitializeAsync()
     {
         databasePath = Path.Combine(Path.GetTempPath(), $"loomx-modelfactory-{Guid.NewGuid():N}.db");
+        preferencesPath = Path.Combine(Path.GetTempPath(), $"loomx-modelfactory-prefs-{Guid.NewGuid():N}.json");
         var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
         await using (var context = new ConfigurationDbContext(options))
         {
@@ -29,11 +32,13 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
         var configurationProvider = new DatabaseConfigurationProvider(startupContext);
         await configurationProvider.ReloadAsync();
         configuration = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+        preferencesStore = new AssistantPreferencesStore(preferencesPath);
         factory = new AssistantModelClientFactory(
             new DelegateHttpClientFactory(),
             configuration,
             NullLogger<OpenAiCompatibleModelClient>.Instance,
-            NullLogger<AssistantModelClientFactory>.Instance);
+            NullLogger<AssistantModelClientFactory>.Instance,
+            preferencesStore: preferencesStore);
     }
 
     public async Task DisposeAsync()
@@ -43,6 +48,8 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
         {
             try { if (File.Exists(databasePath + suffix)) File.Delete(databasePath + suffix); } catch (IOException) { }
         }
+
+        try { if (File.Exists(preferencesPath)) File.Delete(preferencesPath); } catch (IOException) { }
     }
 
     [Fact]
@@ -125,6 +132,70 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
         var info = await factory.DescribeAsync(CancellationToken.None);
 
         Assert.Equal("enabled-model", info!.ModelId);
+    }
+
+    [Fact]
+    public async Task PreferredModel_SelectedOverAutomatic()
+    {
+        var first = await CreateProviderAsync("first-openai", "openai");
+        await CreateModelAsync(first.Id, "auto-model");
+        var second = await CreateProviderAsync("second-openai", "openai");
+        await CreateModelAsync(second.Id, "wanted-model");
+        factory.SetPreferredSelection("second-openai", "wanted-model");
+
+        var info = await factory.DescribeAsync(CancellationToken.None);
+
+        Assert.Equal("second-openai", info!.ProviderBusinessId);
+        Assert.Equal("wanted-model", info.ModelId);
+    }
+
+    [Fact]
+    public async Task PreferredModelDisabled_FallsBackToAutomatic()
+    {
+        var first = await CreateProviderAsync("first-openai", "openai");
+        await CreateModelAsync(first.Id, "auto-model");
+        var second = await CreateProviderAsync("second-openai", "openai");
+        await CreateModelAsync(second.Id, "wanted-model", enabled: false);
+        factory.SetPreferredSelection("second-openai", "wanted-model");
+
+        var info = await factory.DescribeAsync(CancellationToken.None);
+
+        Assert.Equal("first-openai", info!.ProviderBusinessId);
+        Assert.Equal("auto-model", info.ModelId);
+    }
+
+    [Fact]
+    public async Task ClearPreferredSelection_RestoresAutomatic()
+    {
+        var first = await CreateProviderAsync("first-openai", "openai");
+        await CreateModelAsync(first.Id, "auto-model");
+        var second = await CreateProviderAsync("second-openai", "openai");
+        await CreateModelAsync(second.Id, "wanted-model");
+        factory.SetPreferredSelection("second-openai", "wanted-model");
+        factory.ClearPreferredSelection();
+
+        var info = await factory.DescribeAsync(CancellationToken.None);
+
+        Assert.Equal("first-openai", info!.ProviderBusinessId);
+    }
+
+    [Fact]
+    public async Task ListAvailable_GroupsOnlyEnabledOpenAiModels()
+    {
+        var openai = await CreateProviderAsync("main-openai", "openai");
+        await CreateModelAsync(openai.Id, "gpt-4o");
+        await CreateModelAsync(openai.Id, "gpt-4o-mini");
+        var anthropic = await CreateProviderAsync("claude", "anthropic");
+        await CreateModelAsync(anthropic.Id, "claude-sonnet-4-5");
+        var disabled = await CreateProviderAsync("disabled-openai", "openai", enabled: false);
+        await CreateModelAsync(disabled.Id, "hidden-model");
+
+        var groups = await factory.ListAvailableAsync(CancellationToken.None);
+
+        var group = Assert.Single(groups);
+        Assert.Equal("main-openai", group.ProviderBusinessId);
+        Assert.Equal(2, group.Models.Count);
+        Assert.DoesNotContain(group.Models, model => model.ModelId == "hidden-model");
     }
 
     private async Task<ProviderResponse> CreateProviderAsync(string businessId, string apiMode, bool enabled = true) =>

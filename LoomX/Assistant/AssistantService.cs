@@ -2,6 +2,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
 
+/// <summary>待用户批准的修改操作摘要（只含安全摘要，参数已截断）。</summary>
+public sealed record ToolApprovalRequest(string ToolCallId, string ToolName, string ArgumentsSummary);
+
 /// <summary>
 /// 小助手会话门面：管理 AgentSession 生命周期、驱动 AgentLoop、向外暴露 AgentEvent 流。
 /// UI 只与本门面与 AgentEvent 打交道，不接触 Harness 内部对象（规格 #15）。
@@ -22,6 +25,7 @@ public sealed class AssistantService
     private readonly AssistantModelClientFactory modelClientFactory;
     private readonly ToolRegistry toolRegistry;
     private readonly AssistantSessionStore sessionStore;
+    private readonly AssistantPreferencesStore? preferencesStore;
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantService> logger;
     private readonly SemaphoreSlim runLock = new(1, 1);
@@ -32,12 +36,14 @@ public sealed class AssistantService
         AssistantModelClientFactory modelClientFactory,
         ToolRegistry toolRegistry,
         AssistantSessionStore sessionStore,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        AssistantPreferencesStore? preferencesStore = null)
     {
         this.modelClientFactory = modelClientFactory;
         this.toolRegistry = toolRegistry;
         this.sessionStore = sessionStore;
         this.loggerFactory = loggerFactory;
+        this.preferencesStore = preferencesStore;
         logger = loggerFactory.CreateLogger<AssistantService>();
     }
 
@@ -52,6 +58,41 @@ public sealed class AssistantService
     /// <summary>助手模型是否可用（安全摘要，不含 Key）。</summary>
     public async Task<AssistantModelInfo?> DescribeModelAsync(CancellationToken cancellationToken = default) =>
         await modelClientFactory.DescribeAsync(cancellationToken);
+
+    /// <summary>可选助手模型（按 Provider 分组，只走 Provider 模型，不走 combo）。</summary>
+    public Task<IReadOnlyList<AssistantProviderModelGroup>> ListAvailableModelsAsync(CancellationToken cancellationToken = default) =>
+        modelClientFactory.ListAvailableAsync(cancellationToken);
+
+    /// <summary>当前指定模型；null 表示自动选择。</summary>
+    public (string? ProviderBusinessId, string? ModelId) GetModelSelection() =>
+        modelClientFactory.GetPreferredSelection();
+
+    /// <summary>指定助手模型（持久化，下一次发送生效）。</summary>
+    public void SelectModel(string providerBusinessId, string modelId) =>
+        modelClientFactory.SetPreferredSelection(providerBusinessId, modelId);
+
+    /// <summary>恢复自动选择模型。</summary>
+    public void ClearModelSelection() => modelClientFactory.ClearPreferredSelection();
+
+    /// <summary>修改权限模式（自动批准/逐条批准），持久化。</summary>
+    public AssistantPermissionMode PermissionMode
+    {
+        get => preferencesStore?.Load().PermissionMode ?? AssistantPermissionMode.AutoApprove;
+        set => preferencesStore?.Update(current => current with { PermissionMode = value });
+    }
+
+    /// <summary>思考等级：default（不下发）或 minimal/low/medium/high，持久化。</summary>
+    public string ReasoningEffort
+    {
+        get => AssistantPreferences.NormalizeReasoningEffort(preferencesStore?.Load().ReasoningEffort);
+        set => preferencesStore?.Update(current => current with { ReasoningEffort = AssistantPreferences.NormalizeReasoningEffort(value) });
+    }
+
+    /// <summary>
+    /// 逐条批准模式下的 UI 审批桥：返回 true 批准执行。
+    /// 由 UI 在发送前挂接；未挂接时默认批准并记录日志（无 UI 的宿主不会静默卡住）。
+    /// </summary>
+    public Func<ToolApprovalRequest, Task<bool>>? ApprovalHandler { get; set; }
 
     /// <summary>历史会话列表。</summary>
     public IReadOnlyList<AssistantSessionSummary> ListSessions() => sessionStore.List();
@@ -81,6 +122,25 @@ public sealed class AssistantService
     /// <summary>取消当前运行。</summary>
     public void Cancel() => currentRun?.Cancel();
 
+    private ToolApprovalGate BuildApprovalGate() => async (toolCall, tool, cancellationToken) =>
+    {
+        var handler = ApprovalHandler;
+        if (handler is null)
+        {
+            logger.LogWarning("逐条批准模式但未挂接审批 UI，默认放行 {ToolName}", tool.Name);
+            return true;
+        }
+
+        return await handler(new ToolApprovalRequest(toolCall.Id, tool.Name, Summarize(toolCall.ArgumentsJson)));
+    };
+
+    private static string Summarize(string? argumentsJson)
+    {
+        if (string.IsNullOrWhiteSpace(argumentsJson)) return string.Empty;
+        var compact = argumentsJson.Replace('\n', ' ').Replace('\r', ' ').Trim();
+        return compact.Length <= 300 ? compact : compact[..300] + "…";
+    }
+
     /// <summary>
     /// 发送用户消息并驱动一轮 Agent 循环，事件通过返回值逐条流出。
     /// 助手模型未配置时抛出 InvalidOperationException（UI 应提示用户先配置模型）。
@@ -105,7 +165,10 @@ public sealed class AssistantService
         currentRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         try
         {
-            var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>());
+            var approvalGate = PermissionMode == AssistantPermissionMode.AskEachTime
+                ? BuildApprovalGate()
+                : null;
+            var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate);
             await foreach (var agentEvent in loop.RunAsync(CurrentSession, userMessage, currentRun.Token))
             {
                 yield return agentEvent;

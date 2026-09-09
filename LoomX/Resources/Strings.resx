@@ -1437,4 +1437,52 @@
   <data name="assistant.input.watermark">
     <value>输入消息，Enter 发送…</value>
   </data>
+  <data name="assistant.history.delete.tooltip">
+    <value>删除此会话</value>
+  </data>
+  <data name="assistant.permission.auto">
+    <value>自动批准</value>
+  </data>
+  <data name="assistant.permission.ask">
+    <value>逐条批准</value>
+  </data>
+  <data name="assistant.model.auto">
+    <value>自动选择</value>
+  </data>
+  <data name="assistant.model.select.tooltip">
+    <value>指定助手模型（仅 Provider 模型）</value>
+  </data>
+  <data name="assistant.model.search.watermark">
+    <value>搜索模型…</value>
+  </data>
+  <data name="assistant.model.empty">
+    <value>暂无可用模型，请先在 Provider 中启用 openai 兼容模型</value>
+  </data>
+  <data name="assistant.reasoning.label">
+    <value>思考等级</value>
+  </data>
+  <data name="assistant.reasoning.default">
+    <value>默认</value>
+  </data>
+  <data name="assistant.reasoning.minimal">
+    <value>极低</value>
+  </data>
+  <data name="assistant.reasoning.low">
+    <value>低</value>
+  </data>
+  <data name="assistant.reasoning.medium">
+    <value>中</value>
+  </data>
+  <data name="assistant.reasoning.high">
+    <value>高</value>
+  </data>
+  <data name="assistant.approval.title">
+    <value>小助手请求修改</value>
+  </data>
+  <data name="assistant.approval.approve">
+    <value>批准</value>
+  </data>
+  <data name="assistant.approval.reject">
+    <value>拒绝</value>
+  </data>
 </root>

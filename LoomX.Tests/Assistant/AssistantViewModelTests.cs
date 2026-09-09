@@ -87,6 +87,27 @@ public sealed class AssistantViewModelTests
         Assert.False(status.IsAssistantMessage);
     }
 
+    [Fact]
+    public void Project_ToolApprovalRequested_AddsWaitingStatus()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.Project(Event(AgentEventKind.ToolApprovalRequested) with { ToolName = "loomx.update_provider" });
+
+        Assert.Contains(viewModel.Messages, message => message.IsStatus && message.Text.Contains("等待你批准") && message.Text.Contains("loomx.update_provider"));
+    }
+
+    [Fact]
+    public void ModelOption_MatchesSearchByDisplayNameOrModelId()
+    {
+        var option = new AssistantModelOptionViewModel("p1", "gpt-4o-mini", "GPT 4o Mini");
+
+        Assert.True(option.MatchesSearch("mini"));
+        Assert.True(option.MatchesSearch("GPT"));
+        Assert.False(option.MatchesSearch("claude"));
+        Assert.True(option.MatchesSearch(""));
+    }
+
     private static AssistantViewModel CreateViewModel() => new(new GatewayProcessService());
 
     private static AgentEvent Event(AgentEventKind kind) => AgentEvent.Create("test-session", kind);

@@ -15,6 +15,7 @@ public enum AgentEventKind
     TaskCompleted,
     TaskFailed,
     WaitingForUser,
+    ToolApprovalRequested,
 
     // 可扩展事件（规格 #15）
     SecretStored,

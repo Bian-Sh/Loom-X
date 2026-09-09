@@ -100,6 +100,7 @@ public static class LoomXHost
 
         // 小助手（Phase 4）：会话门面与持久化
         builder.Services.AddSingleton<Assistant.AssistantSessionStore>();
+        builder.Services.AddSingleton<Assistant.AssistantPreferencesStore>();
         builder.Services.AddSingleton<Assistant.AssistantService>();
 
         var app = builder.Build();

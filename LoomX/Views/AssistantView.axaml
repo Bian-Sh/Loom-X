@@ -2,11 +2,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:md="using:LiveMarkdown.Avalonia"
              xmlns:conv="using:Avalonia.Data.Converters"
+             xmlns:vm="using:LoomX.ViewModels"
              xmlns:l="using:LoomX.Localization"
              x:Class="LoomX.Views.AssistantView">
-  <Grid RowDefinitions="Auto,*,Auto" RowSpacing="10">
+  <UserControl.Styles>
+    <Style Selector="Button.icon"><Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="7"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style Selector="ComboBox.toolbar"><Setter Property="Height" Value="30"/><Setter Property="FontSize" Value="12"/></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
 
-    <!-- 顶部：历史会话 + 新会话 -->
+    <!-- 顶部：历史会话（项内右侧回收站删除）+ 新会话 -->
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
       <ComboBox Grid.Column="0"
                 ItemsSource="{Binding Sessions}"
@@ -14,7 +20,14 @@
                 PlaceholderText="{l:Locale assistant.history.placeholder}">
         <ComboBox.ItemTemplate>
           <DataTemplate>
-            <TextBlock Text="{Binding Title}" />
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" MinWidth="220">
+              <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <Button Grid.Column="1" Classes="icon" Tag="{Binding}" Click="DeleteHistoryItem_OnClick"
+                      ToolTip.Tip="{l:Locale assistant.history.delete.tooltip}"
+                      AutomationProperties.Name="{l:Locale assistant.history.delete.tooltip}">
+                <Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="13" Height="13"/>
+              </Button>
+            </Grid>
           </DataTemplate>
         </ComboBox.ItemTemplate>
       </ComboBox>
@@ -66,26 +79,147 @@
       </ItemsControl>
     </ScrollViewer>
 
-    <!-- 输入区 -->
-    <Grid Grid.Row="2" RowDefinitions="Auto,Auto">
+    <!-- 逐条批准：待批准的修改操作卡片 -->
+    <Border Grid.Row="2"
+            IsVisible="{Binding PendingApproval, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
+            Background="{DynamicResource WarningSoftBrush}"
+            BorderBrush="{DynamicResource WarningBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="10"
+            Padding="12,10">
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" DataContext="{Binding PendingApproval}">
+        <StackPanel Spacing="4">
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+            <TextBlock Text="{l:Locale assistant.approval.title}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" Text="{Binding ToolName}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center"/>
+          </Grid>
+          <TextBlock Text="{Binding ArgumentsSummary}" Classes="muted" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap" MaxHeight="60"
+                     IsVisible="{Binding HasArguments}"/>
+        </StackPanel>
+        <Button Grid.Column="1" Content="{l:Locale assistant.approval.approve}" Command="{Binding ApproveCommand}" VerticalAlignment="Center"/>
+        <Button Grid.Column="2" Content="{l:Locale assistant.approval.reject}" Command="{Binding RejectCommand}" VerticalAlignment="Center"/>
+      </Grid>
+    </Border>
+
+    <!-- 输入区：上输入框 + 下工具栏（权限 / 模型 / 发送） -->
+    <Grid Grid.Row="3" RowDefinitions="Auto,Auto">
       <TextBlock Grid.Row="0" Text="{Binding StatusText}" FontSize="12" Opacity="0.65" Margin="2,0,0,4"
                  IsVisible="{Binding StatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
-      <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-        <TextBox Grid.Column="0"
-                 Text="{Binding InputText}"
-                 Watermark="{l:Locale assistant.input.watermark}"
-                 AcceptsReturn="False"
-                 KeyDown="OnInputKeyDown" />
-        <Button Grid.Column="1"
-                Content="{l:Locale assistant.send}"
-                Command="{Binding SendCommand}"
-                IsVisible="{Binding !IsRunning}" />
-        <Button Grid.Column="2"
-                Content="{l:Locale assistant.cancel}"
-                Command="{Binding CancelCommand}"
-                IsVisible="{Binding IsRunning}" />
-      </Grid>
+      <Border Grid.Row="1"
+              Background="{DynamicResource SurfaceBrush}"
+              BorderBrush="{DynamicResource BorderBrush}"
+              BorderThickness="1"
+              CornerRadius="10"
+              ClipToBounds="True">
+        <Grid RowDefinitions="Auto,Auto">
+          <TextBox Grid.Row="0"
+                   Text="{Binding InputText}"
+                   Watermark="{l:Locale assistant.input.watermark}"
+                   AcceptsReturn="False"
+                   BorderThickness="0"
+                   Background="Transparent"
+                   KeyDown="OnInputKeyDown" />
+          <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="6,0,6,4">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+            <!-- 修改权限 -->
+            <ComboBox Grid.Column="0" Classes="toolbar"
+                      ItemsSource="{Binding PermissionModeOptions}"
+                      SelectedItem="{Binding SelectedPermissionMode, Mode=TwoWay}"
+                      VerticalAlignment="Center"/>
+            <!-- 模型指定（foldout 弹层，只走 Provider 模型） -->
+            <Button Grid.Column="1" x:Name="modelPickerButton"
+                    HorizontalContentAlignment="Stretch" HorizontalAlignment="Right"
+                    Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                    Padding="8,4" MinWidth="180" MaxWidth="320"
+                    Click="ModelPicker_OnClick"
+                    ToolTip.Tip="{l:Locale assistant.model.select.tooltip}"
+                    AutomationProperties.Name="{l:Locale assistant.model.select.tooltip}">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                <TextBlock Text="{Binding SelectedModelSummary}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                <PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="12" Height="12" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
+            <Button Grid.Column="2"
+                    Content="{l:Locale assistant.send}"
+                    Command="{Binding SendCommand}"
+                    IsVisible="{Binding !IsRunning}" />
+            <Button Grid.Column="2"
+                    Content="{l:Locale assistant.cancel}"
+                    Command="{Binding CancelCommand}"
+                    IsVisible="{Binding IsRunning}" />
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
     </Grid>
+
+    <!-- 模型选择弹层：与网关 model combo 添加子项同款 foldout UI -->
+    <Popup x:Name="modelPopup" PlacementTarget="{Binding #modelPickerButton}" Placement="Top" IsLightDismissEnabled="True"
+           IsOpen="{Binding IsModelPickerOpen, Mode=TwoWay}" HorizontalOffset="0" VerticalOffset="-5">
+      <Border Width="360" MaxHeight="420" Background="{DynamicResource PopupBackgroundBrush}"
+              BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="8" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+          <TextBox x:Name="modelSearch" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="2">
+              <!-- 自动选择伪项 -->
+              <Button Tag="{Binding}" Click="ModelAuto_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
+                      Background="Transparent" BorderThickness="0" Padding="12,8">
+                <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
+                  <TextBlock Text="{l:Locale assistant.model.auto}"/>
+                  <Path Grid.Column="1" Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15"
+                        Stroke="{DynamicResource SuccessBrush}" IsVisible="{Binding IsAutoModelSelected}"/>
+                </Grid>
+              </Button>
+              <ItemsControl ItemsSource="{Binding ModelGroups}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="{x:Type vm:AssistantModelGroupViewModel}">
+                    <StackPanel Spacing="2" Margin="0,0,0,6">
+                      <Button Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
+                              Background="{DynamicResource SurfaceSubtleBrush}" BorderThickness="0" Padding="10,9">
+                        <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="8">
+                          <Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="14" Height="14" Stroke="{DynamicResource TextSecondaryBrush}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%">
+                            <Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform>
+                          </Path>
+                          <TextBlock Grid.Column="1" Text="{Binding ProviderName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                          <TextBlock Grid.Column="2" Text="{Binding ModelCount}" Classes="muted" VerticalAlignment="Center"/>
+                        </Grid>
+                      </Button>
+                      <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding IsExpanded}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="{x:Type vm:AssistantModelOptionViewModel}">
+                            <Button Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
+                                    Background="Transparent" BorderThickness="0" Margin="22,0,0,0" Padding="12,8">
+                              <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
+                                <TextBlock Text="{Binding DisplayName}"/>
+                                <Path Grid.Column="1" Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15"
+                                      Stroke="{DynamicResource SuccessBrush}" IsVisible="{Binding IsSelected}"/>
+                              </Grid>
+                            </Button>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="{l:Locale assistant.model.empty}" Classes="muted" HorizontalAlignment="Center" Margin="0,12"
+                         IsVisible="{Binding HasNoModelGroups}"/>
+            </StackPanel>
+          </ScrollViewer>
+          <!-- 思考等级 -->
+          <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+              <TextBlock Text="{l:Locale assistant.reasoning.label}" Classes="muted" FontSize="12" VerticalAlignment="Center"/>
+              <ComboBox Grid.Column="1" Classes="toolbar" HorizontalAlignment="Right" MinWidth="120"
+                        ItemsSource="{Binding ReasoningEffortOptions}"
+                        SelectedItem="{Binding SelectedReasoningEffort, Mode=TwoWay}"/>
+            </Grid>
+          </Border>
+        </Grid>
+      </Border>
+    </Popup>
 
   </Grid>
 </UserControl>

@@ -1303,4 +1303,52 @@
   <data name="assistant.input.watermark">
     <value>メッセージを入力、Enter で送信…</value>
   </data>
+  <data name="assistant.history.delete.tooltip">
+    <value>この会話を削除</value>
+  </data>
+  <data name="assistant.permission.auto">
+    <value>自動承認</value>
+  </data>
+  <data name="assistant.permission.ask">
+    <value>都度承認</value>
+  </data>
+  <data name="assistant.model.auto">
+    <value>自動選択</value>
+  </data>
+  <data name="assistant.model.select.tooltip">
+    <value>アシスタントのモデルを指定（プロバイダーのモデルのみ）</value>
+  </data>
+  <data name="assistant.model.search.watermark">
+    <value>モデルを検索…</value>
+  </data>
+  <data name="assistant.model.empty">
+    <value>利用可能なモデルがありません。先にプロバイダーで OpenAI 互換モデルを有効にしてください</value>
+  </data>
+  <data name="assistant.reasoning.label">
+    <value>思考レベル</value>
+  </data>
+  <data name="assistant.reasoning.default">
+    <value>デフォルト</value>
+  </data>
+  <data name="assistant.reasoning.minimal">
+    <value>最小</value>
+  </data>
+  <data name="assistant.reasoning.low">
+    <value>低</value>
+  </data>
+  <data name="assistant.reasoning.medium">
+    <value>中</value>
+  </data>
+  <data name="assistant.reasoning.high">
+    <value>高</value>
+  </data>
+  <data name="assistant.approval.title">
+    <value>アシスタントが変更を要求</value>
+  </data>
+  <data name="assistant.approval.approve">
+    <value>承認</value>
+  </data>
+  <data name="assistant.approval.reject">
+    <value>拒否</value>
+  </data>
 </root>

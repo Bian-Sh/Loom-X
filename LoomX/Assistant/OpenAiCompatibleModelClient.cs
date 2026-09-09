@@ -17,6 +17,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
     private readonly string baseUrl;
     private readonly string model;
     private readonly string? apiKey;
+    private readonly IReadOnlyDictionary<string, string>? extraHeaders;
+    private readonly string? reasoningEffort;
     private readonly ILogger<OpenAiCompatibleModelClient>? logger;
 
     public OpenAiCompatibleModelClient(
@@ -24,13 +26,17 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         string baseUrl,
         string model,
         string? apiKey = null,
-        ILogger<OpenAiCompatibleModelClient>? logger = null)
+        ILogger<OpenAiCompatibleModelClient>? logger = null,
+        IReadOnlyDictionary<string, string>? extraHeaders = null,
+        string? reasoningEffort = null)
     {
         this.httpClient = httpClient;
         this.baseUrl = baseUrl.TrimEnd('/');
         this.model = model;
         this.apiKey = apiKey;
         this.logger = logger;
+        this.extraHeaders = extraHeaders;
+        this.reasoningEffort = string.IsNullOrWhiteSpace(reasoningEffort) ? null : reasoningEffort.Trim();
     }
 
     public async IAsyncEnumerable<ModelStreamEvent> StreamAsync(
@@ -45,6 +51,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         {
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         }
+        ApplyExtraHeaders(httpRequest);
 
         HttpResponseMessage response;
         try
@@ -171,6 +178,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             ["messages"] = messages,
             ["stream"] = true,
         };
+        if (reasoningEffort is not null) payload["reasoning_effort"] = reasoningEffort;
 
         if (request.Tools.Count > 0)
         {
@@ -192,6 +200,26 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         }
 
         return payload;
+    }
+
+    /// <summary>
+    /// 注入 Provider/模型配置的自定义头（User-Agent、X-* 等）。
+    /// Authorization 与 Content-Type 由客户端自身管理，跳过避免冲突。
+    /// </summary>
+    private void ApplyExtraHeaders(HttpRequestMessage httpRequest)
+    {
+        if (extraHeaders is null) return;
+        foreach (var header in extraHeaders)
+        {
+            if (string.IsNullOrWhiteSpace(header.Key) || string.IsNullOrWhiteSpace(header.Value)) continue;
+            if (header.Key.Equals("Authorization", StringComparison.OrdinalIgnoreCase)
+                || header.Key.Equals("Content-Type", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            httpRequest.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
     }
 
     private sealed class ToolCallBuilder
