@@ -236,6 +236,21 @@ public sealed class ProvidersViewContractTests
         Assert.DoesNotContain("RowDefinitions=\"Auto,Auto,Auto,Auto\"", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ProviderHealthSurfaceBindsAggregateAndPerProviderState()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+
+        Assert.Contains("Text=\"{Binding ProviderHealthSummary}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding EnabledProviderCount}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding VerifyAllProvidersCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding HealthDetailText}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsHealthSuccess}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsHealthError}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsHealthWarning}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsHealthChecking}\"", source, StringComparison.Ordinal);
+    }
+
     private static string ReadDesktopFile(params string[] segments)
     {
         var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);

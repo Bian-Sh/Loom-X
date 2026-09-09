@@ -127,6 +127,42 @@ public sealed class AgentLoopTests
     }
 
     [Fact]
+    public async Task DuplicateToolCallIds_AreDedupedBeforeExecuting()
+    {
+        // 复现 LoomX 会话 38b4976249be48eda6ad7e7acb7085a0 事故：
+        // 上游把同一批 tool_call 扇出成多份相同 id 的副本，AgentLoop 必须在派发前按 id 去重，
+        // 否则会执行 N 次、写 N 条重复 tool 结果进历史、下一次请求被 sensenova 拒绝为 400。
+        var registry = new ToolRegistry();
+        registry.Register(MockTools.CreateListProvidersTool());
+        // 第二次调用直接 stop，确保我们只关注"第一步如何把 6 次调用降成 1 次"。
+        var modelClient = new ScriptedModelClient(
+            [
+                new ModelToolCallEvent(new ToolCall("call_a", "mock.list_providers", "{}")),
+                new ModelToolCallEvent(new ToolCall("call_a", "mock.list_providers", "{}")),
+                new ModelToolCallEvent(new ToolCall("call_a", "mock.list_providers", "{}")),
+                new ModelToolCallEvent(new ToolCall("call_a", "mock.list_providers", "{}")),
+                new ModelToolCallEvent(new ToolCall("call_a", "mock.list_providers", "{}")),
+                new ModelToolCallEvent(new ToolCall("call_a", "mock.list_providers", "{}")),
+                new ModelCompletedEvent("tool_calls"),
+            ],
+            [new TextDeltaEvent("已读。"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        var events = await CollectAsync(CreateLoop(modelClient, registry).RunAsync(session, "查询"));
+
+        // 仅派发了一次工具（去重生效），写回历史也只有 1 条 tool 结果。
+        var toolCompleted = events.Count(e => e.Kind == AgentEventKind.ToolCallCompleted);
+        Assert.Equal(1, toolCompleted);
+
+        // 历史里 assistant 的 tool_calls 只剩 1 项；后续跟 1 条 tool 消息。
+        var assistantWithCalls = session.Messages.Single(m => m.ToolCalls is { Count: > 0 });
+        Assert.Single(assistantWithCalls.ToolCalls!);
+        var toolResults = session.Messages.Where(m => m.Role == ChatRole.Tool).ToList();
+        Assert.Single(toolResults);
+        Assert.Equal(AgentSessionState.Completed, session.State);
+    }
+
+    [Fact]
     public async Task MaxStepsExceeded_FailsTask()
     {
         var toolCallsTurn = (IReadOnlyList<ModelStreamEvent>)[

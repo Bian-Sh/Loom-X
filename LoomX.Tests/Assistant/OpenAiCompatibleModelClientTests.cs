@@ -104,6 +104,136 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public async Task StreamAsync_SkipsToolCallsWithEmptyName()
+    {
+        // 上游（如 sensenova）可能在 tool_calls 里附带空 id/name 的占位调用，
+        // 客户端应过滤掉，避免透传后被判为「未注册工具」并污染历史导致 400。
+        var sse = string.Join('\n',
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"mock.list_providers","arguments":"{}"}},{"index":1,"function":{"arguments":"{}"}}]},"finish_reason":null}]}""",
+            "",
+            """data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+            "",
+            "data: [DONE]",
+            "");
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+        var request = new ModelRequest([ChatMessage.User("查询")], [CreateTool()]);
+
+        var events = await CollectAsync(client.StreamAsync(request, CancellationToken.None));
+
+        var toolCalls = events.OfType<ModelToolCallEvent>().ToList();
+        Assert.Single(toolCalls);
+        Assert.Equal("mock.list_providers", toolCalls[0].ToolCall.Name);
+        Assert.Equal("call_1", toolCalls[0].ToolCall.Id);
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[^1]).FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_PlaceholderWithoutIdAndName_IsDropped()
+    {
+        // 复现 sensenova 真实畸形：占位片段既无 id/name 也无 index，
+        // 旧逻辑会经 ?? 0 归到 index 0 并新建空 builder，累积出空 name 调用。
+        // 新逻辑应在解析阶段直接丢弃，不污染正常的 index 0 builder。
+        var sse = string.Join('\n',
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"mock.list_providers","arguments":"{}"}}]},"finish_reason":null}]}""",
+            "",
+            """data: {"choices":[{"delta":{"tool_calls":[{"function":{"arguments":"{}"}}]},"finish_reason":null}]}""",
+            "",
+            """data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+            "",
+            "data: [DONE]",
+            "");
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+        var request = new ModelRequest([ChatMessage.User("查询")], [CreateTool()]);
+
+        var events = await CollectAsync(client.StreamAsync(request, CancellationToken.None));
+
+        var toolCalls = events.OfType<ModelToolCallEvent>().ToList();
+        Assert.Single(toolCalls);
+        Assert.Equal("call_1", toolCalls[0].ToolCall.Id);
+        Assert.Equal("mock.list_providers", toolCalls[0].ToolCall.Name);
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[^1]).FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_DedupesFannedOutToolCallsById()
+    {
+        // 复现 LoomX 会话 38b4976249be48eda6ad7e7acb7085a0 的事故：
+        // sensenova 在一次响应里把 6 个 tool_call 扇出成多份相同 id 的副本，
+        // 每个副本的 index 递增；旧逻辑按 index 累积会产生 63 个调用（6 个 id 重复 N 次），
+        // 写回历史后违反 OpenAI 协议 "同一 assistant 消息内 tool_call_id 唯一" 约束
+        // → 下一次请求 400 InvalidRequest → Session Failed。
+        // 新逻辑必须按 id 去重，最终只发射 6 条 ModelToolCallEvent。
+        var parts = new List<string>
+        {
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_a","function":{"name":"mock.list_providers","arguments":"{}"}},{"index":1,"id":"call_b","function":{"name":"mock.list_providers","arguments":"{}"}},{"index":2,"id":"call_c","function":{"name":"mock.list_providers","arguments":"{}"}},{"index":3,"id":"call_d","function":{"name":"mock.list_providers","arguments":"{}"}},{"index":4,"id":"call_e","function":{"name":"mock.list_providers","arguments":"{}"}},{"index":5,"id":"call_f","function":{"name":"mock.list_providers","arguments":"{}"}}]},"finish_reason":null}]}""",
+        };
+        // 重复扇出 10 次（实际事故里是 ~10 次导致 60+ 条），模拟 sensenova 行为
+        for (var round = 1; round <= 10; round++)
+        {
+            var deltas = new List<string>();
+            for (var i = 0; i < 6; i++)
+            {
+                var id = $"call_{(char)('a' + i)}";
+                var idx = round * 6 + i;
+                // 想要的输出：{"index":N,"id":"call_a","function":{"arguments":"{}"}}
+                // 用 $$$"""..."""：单 { 单 } 都视为字面量；{{{ = 一个 { + 一个插值开始。
+                deltas.Add($$$"""{"index":{{{idx}}},"id":"{{{id}}}","function":{"arguments":"{}"}}""");
+            }
+            parts.Add($$$"""data: {"choices":[{"delta":{"tool_calls":[{{{string.Join(",", deltas)}}}]},"finish_reason":null}]}""");
+        }
+        parts.Add("""data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""");
+        parts.Add("data: [DONE]");
+        var sse = string.Join("\n\n", parts);
+
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+        var request = new ModelRequest([ChatMessage.User("查询")], [CreateTool()]);
+
+        var events = await CollectAsync(client.StreamAsync(request, CancellationToken.None));
+
+        var toolCalls = events.OfType<ModelToolCallEvent>().ToList();
+        Assert.Equal(6, toolCalls.Count);
+        var ids = toolCalls.Select(t => t.ToolCall.Id).ToList();
+        Assert.Equal(6, ids.Distinct().Count());
+        Assert.Equal(new[] { "call_a", "call_b", "call_c", "call_d", "call_e", "call_f" }, ids);
+        Assert.All(toolCalls, t => Assert.Equal("mock.list_providers", t.ToolCall.Name));
+        // arguments 形如 "{}{}{}..."（首轮 1 段 + 10 轮扇出共 11 段），任一 tool_call 都不能为空，
+        // 且其字符数 = 2 * 11 = 22。
+        Assert.All(toolCalls, t => Assert.Equal(22, t.ToolCall.ArgumentsJson.Length));
+        Assert.All(toolCalls, t => Assert.True(t.ToolCall.ArgumentsJson.All(c => c == '{' || c == '}')));
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[^1]).FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_RepeatedFinishReasonDoesNotReplayToolCalls()
+    {
+        // 上游若在同一流里出现多个 finish_reason chunk（如重试/异常后再次发送完成帧），
+        // 旧逻辑会把同一组 tool_call 重复发射；新逻辑应在每个 finish_reason 后清空累积器。
+        var sse = string.Join('\n',
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"mock.list_providers","arguments":"{}"}}]},"finish_reason":null}]}""",
+            "",
+            """data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+            "",
+            """data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+            "",
+            "data: [DONE]",
+            "");
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+        var request = new ModelRequest([ChatMessage.User("查询")], [CreateTool()]);
+
+        var events = await CollectAsync(client.StreamAsync(request, CancellationToken.None));
+
+        // 只允许 1 个 tool_call + 2 个 completion
+        Assert.Equal(3, events.Count);
+        Assert.IsType<ModelToolCallEvent>(events[0]);
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[1]).FinishReason);
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[2]).FinishReason);
+    }
+
+    [Fact]
     public async Task StreamAsync_SendsAuthHeaderModelAndToolSchema()
     {
         var handler = new FakeHttpHandler(HttpStatusCode.OK, "data: [DONE]\n");

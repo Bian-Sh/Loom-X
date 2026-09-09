@@ -88,6 +88,11 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var reader = new StreamReader(stream);
             var toolCallBuilders = new Dictionary<int, ToolCallBuilder>();
+            // 按 tool_call_id 去重：上游（如 sensenova）有时会把同一批 tool_call 扇出成多份，
+            // 每份都带相同的 id 但 index 递增；按 index 累积会把同一 id 复制成 N 份进而把历史撑爆、
+            // 下一次请求违反 OpenAI 协议的 "同 assistant 消息内 tool_call_id 唯一" 约束并触发 400。
+            // 一旦某 builder 的 Id 已知，后续若再出现同 Id 的 delta，应合并到该 builder（而不是新建）。
+            var idToBuilder = new Dictionary<string, ToolCallBuilder>(StringComparer.Ordinal);
 
             while (true)
             {
@@ -109,7 +114,10 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                     continue;
                 }
 
-                var choice = chunk?["choices"]?[0];
+                // 兼容部分服务在非流式/异常时返回 {"choices":[]} 或缺失 choices 的情况：
+                // 空数组下 ?[0] 会抛 ArgumentOutOfRangeException，这里显式判空集合兜底为 null。
+                var choices = chunk?["choices"] as JsonArray;
+                var choice = choices is { Count: > 0 } ? choices[0] : null;
                 var delta = choice?["delta"];
                 if (delta?["content"]?.GetValue<string>() is { Length: > 0 } content)
                 {
@@ -121,15 +129,52 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                     foreach (var deltaNode in toolCallDeltas)
                     {
                         if (deltaNode is null) continue;
+                        var deltaId = deltaNode["id"]?.GetValue<string>();
+                        var function = deltaNode["function"];
+                        var deltaName = function?["name"]?.GetValue<string>();
                         var index = deltaNode["index"]?.GetValue<int>() ?? 0;
-                        if (!toolCallBuilders.TryGetValue(index, out var builder))
+
+                        // 根因防御：合法的 tool_call 首个 chunk 一定携带 id 或 name；
+                        // 而后续的 arguments 分片虽然不带 id/name，但对应 index 已有 builder。
+                        // 部分上游（如 sensenova）会在流里附带「既无 id/name、index 也无对应 builder」的
+                        // 畸形占位片段，若为其新建 builder 会累积出 name 为空的调用，进而被误判为
+                        // 「未注册工具」并以空 tool_call_id 回传历史导致 400。这里直接丢弃。
+                        var hasBuilder = toolCallBuilders.ContainsKey(index);
+
+                        if (!hasBuilder && string.IsNullOrEmpty(deltaId) && string.IsNullOrWhiteSpace(deltaName))
+                        {
+                            continue;
+                        }
+
+                        // 去重合并：若该 delta 带 id 且之前已见过同 id 的 builder，
+                        // 把 delta 追加到已有 builder（其 index 由首次出现决定），
+                        // 避免上游扇出造成同 id 多份副本。
+                        ToolCallBuilder? builder = null;
+                        if (deltaId is { Length: > 0 } && idToBuilder.TryGetValue(deltaId, out var existing))
+                        {
+                            builder = existing;
+                        }
+
+                        if (builder is null && !hasBuilder)
                         {
                             builder = new ToolCallBuilder();
                             toolCallBuilders[index] = builder;
+                            if (deltaId is { Length: > 0 })
+                            {
+                                idToBuilder[deltaId] = builder;
+                            }
                         }
-                        if (deltaNode["id"]?.GetValue<string>() is { } id) builder.Id = id;
-                        var function = deltaNode["function"];
-                        if (function?["name"]?.GetValue<string>() is { } name) builder.Name = name;
+                        else if (builder is null)
+                        {
+                            builder = toolCallBuilders[index];
+                        }
+
+                        if (deltaId is { Length: > 0 } && !idToBuilder.ContainsKey(deltaId))
+                        {
+                            idToBuilder[deltaId] = builder;
+                        }
+                        if (deltaId is { Length: > 0 }) builder.Id = deltaId;
+                        if (deltaName is { Length: > 0 }) builder.Name = deltaName;
                         if (function?["arguments"]?.GetValue<string>() is { } arguments) builder.Arguments.Append(arguments);
                     }
                 }
@@ -138,9 +183,17 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 {
                     foreach (var entry in toolCallBuilders.OrderBy(item => item.Key))
                     {
-                        yield return new ModelToolCallEvent(entry.Value.ToToolCall());
+                        var toolCall = entry.Value.ToToolCall();
+                        // 兜底保险：正常路径已在解析时丢弃无 id/name 的占位片段，
+                        // 此处再过滤一次 name 为空的调用，双保险防止无效调用透传到 AgentLoop。
+                        if (string.IsNullOrWhiteSpace(toolCall.Name)) continue;
+                        yield return new ModelToolCallEvent(toolCall);
                     }
                     yield return new ModelCompletedEvent(finishReason);
+                    // 同一流里若出现多个 finish_reason chunk（如上游在重试/异常后再次发送完成帧），
+                    // 清空累积器避免重复发射同一组 tool_call。
+                    toolCallBuilders.Clear();
+                    idToBuilder.Clear();
                 }
             }
         }

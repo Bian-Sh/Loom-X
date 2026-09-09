@@ -1,4 +1,5 @@
 using LoomX.Configuration;
+using LoomX.Services;
 using LoomX.ViewModels;
 using Xunit;
 
@@ -147,6 +148,60 @@ public sealed class ProviderEditorViewModelTests
         };
 
         Assert.False(ProvidersViewModel.MatchesProviderSearch(provider, "missing"));
+    }
+
+    [Fact]
+    public void HealthResultBuildsUsefulStatusAndDetail()
+    {
+        var provider = new ProviderEditorViewModel { Enabled = true };
+
+        provider.ApplyHealthResult(new ProviderHealthResult(
+            ProviderHealthState.Healthy,
+            StatusCode: 200,
+            LatencyMs: 42,
+            DiscoveredModelCount: 3));
+
+        Assert.True(provider.IsHealthSuccess);
+        Assert.Equal("正常", provider.HealthStatusText);
+        Assert.Contains("HTTP 200", provider.HealthDetailText, StringComparison.Ordinal);
+        Assert.Contains("3 个模型", provider.HealthDetailText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConfigurationResetReturnsProviderToPendingState()
+    {
+        var provider = new ProviderEditorViewModel { Enabled = true };
+        provider.ApplyHealthResult(new ProviderHealthResult(ProviderHealthState.Healthy, StatusCode: 200, LatencyMs: 10, DiscoveredModelCount: 1));
+
+        provider.ResetHealthForConfigurationChange();
+
+        Assert.Equal(ProviderHealthState.Unknown, provider.HealthState);
+        Assert.True(provider.IsHealthUnknown);
+        Assert.Contains("尚未验证", provider.HealthDetailText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EmptyModelResultIsWarningButStillPassed()
+    {
+        var provider = new ProviderEditorViewModel { Enabled = true };
+
+        provider.ApplyHealthResult(new ProviderHealthResult(ProviderHealthState.HealthyEmptyModels, StatusCode: 200, LatencyMs: 8, DiscoveredModelCount: 0));
+
+        Assert.False(provider.IsHealthSuccess);
+        Assert.True(provider.IsHealthWarning);
+        Assert.True(provider.IsHealthPassed);
+    }
+
+    [Fact]
+    public void DisabledProviderDoesNotRemainHealthy()
+    {
+        var provider = new ProviderEditorViewModel { Enabled = false };
+        provider.ApplyHealthResult(new ProviderHealthResult(ProviderHealthState.Healthy, StatusCode: 200));
+
+        provider.ResetHealthForConfigurationChange();
+
+        Assert.Equal(ProviderHealthState.Disabled, provider.HealthState);
+        Assert.True(provider.IsHealthDisabled);
     }
 
     [Fact]

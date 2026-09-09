@@ -35,7 +35,7 @@
           <StackPanel Spacing="3"><TextBlock Text="{l:Locale providers.card.keys.label}" Classes="muted"/><TextBlock Text="{Binding ProtectedKeyCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="{l:Locale providers.card.keys.status}" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/></StackPanel>
         </Border>
         <Border Grid.Column="3" Classes="stat">
-          <StackPanel Spacing="3"><TextBlock Text="{l:Locale providers.card.health.label}" Classes="muted"/><StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="{Binding HealthyProviderCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="/" FontSize="17" VerticalAlignment="Center" Opacity="0.5"/><TextBlock Text="{Binding Providers.Count}" FontSize="17" VerticalAlignment="Center" Opacity="0.7"/></StackPanel><TextBlock Text="{l:Locale providers.card.health.status}" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/></StackPanel>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><StackPanel Spacing="3"><TextBlock Text="{l:Locale providers.card.health.label}" Classes="muted"/><StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="{Binding HealthyProviderCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="/" FontSize="17" VerticalAlignment="Center" Opacity="0.5"/><TextBlock Text="{Binding EnabledProviderCount}" FontSize="17" VerticalAlignment="Center" Opacity="0.7"/></StackPanel><TextBlock Text="{Binding ProviderHealthSummary}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" TextWrapping="Wrap"/></StackPanel><Button Grid.Column="1" Classes="icon-button" Command="{Binding VerifyAllProvidersCommand}" IsEnabled="{Binding IsProviderHealthIdle}" ToolTip.Tip="{l:Locale providers.health.verify.all}" AutomationProperties.Name="{l:Locale providers.health.verify.all}"><Path Classes="icon-glyph" Data="M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6" Width="14" Height="14"/></Button></Grid>
         </Border>
       </Grid>
 
@@ -59,14 +59,17 @@
                       <Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="*,Auto">
                         <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                           <TextBlock Text="{Binding DisplayName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                          <Ellipse Width="6" Height="6" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" ToolTip.Tip="{l:Locale providers.toggle.tooltip.enabled}" IsVisible="{Binding Enabled}"/>
+                          <Panel Width="8" Height="8" VerticalAlignment="Center" ToolTip.Tip="{Binding HealthTooltipText}" AutomationProperties.Name="{Binding HealthTooltipText}"><Ellipse Width="7" Height="7" Fill="{DynamicResource TextSecondaryBrush}" ToolTip.Tip="{l:Locale providers.toggle.tooltip.enabled}" IsVisible="{Binding IsHealthUnknown}"/><Ellipse Width="7" Height="7" Fill="{DynamicResource AccentBrush}" IsVisible="{Binding IsHealthChecking}"/><Ellipse Width="7" Height="7" Fill="{DynamicResource SuccessBrush}" IsVisible="{Binding IsHealthSuccess}"/><Ellipse Width="7" Height="7" Fill="{DynamicResource WarningBrush}" IsVisible="{Binding IsHealthWarning}"/><Ellipse Width="7" Height="7" Fill="{DynamicResource DangerBrush}" IsVisible="{Binding IsHealthError}"/><Ellipse Width="7" Height="7" Fill="{DynamicResource TextSecondaryBrush}" IsVisible="{Binding IsHealthDisabled}"/></Panel>
                         </StackPanel>
                         <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled}" OnContent="" OffContent="" ToolTip.Tip="{l:Locale providers.toggle.tooltip}" AutomationProperties.Name="{l:Locale providers.toggle.tooltip}" VerticalAlignment="Center"><ToggleSwitch.RenderTransform><TranslateTransform X="12"/></ToggleSwitch.RenderTransform></ToggleSwitch>
                         <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding BaseUrl}" Classes="muted" FontFamily="Consolas" TextTrimming="CharacterEllipsis" Margin="0,5,0,0"/>
-                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="9" Margin="0,4,42,0">
-                          <TextBlock Text="{Binding ApiMode}" Classes="muted"/>
-                          <TextBlock Text="{Binding Models.Count}" Classes="muted"/><TextBlock Text="{l:Locale providers.count.models}" Classes="muted"/>
-                          <TextBlock Text="{l:Locale providers.key.configured}" Foreground="{DynamicResource SuccessBrush}" FontSize="10" IsVisible="{Binding HasApiKey}"/>
+                        <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Vertical" Spacing="4" Margin="0,4,42,0">
+                          <StackPanel Orientation="Horizontal" Spacing="9" Margin="0">
+                            <TextBlock Text="{Binding ApiMode}" Classes="muted"/>
+                            <TextBlock Text="{Binding Models.Count}" Classes="muted"/><TextBlock Text="{l:Locale providers.count.models}" Classes="muted"/>
+                            <TextBlock Text="{l:Locale providers.key.configured}" Foreground="{DynamicResource SuccessBrush}" FontSize="10" IsVisible="{Binding HasApiKey}"/>
+                          </StackPanel>
+                          <TextBlock Text="{Binding HealthDetailText}" Classes="muted" TextWrapping="Wrap"/>
                         </StackPanel>
                       </Grid>
                       <Button Classes="icon-button" Width="36" Click="DeleteProviderButton_OnClick" ToolTip.Tip="{l:Locale providers.delete.tooltip}" AutomationProperties.Name="{l:Locale providers.delete.tooltip}" HorizontalAlignment="Right" VerticalAlignment="Bottom"><Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="14" Height="14"/></Button>
@@ -129,7 +132,7 @@
                           <TextBlock Text="{l:Locale providers.headers.empty}" Classes="muted" IsVisible="{Binding SelectedProvider.HasNoHeaders}"/>
                         </StackPanel>
                           <Border Background="{DynamicResource SuccessSoftBrush}" BorderBrush="{DynamicResource SuccessBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="11">
-                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="2"><TextBlock Text="{l:Locale providers.connection.label}" FontWeight="SemiBold"/><TextBlock Text="{Binding ConnectionStatus}" Foreground="{DynamicResource SuccessBrush}" TextWrapping="Wrap"/></StackPanel><Button Grid.Column="1" Content="{l:Locale providers.connection.test}" Command="{Binding TestConnectionCommand}" Classes="small-button" VerticalAlignment="Center"/></Grid>
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"><StackPanel Spacing="2"><TextBlock Text="{l:Locale providers.connection.label}" FontWeight="SemiBold"/><TextBlock Text="{Binding SelectedProvider.HealthDetailText}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"/></StackPanel><Button Grid.Column="1" Content="{l:Locale providers.connection.test}" Command="{Binding TestConnectionCommand}" Classes="small-button" VerticalAlignment="Center"/></Grid>
                         </Border>
                       </StackPanel>
                     </ScrollViewer>

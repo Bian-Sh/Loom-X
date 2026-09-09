@@ -745,6 +745,42 @@
   <data name="providers.card.health.status">
     <value>検証待ち</value>
   </data>
+  <data name="providers.health.verify.all"><value>すべて検証</value></data>
+  <data name="providers.health.summary.none"><value>有効な Provider はありません</value></data>
+  <data name="providers.health.summary.checking"><value>検証中 {0}/{1}</value></data>
+  <data name="providers.health.summary.healthy"><value>正常 {0} 件</value></data>
+  <data name="providers.health.summary.warning"><value>警告 {0} 件</value></data>
+  <data name="providers.health.summary.error"><value>異常 {0} 件</value></data>
+  <data name="providers.health.summary.pending"><value>未検証 {0} 件</value></data>
+  <data name="providers.health.summary.separator"><value> · </value></data>
+  <data name="providers.health.status.pending"><value>未検証</value></data>
+  <data name="providers.health.status.checking"><value>検証中</value></data>
+  <data name="providers.health.status.healthy"><value>正常</value></data>
+  <data name="providers.health.status.empty"><value>正常ですがモデルなし</value></data>
+  <data name="providers.health.status.auth"><value>API Key が無効</value></data>
+  <data name="providers.health.status.config"><value>設定エラー</value></data>
+  <data name="providers.health.status.endpoint"><value>互換性のないアドレス</value></data>
+  <data name="providers.health.status.unavailable"><value>アクセス不可</value></data>
+  <data name="providers.health.status.rate"><value>上流で制限中</value></data>
+  <data name="providers.health.status.request"><value>リクエスト拒否</value></data>
+  <data name="providers.health.status.upstream"><value>上流エラー</value></data>
+  <data name="providers.health.status.protocol"><value>レスポンス非互換</value></data>
+  <data name="providers.health.status.disabled"><value>無効</value></data>
+  <data name="providers.health.detail.pending"><value>接続は未検証です</value></data>
+  <data name="providers.health.detail.checking"><value>接続を検証中…</value></data>
+  <data name="providers.health.detail.disabled"><value>Provider は無効です</value></data>
+  <data name="providers.health.detail.healthy"><value>正常 · HTTP {0} · {1} ms · {2} モデル検出</value></data>
+  <data name="providers.health.detail.empty"><value>接続正常 · HTTP {0} · {1} ms · モデルなし</value></data>
+  <data name="providers.health.detail.auth"><value>接続失敗 · API Key が無効または権限不足（HTTP {0}）</value></data>
+  <data name="providers.health.detail.config"><value>設定エラー：Base URL、モデル一覧 URL、ヘッダーを確認してください</value></data>
+  <data name="providers.health.detail.incomplete.headers"><value>リクエストヘッダーが未完成です。名前と値を入力してください</value></data>
+  <data name="providers.health.detail.endpoint"><value>アドレス非互換（HTTP {0}）。モデル一覧パスを確認してください</value></data>
+  <data name="providers.health.detail.timeout"><value>8 秒以内に応答がありません。ネットワークまたはプロキシを確認してください</value></data>
+  <data name="providers.health.detail.unavailable"><value>上流に接続できません。ネットワーク、プロキシ、サーバーを確認してください</value></data>
+  <data name="providers.health.detail.rate"><value>上流でリクエストが制限されています。後でもう一度お試しください</value></data>
+  <data name="providers.health.detail.request"><value>上流に拒否されました（HTTP {0}）</value></data>
+  <data name="providers.health.detail.upstream"><value>上流サービスエラー（HTTP {0}）</value></data>
+  <data name="providers.health.detail.protocol"><value>上流レスポンスは互換性のあるモデル一覧ではありません</value></data>
   <data name="providers.tab.basic">
     <value>基本</value>
   </data>
@@ -1358,7 +1394,7 @@
     <value>最大ステップ数 {0} を超えたため、タスクを中止しました。</value>
   </data>
   <data name="assistant.error.kind.unknown">
-    <value>モデルリクエストが失敗しました。原因は不明です。</value>
+    <value>モデルリクエストが失敗しました。モデルが標準外のレスポンスを返した可能性があります。再試行するかモデルを変更してください。</value>
   </data>
   <data name="assistant.error.kind.connection_failed">
     <value>モデルサービスに接続できません。Base URL とネットワーク接続を確認してください。</value>

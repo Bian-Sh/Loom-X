@@ -35,14 +35,24 @@ public sealed class AssistantSessionStore
         ArgumentNullException.ThrowIfNull(session);
         Directory.CreateDirectory(rootDirectory);
 
-        var payload = new JsonObject
+        // JSON Lines 格式：第一行 meta，后续每行一条消息。
+        var lines = new List<string>
         {
-            ["version"] = 1,
-            ["session_id"] = session.Id,
-            ["state"] = session.State.ToString(),
-            ["updated_at"] = DateTimeOffset.UtcNow,
-            ["messages"] = new JsonArray(session.Messages.Select(message => (JsonNode?)new JsonObject
+            new JsonObject
             {
+                ["type"] = "meta",
+                ["version"] = 1,
+                ["session_id"] = session.Id,
+                ["state"] = session.State.ToString(),
+                ["updated_at"] = DateTimeOffset.UtcNow,
+            }.ToJsonString(StoreJsonOptions),
+        };
+
+        foreach (var message in session.Messages)
+        {
+            lines.Add(new JsonObject
+            {
+                ["type"] = "message",
                 ["role"] = message.Role.ToString(),
                 ["content"] = message.Content,
                 ["tool_name"] = message.ToolName,
@@ -55,11 +65,11 @@ public sealed class AssistantSessionStore
                         ["name"] = call.Name,
                         ["arguments"] = call.ArgumentsJson,
                     }).ToArray()),
-            }).ToArray()),
-        };
+            }.ToJsonString(StoreJsonOptions));
+        }
 
-        var json = payload.ToJsonString();
-        if (SecretLeakScan(json))
+        var jsonl = string.Join('\n', lines) + '\n';
+        if (SecretLeakScan(jsonl))
         {
             logger?.LogError("小助手会话 {SessionId} 检出疑似 Secret，已拒绝落盘", session.Id);
             throw new InvalidOperationException("会话内容检出疑似 Secret，已拒绝保存。");
@@ -68,7 +78,7 @@ public sealed class AssistantSessionStore
         // 原子写：先写临时文件再替换
         var path = PathFor(session.Id);
         var tempPath = path + ".tmp";
-        await File.WriteAllTextAsync(tempPath, json, cancellationToken);
+        await File.WriteAllTextAsync(tempPath, jsonl, cancellationToken);
         File.Move(tempPath, path, overwrite: true);
     }
 
@@ -77,17 +87,24 @@ public sealed class AssistantSessionStore
         var path = PathFor(sessionId);
         if (!File.Exists(path)) return null;
 
-        var payload = JsonNode.Parse(await File.ReadAllTextAsync(path, cancellationToken)) as JsonObject;
-        if (payload is null) return null;
-
+        JsonObject? meta = null;
         var session = new AgentSession();
-        session.RestoreId(payload["session_id"]!.GetValue<string>());
-        foreach (var item in payload["messages"]?.AsArray() ?? new JsonArray())
+        await foreach (var line in File.ReadLinesAsync(path, cancellationToken))
         {
-            if (item is not JsonObject message) continue;
-            var role = Enum.Parse<ChatRole>(message["role"]!.GetValue<string>());
-            var content = message["content"]?.GetValue<string>();
-            var toolCalls = message["tool_calls"]?.AsArray()
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            if (JsonNode.Parse(line) is not JsonObject item) continue;
+
+            if (item["type"]?.GetValue<string>() == "meta")
+            {
+                meta = item;
+                session.RestoreId(item["session_id"]!.GetValue<string>());
+                session.RestoreState(Enum.Parse<AgentSessionState>(item["state"]!.GetValue<string>()));
+                continue;
+            }
+
+            var role = Enum.Parse<ChatRole>(item["role"]!.GetValue<string>());
+            var content = item["content"]?.GetValue<string>();
+            var toolCalls = item["tool_calls"]?.AsArray()
                 .Select(call => new ToolCall(
                     call!["id"]!.GetValue<string>(),
                     call["name"]!.GetValue<string>(),
@@ -96,12 +113,12 @@ public sealed class AssistantSessionStore
             session.RestoreMessage(new ChatMessage(role, content)
             {
                 ToolCalls = toolCalls,
-                ToolName = message["tool_name"]?.GetValue<string>(),
-                ToolCallId = message["tool_call_id"]?.GetValue<string>(),
+                ToolName = item["tool_name"]?.GetValue<string>(),
+                ToolCallId = item["tool_call_id"]?.GetValue<string>(),
             });
         }
 
-        session.RestoreState(Enum.Parse<AgentSessionState>(payload["state"]!.GetValue<string>()));
+        if (meta is null) return null;
         logger?.LogDebug("小助手会话已恢复 {SessionId} 消息数 {MessageCount}", session.Id, session.Messages.Count);
         return session;
     }
@@ -110,21 +127,39 @@ public sealed class AssistantSessionStore
     {
         if (!Directory.Exists(rootDirectory)) return [];
         var summaries = new List<AssistantSessionSummary>();
-        foreach (var path in Directory.EnumerateFiles(rootDirectory, "*.json"))
+        foreach (var path in Directory.EnumerateFiles(rootDirectory, "*.jsonl"))
         {
             try
             {
-                var payload = JsonNode.Parse(File.ReadAllText(path)) as JsonObject;
-                if (payload is null) continue;
-                var messages = payload["messages"]?.AsArray();
-                var firstUserMessage = messages?
-                    .FirstOrDefault(item => item?["role"]?.GetValue<string>() == nameof(ChatRole.User))?["content"]?.GetValue<string>();
+                JsonObject? meta = null;
+                string? firstUserContent = null;
+                var messageCount = 0;
+                foreach (var line in File.ReadLines(path))
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    if (JsonNode.Parse(line) is not JsonObject item) continue;
+
+                    if (item["type"]?.GetValue<string>() == "meta")
+                    {
+                        meta = item;
+                        continue;
+                    }
+
+                    messageCount++;
+                    if (firstUserContent is null
+                        && item["role"]?.GetValue<string>() == nameof(ChatRole.User))
+                    {
+                        firstUserContent = item["content"]?.GetValue<string>();
+                    }
+                }
+
+                if (meta is null) continue;
                 summaries.Add(new AssistantSessionSummary(
-                    payload["session_id"]!.GetValue<string>(),
-                    Truncate(firstUserMessage ?? "（空会话）", 40),
-                    payload["state"]!.GetValue<string>(),
-                    payload["updated_at"]?.GetValue<DateTimeOffset>() ?? DateTimeOffset.MinValue,
-                    messages?.Count ?? 0));
+                    meta["session_id"]!.GetValue<string>(),
+                    Truncate(firstUserContent ?? "（空会话）", 40),
+                    meta["state"]!.GetValue<string>(),
+                    meta["updated_at"]?.GetValue<DateTimeOffset>() ?? DateTimeOffset.MinValue,
+                    messageCount));
             }
             catch (JsonException)
             {
@@ -141,7 +176,7 @@ public sealed class AssistantSessionStore
         if (File.Exists(path)) File.Delete(path);
     }
 
-    private string PathFor(string sessionId) => Path.Combine(rootDirectory, $"{sessionId}.json");
+    private string PathFor(string sessionId) => Path.Combine(rootDirectory, $"{sessionId}.jsonl");
 
     /// <summary>兜底扫描：sk-/Bearer 形态的长值不允许落盘。</summary>
     internal static bool SecretLeakScan(string json)

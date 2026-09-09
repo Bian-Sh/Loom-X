@@ -745,6 +745,42 @@
   <data name="providers.card.health.status">
     <value>等待驗證</value>
   </data>
+  <data name="providers.health.verify.all"><value>全部驗證</value></data>
+  <data name="providers.health.summary.none"><value>沒有啟用的 Provider</value></data>
+  <data name="providers.health.summary.checking"><value>驗證中 {0}/{1}</value></data>
+  <data name="providers.health.summary.healthy"><value>{0} 個正常</value></data>
+  <data name="providers.health.summary.warning"><value>{0} 個警告</value></data>
+  <data name="providers.health.summary.error"><value>{0} 個異常</value></data>
+  <data name="providers.health.summary.pending"><value>{0} 個待驗證</value></data>
+  <data name="providers.health.summary.separator"><value> · </value></data>
+  <data name="providers.health.status.pending"><value>待驗證</value></data>
+  <data name="providers.health.status.checking"><value>驗證中</value></data>
+  <data name="providers.health.status.healthy"><value>正常</value></data>
+  <data name="providers.health.status.empty"><value>正常但沒有模型</value></data>
+  <data name="providers.health.status.auth"><value>API Key 無效</value></data>
+  <data name="providers.health.status.config"><value>設定錯誤</value></data>
+  <data name="providers.health.status.endpoint"><value>位址不相容</value></data>
+  <data name="providers.health.status.unavailable"><value>無法存取</value></data>
+  <data name="providers.health.status.rate"><value>上游限流</value></data>
+  <data name="providers.health.status.request"><value>要求被拒絕</value></data>
+  <data name="providers.health.status.upstream"><value>上游異常</value></data>
+  <data name="providers.health.status.protocol"><value>回應格式不相容</value></data>
+  <data name="providers.health.status.disabled"><value>已停用</value></data>
+  <data name="providers.health.detail.pending"><value>尚未驗證連線</value></data>
+  <data name="providers.health.detail.checking"><value>正在驗證連線…</value></data>
+  <data name="providers.health.detail.disabled"><value>Provider 已停用</value></data>
+  <data name="providers.health.detail.healthy"><value>正常 · HTTP {0} · {1} ms · 發現 {2} 個模型</value></data>
+  <data name="providers.health.detail.empty"><value>連線正常 · HTTP {0} · {1} ms · 未發現模型</value></data>
+  <data name="providers.health.detail.auth"><value>連線失敗 · API Key 無效或權限不足（HTTP {0}）</value></data>
+  <data name="providers.health.detail.config"><value>設定錯誤，請檢查 Base URL、模型清單位址或要求標頭</value></data>
+  <data name="providers.health.detail.incomplete.headers"><value>要求標頭未填寫完整，請補齊名稱和值</value></data>
+  <data name="providers.health.detail.endpoint"><value>位址不相容（HTTP {0}），請檢查模型清單路徑</value></data>
+  <data name="providers.health.detail.timeout"><value>上游在 8 秒內沒有回應，請檢查網路或 Proxy</value></data>
+  <data name="providers.health.detail.unavailable"><value>無法存取上游，請檢查網路、Proxy 或伺服器狀態</value></data>
+  <data name="providers.health.detail.rate"><value>上游要求過於頻繁，請稍後重試</value></data>
+  <data name="providers.health.detail.request"><value>要求被上游拒絕（HTTP {0}）</value></data>
+  <data name="providers.health.detail.upstream"><value>上游服務異常（HTTP {0}）</value></data>
+  <data name="providers.health.detail.protocol"><value>上游回應不是相容的模型清單格式</value></data>
   <data name="providers.tab.basic">
     <value>基礎</value>
   </data>
@@ -1358,7 +1394,7 @@
     <value>已超過最大步驟數 {0}，任務中止。</value>
   </data>
   <data name="assistant.error.kind.unknown">
-    <value>模型請求失敗，原因未知。</value>
+    <value>模型請求失敗。可能是模型傳回了非標準回應，請重試或更換模型。</value>
   </data>
   <data name="assistant.error.kind.connection_failed">
     <value>無法連線模型服務，請檢查 Base URL 與網路連線。</value>

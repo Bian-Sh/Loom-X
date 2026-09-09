@@ -36,7 +36,10 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     public async Task<IReadOnlyList<ProviderResponse>> ListProvidersAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
-        var providers = await db.Providers.AsNoTracking().Include(provider => provider.Models).OrderBy(provider => provider.SortOrder).ToListAsync(cancellationToken);
+        var providers = await db.Providers.AsNoTracking().Include(provider => provider.Models)
+            .OrderBy(provider => provider.SortOrder)
+            .ThenBy(provider => provider.BusinessId)
+            .ToListAsync(cancellationToken);
         return providers.Select(ToResponse).ToArray();
     }
 

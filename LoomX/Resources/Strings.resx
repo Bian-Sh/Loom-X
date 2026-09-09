@@ -869,6 +869,58 @@
   <data name="providers.card.health.status">
     <value>等待验证</value>
   </data>
+  <data name="providers.health.verify.all">
+    <value>全部验证</value>
+  </data>
+  <data name="providers.health.summary.none">
+    <value>无已启用 Provider</value>
+  </data>
+  <data name="providers.health.summary.checking">
+    <value>验证中 {0}/{1}</value>
+  </data>
+  <data name="providers.health.summary.healthy">
+    <value>{0} 个正常</value>
+  </data>
+  <data name="providers.health.summary.warning">
+    <value>{0} 个警告</value>
+  </data>
+  <data name="providers.health.summary.error">
+    <value>{0} 个异常</value>
+  </data>
+  <data name="providers.health.summary.pending">
+    <value>{0} 个待验证</value>
+  </data>
+  <data name="providers.health.summary.separator">
+    <value> · </value>
+  </data>
+  <data name="providers.health.status.pending"><value>待验证</value></data>
+  <data name="providers.health.status.checking"><value>验证中</value></data>
+  <data name="providers.health.status.healthy"><value>正常</value></data>
+  <data name="providers.health.status.empty"><value>正常但无模型</value></data>
+  <data name="providers.health.status.auth"><value>API Key 无效</value></data>
+  <data name="providers.health.status.config"><value>配置错误</value></data>
+  <data name="providers.health.status.endpoint"><value>地址不兼容</value></data>
+  <data name="providers.health.status.unavailable"><value>无法访问</value></data>
+  <data name="providers.health.status.rate"><value>上游限流</value></data>
+  <data name="providers.health.status.request"><value>请求被拒绝</value></data>
+  <data name="providers.health.status.upstream"><value>上游异常</value></data>
+  <data name="providers.health.status.protocol"><value>响应格式不兼容</value></data>
+  <data name="providers.health.status.disabled"><value>已停用</value></data>
+  <data name="providers.health.detail.pending"><value>尚未验证连接</value></data>
+  <data name="providers.health.detail.checking"><value>正在验证连接…</value></data>
+  <data name="providers.health.detail.disabled"><value>Provider 已停用</value></data>
+  <data name="providers.health.detail.healthy"><value>正常 · HTTP {0} · {1} ms · 发现 {2} 个模型</value></data>
+  <data name="providers.health.detail.empty"><value>连接正常 · HTTP {0} · {1} ms · 未发现模型</value></data>
+  <data name="providers.health.detail.auth"><value>连接失败 · API Key 无效或权限不足（HTTP {0}）</value></data>
+  <data name="providers.health.detail.config"><value>配置错误，请检查 Base URL、模型列表地址或请求头</value></data>
+  <data name="providers.health.detail.incomplete.headers"><value>请求头未填写完整，请补齐名称和值</value></data>
+  <data name="providers.health.detail.endpoint"><value>地址不兼容（HTTP {0}），请检查模型列表路径</value></data>
+  <data name="providers.health.detail.timeout"><value>上游在 8 秒内没有响应，请检查网络或代理</value></data>
+  <data name="providers.health.detail.unavailable"><value>无法访问上游，请检查网络、代理或服务器状态</value></data>
+  <data name="providers.health.detail.rate"><value>上游请求过于频繁，请稍后重试</value></data>
+  <data name="providers.health.detail.request"><value>请求被上游拒绝（HTTP {0}）</value></data>
+  <data name="providers.health.detail.upstream"><value>上游服务异常（HTTP {0}）</value></data>
+  <data name="providers.health.detail.protocol"><value>上游响应不是兼容的模型列表格式</value></data>
   <data name="providers.tab.basic">
     <value>基础</value>
   </data>
@@ -1492,7 +1544,7 @@
     <value>已超过最大步骤数 {0}，任务中止。</value>
   </data>
   <data name="assistant.error.kind.unknown">
-    <value>模型请求失败，原因未知。</value>
+    <value>模型请求失败。可能是模型返回了非标准响应，请重试或更换模型。</value>
   </data>
   <data name="assistant.error.kind.connection_failed">
     <value>无法连接模型服务，请检查 Base URL 与网络连接。</value>

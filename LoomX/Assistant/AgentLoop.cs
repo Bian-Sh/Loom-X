@@ -102,6 +102,13 @@ public sealed class AgentLoop
                         yield return AgentEvent.Create(session.Id, AgentEventKind.TextDelta) with { Text = textDelta.Text };
                         break;
                     case ModelToolCallEvent toolCallEvent:
+                        // 防御：忽略 name 为空的无效工具调用（部分上游会附带空占位调用），
+                        // 避免其被误判为「未注册工具」并以空 tool_call_id 回传历史导致 400。
+                        if (string.IsNullOrWhiteSpace(toolCallEvent.ToolCall.Name))
+                        {
+                            logger.LogWarning("小助手忽略了空名称的工具调用 {SessionId} 步骤 {Step}", session.Id, step + 1);
+                            break;
+                        }
                         toolCalls.Add(toolCallEvent.ToolCall);
                         break;
                     case ModelCompletedEvent completedEvent:
@@ -112,18 +119,24 @@ public sealed class AgentLoop
 
             if (cancelled || failedDetail is not null) break;
 
+            // 纵深防御：极少数上游会把同一 tool_call_id 扇出成多份重复 delta；
+            // 即使解析端已按 id 去重，这里再做一次兜底——同一 assistant 消息内
+            // tool_call_id 必须唯一，否则把历史回传给上游时违反 OpenAI 协议触发 400。
+            // 保留首次出现的完整调用（arguments 已逐步追加完整）。
+            var dedupedToolCalls = DedupeToolCallsById(toolCalls);
+
             session.AddMessage(ChatMessage.AssistantToolCalls(
-                toolCalls,
+                dedupedToolCalls,
                 textBuilder.Length > 0 ? textBuilder.ToString() : null));
 
-            if (toolCalls.Count == 0)
+            if (dedupedToolCalls.Count == 0)
             {
                 completed = true;
                 logger.LogDebug("小助手任务完成 {SessionId} 步骤 {Step} 结束原因 {FinishReason}", session.Id, step + 1, finishReason);
                 break;
             }
 
-            foreach (var toolCall in toolCalls)
+            foreach (var toolCall in dedupedToolCalls)
             {
                 yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallStarted) with
                 {
@@ -212,6 +225,28 @@ public sealed class AgentLoop
     /// <summary>修改类操作（写/删）才需要逐条批准；只读与外部测试直接放行。</summary>
     private static bool RequiresApproval(ToolRiskLevel riskLevel) =>
         riskLevel is ToolRiskLevel.Write or ToolRiskLevel.Destructive;
+
+    /// <summary>
+    /// 按 tool_call_id 去重。空 id（极端情况）保留所有项，避免误丢。
+    /// 仅对 id 非空的调用折叠到首次出现的条目上（首次最接近完整 arguments 累积起点）。
+    /// </summary>
+    private static List<ToolCall> DedupeToolCallsById(IReadOnlyList<ToolCall> calls)
+    {
+        if (calls.Count <= 1) return calls.ToList();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<ToolCall>(calls.Count);
+        foreach (var call in calls)
+        {
+            if (string.IsNullOrEmpty(call.Id))
+            {
+                result.Add(call);
+                continue;
+            }
+            if (!seen.Add(call.Id)) continue;
+            result.Add(call);
+        }
+        return result;
+    }
 
     /// <summary>审批卡片展示的参数摘要：截断过长的参数 JSON，仅用于 UI 展示。</summary>
     private static string SummarizeArguments(string? argumentsJson)
