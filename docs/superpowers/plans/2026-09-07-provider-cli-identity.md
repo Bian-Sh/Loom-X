@@ -2,6 +2,7 @@
 change: provider-cli-identity
 design-doc: docs/superpowers/specs/2026-09-07-provider-cli-identity-design.md
 base-ref: 60a0d5e10a2f0801b9d4645ce07e8d49f6af1dbd
+archived-with: 2026-09-09-provider-cli-identity
 ---
 
 # 实施计划：Provider CLI 身份模拟
@@ -182,3 +183,4 @@ Group 5 (测试 + 验证)  ── 任务 10: CliIdentityServiceTests
 - `dotnet test` 全绿
 - 打包发布后手动跑通 10 条验收场景
 - 所有新增/修改文件符合 LoomX 代码风格（无中文硬编码、无 TODO 遗漏）
+

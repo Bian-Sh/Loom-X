@@ -2,6 +2,8 @@
 comet_change: provider-cli-identity
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-09-provider-cli-identity
+status: final
 ---
 
 # Provider CLI 身份模拟 · 技术设计
@@ -436,3 +438,4 @@ foreach (var item in CliIdentities)
 - `LoomX/ViewModels/MainWindowViewModel.cs`
 - `LoomX/Resources/Strings.resx`
 - `LoomX/Resources/Strings.en-US.resx`
+
