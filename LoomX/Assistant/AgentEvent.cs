@@ -15,6 +15,15 @@ public enum AgentEventKind
     TaskCompleted,
     TaskFailed,
     WaitingForUser,
+
+    // 可扩展事件（规格 #15）
+    SecretStored,
+    BrowserTargetCreated,
+    BrowserTargetClosed,
+    ConfigBackupCreated,
+    ConfigChanged,
+    TestStarted,
+    TestCompleted,
 }
 
 /// <summary>

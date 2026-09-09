@@ -25,7 +25,8 @@ public static class LoomXTools
         ConfigurationManagementService configuration,
         IDatabaseConfigurationProvider configurationProvider,
         AssistantTester tester,
-        SkillStore skillStore)
+        SkillStore skillStore,
+        Browser.BrowserSecretVault? secretVault = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -34,12 +35,50 @@ public static class LoomXTools
         ArgumentNullException.ThrowIfNull(skillStore);
 
         RegisterStatusTools(registry, configuration, configurationProvider);
-        RegisterProviderTools(registry, configuration);
+        RegisterProviderTools(registry, configuration, secretVault);
         RegisterModelTools(registry, configuration);
         RegisterComboTools(registry, configuration);
         RegisterEndpointTools(registry, configuration);
         RegisterTestTools(registry, tester);
         RegisterSkillTools(registry, skillStore);
+    }
+
+    /// <summary>
+    /// 注册 loomx.diagnose：对 Provider 调起 Diagnostic Subagent 做分层诊断。
+    /// 助手模型未配置时返回明确错误，不假装诊断。
+    /// </summary>
+    public static void RegisterDiagnosticTool(
+        ToolRegistry registry,
+        DiagnosticSubagent subagent,
+        Func<IModelClient?> modelClientFactory)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        ArgumentNullException.ThrowIfNull(subagent);
+        ArgumentNullException.ThrowIfNull(modelClientFactory);
+
+        registry.Register(new ToolDefinition
+        {
+            Name = "loomx.diagnose",
+            Description = "对指定 Provider 调起诊断工人做分层排查（DNS/TCP/TLS/HTTP/Auth/Models/Chat），返回结构化诊断结论。test_provider 失败后用。",
+            ParametersSchema = Schema("""{"type":"object","properties":{"id":{"type":"string","description":"Provider 的 Guid 或 business_id"}},"required":["id"]}"""),
+            RiskLevel = ToolRiskLevel.Read,
+            Timeout = TimeSpan.FromMinutes(5),
+            Handler = async (args, cancellationToken) => await GuardAsync(async () =>
+            {
+                var modelClient = modelClientFactory();
+                if (modelClient is null)
+                {
+                    return ToolResult.Fail(new JsonObject
+                    {
+                        ["error"] = "assistant_model_not_configured",
+                        ["message"] = "小助手模型尚未配置，无法调起诊断工人。",
+                    }.ToJsonString(OutputJsonOptions));
+                }
+
+                var report = await subagent.DiagnoseProviderAsync(modelClient, RequireString(args, "id"), cancellationToken);
+                return Ok(report.ToJson());
+            }),
+        });
     }
 
     // ---------- loomx.get_status ----------
@@ -91,7 +130,7 @@ public static class LoomXTools
 
     // ---------- loomx.*_provider ----------
 
-    private static void RegisterProviderTools(ToolRegistry registry, ConfigurationManagementService configuration)
+    private static void RegisterProviderTools(ToolRegistry registry, ConfigurationManagementService configuration, Browser.BrowserSecretVault? secretVault)
     {
         registry.Register(new ToolDefinition
         {
@@ -136,7 +175,7 @@ public static class LoomXTools
             RiskLevel = ToolRiskLevel.Write,
             Handler = async (args, cancellationToken) => await GuardAsync(async () =>
             {
-                var provider = await configuration.CreateProviderAsync(ReadProviderInput(args), cancellationToken);
+                var provider = await configuration.CreateProviderAsync(ReadProviderInput(args, secretVault), cancellationToken);
                 return Ok(ToSafeJson(provider, includeModels: false));
             }),
         });
@@ -144,13 +183,14 @@ public static class LoomXTools
         registry.Register(new ToolDefinition
         {
             Name = "loomx.update_provider",
-            Description = "更新 Provider（整体替换语义）。clear_api_key=true 时清除已保存的 Key。",
+            Description = "更新 Provider（整体替换语义）。clear_api_key=true 时清除已保存的 Key；可用 api_key_secret_ref 引用浏览器收割的 Key。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{
                   "id":{"type":"string","description":"Provider Guid"},
                   "business_id":{"type":"string"},"display_name":{"type":"string"},
                   "base_url":{"type":"string"},"api_mode":{"type":"string","enum":["openai","anthropic","ollama"]},
                   "enabled":{"type":"boolean"},"api_key":{"type":"string"},"clear_api_key":{"type":"boolean"},
+                  "api_key_secret_ref":{"type":"string","description":"secret://browser/... 形式的引用"},
                   "use_proxy":{"type":"boolean"},"model_list_url":{"type":"string"},
                   "endpoint_format":{"type":"string","enum":["responses","chat_completions"]},
                   "headers":{"type":"object"}
@@ -159,7 +199,7 @@ public static class LoomXTools
             RiskLevel = ToolRiskLevel.Write,
             Handler = async (args, cancellationToken) => await GuardAsync(async () =>
             {
-                var provider = await configuration.UpdateProviderAsync(RequireGuid(args, "id"), ReadProviderInput(args), cancellationToken);
+                var provider = await configuration.UpdateProviderAsync(RequireGuid(args, "id"), ReadProviderInput(args, secretVault), cancellationToken);
                 return Ok(ToSafeJson(provider, includeModels: false));
             }),
         });
@@ -666,18 +706,33 @@ public static class LoomXTools
 
     // ---------- 参数读取与错误处理 ----------
 
-    private static ProviderInput ReadProviderInput(JsonNode? args) => new(
-        RequireString(args, "business_id"),
-        RequireString(args, "display_name"),
-        RequireString(args, "base_url"),
-        RequireString(args, "api_mode"),
-        GetBool(args, "enabled", true),
-        GetString(args, "api_key"),
-        GetBool(args, "clear_api_key", false),
-        GetStringDictionary(args, "headers"),
-        GetBool(args, "use_proxy", false),
-        GetString(args, "model_list_url"),
-        GetString(args, "endpoint_format") ?? "responses");
+    private static ProviderInput ReadProviderInput(JsonNode? args, Browser.BrowserSecretVault? secretVault = null)
+    {
+        // api_key 直传（用户场景）；api_key_secret_ref 由浏览器收割入库后引用（中转站场景），
+        // 两种途径的明文都只在服务端内部流转，绝不回显到模型上下文。
+        var apiKey = GetString(args, "api_key");
+        var secretRef = GetString(args, "api_key_secret_ref");
+        if (apiKey is null && secretRef is not null)
+        {
+            if (secretVault is null || !secretVault.TryResolve(secretRef, out apiKey!))
+            {
+                throw new ArgumentException($"secret_ref 无法解析（不存在或已失效）：{secretRef}");
+            }
+        }
+
+        return new ProviderInput(
+            RequireString(args, "business_id"),
+            RequireString(args, "display_name"),
+            RequireString(args, "base_url"),
+            RequireString(args, "api_mode"),
+            GetBool(args, "enabled", true),
+            apiKey,
+            GetBool(args, "clear_api_key", false),
+            GetStringDictionary(args, "headers"),
+            GetBool(args, "use_proxy", false),
+            GetString(args, "model_list_url"),
+            GetString(args, "endpoint_format") ?? "responses");
+    }
 
     private static ModelInput ReadModelInput(JsonNode? args) => new(
         RequireString(args, "model_id"),

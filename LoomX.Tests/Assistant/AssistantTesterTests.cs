@@ -13,7 +13,7 @@ public sealed class AssistantTesterTests : IAsyncLifetime
     private string databasePath = string.Empty;
     private ConfigurationDbContext startupContext = null!;
     private ConfigurationManagementService configuration = null!;
-    private LoomXToolsTests.TestDbContextFactory factory = null!;
+    private TestDbContextFactory factory = null!;
     private Func<HttpRequestMessage, HttpResponseMessage> responder = _ => new HttpResponseMessage(HttpStatusCode.OK);
 
     public async Task InitializeAsync()
@@ -28,7 +28,7 @@ public sealed class AssistantTesterTests : IAsyncLifetime
         startupContext = new ConfigurationDbContext(options);
         var configurationProvider = new DatabaseConfigurationProvider(startupContext);
         await configurationProvider.ReloadAsync();
-        factory = new LoomXToolsTests.TestDbContextFactory(options);
+        factory = new TestDbContextFactory(options);
         configuration = new ConfigurationManagementService(factory, configurationProvider);
     }
 
@@ -42,7 +42,7 @@ public sealed class AssistantTesterTests : IAsyncLifetime
     }
 
     private AssistantTester CreateTester() =>
-        new(new HttpClient(new LoomXToolsTests.DelegateHttpHandler(request => responder(request))), configuration, factory);
+        new(new HttpClient(new DelegateHttpHandler(request => responder(request))), configuration, factory);
 
     private async Task<string> CreateProviderAsync()
     {

@@ -65,6 +65,17 @@ public static class LoomXHost
             services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
             services.GetRequiredService<ILogger<Assistant.AssistantTester>>()));
         builder.Services.AddSingleton(_ => Assistant.SkillStore.ForInstallDirectory());
+
+        // 小助手（Phase 3）：Browser Bridge、浏览器 Secret 保险库、网络探针与诊断工人
+        builder.Services.AddSingleton<Assistant.Browser.BrowserSecretVault>();
+        builder.Services.AddSingleton<Assistant.NetworkProbe>();
+        builder.Services.AddSingleton<Assistant.DiagnosticSubagent>();
+        builder.Services.AddSingleton(services => new Assistant.Browser.BrowserBridge(
+            port: 17831,
+            services.GetRequiredService<ILogger<Assistant.Browser.BrowserBridge>>()));
+        builder.Services.AddSingleton<Assistant.Browser.IBrowserBridge>(services =>
+            services.GetRequiredService<Assistant.Browser.BrowserBridge>());
+        builder.Services.AddHostedService<Assistant.Browser.BrowserBridgeHost>();
         builder.Services.AddSingleton(services =>
         {
             var registry = new Assistant.ToolRegistry();
@@ -73,7 +84,17 @@ public static class LoomXHost
                 services.GetRequiredService<ConfigurationManagementService>(),
                 services.GetRequiredService<IDatabaseConfigurationProvider>(),
                 services.GetRequiredService<Assistant.AssistantTester>(),
-                services.GetRequiredService<Assistant.SkillStore>());
+                services.GetRequiredService<Assistant.SkillStore>(),
+                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>());
+            Assistant.Browser.BrowserTools.RegisterAll(
+                registry,
+                services.GetRequiredService<Assistant.Browser.IBrowserBridge>(),
+                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>());
+            Assistant.LoomXTools.RegisterDiagnosticTool(
+                registry,
+                services.GetRequiredService<Assistant.DiagnosticSubagent>(),
+                // 助手模型尚未接入配置（Phase 4 接线），先返回 null，工具会给出明确错误
+                () => services.GetService<Assistant.IModelClient>());
             return registry;
         });
 

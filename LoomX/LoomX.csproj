@@ -41,5 +41,7 @@
     <Content Include="Assets\Overview\three.module.min.js" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Skills\**\manifest.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Skills\**\SKILL.md" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="BrowserExtension\**\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="BrowserExtension\**\*.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

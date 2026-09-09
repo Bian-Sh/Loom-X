@@ -301,18 +301,4 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         Assert.False(missing.Success);
         Assert.Contains("不存在", missing.Content);
     }
-
-    internal sealed class DelegateHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(responder(request));
-    }
-
-    internal sealed class TestDbContextFactory(DbContextOptions<ConfigurationDbContext> options) : IDbContextFactory<ConfigurationDbContext>
-    {
-        public ConfigurationDbContext CreateDbContext() => new(options);
-
-        public Task<ConfigurationDbContext> CreateDbContextAsync(CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ConfigurationDbContext(options));
-    }
 }

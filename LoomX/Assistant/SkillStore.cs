@@ -24,6 +24,11 @@ public sealed class SkillStore
     /// </summary>
     public static SkillStore ForInstallDirectory() => new(Path.Combine(AppContext.BaseDirectory, "Skills"));
 
+    /// <summary>
+    /// 空 Skill 仓库（诊断等不需要 Skill 的场景）。
+    /// </summary>
+    public static SkillStore Empty() => new(Path.Combine(Path.GetTempPath(), "loomx-skills-empty"));
+
     public IReadOnlyList<SkillManifest> List()
     {
         var manifests = new List<SkillManifest>();
