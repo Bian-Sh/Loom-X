@@ -1,5 +1,13 @@
 # Combo 模型 404 修复
 
+## Why
+
+网关请求入口和模型发现入口没有统一按 URL 对应的 Endpoint 解析 Combo，且 Ollama 卡片展示了不应由客户端重复拼接的协议路径，导致模型路由和请求地址出现 404。
+
+## What Changes
+
+按请求 URL 先确定 Endpoint，再从该 Endpoint 的 Combo 目录解析模型；统一 Ollama、OpenAI 和 Azure 的 Endpoint URI，并修正 Ollama 基础地址展示。
+
 ## 问题
 
 网关页 Ollama 卡片把协议路径 `/api` 拼进了地址。Ollama 客户端通常会基于 Base URL 自行追加 `/api`，导致实际请求路径错误；同时请求处理必须严格依据请求 URL 确定 Endpoint，再在该 Endpoint 的 Combo 中解析模型，否则会出现模型发现与请求入口边界不一致。
