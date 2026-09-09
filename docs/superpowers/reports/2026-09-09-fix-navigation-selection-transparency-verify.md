@@ -2,25 +2,25 @@
 
 ## 结论
 
-实现与当前代码及任务清单一致，自动化验证通过。分支收尾仍待用户选择，因此本 change 暂不推进到 archive。
+验证通过。实现已合入当前 `master`，任务清单 8/8 完成；导航选中态与 Runtime NodeGraph 透明交互合同均由当前源码和测试覆盖。
 
-## 检查结果
+## 验证证据
 
 | 检查项 | 结果 | 证据 |
-|---|---|---|
-| 任务完整性 | PASS | `openspec/changes/fix-navigation-selection-transparency/tasks.md` 8/8 已勾选 |
-| 导航选中态透明度 | PASS | `LoomX/Services/WindowAppearanceCoordinator.cs` 将 `AccentSoftBrush` 纳入统一透明度更新；`WindowAppearanceCoordinatorTests` 覆盖透明、磨砂和关闭透明度三种状态 |
-| Runtime NodeGraph 透明交互 | PASS | `OverviewGraphContractTests` 覆盖透明画布、共享 Surface 资源、圆角裁剪、水印布局、节点标签及 Endpoint 导航合同 |
-| 定向自动化测试 | PASS | `WindowAppearanceCoordinatorTests` 与 `OverviewGraphContractTests` 共 19/19 通过 |
-| 全量自动化测试 | PASS | `dotnet test LoomX.slnx --no-restore --no-build`，298/298 通过 |
-| 构建 | PASS | `dotnet build LoomX.slnx --no-restore`，0 error；7 条既有 warning |
-| 安全检查 | PASS | 未新增密钥、授权信息或敏感日志 |
+| --- | --- | --- |
+| 任务完整性 | PASS | `tasks.md` 8/8 已勾选 |
+| 透明度实现 | PASS | `WindowAppearanceCoordinator` 更新 `AccentSoftBrush`；对应测试覆盖透明、磨砂和关闭透明度 |
+| NodeGraph 合同 | PASS | `OverviewGraphContractTests` 覆盖透明命中层、共享 Surface、圆角、标签、水印和 Endpoint 导航 |
+| 定向测试 | PASS | `WindowAppearanceCoordinatorTests`、`MainWindowNavigationContractTests`、`OverviewGraphContractTests` 共 22/22 |
+| 全量测试 | PASS | `dotnet test LoomX.slnx --no-restore --no-build --nologo`，298/298 |
+| 构建 | PASS | `dotnet build LoomX.slnx --no-restore --nologo`，0 错误、7 个既有警告 |
+| 原型与差异检查 | PASS | `.design/scripts/validate.ps1` 通过；`git diff --check` 通过 |
+| 安全 | PASS | 未发现新增密钥、授权信息或敏感日志 |
+
+## 分支收尾
+
+改动已在 `master`，按用户既定要求不创建或保留功能分支；`branch_status` 记录为 `handled`。
 
 ## 已知非阻断项
 
-1. 本轮未重新执行 `dotnet publish -c Release` 后的独立桌面视觉 E2E；发布包中的缩放、平移和窗口四角裁剪仍需桌面验收。
-2. 原 `.comet.yaml` 指向的 `2026-09-05` 报告文件不存在，本报告替代该悬空路径；分支状态仍保持 `pending`。
-
-## 分支状态
-
-验证证据已准备完成，但 `branch_status` 尚未设置为 `handled`。根据 Comet 规则，需要用户选择保持分支、创建 PR、合并主分支或丢弃后，才能继续推进阶段守卫。
+本轮未重新执行独立发布包的桌面视觉 E2E；代码合同和自动化测试均已通过，发布视觉验收仍属于后续人工验收范围。

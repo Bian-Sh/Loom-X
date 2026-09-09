@@ -3,6 +3,8 @@ comet_change: overview-topology-app-data
 role: technical-design
 canonical_spec: openspec
 language: zh-CN
+archived-with: 2026-09-09-overview-topology-app-data
+status: final
 ---
 
 # 概览拓扑与 AppDataStore 实时 Web 交互设计
