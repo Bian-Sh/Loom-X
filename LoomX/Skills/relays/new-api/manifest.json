@@ -1,0 +1,5 @@
+{
+  "name": "new-api",
+  "description": "New-API / One-API 系 AI 中转站的识别与接入知识",
+  "when_to_use": "用户要给 LoomX 配置一个 AI 中转站（New-API、One-API、Sub2API 等衍生面板）"
+}

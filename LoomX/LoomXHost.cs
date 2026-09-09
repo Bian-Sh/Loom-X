@@ -57,6 +57,54 @@ public static class LoomXHost
         builder.Services.AddSingleton<RequestTelemetryHub>();
         builder.Services.AddHostedService(services => services.GetRequiredService<ActivityStore>());
 
+        // 小助手（Phase 2）：诊断测试器、Skill 仓库与 loomx.* 工具注册表
+        builder.Services.AddHttpClient("loomx-assistant");
+        builder.Services.AddSingleton<Assistant.AssistantTester>(services => new Assistant.AssistantTester(
+            services.GetRequiredService<IHttpClientFactory>().CreateClient("loomx-assistant"),
+            services.GetRequiredService<ConfigurationManagementService>(),
+            services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
+            services.GetRequiredService<ILogger<Assistant.AssistantTester>>()));
+        builder.Services.AddSingleton(_ => Assistant.SkillStore.ForInstallDirectory());
+
+        // 小助手（Phase 3）：Browser Bridge、浏览器 Secret 保险库、网络探针与诊断工人
+        builder.Services.AddSingleton<Assistant.Browser.BrowserSecretVault>();
+        builder.Services.AddSingleton<Assistant.NetworkProbe>();
+        builder.Services.AddSingleton<Assistant.DiagnosticSubagent>();
+        builder.Services.AddSingleton<Assistant.AssistantModelClientFactory>();
+        builder.Services.AddSingleton(services => new Assistant.Browser.BrowserBridge(
+            port: 17831,
+            services.GetRequiredService<ILogger<Assistant.Browser.BrowserBridge>>()));
+        builder.Services.AddSingleton<Assistant.Browser.IBrowserBridge>(services =>
+            services.GetRequiredService<Assistant.Browser.BrowserBridge>());
+        builder.Services.AddHostedService<Assistant.Browser.BrowserBridgeHost>();
+        builder.Services.AddSingleton(services =>
+        {
+            var registry = new Assistant.ToolRegistry();
+            Assistant.LoomXTools.RegisterAll(
+                registry,
+                services.GetRequiredService<ConfigurationManagementService>(),
+                services.GetRequiredService<IDatabaseConfigurationProvider>(),
+                services.GetRequiredService<Assistant.AssistantTester>(),
+                services.GetRequiredService<Assistant.SkillStore>(),
+                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>());
+            Assistant.Browser.BrowserTools.RegisterAll(
+                registry,
+                services.GetRequiredService<Assistant.Browser.IBrowserBridge>(),
+                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>());
+            Assistant.LoomXTools.RegisterDiagnosticTool(
+                registry,
+                services.GetRequiredService<Assistant.DiagnosticSubagent>(),
+                services.GetRequiredService<Assistant.AssistantModelClientFactory>().TryCreateAsync);
+            return registry;
+        });
+
+        // 小助手（Phase 4）：会话门面与持久化
+        builder.Services.AddSingleton<Assistant.AssistantSessionStore>();
+        builder.Services.AddSingleton(services => new Assistant.AssistantPreferencesStore(
+            services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
+            services.GetRequiredService<ILogger<Assistant.AssistantPreferencesStore>>()));
+        builder.Services.AddSingleton<Assistant.AssistantService>();
+
         var app = builder.Build();
         app.Lifetime.ApplicationStopped.Register(startupDb.Dispose);
         app.UseMiddleware<ActivityMiddleware>();
@@ -147,6 +195,14 @@ public static class LoomXHost
             var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
             var configuredUrls = app.Services.GetRequiredService<IDatabaseConfigurationProvider>().Current.Server.Urls;
             logger.LogInformation("Loom-x 网关监听 {Urls}", configuredUrls.Count > 0 ? string.Join(", ", configuredUrls) : "默认 ASP.NET Core 地址");
+            try
+            {
+                app.Services.GetRequiredService<Assistant.AssistantPreferencesStore>().MigrateLegacyIfNeeded();
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception, "小助手偏好旧版 JSON 迁移检查失败");
+            }
         });
     }
 

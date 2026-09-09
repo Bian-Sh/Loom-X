@@ -1,0 +1,5 @@
+{
+  "name": "claude-code",
+  "description": "Claude Code 客户端的配置知识：让 Claude Code 走 LoomX 网关",
+  "when_to_use": "用户要求把 Claude Code 配置为使用 LoomX"
+}

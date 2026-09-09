@@ -31,6 +31,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private readonly ProvidersViewModel providersViewModel;
     private readonly GatewayViewModel gatewayViewModel;
     private readonly ActivityViewModel activityViewModel;
+    private readonly AssistantViewModel assistantViewModel;
     private readonly UpdateCoordinator updateCoordinator;
     private readonly Action<bool, int, int, string>? applyAppearance;
     private readonly IStringLocalizer<MainWindowViewModel> _loc;
@@ -58,11 +59,13 @@ public sealed class MainWindowViewModel : NotifyViewModel
         providersViewModel = new ProvidersViewModel(this.dataStore, this.toastService, this.loggerFactory.CreateLogger<ProvidersViewModel>());
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
         activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
+        assistantViewModel = new AssistantViewModel(gatewayService, this.loggerFactory);
         updateCoordinator = new UpdateCoordinator(this.dataStore, logger: this.loggerFactory.CreateLogger<UpdateCoordinator>());
         settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, localizer: LocalizerFactory.Create<SettingsViewModel>());
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
         NavigationItems = new([
             new("nav.overview", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
+            new("nav.assistant", "M 6,4 L 26,4 L 26,20 L 18,20 L 12,27 L 12,20 L 6,20 Z M 11,10 L 13,10 M 16,10 L 18,10 M 21,10 L 23,10", () => ShowAssistant()),
             new("nav.gateway", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
             new("nav.providers", "M 7,8 L 25,8 M 7,16 L 25,16 M 7,24 L 25,24 M 4,8 L 4,8 M 4,16 L 4,16 M 4,24 L 4,24", () => ShowProviders()),
             new("nav.activity", "M 7,28 L 7,5 M 8,6 C 13,4 18,8 25,6 L 25,18 C 18,20 13,16 8,18", () => ShowActivity()),
@@ -94,6 +97,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     }
 
     private void ShowOverview() => ShowView("nav.overview", overviewViewModel);
+    private void ShowAssistant() => ShowView("nav.assistant", assistantViewModel);
     private void ShowProviders() => ShowView("nav.providers", providersViewModel);
     private void ShowGateway() => ShowView("nav.gateway", gatewayViewModel);
     private void ShowConsole() => ShowView("nav.console", consoleViewModel);

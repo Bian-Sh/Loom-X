@@ -6,17 +6,20 @@
     <DataTemplate DataType="{x:Type vm:ActivityViewModel}"><views:ActivityView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:GatewayViewModel}"><views:GatewayView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:AssistantViewModel}"><views:AssistantView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:PlaceholderViewModel}"><views:PlaceholderView /></DataTemplate>
   </Application.DataTemplates>
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://LoomX/Styles/VisualTokens.axaml" />
+        <ResourceInclude Source="avares://LiveMarkdown.Avalonia/Defaults.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://LiveMarkdown.Avalonia/Styles.axaml" />
     <Style Selector="Window">
       <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />

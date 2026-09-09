@@ -14,6 +14,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
     public DbSet<GatewayComboEntity> GatewayCombos => Set<GatewayComboEntity>();
     public DbSet<GatewayEndpointComboBindingEntity> GatewayEndpointComboBindings => Set<GatewayEndpointComboBindingEntity>();
     public DbSet<GatewayRouteEntity> GatewayRoutes => Set<GatewayRouteEntity>();
+    public DbSet<AssistantPreferencesEntity> AssistantPreferences => Set<AssistantPreferencesEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -88,6 +89,14 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.HasIndex(item => new { item.ComboId, item.ModelId }).IsUnique();
             entity.HasOne(item => item.Model).WithMany().HasForeignKey(item => item.ModelId).OnDelete(DeleteBehavior.Restrict);
         });
+        modelBuilder.Entity<AssistantPreferencesEntity>(entity =>
+        {
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.ProviderBusinessId).HasMaxLength(128);
+            entity.Property(item => item.ModelId).HasMaxLength(256);
+            entity.Property(item => item.ReasoningEffort).HasMaxLength(32).IsRequired();
+            entity.Property(item => item.PermissionMode).HasMaxLength(32).IsRequired();
+        });
     }
 }
 
@@ -117,6 +126,16 @@ public sealed class AppSettingsEntity
     public int TransparencyOpacity { get; set; } = 86;
     public int BlurAmount { get; set; } = 24;
     public string TransparencyAlgorithm { get; set; } = "acrylic";
+}
+
+/// <summary>小助手用户偏好：选定模型、思考等级与修改权限模式（单行表，Id 恒为 1）。</summary>
+public sealed class AssistantPreferencesEntity
+{
+    public int Id { get; set; } = 1;
+    public string? ProviderBusinessId { get; set; }
+    public string? ModelId { get; set; }
+    public string ReasoningEffort { get; set; } = "default";
+    public string PermissionMode { get; set; } = "AutoApprove";
 }
 
 public sealed class ProviderEntity
@@ -309,7 +328,7 @@ public static class ConfigurationDatabase
         await dbContext.Database.OpenConnectionAsync(cancellationToken);
         try
         {
-            foreach (var table in new[] { "AppSettings", "GatewayConfigurations", "Providers", "Models", "GatewayEndpoints", "GatewayCombos", "GatewayEndpointComboBindings", "GatewayRoutes" })
+            foreach (var table in new[] { "AppSettings", "GatewayConfigurations", "Providers", "Models", "GatewayEndpoints", "GatewayCombos", "GatewayEndpointComboBindings", "GatewayRoutes", "AssistantPreferences" })
             {
                 await using var tableCommand = connection.CreateCommand();
                 tableCommand.CommandText = $"SELECT EXISTS (SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = '{table}')";
@@ -334,7 +353,8 @@ public static class ConfigurationDatabase
                 || await HasColumnAsync(connection, "GatewayCombos", "EndpointKey", cancellationToken)
                 || !await HasColumnsAsync(connection, "GatewayEndpointComboBindings", cancellationToken, "EndpointKey", "ComboId", "Enabled", "SortOrder")
                 || !await HasColumnsAsync(connection, "GatewayRoutes", cancellationToken, "Id", "ComboId", "ModelId", "Enabled", "SortOrder")
-                || await HasColumnAsync(connection, "GatewayRoutes", "EndpointKey", cancellationToken))
+                || await HasColumnAsync(connection, "GatewayRoutes", "EndpointKey", cancellationToken)
+                || !await HasColumnsAsync(connection, "AssistantPreferences", cancellationToken, "Id", "ProviderBusinessId", "ModelId", "ReasoningEffort", "PermissionMode"))
                 return false;
         }
         finally
@@ -496,6 +516,20 @@ public static class ConfigurationDatabase
             }
         }
         await EnsureGatewaySchemaAsync(dbContext, cancellationToken);
+        await dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS AssistantPreferences (
+                Id INTEGER NOT NULL CONSTRAINT PK_AssistantPreferences PRIMARY KEY,
+                ProviderBusinessId TEXT NULL,
+                ModelId TEXT NULL,
+                ReasoningEffort TEXT NOT NULL DEFAULT 'default',
+                PermissionMode TEXT NOT NULL DEFAULT 'AutoApprove'
+            )
+            """, cancellationToken);
+        if (!await dbContext.AssistantPreferences.AnyAsync(cancellationToken))
+        {
+            dbContext.AssistantPreferences.Add(new AssistantPreferencesEntity());
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/openai' WHERE Key = 'openai' AND PublicPath IN ('/v1', '/openai/v1', '/v1/responses')", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/' WHERE Key = 'ollama' AND (PublicPath = '/api' OR PublicPath = '')", cancellationToken);
         await dbContext.Database.ExecuteSqlRawAsync("UPDATE GatewayEndpoints SET PublicPath = '/azure' WHERE Key = 'azure' AND PublicPath IN ('/azure/v1', '/azure/v1/responses')", cancellationToken);
