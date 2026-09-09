@@ -3,6 +3,9 @@
 ###############################################################################
 * text=auto
 
+# Comet 快照由 runtime 做字节级校验，Windows 检出时必须保持 LF。
+openspec/changes/**/.comet/skill-snapshots/**/package.json text eol=lf
+
 ###############################################################################
 # Set default behavior for command prompt diff.
 #

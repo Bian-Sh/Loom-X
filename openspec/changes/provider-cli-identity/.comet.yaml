@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: executing-plans
 build_pause: null
@@ -17,7 +17,7 @@ verify_result: pass
 verification_report: docs/superpowers/reports/2026-09-08-provider-cli-identity-verify.md
 branch_status: handled
 created_at: 2026-09-07
-verified_at: 2026-09-08
+verified_at: 2026-09-09
 archived: false
 direct_override: null
 handoff_context: openspec/changes/provider-cli-identity/.comet/handoff/design-context.json
