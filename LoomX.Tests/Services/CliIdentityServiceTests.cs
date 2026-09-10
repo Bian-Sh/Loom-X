@@ -1,4 +1,4 @@
-using LoomX.Services;
+﻿using LoomX.Services;
 using Xunit;
 
 namespace LoomX.Tests.Services;
@@ -26,8 +26,8 @@ public sealed class CliIdentityServiceTests
     {
         var headers = CliIdentityService.BuildCliIdentityHeaders(CliIdentityType.Codex, "0.153.4");
 
-        Assert.Equal("codex-cli/0.153.4", headers["User-Agent"]);
-        Assert.Equal("codex-cli", headers["originator"]);
+        Assert.Equal("codex_cli_rs/0.153.4", headers["User-Agent"]);
+        Assert.Equal("codex_cli_rs", headers["originator"]);
         Assert.Equal("0.153.4", headers["version"]);
     }
 
@@ -98,7 +98,7 @@ public sealed class CliIdentityServiceTests
 
         var result = CliIdentityService.ApplyCliIdentity(input, CliIdentityType.Codex, "0.153.4");
 
-        Assert.Equal("codex-cli/0.153.4", result["User-Agent"]);
+        Assert.Equal("codex_cli_rs/0.153.4", result["User-Agent"]);
         Assert.Equal("0.153.4", result["version"]);
     }
 
