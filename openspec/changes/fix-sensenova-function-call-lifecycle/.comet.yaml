@@ -1,6 +1,6 @@
 workflow: hotfix
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: a584a1e3604736e06d4b79ed06c06610f63b9aac
 design_doc: null
 plan: null
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-09-10-fix-sensenova-function-call-lifecycle-verify.md
 branch_status: handled
 created_at: 2026-09-10
-verified_at: null
+verified_at: 2026-09-10
 archived: false
 direct_override: null
 handoff_context: null
