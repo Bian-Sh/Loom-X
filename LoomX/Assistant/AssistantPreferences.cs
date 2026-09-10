@@ -19,10 +19,10 @@ public enum AssistantPermissionMode
 /// </summary>
 public sealed record AssistantPreferences
 {
-    /// <summary>选定模型所属 Provider 的 BusinessId；null 表示自动选择。</summary>
+    /// <summary>选定模型所属 Provider 的 BusinessId；首次使用前为空。</summary>
     public string? ProviderBusinessId { get; init; }
 
-    /// <summary>选定的模型 Id；null 表示自动选择。</summary>
+    /// <summary>选定的模型 Id；首次使用前为空。</summary>
     public string? ModelId { get; init; }
 
     /// <summary>思考等级：default（不下发）或 minimal/low/medium/high。</summary>

@@ -63,7 +63,7 @@ public sealed class AssistantService
     public Task<IReadOnlyList<AssistantProviderModelGroup>> ListAvailableModelsAsync(CancellationToken cancellationToken = default) =>
         modelClientFactory.ListAvailableAsync(cancellationToken);
 
-    /// <summary>当前指定模型；null 表示自动选择。</summary>
+    /// <summary>当前指定模型；首次使用前为空，此时使用可用列表首个模型。</summary>
     public (string? ProviderBusinessId, string? ModelId) GetModelSelection() =>
         modelClientFactory.GetPreferredSelection();
 
@@ -71,7 +71,7 @@ public sealed class AssistantService
     public void SelectModel(string providerBusinessId, string modelId) =>
         modelClientFactory.SetPreferredSelection(providerBusinessId, modelId);
 
-    /// <summary>恢复自动选择模型。</summary>
+    /// <summary>清除模型偏好；下一次使用时重新采用可用列表首个模型。</summary>
     public void ClearModelSelection() => modelClientFactory.ClearPreferredSelection();
 
     /// <summary>修改权限模式（自动批准/逐条批准），持久化。</summary>

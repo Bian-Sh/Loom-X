@@ -1498,8 +1498,8 @@
   <data name="assistant.permission.ask">
     <value>逐条批准</value>
   </data>
-  <data name="assistant.model.auto">
-    <value>自动选择</value>
+  <data name="assistant.model.none">
+    <value>未配置模型</value>
   </data>
   <data name="assistant.model.select.tooltip">
     <value>指定助手模型（仅 Provider 模型）</value>

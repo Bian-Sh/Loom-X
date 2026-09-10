@@ -17,9 +17,25 @@ public interface IProtocolPassthroughClient
     Task<bool> ProxyOpenAiResponsesGatewayAttemptAsync(HttpContext httpContext, ResolvedModelConfig model, JsonObject payload, CancellationToken cancellationToken);
 }
 
-public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<ProtocolPassthroughClient> logger, RequestTelemetryHub? telemetryHub = null) : IProtocolPassthroughClient
+public sealed class ProtocolPassthroughClient : IProtocolPassthroughClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly HttpClient httpClient;
+    private readonly ILogger<ProtocolPassthroughClient> logger;
+    private readonly RequestTelemetryHub? telemetryHub;
+    private readonly IProviderExecutionPipeline executionPipeline;
+
+    public ProtocolPassthroughClient(
+        HttpClient httpClient,
+        ILogger<ProtocolPassthroughClient> logger,
+        RequestTelemetryHub? telemetryHub = null,
+        IProviderExecutionPipeline? executionPipeline = null)
+    {
+        this.httpClient = httpClient;
+        this.logger = logger;
+        this.telemetryHub = telemetryHub;
+        this.executionPipeline = executionPipeline ?? new ProviderExecutionPipeline();
+    }
 
     public async Task ProxyAsync<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload, CancellationToken cancellationToken)
     {
@@ -30,53 +46,51 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
         try
         {
             using var upstreamRequest = BuildRequestMessage(httpContext, model, apiMode, upstreamPath, payload);
-            using var upstreamResponse = await httpClient.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            var result = await executionPipeline.ExecuteAsync(
+                httpClient,
+                upstreamRequest,
+                new ProviderExecutionContext(model.ProviderId, model.ModelId, apiMode, upstreamPath, NormalizeOpenAiFinishReasons: true),
+                cancellationToken);
 
-            httpContext.Response.StatusCode = (int)upstreamResponse.StatusCode;
-            CopyResponseHeaders(upstreamResponse, httpContext.Response);
+            httpContext.Response.StatusCode = (int)result.StatusCode;
+            CopyResponseHeaders(result, httpContext.Response);
+            if (result.WasNormalized) httpContext.Response.Headers.ContentLength = null;
 
-            await using var responseStream = await upstreamResponse.Content.ReadAsStreamAsync(cancellationToken);
-            await using var buffer = new MemoryStream();
-            await responseStream.CopyToAsync(buffer, cancellationToken);
-            var responseNormalized = NormalizeOpenAiFinishReasons(buffer, upstreamResponse.Content.Headers.ContentType, apiMode);
-            if (responseNormalized) httpContext.Response.Headers.ContentLength = null;
-            buffer.Position = 0;
-
-            var contentType = upstreamResponse.Content.Headers.ContentType?.ToString()
+            var contentType = result.ContentType
                 ?? httpContext.Response.ContentType
                 ?? "application/octet-stream";
             var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
 
-            if (upstreamResponse.IsSuccessStatusCode)
+            if (result.IsSuccess)
             {
-                if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, attemptIndex);
+                if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)result.StatusCode, (long)elapsedMs, attemptIndex);
                 logger.LogInformation(
                     "代理请求完成 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
                     model.ProviderId,
                     model.ModelId,
                     apiMode,
                     upstreamPath,
-                    (int)upstreamResponse.StatusCode,
+                    (int)result.StatusCode,
                     contentType,
-                    buffer.Length,
+                    result.Body.Length,
                     elapsedMs);
             }
             else
             {
-                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, false, attemptIndex);
+                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)result.StatusCode, (long)elapsedMs, false, attemptIndex);
                 logger.LogError(
                     "代理请求失败 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
                     model.ProviderId,
                     model.ModelId,
                     apiMode,
                     upstreamPath,
-                    (int)upstreamResponse.StatusCode,
+                    (int)result.StatusCode,
                     contentType,
-                    buffer.Length,
+                    result.Body.Length,
                     elapsedMs);
             }
 
-            await buffer.CopyToAsync(httpContext.Response.Body, cancellationToken);
+            await httpContext.Response.Body.WriteAsync(result.Body, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -114,25 +128,24 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
         try
         {
             using var upstreamRequest = BuildRequestMessage(httpContext, model, apiMode, upstreamPath, payload);
-            using var upstreamResponse = await httpClient.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            await using var responseStream = await upstreamResponse.Content.ReadAsStreamAsync(cancellationToken);
-            await using var buffer = new MemoryStream();
-            await responseStream.CopyToAsync(buffer, cancellationToken);
-            var responseNormalized = NormalizeOpenAiFinishReasons(buffer, upstreamResponse.Content.Headers.ContentType, apiMode);
-            buffer.Position = 0;
-            var retryable = (int)upstreamResponse.StatusCode is 408 or 429 or >= 500;
+            var result = await executionPipeline.ExecuteAsync(
+                httpClient,
+                upstreamRequest,
+                new ProviderExecutionContext(model.ProviderId, model.ModelId, apiMode, upstreamPath, NormalizeOpenAiFinishReasons: true),
+                cancellationToken);
+            var retryable = result.IsRetryable;
             if (retryable)
             {
-                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, true, attemptIndex);
-                logger.LogWarning("网关路由尝试可转移 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ResponseBytes}B {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, (int)upstreamResponse.StatusCode, buffer.Length, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)result.StatusCode, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, true, attemptIndex);
+                logger.LogWarning("网关路由尝试可转移 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ResponseBytes}B {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, (int)result.StatusCode, result.Body.Length, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
                 return false;
             }
-            httpContext.Response.StatusCode = (int)upstreamResponse.StatusCode;
-            CopyResponseHeaders(upstreamResponse, httpContext.Response);
-            if (responseNormalized) httpContext.Response.Headers.ContentLength = null;
-            await buffer.CopyToAsync(httpContext.Response.Body, cancellationToken);
-            if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, attemptIndex);
-            logger.LogInformation("网关路由尝试完成 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ResponseBytes}B {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, (int)upstreamResponse.StatusCode, buffer.Length, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            httpContext.Response.StatusCode = (int)result.StatusCode;
+            CopyResponseHeaders(result, httpContext.Response);
+            if (result.WasNormalized) httpContext.Response.Headers.ContentLength = null;
+            await httpContext.Response.Body.WriteAsync(result.Body, cancellationToken);
+            if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)result.StatusCode, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds, attemptIndex);
+            logger.LogInformation("网关路由尝试完成 {ProviderId}/{ModelId} {ApiMode} {Path} {StatusCode} {ResponseBytes}B {ElapsedMs:F0}ms", model.ProviderId, model.ModelId, apiMode, upstreamPath, (int)result.StatusCode, result.Body.Length, Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             return true;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -159,51 +172,51 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
         {
             var responsesRequest = OpenAiResponsesBridge.CreateResponsesRequest(payload);
             using var upstreamRequest = BuildRequestMessage(httpContext, model, "openai", "/responses", responsesRequest);
-            using var upstreamResponse = await httpClient.SendAsync(upstreamRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-            await using var responseStream = await upstreamResponse.Content.ReadAsStreamAsync(cancellationToken);
-            await using var buffer = new MemoryStream();
-            await responseStream.CopyToAsync(buffer, cancellationToken);
+            var result = await executionPipeline.ExecuteAsync(
+                httpClient,
+                upstreamRequest,
+                new ProviderExecutionContext(model.ProviderId, model.ModelId, "openai", "/responses"),
+                cancellationToken);
             var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-            var responseBytes = buffer.Length;
-            var retryable = (int)upstreamResponse.StatusCode is 408 or 429 or >= 500;
+            var responseBytes = result.Body.Length;
+            var retryable = result.IsRetryable;
             if (retryable)
             {
-                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, true, attemptIndex);
+                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)result.StatusCode, (long)elapsedMs, true, attemptIndex);
                 logger.LogWarning(
                     "Responses 协议桥接上游可转移 {ProviderId}/{ModelId} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
                     model.ProviderId,
                     model.ModelId,
-                    (int)upstreamResponse.StatusCode,
-                    upstreamResponse.Content.Headers.ContentType?.MediaType ?? "unknown",
+                    (int)result.StatusCode,
+                    result.ContentType ?? "unknown",
                     responseBytes,
                     elapsedMs);
                 return false;
             }
 
-            httpContext.Response.StatusCode = (int)upstreamResponse.StatusCode;
-            if (!upstreamResponse.IsSuccessStatusCode)
+            httpContext.Response.StatusCode = (int)result.StatusCode;
+            if (!result.IsSuccess)
             {
-                CopyResponseHeaders(upstreamResponse, httpContext.Response);
-                buffer.Position = 0;
-                await buffer.CopyToAsync(httpContext.Response.Body, cancellationToken);
-                if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, attemptIndex);
+                CopyResponseHeaders(result, httpContext.Response);
+                await httpContext.Response.Body.WriteAsync(result.Body, cancellationToken);
+                if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)result.StatusCode, (long)elapsedMs, attemptIndex);
                 logger.LogInformation(
                     "Responses 协议桥接上游拒绝 {ProviderId}/{ModelId} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
                     model.ProviderId,
                     model.ModelId,
-                    (int)upstreamResponse.StatusCode,
-                    upstreamResponse.Content.Headers.ContentType?.MediaType ?? "unknown",
+                    (int)result.StatusCode,
+                    result.ContentType ?? "unknown",
                     responseBytes,
                     elapsedMs);
                 return true;
             }
 
-            var contentType = upstreamResponse.Content.Headers.ContentType?.MediaType;
+            var contentType = result.ContentType;
             string downstreamPayload;
             string downstreamContentType;
             try
             {
-                var responseBody = Encoding.UTF8.GetString(buffer.ToArray());
+                var responseBody = result.BodyText;
                 if (string.Equals(contentType, "text/event-stream", StringComparison.OrdinalIgnoreCase))
                 {
                     downstreamPayload = OpenAiResponsesBridge.CreateChatCompletionsSse(responseBody, model.ModelId);
@@ -222,7 +235,7 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
             }
             catch (Exception exception) when (exception is InvalidDataException or JsonException)
             {
-                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, true, attemptIndex, exception.GetType().Name);
+                if (requestContext is not null) telemetryHub?.EdgeAttemptFailed(requestContext, model.ProviderId, model.ModelId, (int)result.StatusCode, (long)elapsedMs, true, attemptIndex, exception.GetType().Name);
                 logger.LogWarning(
                     exception,
                     "Responses 协议桥接转换失败，将尝试下一条路由 {ProviderId}/{ModelId} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
@@ -234,17 +247,17 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
                 return false;
             }
 
-            CopyResponseHeaders(upstreamResponse, httpContext.Response);
+            CopyResponseHeaders(result, httpContext.Response);
             httpContext.Response.ContentType = downstreamContentType;
             httpContext.Response.ContentLength = null;
             httpContext.Response.Headers.Remove("content-encoding");
             await httpContext.Response.WriteAsync(downstreamPayload, Encoding.UTF8, cancellationToken);
-            if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)upstreamResponse.StatusCode, (long)elapsedMs, attemptIndex);
+            if (requestContext is not null) telemetryHub?.EdgeAttemptCompleted(requestContext, model.ProviderId, model.ModelId, (int)result.StatusCode, (long)elapsedMs, attemptIndex);
             logger.LogInformation(
                 "Responses 协议桥接完成 {ProviderId}/{ModelId} {StatusCode} {SourceContentType} {OutputContentType} {ResponseBytes}B {OutputBytes}B {ElapsedMs:F0}ms",
                 model.ProviderId,
                 model.ModelId,
-                (int)upstreamResponse.StatusCode,
+                (int)result.StatusCode,
                 contentType,
                 downstreamContentType,
                 responseBytes,
@@ -349,140 +362,13 @@ public sealed class ProtocolPassthroughClient(HttpClient httpClient, ILogger<Pro
         headers.TryAddWithoutValidation(name, value);
     }
 
-    private static void CopyResponseHeaders(HttpResponseMessage upstreamResponse, HttpResponse downstreamResponse)
+    private static void CopyResponseHeaders(ProviderExecutionResult result, HttpResponse downstreamResponse)
     {
-        foreach (var header in upstreamResponse.Headers)
+        foreach (var header in result.Headers)
         {
-            if (string.Equals(header.Key, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            downstreamResponse.Headers[header.Key] = header.Value.ToArray();
-        }
-
-        foreach (var header in upstreamResponse.Content.Headers)
-        {
-            if (string.Equals(header.Key, "Transfer-Encoding", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            downstreamResponse.Headers[header.Key] = header.Value.ToArray();
+            downstreamResponse.Headers[header.Key] = header.Value;
         }
 
         downstreamResponse.Headers.Remove("transfer-encoding");
-    }
-
-    private static bool NormalizeOpenAiFinishReasons(MemoryStream buffer, MediaTypeHeaderValue? contentType, string apiMode)
-    {
-        if (!string.Equals(apiMode, "openai", StringComparison.OrdinalIgnoreCase) || buffer.Length == 0)
-        {
-            return false;
-        }
-
-        var mediaType = contentType?.MediaType;
-        if (!string.Equals(mediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase)
-            && !string.Equals(mediaType, "application/json", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        var original = Encoding.UTF8.GetString(buffer.ToArray());
-        var normalized = string.Equals(mediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase)
-            ? NormalizeOpenAiSse(original)
-            : NormalizeOpenAiJson(original);
-        if (normalized is null || string.Equals(original, normalized, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        buffer.SetLength(0);
-        var bytes = Encoding.UTF8.GetBytes(normalized);
-        buffer.Write(bytes, 0, bytes.Length);
-        return true;
-    }
-
-    private static string? NormalizeOpenAiSse(string body)
-    {
-        var lines = body.Split('\n');
-        var changed = false;
-        for (var index = 0; index < lines.Length; index++)
-        {
-            var line = lines[index];
-            var lineEnding = line.EndsWith('\r') ? "\r" : string.Empty;
-            var content = lineEnding.Length == 0 ? line : line[..^1];
-            if (!content.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            var payload = content[5..].Trim();
-            if (payload.Length == 0 || string.Equals(payload, "[DONE]", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            JsonNode? node;
-            try
-            {
-                node = JsonNode.Parse(payload);
-            }
-            catch (JsonException)
-            {
-                continue;
-            }
-
-            if (!NormalizeOpenAiFinishReasons(node))
-            {
-                continue;
-            }
-
-            var leadingWhitespaceLength = content[5..].Length - content[5..].TrimStart().Length;
-            lines[index] = $"{content[..5]}{content.Substring(5, leadingWhitespaceLength)}{node!.ToJsonString(JsonOptions)}{lineEnding}";
-            changed = true;
-        }
-
-        return changed ? string.Join('\n', lines) : null;
-    }
-
-    private static string? NormalizeOpenAiJson(string body)
-    {
-        JsonNode? node;
-        try
-        {
-            node = JsonNode.Parse(body);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-
-        return NormalizeOpenAiFinishReasons(node) ? node!.ToJsonString(JsonOptions) : null;
-    }
-
-    private static bool NormalizeOpenAiFinishReasons(JsonNode? node)
-    {
-        if (node is not JsonObject response || response["choices"] is not JsonArray choices)
-        {
-            return false;
-        }
-
-        var changed = false;
-        foreach (var choiceNode in choices)
-        {
-            if (choiceNode is not JsonObject choice
-                || choice["finish_reason"] is not JsonValue finishReason
-                || !finishReason.TryGetValue<string>(out var value)
-                || value.Length != 0)
-            {
-                continue;
-            }
-
-            choice["finish_reason"] = null;
-            changed = true;
-        }
-
-        return changed;
     }
 }

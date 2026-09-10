@@ -50,6 +50,7 @@ public static class LoomXHost
         builder.Services.AddSingleton<ConfigurationManagementService>();
         builder.Services.AddSingleton<IAnthropicRequestFactory, AnthropicRequestFactory>();
         builder.Services.AddSingleton<IAnthropicResponseMapper, AnthropicResponseMapper>();
+        builder.Services.AddSingleton<IProviderExecutionPipeline, ProviderExecutionPipeline>();
         builder.Services.AddHttpClient<IAnthropicProxyClient, AnthropicProxyClient>();
         builder.Services.AddHttpClient<IProtocolPassthroughClient, ProtocolPassthroughClient>();
         builder.Services.AddSingleton<ActivityStore>();

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using LoomX.Configuration;
+using LoomX.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -24,7 +25,7 @@ public sealed record AssistantProviderModelGroup(
 /// 助手模型客户端工厂：从 LoomX 现有配置中挑选可用模型并构建 IModelClient。
 /// Key 在服务端内部解析（DPAPI），只进请求头，绝不外泄。
 /// 选择规则：优先用户指定（偏好中的 ProviderBusinessId + ModelId，仍需启用且 openai 兼容）；
-/// 未指定或失效时回落到第一个启用且 api_mode 含 openai 的 Provider 中第一个启用的模型；
+/// 首次没有偏好时仅将可用列表首个模型作为初始选择并持久化；已指定模型失效时不自动回落；
 /// 跳过 anthropic/ollama 原生模式（助手需要 tool calling，走 OpenAI 兼容协议）。
 /// 请求遵循 Provider 配置：use_proxy 时按全局代理设置走代理，Provider/模型自定义头（含 UA）注入请求。
 /// </summary>
@@ -36,6 +37,7 @@ public class AssistantModelClientFactory
     private readonly AssistantPreferencesStore? preferencesStore;
     private readonly ILogger<OpenAiCompatibleModelClient> clientLogger;
     private readonly ILogger<AssistantModelClientFactory> logger;
+    private readonly IProviderExecutionPipeline executionPipeline;
 
     private readonly object proxyClientSync = new();
     private HttpClient? proxyClient;
@@ -47,12 +49,14 @@ public class AssistantModelClientFactory
         ILogger<OpenAiCompatibleModelClient> clientLogger,
         ILogger<AssistantModelClientFactory> logger,
         IDbContextFactory<ConfigurationDbContext>? dbContextFactory = null,
-        AssistantPreferencesStore? preferencesStore = null)
+        AssistantPreferencesStore? preferencesStore = null,
+        IProviderExecutionPipeline? executionPipeline = null)
     {
         this.httpClientFactory = httpClientFactory;
         this.configuration = configuration;
         this.clientLogger = clientLogger;
         this.logger = logger;
+        this.executionPipeline = executionPipeline ?? new ProviderExecutionPipeline();
         this.dbContextFactory = dbContextFactory;
         this.preferencesStore = preferencesStore;
     }
@@ -66,7 +70,7 @@ public class AssistantModelClientFactory
             : new AssistantModelInfo(selection.Provider.BusinessId, selection.Model.ModelId, selection.ModelBaseUrl);
     }
 
-    /// <summary>当前选定的模型标识（偏好值；未指定时为 null，表示自动选择）。</summary>
+    /// <summary>当前选定的模型标识；首次使用前可能尚未持久化。</summary>
     public virtual (string? ProviderBusinessId, string? ModelId) GetPreferredSelection()
     {
         var preferences = preferencesStore?.Load();
@@ -104,7 +108,7 @@ public class AssistantModelClientFactory
         logger.LogInformation("小助手模型已指定 {ProviderId}/{ModelId}", providerBusinessId, modelId);
     }
 
-    /// <summary>清除指定模型，回落自动选择。</summary>
+    /// <summary>清除指定模型偏好；下一次创建客户端时会重新使用可用列表首项作为初始值。</summary>
     public virtual void ClearPreferredSelection()
     {
         preferencesStore?.Update(current => current with
@@ -112,7 +116,7 @@ public class AssistantModelClientFactory
             ProviderBusinessId = null,
             ModelId = null,
         });
-        logger.LogInformation("小助手模型已恢复自动选择");
+        logger.LogInformation("小助手模型偏好已清除");
     }
 
     /// <summary>构建助手模型客户端；无可用模型时返回 null（调用方应给出明确错误而非假装可用）。</summary>
@@ -140,7 +144,9 @@ public class AssistantModelClientFactory
             clientLogger,
             MergeHeaders(selection.Provider, selection.Model),
             ResolveReasoningEffort(),
-            selection.Provider.EndpointFormat);
+            selection.Provider.EndpointFormat,
+            executionPipeline,
+            selection.Provider.BusinessId);
     }
 
     private async Task<ModelSelection?> SelectModelAsync(CancellationToken cancellationToken)
@@ -148,7 +154,7 @@ public class AssistantModelClientFactory
         var providers = await configuration.ListProvidersAsync(cancellationToken);
         var candidates = providers.Where(item => item.Enabled).ToArray();
 
-        // 用户指定的模型优先；失效（删除/禁用/不再 openai 兼容）时回落自动选择
+        // 用户指定的模型优先；失效（删除/禁用/不再 openai 兼容）时明确失败，不回落到其他模型。
         var preferences = preferencesStore?.Load();
         if (preferences?.ProviderBusinessId is { Length: > 0 } preferredProvider
             && preferences.ModelId is { Length: > 0 } preferredModel)
@@ -164,7 +170,8 @@ public class AssistantModelClientFactory
                 return CreateSelection(provider, model);
             }
 
-            logger.LogWarning("小助手指定模型失效，回落自动选择 {ProviderId}/{ModelId}", preferredProvider, preferredModel);
+            logger.LogWarning("小助手指定模型失效，不自动切换 {ProviderId}/{ModelId}", preferredProvider, preferredModel);
+            return null;
         }
 
         foreach (var provider in candidates)
@@ -172,7 +179,14 @@ public class AssistantModelClientFactory
             var model = provider.Models.FirstOrDefault(item =>
                 item.Enabled && SupportsOpenAi(item.ApiMode ?? provider.ApiMode));
             if (model is null) continue;
-            return CreateSelection(provider, model);
+            var initialSelection = CreateSelection(provider, model);
+            preferencesStore?.Update(current => current with
+            {
+                ProviderBusinessId = provider.BusinessId,
+                ModelId = model.ModelId,
+            });
+            logger.LogInformation("小助手首次使用默认模型 {ProviderId}/{ModelId}", provider.BusinessId, model.ModelId);
+            return initialSelection;
         }
 
         return null;

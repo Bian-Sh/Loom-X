@@ -10,7 +10,7 @@ namespace LoomX.ViewModels;
 
 /// <summary>
 /// 小助手聊天页 VM：消费 AgentEvent 流做 Activity Projection，不绑定 Harness 内部对象。
-/// 助手服务在网关进程内（GatewayProcessService.GetHostedService），网关未运行时给出明确提示。
+/// 助手服务复用网关容器中的配置与工具注册，但首次使用时可在不监听网关端口的状态下初始化。
 /// 底部工具栏承载：修改权限（自动批准/逐条批准）、模型指定（只走 Provider 模型，不走 combo）、思考等级。
 /// </summary>
 public sealed class AssistantViewModel : NotifyViewModel
@@ -32,7 +32,6 @@ public sealed class AssistantViewModel : NotifyViewModel
     private AssistantReasoningOption selectedReasoningEffort;
     private ApprovalRequestViewModel? pendingApproval;
     private IReadOnlyList<AssistantModelGroupViewModel> allModelGroups = [];
-    private bool isAutoModelSelected = true;
 
     public AssistantViewModel(GatewayProcessService gatewayService, ILoggerFactory? loggerFactory = null)
     {
@@ -65,7 +64,7 @@ public sealed class AssistantViewModel : NotifyViewModel
 
         RefreshSessions();
         RefreshModelSummary();
-        AddSystemMessage("我是 LoomX 小助手，可以帮你配置 Provider、诊断连通性、接入中转站。网关启动后即可开始。");
+        AddSystemMessage("我是 LoomX 小助手，可以帮你配置 Provider、诊断连通性、接入中转站。请选择模型后即可开始。");
     }
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
@@ -165,38 +164,38 @@ public sealed class AssistantViewModel : NotifyViewModel
         private set => SetProperty(ref pendingApproval, value);
     }
 
-    /// <summary>模型选择弹层中"自动选择"伪项的勾选状态。</summary>
-    public bool IsAutoModelSelected
-    {
-        get => isAutoModelSelected;
-        private set => SetProperty(ref isAutoModelSelected, value);
-    }
-
     /// <summary>模型弹层是否没有任何分组（空态提示）。</summary>
     public bool HasNoModelGroups => ModelGroups.Count == 0;
 
     private AssistantService? ResolveService() => gatewayService.GetHostedService<AssistantService>();
+
+    private async Task<AssistantService?> EnsureServiceAsync(CancellationToken cancellationToken = default)
+    {
+        await gatewayService.EnsureHostedServicesAsync(cancellationToken);
+        return ResolveService();
+    }
 
     private async Task SendAsync()
     {
         var text = InputText.Trim();
         if (text.Length == 0) return;
 
-        var service = ResolveService();
-        if (service is null)
-        {
-            AddSystemMessage("网关未在本进程运行，小助手暂不可用。请先启动网关。");
-            return;
-        }
-
         InputText = string.Empty;
         Messages.Add(new ChatMessageViewModel(ChatRole.User, text));
         IsRunning = true;
         StatusText = "小助手正在工作…";
-        service.ApprovalHandler = ShowApprovalAsync;
+        AssistantService? service = null;
 
         try
         {
+            service = await EnsureServiceAsync();
+            if (service is null)
+            {
+                AddSystemMessage("小助手服务初始化失败，请查看控制台日志。");
+                return;
+            }
+
+            service.ApprovalHandler = ShowApprovalAsync;
             await foreach (var agentEvent in service.SendAsync(text))
             {
                 Dispatcher.UIThread.Post(() => Project(agentEvent));
@@ -213,7 +212,7 @@ public sealed class AssistantViewModel : NotifyViewModel
         }
         finally
         {
-            service.ApprovalHandler = null;
+            if (service is not null) service.ApprovalHandler = null;
             Dispatcher.UIThread.Post(() =>
             {
                 IsRunning = false;
@@ -281,16 +280,17 @@ public sealed class AssistantViewModel : NotifyViewModel
     /// <summary>打开模型选择弹层：从服务端拉取可用模型并按 Provider 分组。</summary>
     public async Task OpenModelPickerAsync()
     {
-        var service = ResolveService();
+        var service = await EnsureServiceAsync();
         if (service is null)
         {
-            AddSystemMessage("网关未在本进程运行，无法选择模型。请先启动网关。");
+            AddSystemMessage("小助手服务初始化失败，请查看控制台日志。");
             return;
         }
 
         var groups = await service.ListAvailableModelsAsync();
         var (preferredProvider, preferredModel) = service.GetModelSelection();
-        IsAutoModelSelected = preferredProvider is null || preferredModel is null;
+        var hasPreferredSelection = preferredProvider is not null && preferredModel is not null;
+        var firstModel = groups.SelectMany(group => group.Models).FirstOrDefault();
         allModelGroups = groups
             .Select(group => new AssistantModelGroupViewModel(
                 group.ProviderDisplayName,
@@ -298,8 +298,12 @@ public sealed class AssistantViewModel : NotifyViewModel
                     model.ProviderBusinessId,
                     model.ModelId,
                     model.DisplayName,
-                    string.Equals(model.ProviderBusinessId, preferredProvider, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(model.ModelId, preferredModel, StringComparison.OrdinalIgnoreCase))).ToArray()))
+                    hasPreferredSelection
+                        ? string.Equals(model.ProviderBusinessId, preferredProvider, StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(model.ModelId, preferredModel, StringComparison.OrdinalIgnoreCase)
+                        : firstModel is not null
+                            && string.Equals(model.ProviderBusinessId, firstModel.ProviderBusinessId, StringComparison.OrdinalIgnoreCase)
+                            && string.Equals(model.ModelId, firstModel.ModelId, StringComparison.OrdinalIgnoreCase))).ToArray()))
             .ToArray();
         ApplyModelFilter();
         IsModelPickerOpen = true;
@@ -327,29 +331,19 @@ public sealed class AssistantViewModel : NotifyViewModel
         OnPropertyChanged(nameof(HasNoModelGroups));
     }
 
-    /// <summary>恢复自动选择模型（弹层顶部伪项）。</summary>
-    public void SelectAutoModel() => SelectModel(new AssistantModelOptionViewModel(null, null, string.Empty));
-
     /// <summary>选定模型（只走 Provider 模型，不走 combo）；持久化并关闭弹层。</summary>
     public void SelectModel(AssistantModelOptionViewModel option)
     {
         var service = ResolveService();
         if (service is null) return;
 
-        if (option.IsAuto)
-        {
-            service.ClearModelSelection();
-        }
-        else
-        {
-            service.SelectModel(option.ProviderBusinessId!, option.ModelId!);
-        }
+        service.SelectModel(option.ProviderBusinessId!, option.ModelId!);
 
         foreach (var group in allModelGroups)
         {
             foreach (var model in group.Models)
             {
-                model.IsSelected = !option.IsAuto && ReferenceEquals(model, option);
+                model.IsSelected = ReferenceEquals(model, option);
             }
         }
 
@@ -357,32 +351,38 @@ public sealed class AssistantViewModel : NotifyViewModel
         RefreshModelSummary();
     }
 
-    /// <summary>模型摘要：未指定时显示自动选择，指定时显示 Provider / 模型。</summary>
+    /// <summary>模型摘要：未持久化选择时显示可用列表首个模型。</summary>
     private async void RefreshModelSummary()
     {
-        var fallback = ResourceLookup.Resolve("assistant.model.auto");
-        var service = ResolveService();
-        if (service is null)
-        {
-            SelectedModelSummary = fallback;
-            return;
-        }
-
+        var fallback = ResourceLookup.Resolve("assistant.model.none");
         try
         {
-            var (preferredProvider, preferredModel) = service.GetModelSelection();
-            if (preferredProvider is null || preferredModel is null)
+            var service = await EnsureServiceAsync();
+            if (service is null)
             {
                 SelectedModelSummary = fallback;
                 return;
             }
 
+            var (preferredProvider, preferredModel) = service.GetModelSelection();
             var groups = await service.ListAvailableModelsAsync();
+            if (preferredProvider is null || preferredModel is null)
+            {
+                var firstGroup = groups.FirstOrDefault();
+                var firstModel = firstGroup?.Models.FirstOrDefault();
+                SelectedModelSummary = firstModel is null
+                    ? fallback
+                    : $"{firstGroup!.ProviderDisplayName} / {firstModel.ModelId}";
+                RefreshSessions();
+                return;
+            }
+
             var group = groups.FirstOrDefault(item =>
                 string.Equals(item.ProviderBusinessId, preferredProvider, StringComparison.OrdinalIgnoreCase));
             SelectedModelSummary = group is null
                 ? preferredModel
                 : $"{group.ProviderDisplayName} / {preferredModel}";
+            RefreshSessions();
         }
         catch (Exception exception)
         {
@@ -457,7 +457,7 @@ public sealed class AssistantViewModel : NotifyViewModel
     private async Task LoadSessionAsync(AssistantSessionSummary? summary)
     {
         if (summary is null) return;
-        var service = ResolveService();
+        var service = await EnsureServiceAsync();
         if (service is null) return;
 
         if (!await service.LoadSessionAsync(summary.SessionId))
@@ -514,7 +514,7 @@ public sealed record AssistantReasoningOption(string Value, string Label)
     public override string ToString() => Label;
 }
 
-/// <summary>模型选择弹层中的模型项；ProviderBusinessId 为 null 表示"自动选择"伪项。</summary>
+/// <summary>模型选择弹层中的 Provider 模型项。</summary>
 public sealed class AssistantModelOptionViewModel : NotifyViewModel
 {
     private bool isSelected;
@@ -530,8 +530,6 @@ public sealed class AssistantModelOptionViewModel : NotifyViewModel
     public string? ProviderBusinessId { get; }
     public string? ModelId { get; }
     public string DisplayName { get; }
-    public bool IsAuto => ProviderBusinessId is null;
-
     public bool IsSelected
     {
         get => isSelected;

@@ -147,7 +147,7 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PreferredModelDisabled_FallsBackToAutomatic()
+    public async Task PreferredModelDisabled_DoesNotFallback()
     {
         var first = await CreateProviderAsync("first-openai", "openai");
         await CreateModelAsync(first.Id, "auto-model");
@@ -157,12 +157,11 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
 
         var info = await factory.DescribeAsync(CancellationToken.None);
 
-        Assert.Equal("first-openai", info!.ProviderBusinessId);
-        Assert.Equal("auto-model", info.ModelId);
+        Assert.Null(info);
     }
 
     [Fact]
-    public async Task ClearPreferredSelection_RestoresAutomatic()
+    public async Task ClearPreferredSelection_UsesFirstModelAsNextInitialSelection()
     {
         var first = await CreateProviderAsync("first-openai", "openai");
         await CreateModelAsync(first.Id, "auto-model");
@@ -174,6 +173,7 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
         var info = await factory.DescribeAsync(CancellationToken.None);
 
         Assert.Equal("first-openai", info!.ProviderBusinessId);
+        Assert.Equal(("first-openai", "auto-model"), factory.GetPreferredSelection());
     }
 
     [Fact]

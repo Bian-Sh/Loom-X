@@ -22,6 +22,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
     private readonly string? reasoningEffort;
     private readonly ILogger<OpenAiCompatibleModelClient>? logger;
     private readonly bool useResponsesEndpoint;
+    private readonly IProviderExecutionPipeline executionPipeline;
+    private readonly string providerId;
 
     public OpenAiCompatibleModelClient(
         HttpClient httpClient,
@@ -31,7 +33,9 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         ILogger<OpenAiCompatibleModelClient>? logger = null,
         IReadOnlyDictionary<string, string>? extraHeaders = null,
         string? reasoningEffort = null,
-        string? endpointFormat = "chat_completions")
+        string? endpointFormat = "chat_completions",
+        IProviderExecutionPipeline? executionPipeline = null,
+        string? providerId = null)
     {
         this.httpClient = httpClient;
         this.baseUrl = baseUrl.TrimEnd('/');
@@ -41,6 +45,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         this.extraHeaders = extraHeaders;
         this.reasoningEffort = string.IsNullOrWhiteSpace(reasoningEffort) ? null : reasoningEffort.Trim();
         useResponsesEndpoint = string.Equals(endpointFormat, "responses", StringComparison.OrdinalIgnoreCase);
+        this.executionPipeline = executionPipeline ?? new ProviderExecutionPipeline();
+        this.providerId = string.IsNullOrWhiteSpace(providerId) ? "assistant" : providerId.Trim();
     }
 
     public async IAsyncEnumerable<ModelStreamEvent> StreamAsync(
@@ -62,10 +68,14 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         }
         ApplyExtraHeaders(httpRequest);
 
-        HttpResponseMessage response;
+        ProviderExecutionResult result;
         try
         {
-            response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            result = await executionPipeline.ExecuteAsync(
+                httpClient,
+                httpRequest,
+                new ProviderExecutionContext(providerId, model, "openai", endpoint),
+                cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -76,43 +86,39 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 innerException: exception);
         }
 
-        using (response)
+        if (!result.IsSuccess)
         {
-            if (!response.IsSuccessStatusCode)
-            {
-                var statusCode = (int)response.StatusCode;
-                var (errorCode, upstreamMessage) = await ReadErrorBodyAsync(response, cancellationToken);
-                var kind = ModelErrorClassifier.Classify(statusCode, errorCode);
-                logger?.LogWarning(
-                    "小助手模型服务返回错误 {BaseUrl} {StatusCode} {ErrorCode} {Kind}",
-                    baseUrl, statusCode, errorCode ?? "-", kind);
-                throw new ModelClientException(
-                    $"模型服务返回错误状态 {statusCode}。",
-                    kind,
-                    statusCode,
-                    errorCode,
-                    upstreamMessage);
-            }
+            var statusCode = (int)result.StatusCode;
+            var (errorCode, upstreamMessage) = ReadErrorBody(result.Body);
+            var kind = ModelErrorClassifier.Classify(statusCode, errorCode);
+            logger?.LogWarning(
+                "小助手模型服务返回错误 {BaseUrl} {StatusCode} {ErrorCode} {Kind}",
+                baseUrl, statusCode, errorCode ?? "-", kind);
+            throw new ModelClientException(
+                $"模型服务返回错误状态 {statusCode}。",
+                kind,
+                statusCode,
+                errorCode,
+                upstreamMessage);
+        }
 
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using var reader = new StreamReader(stream);
-            if (useResponsesEndpoint)
-            {
-                var responsesBody = await reader.ReadToEndAsync(cancellationToken);
-                var chatSse = ConvertResponsesBody(responsesBody, response.Content.Headers.ContentType?.MediaType);
-                using var translatedReader = new StringReader(chatSse);
-                await foreach (var streamEvent in ParseChatCompletionsSseAsync(translatedReader, cancellationToken))
-                {
-                    yield return streamEvent;
-                }
-
-                yield break;
-            }
-
-            await foreach (var streamEvent in ParseChatCompletionsBodyAsync(reader, cancellationToken))
+        using var reader = new StringReader(result.BodyText);
+        if (useResponsesEndpoint)
+        {
+            var responsesBody = await reader.ReadToEndAsync(cancellationToken);
+            var chatSse = ConvertResponsesBody(responsesBody, result.ContentType);
+            using var translatedReader = new StringReader(chatSse);
+            await foreach (var streamEvent in ParseChatCompletionsSseAsync(translatedReader, cancellationToken))
             {
                 yield return streamEvent;
             }
+
+            yield break;
+        }
+
+        await foreach (var streamEvent in ParseChatCompletionsBodyAsync(reader, cancellationToken))
+        {
+            yield return streamEvent;
         }
     }
 
@@ -427,34 +433,15 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         return payload;
     }
 
-    /// <summary>
-    /// 读取并解析错误响应体（限量 <see cref="ModelErrorClassifier.MaxErrorBodyBytes"/>），
-    /// 返回 Provider 错误码与脱敏后的上游描述。读取失败静默降级为 null，不掩盖原始状态码。
-    /// </summary>
-    private static async Task<(string? ErrorCode, string? UpstreamMessage)> ReadErrorBodyAsync(
-        HttpResponseMessage response,
-        CancellationToken cancellationToken)
+    /// <summary>从统一执行结果中解析错误响应体，正文仅用于本地分类且不会写入日志。</summary>
+    private static (string? ErrorCode, string? UpstreamMessage) ReadErrorBody(byte[] body)
     {
-        try
-        {
-            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            var buffer = new byte[ModelErrorClassifier.MaxErrorBodyBytes];
-            var totalRead = 0;
-            while (totalRead < buffer.Length)
-            {
-                var read = await stream.ReadAsync(buffer.AsMemory(totalRead, buffer.Length - totalRead), cancellationToken);
-                if (read == 0) break;
-                totalRead += read;
-            }
-
-            var body = Encoding.UTF8.GetString(buffer, 0, totalRead);
-            var (code, message) = ModelErrorClassifier.ParseErrorBody(body);
-            return (code, ModelErrorClassifier.SanitizeUpstreamMessage(message));
-        }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            return (null, null);
-        }
+        var limited = body.Length <= ModelErrorClassifier.MaxErrorBodyBytes
+            ? body
+            : body[..ModelErrorClassifier.MaxErrorBodyBytes];
+        var text = Encoding.UTF8.GetString(limited);
+        var (code, message) = ModelErrorClassifier.ParseErrorBody(text);
+        return (code, ModelErrorClassifier.SanitizeUpstreamMessage(message));
     }
 
     /// <summary>

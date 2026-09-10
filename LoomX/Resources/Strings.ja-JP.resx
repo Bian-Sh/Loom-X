@@ -1348,8 +1348,8 @@
   <data name="assistant.permission.ask">
     <value>都度承認</value>
   </data>
-  <data name="assistant.model.auto">
-    <value>自動選択</value>
+  <data name="assistant.model.none">
+    <value>モデル未設定</value>
   </data>
   <data name="assistant.model.select.tooltip">
     <value>アシスタントのモデルを指定（プロバイダーのモデルのみ）</value>

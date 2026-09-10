@@ -2,6 +2,7 @@ using System.Net.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using LoomX;
 using LoomX.Activity;
 
@@ -21,6 +22,7 @@ public sealed class GatewayProcessService : IDisposable
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(1) };
     private readonly SemaphoreSlim lifecycleLock = new(1, 1);
     private WebApplication? app;
+    private bool appStarted;
     private ActivityStore? activityStore;
     private RequestTelemetryHub? telemetryHub;
 
@@ -37,15 +39,17 @@ public sealed class GatewayProcessService : IDisposable
         try
         {
             if (await CheckHealthCoreAsync(endpoint, cancellationToken)) return;
-            if (app is not null) return;
 
             SetState(GatewayState.Starting, null);
-            app = await LoomXHost.CreateAsync(cancellationToken);
-            activityStore = app.Services.GetRequiredService<ActivityStore>();
-            telemetryHub = app.Services.GetRequiredService<RequestTelemetryHub>();
+            app ??= await LoomXHost.CreateAsync(cancellationToken);
+            activityStore ??= app.Services.GetRequiredService<ActivityStore>();
+            telemetryHub ??= app.Services.GetRequiredService<RequestTelemetryHub>();
+            activityStore.ActivityEnqueued -= OnActivityEnqueued;
             activityStore.ActivityEnqueued += OnActivityEnqueued;
+            telemetryHub.Published -= OnTelemetryPublished;
             telemetryHub.Published += OnTelemetryPublished;
             await app.StartAsync(cancellationToken);
+            appStarted = true;
 
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(8);
             while (DateTime.UtcNow < deadline)
@@ -72,6 +76,34 @@ public sealed class GatewayProcessService : IDisposable
         }
     }
 
+    /// <summary>
+    /// 仅初始化网关容器中的共享服务，不监听网关端口。
+    /// 小助手直连 Provider 时调用此方法，因此不受概览页网关启停状态影响。
+    /// </summary>
+    public async Task EnsureHostedServicesAsync(CancellationToken cancellationToken = default)
+    {
+        await lifecycleLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (app is not null) return;
+            app = await LoomXHost.CreateAsync(cancellationToken);
+            try
+            {
+                app.Services.GetRequiredService<LoomX.Assistant.AssistantPreferencesStore>().MigrateLegacyIfNeeded();
+            }
+            catch (Exception exception)
+            {
+                // 偏好迁移失败不阻止助手使用，正常启动时仍会再次尝试。
+                app.Services.GetRequiredService<ILogger<GatewayProcessService>>()
+                    .LogWarning(exception, "小助手偏好旧版 JSON 迁移检查失败");
+            }
+        }
+        finally
+        {
+            lifecycleLock.Release();
+        }
+    }
+
     public async Task<bool> CheckHealthAsync(string endpoint, CancellationToken cancellationToken = default)
     {
         await lifecycleLock.WaitAsync(cancellationToken);
@@ -80,8 +112,8 @@ public sealed class GatewayProcessService : IDisposable
     }
 
     /// <summary>
-    /// 网关在进程内运行时解析其 DI 容器中的服务（如小助手 AssistantService）；
-    /// 网关未在进程内运行（停止或连接外部实例）时返回 null。
+    /// 解析已初始化的共享容器服务（如小助手 AssistantService）。
+    /// 容器可以在网关未监听端口时初始化，因此助手不依赖网关启停状态。
     /// </summary>
     public T? GetHostedService<T>() where T : class => app?.Services.GetService(typeof(T)) as T;
 
@@ -97,13 +129,14 @@ public sealed class GatewayProcessService : IDisposable
             }
 
             SetState(GatewayState.Stopping, null);
-            await app.StopAsync(cancellationToken);
+            if (appStarted) await app.StopAsync(cancellationToken);
             await app.DisposeAsync();
             if (activityStore is not null) activityStore.ActivityEnqueued -= OnActivityEnqueued;
             if (telemetryHub is not null) telemetryHub.Published -= OnTelemetryPublished;
             activityStore = null;
             telemetryHub = null;
             app = null;
+            appStarted = false;
             SetState(GatewayState.Stopped, null);
         }
         finally { lifecycleLock.Release(); }
@@ -150,6 +183,7 @@ public sealed class GatewayProcessService : IDisposable
             activityStore = null;
             telemetryHub = null;
             app = null;
+            appStarted = false;
         }
         httpClient.Dispose();
         lifecycleLock.Dispose();

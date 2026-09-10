@@ -83,8 +83,4 @@ public partial class AssistantView : UserControl
         }
     }
 
-    private void ModelAuto_OnClick(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
-    {
-        if (DataContext is AssistantViewModel viewModel) viewModel.SelectAutoModel();
-    }
 }

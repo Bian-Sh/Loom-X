@@ -162,15 +162,6 @@
           <TextBox x:Name="modelSearch" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="2">
-              <!-- 自动选择伪项 -->
-              <Button Tag="{Binding}" Click="ModelAuto_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
-                      Background="Transparent" BorderThickness="0" Padding="12,8">
-                <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
-                  <TextBlock Text="{l:Locale assistant.model.auto}"/>
-                  <Path Grid.Column="1" Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15"
-                        Stroke="{DynamicResource SuccessBrush}" IsVisible="{Binding IsAutoModelSelected}"/>
-                </Grid>
-              </Button>
               <ItemsControl ItemsSource="{Binding ModelGroups}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate DataType="{x:Type vm:AssistantModelGroupViewModel}">
