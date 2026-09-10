@@ -13,6 +13,16 @@ PASS。SenseNova 工具参数分片、重复快照与同 id 扇出已能稳定�
 - Comet 状态与精简设计文档同步纳入当前 change
 - 未修改数据库结构、公开 API 或生产日志敏感信息边界
 
+## OpenSpec 完整验证记分卡
+
+| 维度 | 状态 | 结果 |
+| --- | --- | --- |
+| 完整性 | PASS | 3/3 tasks 完成；无 delta spec，不存在未实现的规格要求 |
+| 正确性 | PASS | proposal 的 4 项目标均有实现与测试证据，核心真实场景通过 |
+| 一致性 | PASS | 实现遵循 design.md 的参数组装、Responses 桥接、工具名映射与低频验收设计 |
+
+未发现 CRITICAL、WARNING 或 SUGGESTION 级验证问题，可以进入归档前确认。
+
 ## 根因消除证据
 
 - 指定会话文件最终状态为 `Failed`；在失败前存在多轮 assistant tool call 与 tool result，证明问题位于调用参数/后续请求生命周期，而不是工具注册缺失。
@@ -45,6 +55,7 @@ PASS。SenseNova 工具参数分片、重复快照与同 id 扇出已能稳定�
 - `SettingsViewModel` 的 CS8618、`AnthropicResponseMapper` 的 CA2024 与两处测试 CS8602 为既有警告，本次未改动对应文件。
 - 全仓格式检查仍会受到既有编码、CRLF 与无关模块格式差异影响；本次仅对任务涉及的 6 个 C# 文件执行并通过定向检查，未批量改写无关文件。
 - 现有 `graphify-out` 图谱仍包含项目更名前的 `OllamaHub` 路径，查询结果不适合作为本次正确性证据；实际代码关系已通过最新 CodeGraph 索引与源码核对。
+- 当前终端未提供 `openspec` CLI，完整性、正确性与一致性检查直接读取 change 下的 proposal/design/tasks 完成；该 change 无 delta spec，因此没有跳过规格场景。
 
 ## 分支状态
 
