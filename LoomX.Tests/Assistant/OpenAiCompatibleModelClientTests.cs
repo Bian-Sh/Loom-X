@@ -1,4 +1,5 @@
 using System.Net;
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json.Nodes;
 using LoomX.Assistant;
@@ -75,6 +76,24 @@ public sealed class OpenAiCompatibleModelClientTests
         Assert.Equal("stop", Assert.IsType<ModelCompletedEvent>(events[2]).FinishReason);
     }
 
+    private sealed class GzipResponseHandler(string body) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            using var source = new MemoryStream();
+            using (var gzip = new GZipStream(source, CompressionLevel.Fastest, leaveOpen: true))
+            using (var writer = new StreamWriter(gzip, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true))
+            {
+                writer.Write(body);
+            }
+
+            var content = new ByteArrayContent(source.ToArray());
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+            content.Headers.ContentEncoding.Add("gzip");
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+        }
+    }
+
     [Fact]
     public async Task StreamAsync_ResponsesEndpoint_ConvertsRequestAndParsesToolCall()
     {
@@ -118,6 +137,40 @@ public sealed class OpenAiCompatibleModelClientTests
         Assert.Equal("mock.list_providers", Assert.IsType<ModelToolCallEvent>(events[1]).ToolCall.Name);
         Assert.Equal("{}", Assert.IsType<ModelToolCallEvent>(events[1]).ToolCall.ArgumentsJson);
         Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[2]).FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_GzipResponsesJson_EmitsToolCallAndCompletion()
+    {
+        const string responsesJson = """
+        {
+          "id": "resp_gzip",
+          "output": [
+            {
+              "type": "function_call",
+              "call_id": "call_gzip",
+              "name": "loomx.list_providers",
+              "arguments": "{}"
+            }
+          ]
+        }
+        """;
+        var handler = new GzipResponseHandler(responsesJson);
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler),
+            "https://provider.example/v1",
+            "test-model",
+            endpointFormat: "responses");
+
+        var events = await CollectAsync(client.StreamAsync(
+            new ModelRequest([ChatMessage.User("读取 Provider")], [CreateTool()]),
+            CancellationToken.None));
+
+        var toolCall = Assert.IsType<ModelToolCallEvent>(events[0]).ToolCall;
+        Assert.Equal("call_gzip", toolCall.Id);
+        Assert.Equal("loomx.list_providers", toolCall.Name);
+        Assert.Equal("{}", toolCall.ArgumentsJson);
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[1]).FinishReason);
     }
 
     [Fact]
@@ -196,6 +249,41 @@ public sealed class OpenAiCompatibleModelClientTests
         Assert.Equal("call_1", toolCall.Id);
         Assert.Equal("mock.list_providers", toolCall.Name);
         Assert.Equal("""{"provider":true}""", toolCall.ArgumentsJson);
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[1]).FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_FlushesToolCallWhenDoneMarkerOmitsFinishReason()
+    {
+        var sse = string.Join("\n\n",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_done","function":{"name":"mock.list_providers","arguments":"{}"}}]},"finish_reason":null}]}""",
+            "data: [DONE]");
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+
+        var events = await CollectAsync(client.StreamAsync(
+            new ModelRequest([ChatMessage.User("查询")], [CreateTool()]),
+            CancellationToken.None));
+
+        var toolCall = Assert.IsType<ModelToolCallEvent>(Assert.Single(events.Take(1))).ToolCall;
+        Assert.Equal("call_done", toolCall.Id);
+        Assert.Equal("mock.list_providers", toolCall.Name);
+        Assert.Equal("{}", toolCall.ArgumentsJson);
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[1]).FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_FlushesToolCallWhenConnectionClosesWithoutDoneMarker()
+    {
+        const string sse = """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_eof","function":{"name":"mock.list_providers","arguments":"{}"}}]},"finish_reason":null}]}""";
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+
+        var events = await CollectAsync(client.StreamAsync(
+            new ModelRequest([ChatMessage.User("查询")], [CreateTool()]),
+            CancellationToken.None));
+
+        Assert.Equal("call_eof", Assert.IsType<ModelToolCallEvent>(events[0]).ToolCall.Id);
         Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[1]).FinishReason);
     }
 

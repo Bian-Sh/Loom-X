@@ -199,9 +199,10 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             upstreamMessage: ModelErrorClassifier.SanitizeUpstreamMessage(upstreamMessage));
     }
 
-    private static ModelClientException InvalidResponsesException(string detail) => new(
+    private static ModelClientException InvalidResponsesException(string detail, Exception? innerException = null) => new(
         "模型服务返回无效响应。",
         ModelErrorKind.Unknown,
+        innerException: innerException,
         upstreamMessage: detail);
 
     private static async IAsyncEnumerable<ModelStreamEvent> ParseChatCompletionsBodyAsync(
@@ -244,9 +245,66 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             body.AppendLine(line);
         }
 
-        // 部分中转站会用 HTTP 200 携带 JSON 错误，不能被当成空的成功流吞掉。
-        ThrowIfStructuredError(body.ToString());
-        throw InvalidResponsesException("模型响应格式无效。请检查 Provider 的 Chat Completions API 配置。");
+        // 部分中转站会忽略 stream=true 并返回完整 JSON；将其转换为统一的模型事件。
+        var bodyText = body.ToString();
+        ThrowIfStructuredError(bodyText);
+        JsonNode? response;
+        try
+        {
+            response = JsonNode.Parse(bodyText);
+        }
+        catch (JsonException exception)
+        {
+            throw InvalidResponsesException("模型响应格式无效。请检查 Provider 的 Chat Completions API 配置。", exception);
+        }
+
+        if (response is not JsonObject responseObject)
+        {
+            throw InvalidResponsesException("模型响应格式无效。请检查 Provider 的 Chat Completions API 配置。");
+        }
+
+        foreach (var streamEvent in ParseChatCompletionsJson(responseObject))
+        {
+            yield return streamEvent;
+        }
+    }
+
+    private static IEnumerable<ModelStreamEvent> ParseChatCompletionsJson(JsonObject response)
+    {
+        var choices = response["choices"] as JsonArray;
+        var choice = choices is { Count: > 0 } ? choices[0] as JsonObject : null;
+        if (choice is null)
+        {
+            throw InvalidResponsesException("模型响应没有 choices。请检查 Provider 的 Chat Completions API 配置。");
+        }
+
+        var message = choice["message"] as JsonObject;
+        if (message?["content"]?.GetValue<string>() is { Length: > 0 } content)
+        {
+            yield return new TextDeltaEvent(content);
+        }
+
+        var toolCalls = message?["tool_calls"] as JsonArray;
+        if (toolCalls is not null)
+        {
+            foreach (var toolCallNode in toolCalls.OfType<JsonObject>())
+            {
+                var function = toolCallNode["function"] as JsonObject;
+                var name = function?["name"]?.GetValue<string>();
+                if (string.IsNullOrWhiteSpace(name)) continue;
+
+                yield return new ModelToolCallEvent(new ToolCall(
+                    toolCallNode["id"]?.GetValue<string>() ?? string.Empty,
+                    name,
+                    function?["arguments"]?.GetValue<string>() ?? "{}"));
+            }
+        }
+
+        var finishReason = choice["finish_reason"]?.GetValue<string>();
+        yield return new ModelCompletedEvent(
+            string.IsNullOrWhiteSpace(finishReason)
+                ? toolCalls is { Count: > 0 } ? "tool_calls" : "stop"
+                : finishReason);
     }
 
     private static async IAsyncEnumerable<ModelStreamEvent> ParseChatCompletionsSseAsync(
@@ -259,6 +317,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             // 下一次请求违反 OpenAI 协议的 "同 assistant 消息内 tool_call_id 唯一" 约束并触发 400。
             // 一旦某 builder 的 Id 已知，后续若再出现同 Id 的 delta，应合并到该 builder（而不是新建）。
             var idToBuilder = new Dictionary<string, ToolCallBuilder>(StringComparer.Ordinal);
+            var completionEmitted = false;
 
             while (true)
             {
@@ -268,7 +327,27 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
 
                 var data = line["data:".Length..].Trim();
                 if (data.Length == 0) continue;
-                if (data == "[DONE]") break;
+                if (data == "[DONE]")
+                {
+                    if (completionEmitted)
+                    {
+                        break;
+                    }
+
+                    var toolCalls = DrainToolCalls(toolCallBuilders, idToBuilder);
+                    foreach (var toolCall in toolCalls)
+                    {
+                        yield return new ModelToolCallEvent(toolCall);
+                    }
+
+                    if (toolCalls.Length > 0)
+                    {
+                        yield return new ModelCompletedEvent("tool_calls");
+                        completionEmitted = true;
+                    }
+
+                    break;
+                }
 
                 JsonNode? chunk;
                 try
@@ -288,6 +367,31 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 if (delta?["content"]?.GetValue<string>() is { Length: > 0 } content)
                 {
                     yield return new TextDeltaEvent(content);
+                }
+
+                // 某些兼容端点即使请求 stream=true 仍返回完整 chat.completion，
+                // 工具调用位于 choice.message.tool_calls 而不是 delta.tool_calls。
+                if (delta is null && choice?["message"] is JsonObject message)
+                {
+                    if (message["content"]?.GetValue<string>() is { Length: > 0 } messageContent)
+                    {
+                        yield return new TextDeltaEvent(messageContent);
+                    }
+
+                    if (message["tool_calls"] is JsonArray messageToolCalls)
+                    {
+                        foreach (var toolCallNode in messageToolCalls.OfType<JsonObject>())
+                        {
+                            var function = toolCallNode["function"] as JsonObject;
+                            var name = function?["name"]?.GetValue<string>();
+                            if (string.IsNullOrWhiteSpace(name)) continue;
+
+                            yield return new ModelToolCallEvent(new ToolCall(
+                                toolCallNode["id"]?.GetValue<string>() ?? string.Empty,
+                                name,
+                                function?["arguments"]?.GetValue<string>() ?? "{}"));
+                        }
+                    }
                 }
 
                 if (delta?["tool_calls"] is JsonArray toolCallDeltas)
@@ -347,21 +451,47 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
 
                 if (choice?["finish_reason"]?.GetValue<string>() is { } finishReason)
                 {
-                    foreach (var entry in toolCallBuilders.OrderBy(item => item.Key))
+                    foreach (var toolCall in DrainToolCalls(toolCallBuilders, idToBuilder))
                     {
-                        var toolCall = entry.Value.ToToolCall();
-                        // 兜底保险：正常路径已在解析时丢弃无 id/name 的占位片段，
-                        // 此处再过滤一次 name 为空的调用，双保险防止无效调用透传到 AgentLoop。
-                        if (string.IsNullOrWhiteSpace(toolCall.Name)) continue;
                         yield return new ModelToolCallEvent(toolCall);
                     }
                     yield return new ModelCompletedEvent(finishReason);
-                    // 同一流里若出现多个 finish_reason chunk（如上游在重试/异常后再次发送完成帧），
-                    // 清空累积器避免重复发射同一组 tool_call。
-                    toolCallBuilders.Clear();
-                    idToBuilder.Clear();
+                    completionEmitted = true;
                 }
             }
+
+            // 一些兼容端点只发送 [DONE] 之前的增量后直接关闭连接，
+            // 没有 finish_reason，也可能省略 [DONE]。结束时仍需把完整工具调用交给 AgentLoop。
+            if (!completionEmitted && toolCallBuilders.Count > 0)
+            {
+                var toolCalls = DrainToolCalls(toolCallBuilders, idToBuilder);
+                foreach (var toolCall in toolCalls)
+                {
+                    yield return new ModelToolCallEvent(toolCall);
+                }
+
+                if (toolCalls.Length > 0)
+                {
+                    yield return new ModelCompletedEvent("tool_calls");
+                }
+            }
+    }
+
+    private static ToolCall[] DrainToolCalls(
+        IDictionary<int, ToolCallBuilder> toolCallBuilders,
+        IDictionary<string, ToolCallBuilder> idToBuilder)
+    {
+        var toolCalls = toolCallBuilders
+            .OrderBy(item => item.Key)
+            .Select(item => item.Value.ToToolCall())
+            .Where(toolCall => !string.IsNullOrWhiteSpace(toolCall.Name))
+            .ToArray();
+
+        // 同一流里若出现多个 finish_reason chunk（如上游在重试/异常后再次发送完成帧），
+        // 清空累积器避免重复发射同一组 tool_call。
+        toolCallBuilders.Clear();
+        idToBuilder.Clear();
+        return toolCalls;
     }
 
     private JsonObject BuildPayload(ModelRequest request)

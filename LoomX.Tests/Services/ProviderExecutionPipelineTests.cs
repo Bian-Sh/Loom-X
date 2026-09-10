@@ -1,4 +1,5 @@
 using System.Net;
+using System.IO.Compression;
 using System.Text;
 using LoomX.Assistant;
 using LoomX.Services;
@@ -31,6 +32,29 @@ public sealed class ProviderExecutionPipelineTests
         Assert.True(result.IsRetryable);
         Assert.False(result.IsSuccess);
         Assert.False(result.WasNormalized);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DecompressesGzipResponseBeforeParsing()
+    {
+        const string body = "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}";
+        var compressed = CompressGzip(body);
+        using var httpClient = new HttpClient(new StaticBinaryResponseHandler(
+            HttpStatusCode.OK,
+            compressed,
+            "application/json",
+            "gzip"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://provider.example/v1/responses");
+        var pipeline = new ProviderExecutionPipeline();
+
+        var result = await pipeline.ExecuteAsync(
+            httpClient,
+            request,
+            new ProviderExecutionContext("provider", "model", "openai", "/responses"),
+            CancellationToken.None);
+
+        Assert.Equal(body, result.BodyText);
+        Assert.DoesNotContain("Content-Encoding", result.Headers.Keys, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -105,6 +129,33 @@ public sealed class ProviderExecutionPipelineTests
             response.Headers.TryAddWithoutValidation("X-Trace", "trace-1");
             return Task.FromResult(response);
         }
+    }
+
+    private sealed class StaticBinaryResponseHandler(
+        HttpStatusCode statusCode,
+        byte[] body,
+        string mediaType,
+        string contentEncoding) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var content = new ByteArrayContent(body);
+            content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(mediaType);
+            content.Headers.ContentEncoding.Add(contentEncoding);
+            return Task.FromResult(new HttpResponseMessage(statusCode) { Content = content });
+        }
+    }
+
+    private static byte[] CompressGzip(string body)
+    {
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.Fastest, leaveOpen: true))
+        using (var writer = new StreamWriter(gzip, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), leaveOpen: true))
+        {
+            writer.Write(body);
+        }
+
+        return output.ToArray();
     }
 
     private sealed class CapturingPipeline : IProviderExecutionPipeline

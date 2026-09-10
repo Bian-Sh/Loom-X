@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -59,6 +60,11 @@ public sealed class ProviderExecutionPipeline : IProviderExecutionPipeline
         using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         var headers = CaptureHeaders(response);
         var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+        if (TryDecompress(body, response.Content.Headers.ContentEncoding, out var decompressedBody))
+        {
+            body = decompressedBody;
+            headers = RemoveContentEncodingHeaders(headers);
+        }
         var contentType = response.Content.Headers.ContentType?.MediaType;
         var normalized = false;
 
@@ -69,6 +75,62 @@ public sealed class ProviderExecutionPipeline : IProviderExecutionPipeline
         }
 
         return new ProviderExecutionResult(response.StatusCode, contentType, headers, body, normalized);
+    }
+
+    private static bool TryDecompress(
+        byte[] body,
+        ICollection<string> encodings,
+        out byte[] decompressedBody)
+    {
+        decompressedBody = body;
+        if (body.Length == 0 || encodings.Count == 0) return false;
+
+        var current = body;
+        foreach (var encoding in encodings.Reverse())
+        {
+            var normalized = encoding.Trim();
+            if (normalized.Length == 0 || normalized.Equals("identity", StringComparison.OrdinalIgnoreCase)) continue;
+
+            try
+            {
+                current = normalized.ToLowerInvariant() switch
+                {
+                    "gzip" => DecompressSingle(current, static stream => new GZipStream(stream, CompressionMode.Decompress)),
+                    "deflate" => DecompressSingle(current, static stream => new DeflateStream(stream, CompressionMode.Decompress)),
+                    "br" => DecompressSingle(current, static stream => new BrotliStream(stream, CompressionMode.Decompress)),
+                    _ => throw new NotSupportedException(),
+                };
+            }
+            catch (InvalidDataException)
+            {
+                return false;
+            }
+            catch (NotSupportedException)
+            {
+                return false;
+            }
+        }
+
+        decompressedBody = current;
+        return true;
+    }
+
+    private static byte[] DecompressSingle(byte[] body, Func<Stream, Stream> createDecoder)
+    {
+        using var input = new MemoryStream(body, writable: false);
+        using var decoder = createDecoder(input);
+        using var output = new MemoryStream();
+        decoder.CopyTo(output);
+        return output.ToArray();
+    }
+
+    private static IReadOnlyDictionary<string, string[]> RemoveContentEncodingHeaders(
+        IReadOnlyDictionary<string, string[]> headers)
+    {
+        var result = new Dictionary<string, string[]>(headers, StringComparer.OrdinalIgnoreCase);
+        result.Remove("Content-Encoding");
+        result.Remove("Content-Length");
+        return result;
     }
 
     private static IReadOnlyDictionary<string, string[]> CaptureHeaders(HttpResponseMessage response)
