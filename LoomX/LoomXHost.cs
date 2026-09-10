@@ -60,6 +60,7 @@ public static class LoomXHost
 
         // 小助手（Phase 2）：诊断测试器、Skill 仓库与 loomx.* 工具注册表
         builder.Services.AddHttpClient("loomx-assistant");
+        builder.Services.AddSingleton<GatewayStateHub>();
         builder.Services.AddSingleton<Assistant.AssistantTester>(services => new Assistant.AssistantTester(
             services.GetRequiredService<IHttpClientFactory>().CreateClient("loomx-assistant"),
             services.GetRequiredService<ConfigurationManagementService>(),
@@ -87,7 +88,8 @@ public static class LoomXHost
                 services.GetRequiredService<IDatabaseConfigurationProvider>(),
                 services.GetRequiredService<Assistant.AssistantTester>(),
                 services.GetRequiredService<Assistant.SkillStore>(),
-                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>());
+                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>(),
+                services.GetRequiredService<GatewayStateHub>());
             Assistant.Browser.BrowserTools.RegisterAll(
                 registry,
                 services.GetRequiredService<Assistant.Browser.IBrowserBridge>(),

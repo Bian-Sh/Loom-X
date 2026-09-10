@@ -35,4 +35,5 @@ Read → Backup → Patch → Validate → Test → Restart if necessary → Ver
 
 - 查看状态：loomx.get_status → loomx.list_providers / list_combos / list_endpoints
 - 新增 Provider：loomx.create_provider → loomx.create_model → loomx.create_combo（挂 model_ids）→ loomx.update_endpoint（绑定 Combo）→ loomx.test_provider / test_model
-- 排障：loomx.test_provider → loomx.test_model → 根据 diagnosis（auth_failed / unreachable / timeout / model_not_found 等）解释原因
+- 连接被拒（Connection refused / 主机积极拒绝）：先看 loomx.get_status 的 `gateway` 字段。`running: false` 说明网关未启动（配置层完全正常也会被拒），提示用户在概览页点"启动网关"；`running: true` 才继续排查端口/防火墙/跨机访问。
+- 上游排障：loomx.test_provider → loomx.test_model → 根据 diagnosis（auth_failed / unreachable / timeout / model_not_found 等）解释原因

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using LoomX.Assistant;
 using LoomX.Configuration;
+using LoomX.Services;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -17,6 +18,7 @@ public sealed class LoomXToolsTests : IAsyncLifetime
     private ConfigurationDbContext startupContext = null!;
     private ConfigurationManagementService configuration = null!;
     private ToolRegistry registry = null!;
+    private GatewayStateHub gatewayStateHub = null!;
 
     public async Task InitializeAsync()
     {
@@ -46,7 +48,8 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         await File.WriteAllTextAsync(Path.Combine(skillDirectory, "SKILL.md"), "# 测试 Skill 内容");
 
         registry = new ToolRegistry();
-        LoomXTools.RegisterAll(registry, configuration, configurationProvider, tester, new SkillStore(skillsDirectory));
+        gatewayStateHub = new GatewayStateHub();
+        LoomXTools.RegisterAll(registry, configuration, configurationProvider, tester, new SkillStore(skillsDirectory), gatewayStateHub: gatewayStateHub);
     }
 
     public async Task DisposeAsync()
@@ -106,6 +109,26 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         Assert.False(string.IsNullOrWhiteSpace(json["version"]?.GetValue<string>()));
         Assert.NotNull(json["providers"]);
         Assert.NotNull(json["endpoints"]);
+    }
+
+    [Fact]
+    public async Task GetStatus_ReportsGatewayRuntimeState()
+    {
+        gatewayStateHub.Update(GatewayState.Stopped, null);
+        var stopped = JsonNode.Parse((await InvokeAsync("loomx.get_status")).Content)!.AsObject();
+        Assert.False(stopped["gateway"]!["running"]!.GetValue<bool>());
+        Assert.Equal("stopped", stopped["gateway"]!["state"]!.GetValue<string>());
+
+        gatewayStateHub.Update(GatewayState.Running, null);
+        var running = JsonNode.Parse((await InvokeAsync("loomx.get_status")).Content)!.AsObject();
+        Assert.True(running["gateway"]!["running"]!.GetValue<bool>());
+        Assert.Equal("running", running["gateway"]!["state"]!.GetValue<string>());
+
+        gatewayStateHub.Update(GatewayState.Failed, "健康检查返回 HTTP 503。");
+        var failed = JsonNode.Parse((await InvokeAsync("loomx.get_status")).Content)!.AsObject();
+        Assert.False(failed["gateway"]!["running"]!.GetValue<bool>());
+        Assert.Equal("failed", failed["gateway"]!["state"]!.GetValue<string>());
+        Assert.Equal("健康检查返回 HTTP 503。", failed["gateway"]!["error"]!.GetValue<string>());
     }
 
     [Fact]

@@ -26,7 +26,8 @@ public static class LoomXTools
         IDatabaseConfigurationProvider configurationProvider,
         AssistantTester tester,
         SkillStore skillStore,
-        Browser.BrowserSecretVault? secretVault = null)
+        Browser.BrowserSecretVault? secretVault = null,
+        GatewayStateHub? gatewayStateHub = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(configuration);
@@ -34,7 +35,7 @@ public static class LoomXTools
         ArgumentNullException.ThrowIfNull(tester);
         ArgumentNullException.ThrowIfNull(skillStore);
 
-        RegisterStatusTools(registry, configuration, configurationProvider);
+        RegisterStatusTools(registry, configuration, configurationProvider, gatewayStateHub);
         RegisterProviderTools(registry, configuration, secretVault);
         RegisterModelTools(registry, configuration);
         RegisterComboTools(registry, configuration);
@@ -83,19 +84,19 @@ public static class LoomXTools
 
     // ---------- loomx.get_status ----------
 
-    private static void RegisterStatusTools(ToolRegistry registry, ConfigurationManagementService configuration, IDatabaseConfigurationProvider configurationProvider)
+    private static void RegisterStatusTools(ToolRegistry registry, ConfigurationManagementService configuration, IDatabaseConfigurationProvider configurationProvider, GatewayStateHub? gatewayStateHub)
     {
         registry.Register(new ToolDefinition
         {
             Name = "loomx.get_status",
-            Description = "获取 LoomX 整体状态：Provider/Model/Endpoint/Combo 数量与启用情况、监听地址、版本。",
+            Description = "获取 LoomX 整体状态：网关运行状态（running/state/error）、Provider/Model/Endpoint/Combo 数量与启用情况、监听地址、版本。",
             ParametersSchema = EmptyObjectSchema.DeepClone(),
             RiskLevel = ToolRiskLevel.Read,
-            Handler = async (_, cancellationToken) => Ok(await BuildStatusJsonAsync(configuration, configurationProvider, cancellationToken)),
+            Handler = async (_, cancellationToken) => Ok(await BuildStatusJsonAsync(configuration, configurationProvider, gatewayStateHub, cancellationToken)),
         });
     }
 
-    private static async Task<JsonObject> BuildStatusJsonAsync(ConfigurationManagementService configuration, IDatabaseConfigurationProvider configurationProvider, CancellationToken cancellationToken)
+    private static async Task<JsonObject> BuildStatusJsonAsync(ConfigurationManagementService configuration, IDatabaseConfigurationProvider configurationProvider, GatewayStateHub? gatewayStateHub, CancellationToken cancellationToken)
     {
         var providers = await configuration.ListProvidersAsync(cancellationToken);
         var endpoints = await configuration.ListGatewayEndpointsAsync(cancellationToken);
@@ -104,6 +105,18 @@ public static class LoomXTools
         {
             ["version"] = AppVersion.Current,
             ["listen_urls"] = new JsonArray(configurationProvider.Current.Server.Urls.Select(url => (JsonNode?)JsonValue.Create(url)).ToArray()),
+            ["gateway"] = gatewayStateHub is null
+                ? new JsonObject
+                {
+                    ["running"] = null,
+                    ["state"] = "unknown",
+                }
+                : new JsonObject
+                {
+                    ["running"] = gatewayStateHub.State == GatewayState.Running,
+                    ["state"] = gatewayStateHub.State.ToString().ToLowerInvariant(),
+                    ["error"] = string.IsNullOrWhiteSpace(gatewayStateHub.Error) ? null : gatewayStateHub.Error,
+                },
             ["providers"] = new JsonObject
             {
                 ["total"] = providers.Count,

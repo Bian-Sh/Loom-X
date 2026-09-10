@@ -25,6 +25,7 @@ public sealed class GatewayProcessService : IDisposable
     private bool appStarted;
     private ActivityStore? activityStore;
     private RequestTelemetryHub? telemetryHub;
+    private GatewayStateHub? stateHub;
 
     public GatewayState State { get; private set; } = GatewayState.Stopped;
     public string? Error { get; private set; }
@@ -170,6 +171,8 @@ public sealed class GatewayProcessService : IDisposable
     {
         State = state;
         Error = error;
+        stateHub ??= app?.Services.GetService<GatewayStateHub>();
+        stateHub?.Update(state, error);
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
