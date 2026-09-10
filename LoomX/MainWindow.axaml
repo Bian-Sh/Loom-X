@@ -109,9 +109,7 @@
       <Border Grid.Column="0" Classes="glass-sidebar" Padding="16,24">
         <Grid RowDefinitions="Auto,*,Auto">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28" PointerPressed="WindowChrome_OnPointerPressed">
-            <Border Width="38" Height="38" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12">
-              <Image Source="/Assets/icon-transparent.png" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
+            <Image Source="/Assets/icon-transparent.png" Width="30" Height="30" HorizontalAlignment="Left" VerticalAlignment="Center" />
             <StackPanel Spacing="1" VerticalAlignment="Center">
               <TextBlock Text="Loom-X" FontSize="16" FontWeight="SemiBold" />
             </StackPanel>
