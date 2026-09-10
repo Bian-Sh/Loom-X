@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+﻿using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -311,159 +311,29 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         TextReader reader,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-            var toolCallBuilders = new Dictionary<int, ToolCallBuilder>();
-            // 按 tool_call_id 去重：上游（如 sensenova）有时会把同一批 tool_call 扇出成多份，
-            // 每份都带相同的 id 但 index 递增；按 index 累积会把同一 id 复制成 N 份进而把历史撑爆、
-            // 下一次请求违反 OpenAI 协议的 "同 assistant 消息内 tool_call_id 唯一" 约束并触发 400。
-            // 一旦某 builder 的 Id 已知，后续若再出现同 Id 的 delta，应合并到该 builder（而不是新建）。
-            var idToBuilder = new Dictionary<string, ToolCallBuilder>(StringComparer.Ordinal);
-            var completionEmitted = false;
+        var toolCallBuilders = new Dictionary<int, ToolCallBuilder>();
+        // 按 tool_call_id 去重：上游（如 sensenova）有时会把同一批 tool_call 扇出成多份，
+        // 每份都带相同的 id 但 index 递增；按 index 累积会把同一 id 复制成 N 份进而把历史撑爆、
+        // 下一次请求违反 OpenAI 协议的 "同 assistant 消息内 tool_call_id 唯一" 约束并触发 400。
+        // 一旦某 builder 的 Id 已知，后续若再出现同 Id 的 delta，应合并到该 builder（而不是新建）。
+        var idToBuilder = new Dictionary<string, ToolCallBuilder>(StringComparer.Ordinal);
+        var completionEmitted = false;
 
-            while (true)
+        while (true)
+        {
+            var line = await reader.ReadLineAsync(cancellationToken);
+            if (line is null) break;
+            if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
+
+            var data = line["data:".Length..].Trim();
+            if (data.Length == 0) continue;
+            if (data == "[DONE]")
             {
-                var line = await reader.ReadLineAsync(cancellationToken);
-                if (line is null) break;
-                if (!line.StartsWith("data:", StringComparison.Ordinal)) continue;
-
-                var data = line["data:".Length..].Trim();
-                if (data.Length == 0) continue;
-                if (data == "[DONE]")
+                if (completionEmitted)
                 {
-                    if (completionEmitted)
-                    {
-                        break;
-                    }
-
-                    var toolCalls = DrainToolCalls(toolCallBuilders, idToBuilder);
-                    foreach (var toolCall in toolCalls)
-                    {
-                        yield return new ModelToolCallEvent(toolCall);
-                    }
-
-                    if (toolCalls.Length > 0)
-                    {
-                        yield return new ModelCompletedEvent("tool_calls");
-                        completionEmitted = true;
-                    }
-
                     break;
                 }
 
-                JsonNode? chunk;
-                try
-                {
-                    chunk = JsonNode.Parse(data);
-                }
-                catch (JsonException)
-                {
-                    continue;
-                }
-
-                // 兼容部分服务在非流式/异常时返回 {"choices":[]} 或缺失 choices 的情况：
-                // 空数组下 ?[0] 会抛 ArgumentOutOfRangeException，这里显式判空集合兜底为 null。
-                var choices = chunk?["choices"] as JsonArray;
-                var choice = choices is { Count: > 0 } ? choices[0] : null;
-                var delta = choice?["delta"];
-                if (delta?["content"]?.GetValue<string>() is { Length: > 0 } content)
-                {
-                    yield return new TextDeltaEvent(content);
-                }
-
-                // 某些兼容端点即使请求 stream=true 仍返回完整 chat.completion，
-                // 工具调用位于 choice.message.tool_calls 而不是 delta.tool_calls。
-                if (delta is null && choice?["message"] is JsonObject message)
-                {
-                    if (message["content"]?.GetValue<string>() is { Length: > 0 } messageContent)
-                    {
-                        yield return new TextDeltaEvent(messageContent);
-                    }
-
-                    if (message["tool_calls"] is JsonArray messageToolCalls)
-                    {
-                        foreach (var toolCallNode in messageToolCalls.OfType<JsonObject>())
-                        {
-                            var function = toolCallNode["function"] as JsonObject;
-                            var name = function?["name"]?.GetValue<string>();
-                            if (string.IsNullOrWhiteSpace(name)) continue;
-
-                            yield return new ModelToolCallEvent(new ToolCall(
-                                toolCallNode["id"]?.GetValue<string>() ?? string.Empty,
-                                name,
-                                function?["arguments"]?.GetValue<string>() ?? "{}"));
-                        }
-                    }
-                }
-
-                if (delta?["tool_calls"] is JsonArray toolCallDeltas)
-                {
-                    foreach (var deltaNode in toolCallDeltas)
-                    {
-                        if (deltaNode is null) continue;
-                        var deltaId = deltaNode["id"]?.GetValue<string>();
-                        var function = deltaNode["function"];
-                        var deltaName = function?["name"]?.GetValue<string>();
-                        var index = deltaNode["index"]?.GetValue<int>() ?? 0;
-
-                        // 根因防御：合法的 tool_call 首个 chunk 一定携带 id 或 name；
-                        // 而后续的 arguments 分片虽然不带 id/name，但对应 index 已有 builder。
-                        // 部分上游（如 sensenova）会在流里附带「既无 id/name、index 也无对应 builder」的
-                        // 畸形占位片段，若为其新建 builder 会累积出 name 为空的调用，进而被误判为
-                        // 「未注册工具」并以空 tool_call_id 回传历史导致 400。这里直接丢弃。
-                        var hasBuilder = toolCallBuilders.ContainsKey(index);
-
-                        if (!hasBuilder && string.IsNullOrEmpty(deltaId) && string.IsNullOrWhiteSpace(deltaName))
-                        {
-                            continue;
-                        }
-
-                        // 去重合并：若该 delta 带 id 且之前已见过同 id 的 builder，
-                        // 把 delta 追加到已有 builder（其 index 由首次出现决定），
-                        // 避免上游扇出造成同 id 多份副本。
-                        ToolCallBuilder? builder = null;
-                        if (deltaId is { Length: > 0 } && idToBuilder.TryGetValue(deltaId, out var existing))
-                        {
-                            builder = existing;
-                        }
-
-                        if (builder is null && !hasBuilder)
-                        {
-                            builder = new ToolCallBuilder();
-                            toolCallBuilders[index] = builder;
-                            if (deltaId is { Length: > 0 })
-                            {
-                                idToBuilder[deltaId] = builder;
-                            }
-                        }
-                        else if (builder is null)
-                        {
-                            builder = toolCallBuilders[index];
-                        }
-
-                        if (deltaId is { Length: > 0 } && !idToBuilder.ContainsKey(deltaId))
-                        {
-                            idToBuilder[deltaId] = builder;
-                        }
-                        if (deltaId is { Length: > 0 }) builder.Id = deltaId;
-                        if (deltaName is { Length: > 0 }) builder.Name = deltaName;
-                        if (function?["arguments"]?.GetValue<string>() is { } arguments) builder.Arguments.Append(arguments);
-                    }
-                }
-
-                if (choice?["finish_reason"]?.GetValue<string>() is { } finishReason)
-                {
-                    foreach (var toolCall in DrainToolCalls(toolCallBuilders, idToBuilder))
-                    {
-                        yield return new ModelToolCallEvent(toolCall);
-                    }
-                    yield return new ModelCompletedEvent(finishReason);
-                    completionEmitted = true;
-                }
-            }
-
-            // 一些兼容端点只发送 [DONE] 之前的增量后直接关闭连接，
-            // 没有 finish_reason，也可能省略 [DONE]。结束时仍需把完整工具调用交给 AgentLoop。
-            if (!completionEmitted && toolCallBuilders.Count > 0)
-            {
                 var toolCalls = DrainToolCalls(toolCallBuilders, idToBuilder);
                 foreach (var toolCall in toolCalls)
                 {
@@ -473,8 +343,139 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 if (toolCalls.Length > 0)
                 {
                     yield return new ModelCompletedEvent("tool_calls");
+                    completionEmitted = true;
+                }
+
+                break;
+            }
+
+            JsonNode? chunk;
+            try
+            {
+                chunk = JsonNode.Parse(data);
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+
+            // 兼容部分服务在非流式/异常时返回 {"choices":[]} 或缺失 choices 的情况：
+            // 空数组下 ?[0] 会抛 ArgumentOutOfRangeException，这里显式判空集合兜底为 null。
+            var choices = chunk?["choices"] as JsonArray;
+            var choice = choices is { Count: > 0 } ? choices[0] : null;
+            var delta = choice?["delta"];
+            if (delta?["content"]?.GetValue<string>() is { Length: > 0 } content)
+            {
+                yield return new TextDeltaEvent(content);
+            }
+
+            // 某些兼容端点即使请求 stream=true 仍返回完整 chat.completion，
+            // 工具调用位于 choice.message.tool_calls 而不是 delta.tool_calls。
+            if (delta is null && choice?["message"] is JsonObject message)
+            {
+                if (message["content"]?.GetValue<string>() is { Length: > 0 } messageContent)
+                {
+                    yield return new TextDeltaEvent(messageContent);
+                }
+
+                if (message["tool_calls"] is JsonArray messageToolCalls)
+                {
+                    foreach (var toolCallNode in messageToolCalls.OfType<JsonObject>())
+                    {
+                        var function = toolCallNode["function"] as JsonObject;
+                        var name = function?["name"]?.GetValue<string>();
+                        if (string.IsNullOrWhiteSpace(name)) continue;
+
+                        yield return new ModelToolCallEvent(new ToolCall(
+                            toolCallNode["id"]?.GetValue<string>() ?? string.Empty,
+                            name,
+                            function?["arguments"]?.GetValue<string>() ?? "{}"));
+                    }
                 }
             }
+
+            if (delta?["tool_calls"] is JsonArray toolCallDeltas)
+            {
+                foreach (var deltaNode in toolCallDeltas)
+                {
+                    if (deltaNode is null) continue;
+                    var deltaId = deltaNode["id"]?.GetValue<string>();
+                    var function = deltaNode["function"];
+                    var deltaName = function?["name"]?.GetValue<string>();
+                    var index = deltaNode["index"]?.GetValue<int>() ?? 0;
+
+                    // 根因防御：合法的 tool_call 首个 chunk 一定携带 id 或 name；
+                    // 而后续的 arguments 分片虽然不带 id/name，但对应 index 已有 builder。
+                    // 部分上游（如 sensenova）会在流里附带「既无 id/name、index 也无对应 builder」的
+                    // 畸形占位片段，若为其新建 builder 会累积出 name 为空的调用，进而被误判为
+                    // 「未注册工具」并以空 tool_call_id 回传历史导致 400。这里直接丢弃。
+                    var hasBuilder = toolCallBuilders.ContainsKey(index);
+
+                    if (!hasBuilder && string.IsNullOrEmpty(deltaId) && string.IsNullOrWhiteSpace(deltaName))
+                    {
+                        continue;
+                    }
+
+                    // 去重合并：若该 delta 带 id 且之前已见过同 id 的 builder，
+                    // 把 delta 追加到已有 builder（其 index 由首次出现决定），
+                    // 避免上游扇出造成同 id 多份副本。
+                    ToolCallBuilder? builder = null;
+                    if (deltaId is { Length: > 0 } && idToBuilder.TryGetValue(deltaId, out var existing))
+                    {
+                        builder = existing;
+                    }
+
+                    if (builder is null && !hasBuilder)
+                    {
+                        builder = new ToolCallBuilder();
+                        toolCallBuilders[index] = builder;
+                        if (deltaId is { Length: > 0 })
+                        {
+                            idToBuilder[deltaId] = builder;
+                        }
+                    }
+                    else if (builder is null)
+                    {
+                        builder = toolCallBuilders[index];
+                    }
+
+                    if (deltaId is { Length: > 0 } && !idToBuilder.ContainsKey(deltaId))
+                    {
+                        idToBuilder[deltaId] = builder;
+                    }
+                    if (deltaId is { Length: > 0 }) builder.Id = deltaId;
+                    if (deltaName is { Length: > 0 }) builder.Name = deltaName;
+                    if (function?["arguments"]?.GetValue<string>() is { } arguments) builder.AppendArguments(arguments);
+                }
+            }
+
+            if (choice?["finish_reason"]?.GetValue<string>() is { } finishReason
+                && !string.IsNullOrWhiteSpace(finishReason))
+            {
+                foreach (var toolCall in DrainToolCalls(toolCallBuilders, idToBuilder))
+                {
+                    yield return new ModelToolCallEvent(toolCall);
+                }
+                yield return new ModelCompletedEvent(finishReason);
+                completionEmitted = true;
+            }
+        }
+
+        // 一些兼容端点只发送 [DONE] 之前的增量后直接关闭连接，
+        // 没有 finish_reason，也可能省略 [DONE]。结束时仍需把完整工具调用交给 AgentLoop。
+        if (!completionEmitted && toolCallBuilders.Count > 0)
+        {
+            var toolCalls = DrainToolCalls(toolCallBuilders, idToBuilder);
+            foreach (var toolCall in toolCalls)
+            {
+                yield return new ModelToolCallEvent(toolCall);
+            }
+
+            if (toolCalls.Length > 0)
+            {
+                yield return new ModelCompletedEvent("tool_calls");
+            }
+        }
     }
 
     private static ToolCall[] DrainToolCalls(
@@ -600,7 +601,56 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         public string Name = string.Empty;
         public readonly StringBuilder Arguments = new();
 
-        public ToolCall ToToolCall() => new(Id, Name, Arguments.ToString());
+        public void AppendArguments(string fragment)
+        {
+            if (fragment.Length == 0) return;
+
+            var current = Arguments.ToString();
+            if (current.Length == 0)
+            {
+                Arguments.Append(fragment);
+                return;
+            }
+
+            // 同一 tool_call_id 被扇出时，上游可能重复发送完整参数快照。
+            // 工具参数按协议必须是 JSON object；一旦已有完整对象，后续副本不能继续拼接。
+            if (IsCompleteJsonObject(current)) return;
+
+            // 兼容累计快照：新片段已包含当前前缀时，用较完整的快照替换；
+            // 反向则是旧快照重复，直接忽略。其余情况按标准增量追加。
+            if (fragment.StartsWith(current, StringComparison.Ordinal))
+            {
+                Arguments.Clear();
+                Arguments.Append(fragment);
+                return;
+            }
+            if (current.StartsWith(fragment, StringComparison.Ordinal)) return;
+
+            Arguments.Append(fragment);
+        }
+
+        public ToolCall ToToolCall()
+        {
+            var arguments = Arguments.Length == 0 ? "{}" : Arguments.ToString();
+            if (!IsCompleteJsonObject(arguments))
+            {
+                throw InvalidResponsesException("模型工具调用参数不完整，未进入工具执行。");
+            }
+
+            return new ToolCall(Id, Name, arguments);
+        }
+
+        private static bool IsCompleteJsonObject(string value)
+        {
+            try
+            {
+                return JsonNode.Parse(value) is JsonObject;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
     }
 
     private sealed class PrefixedTextReader(string firstLine, TextReader inner) : TextReader

@@ -1,8 +1,14 @@
-using System.Net;
+﻿using System.Net;
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using LoomX.Configuration;
 using LoomX.Assistant;
+using LoomX.Services;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace LoomX.Tests.Assistant;
@@ -91,6 +97,31 @@ public sealed class OpenAiCompatibleModelClientTests
             content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
             content.Headers.ContentEncoding.Add("gzip");
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+        }
+    }
+
+    private sealed class SequenceHttpHandler(params string[] responseBodies) : HttpMessageHandler
+    {
+        private readonly Queue<string> responses = new(responseBodies);
+
+        public List<string> RequestBodies { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestBodies.Add(request.Content is null
+                ? string.Empty
+                : await request.Content.ReadAsStringAsync(cancellationToken));
+            if (!responses.TryDequeue(out var body))
+            {
+                throw new InvalidOperationException("测试没有为本次模型请求准备响应。");
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(body, Encoding.UTF8, "text/event-stream"),
+            };
         }
     }
 
@@ -253,6 +284,132 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public async Task StreamAsync_EmptyFinishReason_DoesNotFlushSenseNovaToolArgumentsEarly()
+    {
+        // SenseNova 会在参数增量帧中返回 finish_reason:""，只有最后一帧才返回 tool_calls。
+        // 空字符串不是完成信号；若提前 drain，三个调用都会只剩首段 "{"。
+        var sse = string.Join("\n\n",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_openai","function":{"name":"mock.test_endpoint","arguments":"{"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"key\": "}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"open"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"ai\""}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"}"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":1,"id":"call_azure","function":{"name":"mock.test_endpoint","arguments":"{"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"\"key\": "}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"\"azure\""}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"}"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":2,"id":"call_ollama","function":{"name":"mock.test_endpoint","arguments":"{"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":2,"function":{"arguments":"\"key\": "}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":2,"function":{"arguments":"\"ollama"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":2,"function":{"arguments":"\"}"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+            "data: [DONE]");
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+
+        var events = await CollectAsync(client.StreamAsync(
+            new ModelRequest([ChatMessage.User("检查三个 Endpoint")], [CreateTool()]),
+            CancellationToken.None));
+
+        var toolCalls = events.OfType<ModelToolCallEvent>().Select(item => item.ToolCall).ToArray();
+        Assert.Equal(3, toolCalls.Length);
+        Assert.Equal("""{"key": "openai"}""", toolCalls[0].ArgumentsJson);
+        Assert.Equal("""{"key": "azure"}""", toolCalls[1].ArgumentsJson);
+        Assert.Equal("""{"key": "ollama"}""", toolCalls[2].ArgumentsJson);
+        Assert.All(toolCalls, toolCall => Assert.NotNull(JsonNode.Parse(toolCall.ArgumentsJson)));
+        var completed = Assert.Single(events.OfType<ModelCompletedEvent>());
+        Assert.Equal("tool_calls", completed.FinishReason);
+    }
+
+    [Fact]
+    public async Task StreamAsync_IncompleteToolArguments_FailsBeforeToolExecution()
+    {
+        var sse = string.Join("\n\n",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_incomplete","function":{"name":"mock.test_endpoint","arguments":"{"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+            "data: [DONE]");
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+
+        var exception = await Assert.ThrowsAsync<ModelClientException>(async () =>
+            await CollectAsync(client.StreamAsync(
+                new ModelRequest([ChatMessage.User("检查")], [CreateTool()]),
+                CancellationToken.None)));
+
+        Assert.Equal(ModelErrorKind.Unknown, exception.Kind);
+        Assert.Contains("工具调用参数不完整", exception.UpstreamMessage);
+    }
+
+    [Fact]
+    public async Task FunctionCallLifecycle_SenseNovaStream_ExecutesToolAndCompletesSecondModelTurn()
+    {
+        var toolCallSse = string.Join("\n\n",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_lifecycle","function":{"name":"mock.test_endpoint","arguments":"{"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"key\": "}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"openai\""}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"}"}}]},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+            "data: [DONE]");
+        var finalAnswerSse = string.Join("\n\n",
+            """data: {"choices":[{"delta":{"content":"生命周期验收通过"},"finish_reason":""}]}""",
+            """data: {"choices":[{"delta":{},"finish_reason":"stop"}]}""",
+            "data: [DONE]");
+        var handler = new SequenceHttpHandler(toolCallSse, finalAnswerSse);
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler),
+            "https://provider.example/v1",
+            "test-model");
+        var registry = new ToolRegistry();
+        var executionCount = 0;
+        string? executedKey = null;
+        registry.Register(new ToolDefinition
+        {
+            Name = "mock.test_endpoint",
+            Description = "读取 Endpoint 的无副作用验收工具。",
+            ParametersSchema = JsonNode.Parse(
+                """{"type":"object","properties":{"key":{"type":"string"}},"required":["key"]}""")!,
+            Handler = (arguments, _) =>
+            {
+                executionCount++;
+                executedKey = arguments?["key"]?.GetValue<string>();
+                return Task.FromResult(ToolResult.Ok("Endpoint 状态正常。"));
+            },
+        });
+        var session = new AgentSession(new AgentSessionOptions
+        {
+            MaxSteps = 3,
+            SystemPrompt = "必须先调用工具，收到结果后给出最终回答。",
+        });
+        var loop = new AgentLoop(client, registry, NullLogger<AgentLoop>.Instance);
+
+        var events = new List<AgentEvent>();
+        await foreach (var agentEvent in loop.RunAsync(session, "检查 openai Endpoint"))
+        {
+            events.Add(agentEvent);
+        }
+
+        Assert.Equal(AgentSessionState.Completed, session.State);
+        Assert.Equal(AgentEventKind.TaskCompleted, events[^1].Kind);
+        Assert.Equal(1, executionCount);
+        Assert.Equal("openai", executedKey);
+        Assert.Equal(2, handler.RequestBodies.Count);
+
+        var secondRequest = JsonNode.Parse(handler.RequestBodies[1])!.AsObject();
+        var messages = secondRequest["messages"]!.AsArray();
+        var assistantToolMessage = messages.Single(message =>
+            message?["role"]?.GetValue<string>() == "assistant"
+            && message?["tool_calls"] is JsonArray);
+        var persistedCall = assistantToolMessage!["tool_calls"]![0]!;
+        Assert.Equal("call_lifecycle", persistedCall["id"]!.GetValue<string>());
+        Assert.Equal(
+            """{"key": "openai"}""",
+            persistedCall["function"]!["arguments"]!.GetValue<string>());
+        var toolResultMessage = messages.Single(message => message?["role"]?.GetValue<string>() == "tool");
+        Assert.Equal("call_lifecycle", toolResultMessage!["tool_call_id"]!.GetValue<string>());
+        Assert.Equal("生命周期验收通过", session.Messages[^1].Content);
+    }
+
+    [Fact]
     public async Task StreamAsync_FlushesToolCallWhenDoneMarkerOmitsFinishReason()
     {
         var sse = string.Join("\n\n",
@@ -383,10 +540,9 @@ public sealed class OpenAiCompatibleModelClientTests
         Assert.Equal(6, ids.Distinct().Count());
         Assert.Equal(new[] { "call_a", "call_b", "call_c", "call_d", "call_e", "call_f" }, ids);
         Assert.All(toolCalls, t => Assert.Equal("mock.list_providers", t.ToolCall.Name));
-        // arguments 形如 "{}{}{}..."（首轮 1 段 + 10 轮扇出共 11 段），任一 tool_call 都不能为空，
-        // 且其字符数 = 2 * 11 = 22。
-        Assert.All(toolCalls, t => Assert.Equal(22, t.ToolCall.ArgumentsJson.Length));
-        Assert.All(toolCalls, t => Assert.True(t.ToolCall.ArgumentsJson.All(c => c == '{' || c == '}')));
+        // 重复扇出是同一完整参数快照，不能被拼成 "{}{}{}..." 这种无效 JSON。
+        Assert.All(toolCalls, t => Assert.Equal("{}", t.ToolCall.ArgumentsJson));
+        Assert.All(toolCalls, t => Assert.NotNull(JsonNode.Parse(t.ToolCall.ArgumentsJson)));
         Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[^1]).FinishReason);
     }
 
@@ -577,5 +733,159 @@ public sealed class OpenAiCompatibleModelClientTests
         await CollectAsync(client.StreamAsync(new ModelRequest([ChatMessage.User("hi")], []), CancellationToken.None));
 
         Assert.Null(JsonNode.Parse(handler.LastRequestBody!)!.AsObject()["reasoning_effort"]);
+    }
+
+    [Fact]
+    [Trait("Category", "Live")]
+    public async Task SenseNovaLive_FunctionCallLifecycle_CompletesWhenExplicitlyEnabled()
+    {
+        if (!string.Equals(
+                Environment.GetEnvironmentVariable("LOOMX_LIVE_SENSENOVA_FUNCTIONCALL"),
+                "1",
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var providerBusinessId = Environment.GetEnvironmentVariable("LOOMX_LIVE_PROVIDER") ?? "sensenova";
+        var modelId = Environment.GetEnvironmentVariable("LOOMX_LIVE_MODEL") ?? "glm-5.2";
+        var connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = AppDataPaths.DatabasePath,
+            Mode = SqliteOpenMode.ReadOnly,
+            Cache = SqliteCacheMode.Private,
+            Pooling = false,
+            DefaultTimeout = 5,
+        }.ToString();
+        var options = new DbContextOptionsBuilder<ConfigurationDbContext>()
+            .UseSqlite(connectionString)
+            .Options;
+        await using var db = new ConfigurationDbContext(options);
+        var provider = await db.Providers
+            .AsNoTracking()
+            .Include(item => item.Models)
+            .SingleOrDefaultAsync(item => item.BusinessId == providerBusinessId);
+        Assert.NotNull(provider);
+        Assert.True(provider.Enabled, $"Provider '{providerBusinessId}' 未启用。");
+        var model = provider.Models.SingleOrDefault(item => item.ModelId == modelId);
+        Assert.NotNull(model);
+        Assert.True(model.Enabled, $"模型 '{providerBusinessId}/{modelId}' 未启用。");
+        Assert.False(string.IsNullOrWhiteSpace(provider.ProtectedApiKey), "Provider 未配置 API Key。");
+        Assert.True(
+            ProtectedApiKeyStore.TryUnprotect(provider.ProtectedApiKey!, out var apiKey),
+            "Provider API Key 无法由当前 Windows 用户解密。");
+
+        using var httpClient = new HttpClient(new HttpClientHandler());
+        var executionPipeline = new MinimumIntervalExecutionPipeline(TimeSpan.FromSeconds(5));
+        var client = new OpenAiCompatibleModelClient(
+            httpClient,
+            (model.BaseUrl ?? provider.BaseUrl).TrimEnd('/'),
+            model.ModelId,
+            apiKey,
+            NullLogger<OpenAiCompatibleModelClient>.Instance,
+            MergeHeaders(provider.HeadersJson, model.HeadersJson),
+            endpointFormat: provider.EndpointFormat,
+            executionPipeline: executionPipeline,
+            providerId: provider.BusinessId);
+        var registry = new ToolRegistry();
+        var executionCount = 0;
+        string? executedKey = null;
+        registry.Register(new ToolDefinition
+        {
+            Name = "acceptance.inspect_endpoint",
+            Description = "Function Call 生命周期验收专用的无副作用工具。",
+            ParametersSchema = JsonNode.Parse(
+                """{"type":"object","properties":{"key":{"type":"string","enum":["openai"]}},"required":["key"],"additionalProperties":false}""")!,
+            Handler = (arguments, _) =>
+            {
+                executionCount++;
+                executedKey = arguments?["key"]?.GetValue<string>();
+                return Task.FromResult(ToolResult.Ok("Endpoint openai 状态正常；请回复 LIFECYCLE_OK。"));
+            },
+        });
+        var session = new AgentSession(new AgentSessionOptions
+        {
+            MaxSteps = 2,
+            ModelTimeout = TimeSpan.FromSeconds(60),
+            SystemPrompt = "你正在执行验收。必须先且只调用一次 acceptance.inspect_endpoint，参数 key 固定为 openai；收到工具结果后只回复 LIFECYCLE_OK，不得再次调用工具。",
+        });
+        var loop = new AgentLoop(client, registry, NullLogger<AgentLoop>.Instance);
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(120));
+
+        var events = new List<AgentEvent>();
+        await foreach (var agentEvent in loop.RunAsync(
+                           session,
+                           "开始 Function Call 全生命周期验收。",
+                           timeout.Token))
+        {
+            events.Add(agentEvent);
+        }
+
+        Assert.Equal(2, executionPipeline.RequestCount);
+        Assert.Equal(1, executionCount);
+        Assert.Equal("openai", executedKey);
+        Assert.Equal(AgentSessionState.Completed, session.State);
+        Assert.Equal(AgentEventKind.TaskCompleted, events[^1].Kind);
+        Assert.Contains("LIFECYCLE_OK", session.Messages[^1].Content, StringComparison.Ordinal);
+        var assistantToolMessage = Assert.Single(session.Messages, item => item.ToolCalls.Count > 0);
+        var toolCall = Assert.Single(assistantToolMessage.ToolCalls);
+        Assert.Equal("acceptance.inspect_endpoint", toolCall.Name);
+        Assert.Equal("openai", JsonNode.Parse(toolCall.ArgumentsJson)?["key"]?.GetValue<string>());
+        Assert.Single(session.Messages, item => item.Role == ChatRole.Tool);
+    }
+
+    private static IReadOnlyDictionary<string, string> MergeHeaders(string providerHeadersJson, string modelHeadersJson)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in ParseHeaders(providerHeadersJson)) result[pair.Key] = pair.Value;
+        foreach (var pair in ParseHeaders(modelHeadersJson)) result[pair.Key] = pair.Value;
+        return result;
+    }
+
+    private static IReadOnlyDictionary<string, string> ParseHeaders(string headersJson)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(headersJson) ?? [];
+        }
+        catch (JsonException)
+        {
+            return new Dictionary<string, string>();
+        }
+    }
+
+    private sealed class MinimumIntervalExecutionPipeline(TimeSpan minimumInterval) : IProviderExecutionPipeline
+    {
+        private readonly ProviderExecutionPipeline inner = new();
+        private readonly SemaphoreSlim gate = new(1, 1);
+        private DateTimeOffset lastCompletedAt = DateTimeOffset.MinValue;
+
+        public int RequestCount { get; private set; }
+
+        public async Task<ProviderExecutionResult> ExecuteAsync(
+            HttpClient httpClient,
+            HttpRequestMessage request,
+            ProviderExecutionContext context,
+            CancellationToken cancellationToken)
+        {
+            await gate.WaitAsync(cancellationToken);
+            try
+            {
+                var remaining = minimumInterval - (DateTimeOffset.UtcNow - lastCompletedAt);
+                if (remaining > TimeSpan.Zero)
+                {
+                    await Task.Delay(remaining, cancellationToken);
+                }
+
+                RequestCount++;
+                var result = await inner.ExecuteAsync(httpClient, request, context, cancellationToken);
+                lastCompletedAt = DateTimeOffset.UtcNow;
+                return result;
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
     }
 }
