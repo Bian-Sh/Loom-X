@@ -105,6 +105,7 @@ public sealed class OpenAiCompatibleModelClientTests
         private readonly Queue<string> responses = new(responseBodies);
 
         public List<string> RequestBodies { get; } = [];
+        public List<IReadOnlyDictionary<string, string>> RequestHeaders { get; } = [];
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
@@ -113,6 +114,10 @@ public sealed class OpenAiCompatibleModelClientTests
             RequestBodies.Add(request.Content is null
                 ? string.Empty
                 : await request.Content.ReadAsStringAsync(cancellationToken));
+            RequestHeaders.Add(request.Headers.ToDictionary(
+                header => header.Key,
+                header => string.Join(",", header.Value),
+                StringComparer.OrdinalIgnoreCase));
             if (!responses.TryDequeue(out var body))
             {
                 throw new InvalidOperationException("测试没有为本次模型请求准备响应。");
@@ -139,7 +144,7 @@ public sealed class OpenAiCompatibleModelClientTests
         data: {"type":"response.output_text.delta","delta":"先查一下"}
 
         event: response.output_item.added
-        data: {"type":"response.output_item.added","item":{"id":"fc_1","type":"function_call","call_id":"call_1","name":"mock.list_providers"}}
+        data: {"type":"response.output_item.added","item":{"id":"fc_1","type":"function_call","call_id":"call_1","name":"mock_list_providers"}}
 
         event: response.function_call_arguments.delta
         data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","delta":"{}"}
@@ -161,9 +166,9 @@ public sealed class OpenAiCompatibleModelClientTests
         Assert.Equal("https://api.example.com/v1/responses", handler.LastRequest?.RequestUri?.ToString());
         var body = JsonNode.Parse(handler.LastRequestBody!)!.AsObject();
         Assert.Null(body["messages"]);
-        Assert.Equal("查询", body["input"]![0]!["content"]!.GetValue<string>());
+        Assert.Equal("查询", body["input"]![0]!["content"]![0]!["text"]!.GetValue<string>());
         Assert.Equal("function", body["tools"]![0]!["type"]!.GetValue<string>());
-        Assert.Equal("mock.list_providers", body["tools"]![0]!["name"]!.GetValue<string>());
+        Assert.Equal("mock_list_providers", body["tools"]![0]!["name"]!.GetValue<string>());
         Assert.Equal("先查一下", Assert.IsType<TextDeltaEvent>(events[0]).Text);
         Assert.Equal("mock.list_providers", Assert.IsType<ModelToolCallEvent>(events[1]).ToolCall.Name);
         Assert.Equal("{}", Assert.IsType<ModelToolCallEvent>(events[1]).ToolCall.ArgumentsJson);
@@ -410,6 +415,103 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public async Task FunctionCallLifecycle_CodexResponses_UsesStableSessionAndCompletesSecondTurn()
+    {
+        const string toolCallSse = """
+        event: response.output_item.added
+        data: {"type":"response.output_item.added","item":{"id":"fc_lifecycle","type":"function_call","call_id":"call_lifecycle","name":"acceptance_inspect_endpoint"}}
+
+        event: response.function_call_arguments.delta
+        data: {"type":"response.function_call_arguments.delta","item_id":"fc_lifecycle","delta":"{\"key\":\"openai\"}"}
+
+        event: response.completed
+        data: {"type":"response.completed","response":{"id":"resp_first"}}
+
+        data: [DONE]
+
+        """;
+        const string finalAnswerSse = """
+        event: response.output_item.added
+        data: {"type":"response.output_item.added","item":{"id":"msg_final","type":"message","role":"assistant"}}
+
+        event: response.output_text.delta
+        data: {"type":"response.output_text.delta","delta":"LIFECYCLE_OK"}
+
+        event: response.completed
+        data: {"type":"response.completed","response":{"id":"resp_second"}}
+
+        data: [DONE]
+
+        """;
+        var handler = new SequenceHttpHandler(toolCallSse, finalAnswerSse);
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler),
+            "https://provider.example/v1",
+            "gpt-6-astra",
+            extraHeaders: new Dictionary<string, string>
+            {
+                ["User-Agent"] = "codex_cli_rs/0.153.4",
+                ["originator"] = "codex_cli_rs",
+                ["version"] = "0.153.4",
+            },
+            endpointFormat: "responses");
+        var registry = new ToolRegistry();
+        var executionCount = 0;
+        registry.Register(new ToolDefinition
+        {
+            Name = "acceptance.inspect_endpoint",
+            Description = "读取 Endpoint 的无副作用验收工具。",
+            ParametersSchema = JsonNode.Parse(
+                """{"type":"object","properties":{"key":{"type":"string"}},"required":["key"],"additionalProperties":false}""")!,
+            Handler = (_, _) =>
+            {
+                executionCount++;
+                return Task.FromResult(ToolResult.Ok("Endpoint openai 状态正常。"));
+            },
+        });
+        var session = new AgentSession(new AgentSessionOptions
+        {
+            MaxSteps = 2,
+            SystemPrompt = "必须先调用验收工具，再根据工具结果回复 LIFECYCLE_OK。",
+        });
+        var loop = new AgentLoop(client, registry, NullLogger<AgentLoop>.Instance);
+
+        var events = new List<AgentEvent>();
+        await foreach (var agentEvent in loop.RunAsync(session, "开始验收"))
+        {
+            events.Add(agentEvent);
+        }
+
+        Assert.Equal(2, handler.RequestBodies.Count);
+        Assert.Equal(2, handler.RequestHeaders.Count);
+        Assert.Equal(1, executionCount);
+        Assert.Equal(AgentSessionState.Completed, session.State);
+        Assert.Equal(AgentEventKind.TaskCompleted, events[^1].Kind);
+        Assert.Equal("LIFECYCLE_OK", session.Messages[^1].Content);
+
+        var firstRequest = JsonNode.Parse(handler.RequestBodies[0])!.AsObject();
+        var secondRequest = JsonNode.Parse(handler.RequestBodies[1])!.AsObject();
+        var sessionId = firstRequest["prompt_cache_key"]!.GetValue<string>();
+        Assert.Equal(sessionId, secondRequest["prompt_cache_key"]!.GetValue<string>());
+        Assert.Equal(sessionId, handler.RequestHeaders[0]["session-id"]);
+        Assert.Equal(sessionId, handler.RequestHeaders[1]["session-id"]);
+        Assert.Equal(
+            firstRequest["client_metadata"]!["root_turn_id"]!.GetValue<string>(),
+            secondRequest["client_metadata"]!["root_turn_id"]!.GetValue<string>());
+        Assert.NotEqual(
+            firstRequest["client_metadata"]!["turn_id"]!.GetValue<string>(),
+            secondRequest["client_metadata"]!["turn_id"]!.GetValue<string>());
+
+        var secondInput = secondRequest["input"]!.AsArray();
+        var functionCall = secondInput.Single(item => item?["type"]?.GetValue<string>() == "function_call");
+        var functionOutput = secondInput.Single(item => item?["type"]?.GetValue<string>() == "function_call_output");
+        Assert.Equal("call_lifecycle", functionCall!["call_id"]!.GetValue<string>());
+        Assert.Equal("acceptance_inspect_endpoint", functionCall["name"]!.GetValue<string>());
+        Assert.Equal("call_lifecycle", functionOutput!["call_id"]!.GetValue<string>());
+        Assert.Equal("Endpoint openai 状态正常。", functionOutput["output"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task StreamAsync_FlushesToolCallWhenDoneMarkerOmitsFinishReason()
     {
         var sse = string.Join("\n\n",
@@ -650,6 +752,29 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public async Task StreamAsync_AnyRouterInvalidCodexRequest_PreservesErrorTypeAndMessage()
+    {
+        var handler = new FakeHttpHandler(
+            HttpStatusCode.BadRequest,
+            """{"error":{"type":"invalid_responses_request","message":"invalid codex request"}}""");
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler),
+            "https://anyrouter.example/v1",
+            "gpt-6-astra",
+            endpointFormat: "responses");
+
+        var exception = await Assert.ThrowsAsync<ModelClientException>(async () =>
+            await CollectAsync(client.StreamAsync(
+                new ModelRequest([ChatMessage.User("hi")], []),
+                CancellationToken.None)));
+
+        Assert.Equal(ModelErrorKind.InvalidRequest, exception.Kind);
+        Assert.Equal(400, exception.StatusCode);
+        Assert.Equal("invalid_responses_request", exception.ErrorCode);
+        Assert.Equal("invalid codex request", exception.UpstreamMessage);
+    }
+
+    [Fact]
     public async Task StreamAsync_ErrorBodyWithSecret_IsRedactedBeforeThrowing()
     {
         var handler = new FakeHttpHandler(
@@ -700,6 +825,63 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public async Task StreamAsync_CodexResponses_AlignsOfficialRequestIdentityAndPayloadShape()
+    {
+        const string responsesSse = """
+        event: response.output_item.added
+        data: {"type":"response.output_item.added","item":{"id":"msg_1","type":"message","role":"assistant"}}
+
+        event: response.output_text.delta
+        data: {"type":"response.output_text.delta","delta":"ok"}
+
+        event: response.completed
+        data: {"type":"response.completed","response":{"id":"resp_123"}}
+
+        data: [DONE]
+
+        """;
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, responsesSse);
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler),
+            "https://api.example.com/v1",
+            "test-model",
+            extraHeaders: new Dictionary<string, string>
+            {
+                ["User-Agent"] = "codex-cli/0.153.4",
+                ["originator"] = "codex-cli",
+                ["version"] = "0.153.4",
+            },
+            endpointFormat: "responses");
+
+        await CollectAsync(client.StreamAsync(
+            new ModelRequest(
+                [ChatMessage.System("system instruction"), ChatMessage.User("hi")],
+                [CreateTool()]),
+            CancellationToken.None));
+
+        Assert.Equal("codex_cli_rs/0.153.4", string.Join(",", handler.LastRequest!.Headers.GetValues("User-Agent")));
+        Assert.Equal("codex_cli_rs", string.Join(",", handler.LastRequest.Headers.GetValues("originator")));
+        Assert.Contains(handler.LastRequest.Headers.Accept, item => item.MediaType == "text/event-stream");
+        var sessionId = string.Join(",", handler.LastRequest.Headers.GetValues("session-id"));
+        Assert.True(Guid.TryParse(sessionId, out _));
+        Assert.Equal(sessionId, string.Join(",", handler.LastRequest.Headers.GetValues("thread-id")));
+        Assert.Equal(sessionId, string.Join(",", handler.LastRequest.Headers.GetValues("x-client-request-id")));
+        Assert.False(handler.LastRequest.Headers.Contains("session_id"));
+        var body = JsonNode.Parse(handler.LastRequestBody!)!.AsObject();
+        Assert.Equal("system instruction", body["instructions"]!.GetValue<string>());
+        Assert.Equal(sessionId, body["prompt_cache_key"]!.GetValue<string>());
+        Assert.Equal(sessionId, body["client_metadata"]!["session_id"]!.GetValue<string>());
+        Assert.Equal(sessionId, body["client_metadata"]!["thread_id"]!.GetValue<string>());
+        Assert.True(Guid.TryParse(body["client_metadata"]!["root_turn_id"]!.GetValue<string>(), out _));
+        Assert.True(Guid.TryParse(body["client_metadata"]!["turn_id"]!.GetValue<string>(), out _));
+        Assert.True(body["parallel_tool_calls"]!.GetValue<bool>());
+        Assert.Equal("auto", body["tool_choice"]!.GetValue<string>());
+        Assert.False(body["tools"]![0]!["strict"]!.GetValue<bool>());
+        Assert.Equal("low", body["reasoning"]!["effort"]!.GetValue<string>());
+        Assert.Equal("auto", body["reasoning"]!["summary"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task StreamAsync_ExtraHeaders_CannotOverrideAuthorization()
     {
         var handler = new FakeHttpHandler(HttpStatusCode.OK, "data: [DONE]\n");
@@ -737,12 +919,17 @@ public sealed class OpenAiCompatibleModelClientTests
 
     [Fact]
     [Trait("Category", "Live")]
-    public async Task SenseNovaLive_FunctionCallLifecycle_CompletesWhenExplicitlyEnabled()
+    public async Task ConfiguredProviderLive_FunctionCallLifecycle_CompletesWhenExplicitlyEnabled()
     {
-        if (!string.Equals(
-                Environment.GetEnvironmentVariable("LOOMX_LIVE_SENSENOVA_FUNCTIONCALL"),
-                "1",
-                StringComparison.Ordinal))
+        var enabled = string.Equals(
+                          Environment.GetEnvironmentVariable("LOOMX_LIVE_FUNCTIONCALL"),
+                          "1",
+                          StringComparison.Ordinal)
+                      || string.Equals(
+                          Environment.GetEnvironmentVariable("LOOMX_LIVE_SENSENOVA_FUNCTIONCALL"),
+                          "1",
+                          StringComparison.Ordinal);
+        if (!enabled)
         {
             return;
         }

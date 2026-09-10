@@ -22,6 +22,9 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
     private readonly string? reasoningEffort;
     private readonly ILogger<OpenAiCompatibleModelClient>? logger;
     private readonly bool useResponsesEndpoint;
+    private readonly bool useCodexIdentity;
+    private readonly string codexSessionId = Guid.NewGuid().ToString("D");
+    private readonly string codexRootTurnId = Guid.NewGuid().ToString("D");
     private readonly IProviderExecutionPipeline executionPipeline;
     private readonly string providerId;
 
@@ -45,6 +48,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         this.extraHeaders = extraHeaders;
         this.reasoningEffort = string.IsNullOrWhiteSpace(reasoningEffort) ? null : reasoningEffort.Trim();
         useResponsesEndpoint = string.Equals(endpointFormat, "responses", StringComparison.OrdinalIgnoreCase);
+        useCodexIdentity = useResponsesEndpoint && HasCodexIdentity(extraHeaders);
         this.executionPipeline = executionPipeline ?? new ProviderExecutionPipeline();
         this.providerId = string.IsNullOrWhiteSpace(providerId) ? "assistant" : providerId.Trim();
     }
@@ -53,20 +57,40 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         ModelRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        var chatPayload = BuildPayload(request);
+        var toolNames = useResponsesEndpoint
+            ? BuildResponsesToolNameMap(request.Tools)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+        var wireToOriginalToolNames = toolNames.ToDictionary(
+            item => item.Value,
+            item => item.Key,
+            StringComparer.Ordinal);
+        var chatPayload = BuildPayload(request, toolNames);
         var payload = useResponsesEndpoint
             ? OpenAiResponsesBridge.CreateResponsesRequest(chatPayload)
             : chatPayload;
+        var codexTurnId = useCodexIdentity ? Guid.NewGuid().ToString("D") : null;
+        if (codexTurnId is not null)
+        {
+            ApplyCodexRequestShape(payload, codexTurnId);
+        }
         var endpoint = useResponsesEndpoint ? "/responses" : "/chat/completions";
         using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}{endpoint}")
         {
             Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json"),
         };
+        if (useResponsesEndpoint)
+        {
+            httpRequest.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
+        }
         if (!string.IsNullOrEmpty(apiKey))
         {
             httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         }
         ApplyExtraHeaders(httpRequest);
+        if (useCodexIdentity)
+        {
+            ApplyCodexRequestHeaders(httpRequest);
+        }
 
         ProviderExecutionResult result;
         try
@@ -110,7 +134,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             using var translatedReader = new StringReader(chatSse);
             await foreach (var streamEvent in ParseChatCompletionsSseAsync(translatedReader, cancellationToken))
             {
-                yield return streamEvent;
+                yield return RestoreToolName(streamEvent, wireToOriginalToolNames);
             }
 
             yield break;
@@ -118,7 +142,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
 
         await foreach (var streamEvent in ParseChatCompletionsBodyAsync(reader, cancellationToken))
         {
-            yield return streamEvent;
+            yield return RestoreToolName(streamEvent, wireToOriginalToolNames);
         }
     }
 
@@ -495,7 +519,9 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         return toolCalls;
     }
 
-    private JsonObject BuildPayload(ModelRequest request)
+    private JsonObject BuildPayload(
+        ModelRequest request,
+        IReadOnlyDictionary<string, string> toolNames)
     {
         var messages = new JsonArray();
         foreach (var message in request.Messages)
@@ -523,7 +549,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                         ["type"] = "function",
                         ["function"] = new JsonObject
                         {
-                            ["name"] = call.Name,
+                            ["name"] = ResolveWireToolName(call.Name, toolNames),
                             ["arguments"] = call.ArgumentsJson,
                         },
                     });
@@ -540,7 +566,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             ["messages"] = messages,
             ["stream"] = true,
         };
-        if (reasoningEffort is not null) payload["reasoning_effort"] = reasoningEffort;
+        var effectiveReasoningEffort = reasoningEffort ?? (useCodexIdentity ? "low" : null);
+        if (effectiveReasoningEffort is not null) payload["reasoning_effort"] = effectiveReasoningEffort;
 
         if (request.Tools.Count > 0)
         {
@@ -552,7 +579,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                     ["type"] = "function",
                     ["function"] = new JsonObject
                     {
-                        ["name"] = tool.Name,
+                        ["name"] = ResolveWireToolName(tool.Name, toolNames),
                         ["description"] = tool.Description,
                         ["parameters"] = tool.ParametersSchema.DeepClone(),
                     },
@@ -562,6 +589,123 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         }
 
         return payload;
+    }
+
+    private static IReadOnlyDictionary<string, string> BuildResponsesToolNameMap(
+        IReadOnlyCollection<ToolDefinition> tools)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        var usedNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var tool in tools)
+        {
+            var normalized = new string(tool.Name.Select(character =>
+                character is >= 'a' and <= 'z'
+                    or >= 'A' and <= 'Z'
+                    or >= '0' and <= '9'
+                    or '_' or '-'
+                    ? character
+                    : '_').ToArray());
+            if (string.IsNullOrWhiteSpace(normalized)) normalized = "tool";
+            if (normalized.Length > 64) normalized = normalized[..64];
+
+            var candidate = normalized;
+            for (var suffix = 2; !usedNames.Add(candidate); suffix++)
+            {
+                var suffixText = $"_{suffix}";
+                candidate = normalized[..Math.Min(normalized.Length, 64 - suffixText.Length)] + suffixText;
+            }
+
+            result[tool.Name] = candidate;
+        }
+
+        return result;
+    }
+
+    private static string ResolveWireToolName(
+        string toolName,
+        IReadOnlyDictionary<string, string> toolNames) =>
+        toolNames.TryGetValue(toolName, out var wireName) ? wireName : toolName;
+
+    private static ModelStreamEvent RestoreToolName(
+        ModelStreamEvent streamEvent,
+        IReadOnlyDictionary<string, string> wireToOriginalToolNames)
+    {
+        if (streamEvent is not ModelToolCallEvent toolCallEvent
+            || !wireToOriginalToolNames.TryGetValue(toolCallEvent.ToolCall.Name, out var originalName))
+        {
+            return streamEvent;
+        }
+
+        return new ModelToolCallEvent(toolCallEvent.ToolCall with { Name = originalName });
+    }
+
+    private void ApplyCodexRequestShape(JsonObject payload, string turnId)
+    {
+        var sessionId = ResolveCodexSessionId();
+        if (payload["prompt_cache_key"] is null)
+        {
+            payload["prompt_cache_key"] = sessionId;
+        }
+
+        var metadata = payload["client_metadata"] as JsonObject;
+        if (metadata is null)
+        {
+            metadata = new JsonObject();
+            payload["client_metadata"] = metadata;
+        }
+        metadata["session_id"] ??= sessionId;
+        metadata["thread_id"] ??= sessionId;
+        metadata["root_turn_id"] ??= codexRootTurnId;
+        metadata["turn_id"] ??= turnId;
+
+        if (payload["tools"] is not JsonArray { Count: > 0 } tools)
+        {
+            return;
+        }
+
+        foreach (var tool in tools.OfType<JsonObject>())
+        {
+            if (string.Equals(tool["type"]?.GetValue<string>(), "function", StringComparison.OrdinalIgnoreCase))
+            {
+                tool["strict"] ??= false;
+            }
+        }
+        payload["parallel_tool_calls"] ??= true;
+        payload["tool_choice"] ??= "auto";
+    }
+
+    private void ApplyCodexRequestHeaders(HttpRequestMessage httpRequest)
+    {
+        var sessionId = ResolveCodexSessionId();
+        AddHeaderIfMissing(httpRequest, "session-id", sessionId);
+        AddHeaderIfMissing(httpRequest, "thread-id", sessionId);
+        AddHeaderIfMissing(httpRequest, "x-client-request-id", sessionId);
+    }
+
+    private string ResolveCodexSessionId()
+    {
+        if (extraHeaders is not null)
+        {
+            foreach (var headerName in new[] { "session-id", "session_id" })
+            {
+                var configured = extraHeaders.FirstOrDefault(header =>
+                    header.Key.Equals(headerName, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrWhiteSpace(configured.Value))
+                {
+                    return configured.Value.Trim();
+                }
+            }
+        }
+
+        return codexSessionId;
+    }
+
+    private static void AddHeaderIfMissing(HttpRequestMessage httpRequest, string name, string value)
+    {
+        if (!httpRequest.Headers.Contains(name))
+        {
+            httpRequest.Headers.TryAddWithoutValidation(name, value);
+        }
     }
 
     /// <summary>从统一执行结果中解析错误响应体，正文仅用于本地分类且不会写入日志。</summary>
@@ -591,8 +735,50 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 continue;
             }
 
-            httpRequest.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            httpRequest.Headers.TryAddWithoutValidation(
+                header.Key,
+                useCodexIdentity ? NormalizeCodexIdentityHeader(header.Key, header.Value) : header.Value);
         }
+    }
+
+    private static bool HasCodexIdentity(IReadOnlyDictionary<string, string>? headers)
+    {
+        if (headers is null) return false;
+        foreach (var header in headers)
+        {
+            if (header.Key.Equals("originator", StringComparison.OrdinalIgnoreCase)
+                && (header.Value.Equals("codex-cli", StringComparison.OrdinalIgnoreCase)
+                    || header.Value.Equals("codex_cli_rs", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            if (header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)
+                && (header.Value.StartsWith("codex-cli/", StringComparison.OrdinalIgnoreCase)
+                    || header.Value.StartsWith("codex_cli_rs/", StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string NormalizeCodexIdentityHeader(string name, string value)
+    {
+        if (name.Equals("originator", StringComparison.OrdinalIgnoreCase)
+            && value.Equals("codex-cli", StringComparison.OrdinalIgnoreCase))
+        {
+            return "codex_cli_rs";
+        }
+
+        if (name.Equals("User-Agent", StringComparison.OrdinalIgnoreCase)
+            && value.StartsWith("codex-cli/", StringComparison.OrdinalIgnoreCase))
+        {
+            return "codex_cli_rs/" + value["codex-cli/".Length..];
+        }
+
+        return value;
     }
 
     private sealed class ToolCallBuilder
