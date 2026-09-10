@@ -110,7 +110,7 @@
         <Grid RowDefinitions="Auto,*,Auto">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28" PointerPressed="WindowChrome_OnPointerPressed">
             <Border Width="38" Height="38" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12">
-              <PathIcon Data="M 19,3 L 22,3 L 22,16 L 35,16 L 35,19 L 22,19 L 22,32 L 19,32 L 19,19 L 6,19 L 6,16 L 19,16 Z" Foreground="{DynamicResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Image Source="/Assets/icon-transparent.png" Width="26" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Border>
             <StackPanel Spacing="1" VerticalAlignment="Center">
               <TextBlock Text="Loom-X" FontSize="16" FontWeight="SemiBold" />

@@ -19,8 +19,9 @@
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Avalonia 资源：窗口/任务栏图标（MainWindow Icon） -->
+    <!-- Avalonia 资源：窗口/任务栏图标（MainWindow Icon）与标题区应用图标 -->
     <AvaloniaResource Include="Assets\app.ico" />
+    <AvaloniaResource Include="Assets\icon-transparent.png" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Resources\Strings.resx">
