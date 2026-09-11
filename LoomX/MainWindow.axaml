@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Icon="/Assets/app.ico" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
   <Window.Styles>
     <Style Selector="ToggleButton.nav-button">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -109,9 +109,7 @@
       <Border Grid.Column="0" Classes="glass-sidebar" Padding="16,24">
         <Grid RowDefinitions="Auto,*,Auto">
           <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28" PointerPressed="WindowChrome_OnPointerPressed">
-            <Border Width="38" Height="38" Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="12">
-              <PathIcon Data="M 19,3 L 22,3 L 22,16 L 35,16 L 35,19 L 22,19 L 22,32 L 19,32 L 19,19 L 6,19 L 6,16 L 19,16 Z" Foreground="{DynamicResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center" />
-            </Border>
+            <Image Source="/Assets/icon-transparent.png" Width="30" Height="30" HorizontalAlignment="Left" VerticalAlignment="Center" />
             <StackPanel Spacing="1" VerticalAlignment="Center">
               <TextBlock Text="Loom-X" FontSize="16" FontWeight="SemiBold" />
             </StackPanel>
