@@ -66,6 +66,69 @@ public sealed class AppDataStoreTests
     }
 
     [Fact]
+    public async Task InitializePublishesInitializationSnapshotEvent()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            ConfigurationChangedEventArgs? received = null;
+            store.ConfigurationChanged += (_, args) => received = args;
+
+            await store.InitializeAsync();
+
+            Assert.NotNull(received);
+            Assert.Equal(ConfigurationChangeSource.Initialization, received!.Source);
+            Assert.Equal(ConfigurationChangeKind.Snapshot, received.Kind);
+            store.Dispose();
+            gatewayService.Dispose();
+            configService.Dispose();
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
+    public async Task LocalWritesPublishLocalSaveEventsWithEntityId()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            await store.InitializeAsync();
+            var events = new List<ConfigurationChangedEventArgs>();
+            store.ConfigurationChanged += (_, args) => events.Add(args);
+
+            var created = await store.CreateProviderAsync(new ProviderInput("test-provider", "测试 Provider", "https://example.com", "openai", true, null, false, null));
+
+            var createEvent = events.Last();
+            Assert.Equal(ConfigurationChangeSource.LocalSave, createEvent.Source);
+            Assert.Equal(ConfigurationChangeKind.Provider, createEvent.Kind);
+            Assert.Equal(created.Id, createEvent.EntityId);
+
+            events.Clear();
+            await store.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "direct", "http://127.0.0.1", 7890, null, null, false, true, "stable", false, 30, false, true, 86, 24, "acrylic", true));
+
+            var settingsEvent = events.Last();
+            Assert.Equal(ConfigurationChangeSource.LocalSave, settingsEvent.Source);
+            Assert.Equal(ConfigurationChangeKind.Settings, settingsEvent.Kind);
+            store.Dispose();
+            gatewayService.Dispose();
+            configService.Dispose();
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
     public async Task FailedConfigurationWriteKeepsExistingSnapshot()
     {
         var directory = CreateDirectory();

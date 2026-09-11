@@ -224,6 +224,9 @@
   <data name="settings.status.save.failed">
     <value>設定の保存に失敗しました：{0}</value>
   </data>
+  <data name="settings.status.save.failed.toast">
+    <value>設定の自動保存に失敗しました。ステータスバーをご確認ください。</value>
+  </data>
   <data name="settings.status.waiting">
     <value>自動保存を待機中…</value>
   </data>

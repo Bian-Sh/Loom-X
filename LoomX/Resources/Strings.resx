@@ -296,6 +296,9 @@
   <data name="settings.status.save.failed">
     <value>保存设置失败：{0}</value>
   </data>
+  <data name="settings.status.save.failed.toast">
+    <value>设置自动保存失败，请查看状态栏。</value>
+  </data>
   <data name="settings.status.waiting">
     <value>等待自动保存…</value>
   </data>

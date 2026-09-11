@@ -141,9 +141,13 @@ public sealed class ProvidersViewContractTests
         var source = File.ReadAllText(path);
 
         Assert.Contains("private bool suppressConfigurationRefresh;", source, StringComparison.Ordinal);
-        Assert.Contains("if (suppressConfigurationRefresh) return;", source, StringComparison.Ordinal);
         Assert.Contains("suppressConfigurationRefresh = true;", source, StringComparison.Ordinal);
         Assert.Contains("finally { suppressConfigurationRefresh = false; }", source, StringComparison.Ordinal);
+        // 本机保存事件必须携带 LocalSave 来源，Providers 页据此跳过列表重建，编辑中的实例原地保留。
+        Assert.Contains("if (args.Source == ConfigurationChangeSource.LocalSave) return;", source, StringComparison.Ordinal);
+        Assert.Contains("private void MergeProviders(IReadOnlyList<ProviderResponse> responses)", source, StringComparison.Ordinal);
+        Assert.Contains("Providers.RemoveAt(index);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Providers.Add(ProviderEditorViewModel.FromResponse(provider));", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -176,7 +180,9 @@ public sealed class ProvidersViewContractTests
         Assert.DoesNotContain("ModelEditorToggle_OnClick", codeBehindSource, StringComparison.Ordinal);
         Assert.Contains("provider.PropertyChanged += ProviderChanged;", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("model.PropertyChanged += ModelChanged;", viewModelSource, StringComparison.Ordinal);
-        Assert.Contains("Task.Delay(TimeSpan.FromMilliseconds(350), cancellationToken)", viewModelSource, StringComparison.Ordinal);
+        // 防抖与串行化由共享的 DebouncedAutoSaver 承担，保存动作扫描全部未保存项，避免切换编辑对象时丢保存。
+        Assert.Contains("providerAutoSaver = new DebouncedAutoSaver(SaveDirtyProvidersAsync, logger: logger);", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("modelAutoSaver = new DebouncedAutoSaver(SaveDirtyModelsAsync, logger: logger);", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("QueueProviderAutoSave(provider)", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("QueueModelAutoSave(provider, model)", viewModelSource, StringComparison.Ordinal);
     }

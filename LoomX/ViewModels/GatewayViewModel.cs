@@ -149,7 +149,7 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         }
     }
 
-    private void OnConfigurationChanged(object? sender, EventArgs args)
+    private void OnConfigurationChanged(object? sender, ConfigurationChangedEventArgs args)
     {
         if (gatewayMutationDepth > 0 || isRefreshing)
         {
@@ -157,9 +157,20 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             return;
         }
 
+        if (args.Source == ConfigurationChangeSource.LocalSave && HasPendingInlineEdits())
+        {
+            // 存在行内未提交编辑（组合名称/推理力度）时挂起刷新，避免销毁正在编辑的行。
+            refreshPending = true;
+            return;
+        }
+
         if (Dispatcher.UIThread.CheckAccess()) _ = RefreshAsync();
         else Dispatcher.UIThread.Post(() => _ = RefreshAsync());
     }
+
+    private bool HasPendingInlineEdits() =>
+        Combos.Any(item => item.HasPendingChanges)
+        || Endpoints.Any(item => item.HasPendingReasoningEffortChange);
 
     private async Task AddComboAsync()
     {

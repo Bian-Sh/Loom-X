@@ -71,7 +71,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private string status;
     private bool hasProxyPassword;
     private bool suppressAutoSave;
-    private CancellationTokenSource? autoSaveCancellation;
+    private readonly DebouncedAutoSaver autoSaver;
 
     public static IReadOnlyList<SettingOption> LanguageOptions { get; } =
     [
@@ -119,7 +119,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public bool TransparencyEnabled { get => transparencyEnabled; set { if (SetProperty(ref transparencyEnabled, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
     public int TransparencyOpacity { get => transparencyOpacity; set { if (SetProperty(ref transparencyOpacity, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
     public int BlurAmount { get => blurAmount; set { if (SetProperty(ref blurAmount, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
-    public SettingOption SelectedLogRetention { get => selectedLogRetention; set { if (SetProperty(ref selectedLogRetention, value)) OnPropertyChanged(nameof(LogRetentionDays)); } }
+    public SettingOption SelectedLogRetention { get => selectedLogRetention; set { if (SetProperty(ref selectedLogRetention, value)) { OnPropertyChanged(nameof(LogRetentionDays)); QueueAutoSave(); } } }
     public int LogRetentionDays => int.Parse(SelectedLogRetention.Value);
     public bool IsBusy { get => isBusy; private set { if (SetProperty(ref isBusy, value)) { OnPropertyChanged(nameof(IsNotBusy)); } } }
     public bool IsNotBusy => !IsBusy;
@@ -157,6 +157,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         OpenDataDirectoryCommand = new AsyncCommand(OpenDataDirectoryAsync);
         ClearLogsCommand = new AsyncCommand(ClearLogsAsync);
         ExportDiagnosticsCommand = new AsyncCommand(ExportDiagnosticsAsync);
+        autoSaver = new DebouncedAutoSaver(() => SaveAsync(), logger: logger);
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;
         _ = LoadAsync();
@@ -207,7 +208,6 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
 
     private async Task SaveAsync(CancellationToken cancellationToken = default)
     {
-        if (IsBusy) return;
         IsBusy = true;
         Status = Loc("settings.status.saving");
         try
@@ -233,14 +233,13 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
                 UseProxyForUpdates);
             var response = await dataStore.UpdateSettingsAsync(input, cancellationToken);
             HasProxyPassword = response.HasProxyPassword;
-            ProxyPassword = "";
-            ClearProxyPassword = false;
             Status = string.Format(Loc("settings.status.saved"), DateTime.Now.ToString("HH:mm:ss"));
             logger.LogInformation("设置保存完成 {ProxyMode} {AutoCheckUpdates} {UseProxyForUpdates} {DiagnosticsEnabled}", response.ProxyMode, response.AutoCheckUpdates, response.UseProxyForUpdates, response.DiagnosticsEnabled);
         }
         catch (Exception exception)
         {
             Status = string.Format(Loc("settings.status.save.failed"), exception.Message);
+            toastService.Show(Loc("settings.status.save.failed.toast"), ToastLevel.Error);
             logger.LogError(exception, "设置保存失败");
         }
         finally { IsBusy = false; }
@@ -249,22 +248,8 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private void QueueAutoSave()
     {
         if (suppressAutoSave) return;
-        autoSaveCancellation?.Cancel();
-        autoSaveCancellation?.Dispose();
-        autoSaveCancellation = new CancellationTokenSource();
-        var token = autoSaveCancellation.Token;
         Status = Loc("settings.status.waiting");
-        _ = AutoSaveAfterDelayAsync(token);
-    }
-
-    private async Task AutoSaveAfterDelayAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await Task.Delay(350, cancellationToken);
-            await SaveAsync(cancellationToken);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
+        autoSaver.Trigger();
     }
 
     private async Task TestProxyAsync()
@@ -371,8 +356,10 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
 
     private void ApplyAppearancePreview() => applyAppearance?.Invoke(TransparencyEnabled, TransparencyOpacity, BlurAmount, AcrylicTransparencyAlgorithm);
 
-    private void OnConfigurationChanged(object? sender, EventArgs args)
+    private void OnConfigurationChanged(object? sender, ConfigurationChangedEventArgs args)
     {
+        // 本机编辑保存不回读字段，避免覆盖用户正在输入的内容；仅全量刷新时重载。
+        if (args.Source == ConfigurationChangeSource.LocalSave) return;
         if (Dispatcher.UIThread.CheckAccess()) _ = LoadAsync();
         else Dispatcher.UIThread.Post(() => _ = LoadAsync());
     }
@@ -386,8 +373,9 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     {
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
         LocaleService.CultureChanged -= OnCultureChanged;
-        autoSaveCancellation?.Cancel();
-        autoSaveCancellation?.Dispose();
+        // 尽力把待存的设置在退出前落库
+        _ = autoSaver.FlushAsync();
+        autoSaver.Dispose();
         if (ownsUpdateCoordinator) updateCoordinator.Dispose();
     }
 }

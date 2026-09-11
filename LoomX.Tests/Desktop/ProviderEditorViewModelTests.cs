@@ -118,6 +118,40 @@ public sealed class ProviderEditorViewModelTests
         Assert.True(viewModel.HasUnsavedChanges);
     }
 
+    [Fact]
+    public void ApplySaveResult_BackfillsIdentityWithoutRewritingEditedText()
+    {
+        var viewModel = new ProviderEditorViewModel();
+        viewModel.DisplayName = "草稿名称";
+        viewModel.BaseUrl = "https://draft.example.com/";
+        viewModel.AddHeader();
+        viewModel.Headers[0].Name = "X-Draft";
+        viewModel.Headers[0].Value = "draft";
+        Assert.True(viewModel.HasUnsavedChanges);
+
+        var id = Guid.NewGuid();
+        viewModel.ApplySaveResult(new ProviderResponse(
+            id,
+            "provider",
+            "规范化名称",
+            "https://normalized.example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []));
+
+        Assert.Equal(id, viewModel.Id);
+        Assert.False(viewModel.HasUnsavedChanges);
+        Assert.Equal("草稿名称", viewModel.DisplayName);
+        Assert.Equal("https://draft.example.com/", viewModel.BaseUrl);
+        Assert.Single(viewModel.Headers);
+        Assert.Equal("X-Draft", viewModel.Headers[0].Name);
+        Assert.Equal("draft", viewModel.Headers[0].Value);
+    }
+
     [Theory]
     [InlineData("  grox  ")]
     [InlineData("PROVIDER-ID")]

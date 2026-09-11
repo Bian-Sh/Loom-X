@@ -224,6 +224,9 @@
   <data name="settings.status.save.failed">
     <value>保存設置失敗：{0}</value>
   </data>
+  <data name="settings.status.save.failed.toast">
+    <value>設置自動保存失敗，請查看狀態欄。</value>
+  </data>
   <data name="settings.status.waiting">
     <value>等待自動保存…</value>
   </data>

@@ -77,6 +77,7 @@
   <data name="settings.status.saving"><value>Saving settings…</value></data>
   <data name="settings.status.saved"><value>Settings saved · {0}</value></data>
   <data name="settings.status.save.failed"><value>Failed to save settings: {0}</value></data>
+  <data name="settings.status.save.failed.toast"><value>Settings auto-save failed. See the status bar for details.</value></data>
   <data name="settings.status.waiting"><value>Waiting for auto-save…</value></data>
   <data name="settings.proxy.test.direct.success"><value>Direct mode configuration is valid.</value></data>
   <data name="settings.proxy.test.system.success"><value>System proxy mode selected; Windows settings will be used.</value></data>

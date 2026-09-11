@@ -40,7 +40,7 @@ public sealed class AppDataStore : IDisposable
     public Exception? InitializationError { get; private set; }
 
     public event EventHandler? ConfigurationReady;
-    public event EventHandler? ConfigurationChanged;
+    public event EventHandler<ConfigurationChangedEventArgs>? ConfigurationChanged;
     public event EventHandler? ActivityWindowChanged;
 
     public AppDataStore(
@@ -68,7 +68,7 @@ public sealed class AppDataStore : IDisposable
     }
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default) =>
-        await ReloadCoreAsync(cancellationToken, isInitialLoad: false);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.Snapshot, ConfigurationChangeKind.Snapshot));
 
     public async Task<IReadOnlyList<ProviderResponse>> ListProvidersAsync(CancellationToken cancellationToken = default)
     {
@@ -115,123 +115,123 @@ public sealed class AppDataStore : IDisposable
     public async Task<AppSettingsResponse> UpdateSettingsAsync(AppSettingsInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.UpdateSettingsAsync(input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Settings));
         return result;
     }
 
     public async Task<ProviderResponse> CreateProviderAsync(ProviderInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.CreateProviderAsync(input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Provider, result.Id));
         return result;
     }
 
     public async Task<ProviderResponse> UpdateProviderAsync(Guid id, ProviderInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.UpdateProviderAsync(id, input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Provider, result.Id));
         return result;
     }
 
     public async Task DeleteProviderAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await configService.DeleteProviderAsync(id, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Provider, id));
     }
 
     public async Task<ModelResponse> CreateModelAsync(Guid providerId, ModelInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.CreateModelAsync(providerId, input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Model, result.Id));
         return result;
     }
 
     public async Task<ModelResponse> UpdateModelAsync(Guid id, ModelInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.UpdateModelAsync(id, input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Model, result.Id));
         return result;
     }
 
     public async Task<IReadOnlyList<ModelResponse>> UpdateModelOrderAsync(Guid providerId, ModelOrderInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.UpdateModelOrderAsync(providerId, input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Provider, providerId));
         return result;
     }
 
     public async Task DeleteModelAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await configService.DeleteModelAsync(id, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Model, id));
     }
 
     public async Task<GatewayEndpointResponse> SetGatewayEndpointEnabledAsync(string key, bool enabled, CancellationToken cancellationToken = default)
     {
         var result = await configService.SetGatewayEndpointEnabledAsync(key, enabled, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayEndpoint));
         return result;
     }
 
     public async Task<GatewayEndpointResponse> RotateGatewayApiKeyAsync(string key, CancellationToken cancellationToken = default)
     {
         var result = await configService.RotateGatewayApiKeyAsync(key, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayEndpoint));
         return result;
     }
 
     public async Task<GatewayEndpointResponse> UpdateGatewayEndpointReasoningEffortAsync(string key, string value, CancellationToken cancellationToken = default)
     {
         var result = await configService.UpdateGatewayEndpointReasoningEffortAsync(key, value, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayEndpoint));
         return result;
     }
 
     public async Task<GatewayEndpointResponse> UpdateGatewayEndpointComboBindingsAsync(string endpointKey, GatewayEndpointComboSelectionInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.UpdateGatewayEndpointComboBindingsAsync(endpointKey, input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayEndpoint));
         return result;
     }
 
     public async Task<GatewayComboResponse> CreateGatewayComboAsync(GatewayComboInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.CreateGatewayComboAsync(input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayCombo, result.Id));
         return result;
     }
 
     public async Task<GatewayComboResponse> UpdateGatewayComboAsync(Guid id, GatewayComboInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.UpdateGatewayComboAsync(id, input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayCombo, id));
         return result;
     }
 
     public async Task DeleteGatewayComboAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await configService.DeleteGatewayComboAsync(id, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayCombo, id));
     }
 
     public async Task<GatewayRouteResponse> CreateGatewayRouteAsync(Guid comboId, GatewayRouteInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.CreateGatewayRouteAsync(comboId, input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayRoute, comboId));
         return result;
     }
 
     public async Task<GatewayRouteResponse> UpdateGatewayRouteAsync(Guid id, GatewayRouteInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.UpdateGatewayRouteAsync(id, input, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayRoute, id));
         return result;
     }
 
     public async Task DeleteGatewayRouteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await configService.DeleteGatewayRouteAsync(id, cancellationToken);
-        await RefreshAsync(cancellationToken);
+        await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.GatewayRoute, id));
     }
 
     public async Task<ActivityPage> LoadActivityPageAsync(ActivityQuery query, CancellationToken cancellationToken = default)
@@ -311,7 +311,7 @@ public sealed class AppDataStore : IDisposable
     {
         try
         {
-            await ReloadCoreAsync(cancellationToken, isInitialLoad: true);
+            await ReloadCoreAsync(cancellationToken, isInitialLoad: true, new ConfigurationChangedEventArgs(ConfigurationChangeSource.Initialization, ConfigurationChangeKind.Snapshot));
             IsInitialized = true;
             InitializationError = null;
             ConfigurationReady?.Invoke(this, EventArgs.Empty);
@@ -324,7 +324,7 @@ public sealed class AppDataStore : IDisposable
         }
     }
 
-    private async Task ReloadCoreAsync(CancellationToken cancellationToken, bool isInitialLoad)
+    private async Task ReloadCoreAsync(CancellationToken cancellationToken, bool isInitialLoad, ConfigurationChangedEventArgs? changeArgs = null)
     {
         await stateLock.WaitAsync(cancellationToken);
         try
@@ -343,7 +343,7 @@ public sealed class AppDataStore : IDisposable
             GatewayCombos = combos;
             EnabledGatewayModels = enabledModels;
             logger.LogInformation("桌面数据中心配置快照完成 {ProviderCount} {ModelCount} {EndpointCount}", providers.Count, config.Models.Count, endpoints.Count);
-            ConfigurationChanged?.Invoke(this, EventArgs.Empty);
+            ConfigurationChanged?.Invoke(this, changeArgs ?? new ConfigurationChangedEventArgs(ConfigurationChangeSource.Snapshot, ConfigurationChangeKind.Snapshot));
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
