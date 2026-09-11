@@ -1,6 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Icon="/Assets/app.ico" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
   <Window.Styles>
-    <Style Selector="ToggleButton.nav-button">
+    <Style Selector="Button.nav-button">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
       <Setter Property="Padding" Value="12,10" />
@@ -11,26 +11,48 @@
       <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
       <Setter Property="CornerRadius" Value="10" />
     </Style>
-    <Style Selector="ToggleButton.nav-button:pointerover">
+    <Style Selector="Button.nav-button.active">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Button.nav-button:pointerover">
       <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
     </Style>
-    <Style Selector="ToggleButton.nav-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Style Selector="Button.nav-button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
       <Setter Property="BorderThickness" Value="0" />
     </Style>
-    <Style Selector="ToggleButton.nav-button:checked">
-      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+    <Style Selector="Button.nav-button.active:pointerover">
+      <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
-      <Setter Property="BorderThickness" Value="1" />
     </Style>
-    <Style Selector="ToggleButton.nav-button:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+    <Style Selector="Button.nav-button.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Border.navigation-selection-indicator">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
       <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Height" Value="42" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="IsHitTestVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.navigation-selection-outline">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Height" Value="42" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+      <Setter Property="IsHitTestVisible" Value="False" />
+      <Setter Property="Panel.ZIndex" Value="1" />
     </Style>
     <Style Selector="Path.nav-icon">
       <Setter Property="Fill" Value="Transparent" />
@@ -115,18 +137,30 @@
             </StackPanel>
           </StackPanel>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding NavigationItems}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <ToggleButton Command="{Binding NavigateCommand}" IsChecked="{Binding IsActive, Mode=OneWay}" Classes="nav-button">
-                    <StackPanel Orientation="Horizontal" Spacing="11">
-                      <Path Classes="nav-icon" Data="{Binding IconData}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                      <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
-                    </StackPanel>
-                  </ToggleButton>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <Grid>
+              <Border x:Name="navigationSelectionIndicator" Classes="navigation-selection-indicator" IsVisible="{Binding HasActiveNavigationItem}" Margin="0,2,0,0">
+                <Border.RenderTransform>
+                  <TranslateTransform />
+                </Border.RenderTransform>
+              </Border>
+              <ItemsControl ItemsSource="{Binding NavigationItems}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Button Command="{Binding NavigateCommand}" Classes="nav-button" Classes.active="{Binding IsActive}">
+                      <StackPanel Orientation="Horizontal" Spacing="11">
+                        <Path Classes="nav-icon" Data="{Binding IconData}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Border x:Name="navigationSelectionOutline" Classes="navigation-selection-outline" IsVisible="{Binding HasActiveNavigationItem}" Margin="0,2,0,0">
+                <Border.RenderTransform>
+                  <TranslateTransform />
+                </Border.RenderTransform>
+              </Border>
+            </Grid>
           </ScrollViewer>
           <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="8,16,8,0">
             <StackPanel Spacing="4">

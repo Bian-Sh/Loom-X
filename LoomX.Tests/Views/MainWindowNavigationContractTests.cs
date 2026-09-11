@@ -41,6 +41,39 @@ public sealed class MainWindowNavigationContractTests
     }
 
     [Fact]
+    public void NavigationUsesPersistentActiveStateAndAnimatedSharedSelection()
+    {
+        var windowSource = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "MainWindow.axaml"));
+        var viewModelSource = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs"));
+
+        Assert.Contains("<Button Command=\"{Binding NavigateCommand}\" Classes=\"nav-button\" Classes.active=\"{Binding IsActive}\">", windowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ToggleButton Command=\"{Binding NavigateCommand}\"", windowSource, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"navigation-selection-indicator\"", windowSource, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"navigation-selection-outline\"", windowSource, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Panel.ZIndex\" Value=\"1\" />", windowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("<DoubleTransition Property=\"Y\"", windowSource, StringComparison.Ordinal);
+        Assert.Contains("Button.nav-button.active:pointerover", windowSource, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Background\" Value=\"Transparent\" />", windowSource[windowSource.IndexOf("Button.nav-button.active:pointerover", StringComparison.Ordinal)..], StringComparison.Ordinal);
+        Assert.Contains("public double SelectedNavigationOffset", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("public bool HasActiveNavigationItem", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("public const double LayoutStep = 46", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("SetActive(\"nav.overview\")", viewModelSource, StringComparison.Ordinal);
+
+        var codeBehindSource = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "MainWindow.axaml.cs"));
+        Assert.Contains("NavigationViewModel_OnPropertyChanged", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("NavigationSelectionAnimationDurationMs = 200", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("CubicEaseOut NavigationSelectionEasing", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("var eased = NavigationSelectionEasing.Ease(progress)", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("navigationSelectionAnimationTimer", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("navigationSelectionIndicatorTransform.Y = offset", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("navigationSelectionOutlineTransform.Y = offset", codeBehindSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("navigationSelectionIndicator.RenderTransform = new TranslateTransform", codeBehindSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("navigationSelectionOutline.RenderTransform = new TranslateTransform", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("Dispatcher.UIThread.Post(() =>", codeBehindSource, StringComparison.Ordinal);
+        Assert.Contains("DispatcherPriority.Background", codeBehindSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OverviewViewDoesNotDisposeTheLongLivedPageViewModel()
     {
         var viewPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "OverviewView.axaml.cs");

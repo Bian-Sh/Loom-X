@@ -38,11 +38,15 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private object currentView;
     private string currentViewKey = "nav.overview";
     private PlaceholderViewModel? currentError;
+    private double selectedNavigationOffset;
+    private bool hasActiveNavigationItem;
 
     public ObservableCollection<NavigationItemViewModel> NavigationItems { get; }
     public object CurrentView => currentView;
     public string PageTitle => currentError?.Title ?? Loc(currentViewKey);
     public string PageDescription => currentError?.Description ?? Loc(currentViewKey + ".description");
+    public double SelectedNavigationOffset => selectedNavigationOffset;
+    public bool HasActiveNavigationItem => hasActiveNavigationItem;
     public UpdateCoordinator Update => updateCoordinator;
 
     public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null, Action<bool, int, int, string>? applyAppearance = null, AppDataStore? dataStore = null, IStringLocalizer<MainWindowViewModel>? localizer = null)
@@ -72,6 +76,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
             new("nav.console", "M 5,6 L 27,6 L 27,26 L 5,26 Z M 9,12 L 13,16 L 9,20 M 16,20 L 23,20", () => ShowConsole()),
             new("nav.settings", "M 16,4 L 18,7 L 22,8 L 25,6 L 28,9 L 26,12 L 27,16 L 30,18 L 28,22 L 24,21 L 21,24 L 21,28 L 16,29 L 14,25 L 10,24 L 7,26 L 4,22 L 6,19 L 5,15 L 2,13 L 4,8 L 8,9 L 11,6 L 11,3 Z M 16,12 A 4,4 0 1,0 16,20 A 4,4 0 1,0 16,12 Z", () => ShowSettings())
         ]);
+        SetActive("nav.overview");
         this.dataStore.ConfigurationReady += OnConfigurationReady;
         this.dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;
@@ -82,7 +87,30 @@ public sealed class MainWindowViewModel : NotifyViewModel
 
     private void SetActive(string titleKey)
     {
-        foreach (var item in NavigationItems) item.IsActive = item.TitleKey == titleKey;
+        var activeIndex = -1;
+        for (var index = 0; index < NavigationItems.Count; index++)
+        {
+            var isActive = NavigationItems[index].TitleKey == titleKey;
+            NavigationItems[index].IsActive = isActive;
+            if (isActive) activeIndex = index;
+        }
+
+        var hasActiveItem = activeIndex >= 0;
+        if (hasActiveNavigationItem != hasActiveItem)
+        {
+            hasActiveNavigationItem = hasActiveItem;
+            OnPropertyChanged(nameof(HasActiveNavigationItem));
+        }
+
+        if (hasActiveItem)
+        {
+            var offset = activeIndex * NavigationItemViewModel.LayoutStep;
+            if (!EqualityComparer<double>.Default.Equals(selectedNavigationOffset, offset))
+            {
+                selectedNavigationOffset = offset;
+                OnPropertyChanged(nameof(SelectedNavigationOffset));
+            }
+        }
     }
 
     private void ShowView(string key, object view)
@@ -174,6 +202,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
 
 public sealed class NavigationItemViewModel : NotifyViewModel
 {
+    public const double LayoutStep = 46;
     private readonly string _titleKey;
     private string title;
     private bool isActive;
