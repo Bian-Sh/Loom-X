@@ -1,4 +1,4 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 using LoomX.Services;
 using Xunit;
 
@@ -12,7 +12,10 @@ public sealed class OpenAiResponsesBridgeTests
         var chatRequest = JsonNode.Parse("""
         {
           "model": "configured-model",
-          "messages": [{"role": "user", "content": "sensitive prompt"}],
+          "messages": [
+            {"role": "system", "content": "遵循系统规则"},
+            {"role": "user", "content": "sensitive prompt"}
+          ],
           "max_tokens": 64,
           "tools": [{"type": "function", "function": {"name": "read_file", "description": "读取文件", "parameters": {"type": "object"}}}],
           "tool_choice": {"type": "function", "function": {"name": "read_file"}}
@@ -22,7 +25,15 @@ public sealed class OpenAiResponsesBridgeTests
         var result = OpenAiResponsesBridge.CreateResponsesRequest(chatRequest);
 
         Assert.Equal("configured-model", result["model"]!.GetValue<string>());
-        Assert.Equal("sensitive prompt", result["input"]![0]!["content"]!.GetValue<string>());
+        Assert.Equal("遵循系统规则", result["instructions"]!.GetValue<string>());
+        var input = result["input"]!.AsArray();
+        var message = Assert.Single(input)!.AsObject();
+        Assert.Equal("message", message["type"]!.GetValue<string>());
+        Assert.Equal("user", message["role"]!.GetValue<string>());
+        var content = Assert.Single(message["content"]!.AsArray())!.AsObject();
+        Assert.Equal("input_text", content["type"]!.GetValue<string>());
+        Assert.Equal("sensitive prompt", content["text"]!.GetValue<string>());
+        Assert.False(result["store"]!.GetValue<bool>());
         Assert.Equal(64, result["max_output_tokens"]!.GetValue<int>());
         Assert.Null(result["messages"]);
         Assert.Null(result["max_tokens"]);
@@ -40,6 +51,10 @@ public sealed class OpenAiResponsesBridgeTests
         var result = OpenAiResponsesBridge.CreateResponsesRequest(chatRequest);
 
         Assert.Equal("high", result["reasoning"]!["effort"]!.GetValue<string>());
+        Assert.Equal("auto", result["reasoning"]!["summary"]!.GetValue<string>());
+        Assert.Contains(
+            "reasoning.encrypted_content",
+            result["include"]!.AsArray().Select(item => item!.GetValue<string>()));
         Assert.Null(result["reasoning_effort"]);
     }
 

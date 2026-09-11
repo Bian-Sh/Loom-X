@@ -1,4 +1,4 @@
-namespace LoomX.Services;
+﻿namespace LoomX.Services;
 
 /// <summary>
 /// CLI 身份类型。三家官方 CLI 各对应一个枚举值。
@@ -82,11 +82,11 @@ public static class CliIdentityService
     private static readonly CliIdentityProfile CodexProfile = new(
         CliIdentityType.Codex,
         "Codex CLI",
-        "codex-cli/",
-        "codex-cli/{version}",
+        "codex_cli_rs/",
+        "codex_cli_rs/{version}",
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["originator"] = "codex-cli",
+            ["originator"] = "codex_cli_rs",
             ["version"] = "{version}",
         },
         new[]
@@ -194,6 +194,8 @@ public static class CliIdentityService
             if (ua.StartsWith(profile.UaPrefix, StringComparison.OrdinalIgnoreCase))
                 return profile.Type;
         }
+        if (ua.StartsWith("codex-cli/", StringComparison.OrdinalIgnoreCase))
+            return CliIdentityType.Codex;
         return null;
     }
 
@@ -205,9 +207,15 @@ public static class CliIdentityService
     {
         if (headers is null) return null;
         var profile = GetProfile(type);
-        if (headers.TryGetValue("User-Agent", out var ua) && ua.StartsWith(profile.UaPrefix, StringComparison.OrdinalIgnoreCase))
+        if (headers.TryGetValue("User-Agent", out var ua))
         {
-            var rest = ua[profile.UaPrefix.Length..].Trim();
+            var prefix = ua.StartsWith(profile.UaPrefix, StringComparison.OrdinalIgnoreCase)
+                ? profile.UaPrefix
+                : type == CliIdentityType.Codex && ua.StartsWith("codex-cli/", StringComparison.OrdinalIgnoreCase)
+                    ? "codex-cli/"
+                    : null;
+            if (prefix is null) return null;
+            var rest = ua[prefix.Length..].Trim();
             // 形如 "2.1.263 (external, cli)" 或 "2.1.263"
             var separator = rest.IndexOfAny(new[] { ' ', '(' });
             if (separator > 0) return rest[..separator].Trim();

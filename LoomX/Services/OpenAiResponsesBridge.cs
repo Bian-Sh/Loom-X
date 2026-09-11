@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -24,14 +24,46 @@ internal static class OpenAiResponsesBridge
             && reasoningEffort.TryGetValue<string>(out var effort)
             && !string.IsNullOrWhiteSpace(effort))
         {
-            if (responsesRequest["reasoning"] is null)
-                responsesRequest["reasoning"] = new JsonObject { ["effort"] = effort };
+            var reasoning = responsesRequest["reasoning"] as JsonObject;
+            if (reasoning is null)
+            {
+                reasoning = new JsonObject();
+                responsesRequest["reasoning"] = reasoning;
+            }
+            if (reasoning["effort"] is null) reasoning["effort"] = effort;
+            if (reasoning["summary"] is null) reasoning["summary"] = "auto";
             responsesRequest.Remove("reasoning_effort");
+
+            if (!string.Equals(effort, "none", StringComparison.OrdinalIgnoreCase))
+            {
+                var include = responsesRequest["include"] as JsonArray;
+                if (include is null)
+                {
+                    include = new JsonArray();
+                    responsesRequest["include"] = include;
+                }
+                if (!include.Any(item => string.Equals(
+                        item?.GetValue<string>(),
+                        "reasoning.encrypted_content",
+                        StringComparison.Ordinal)))
+                {
+                    include.Add("reasoning.encrypted_content");
+                }
+            }
         }
 
         if (hasMessages && responsesRequest["input"] is JsonArray input)
         {
-            responsesRequest["input"] = ConvertInput(input);
+            responsesRequest["input"] = ConvertInput(input, out var instructions);
+            if (!string.IsNullOrWhiteSpace(instructions) && responsesRequest["instructions"] is null)
+            {
+                responsesRequest["instructions"] = instructions;
+            }
+        }
+
+        if (responsesRequest["store"] is null)
+        {
+            responsesRequest["store"] = false;
         }
 
         if (responsesRequest["tools"] is JsonArray tools)
@@ -308,9 +340,10 @@ internal static class OpenAiResponsesBridge
         return converted;
     }
 
-    private static JsonArray ConvertInput(JsonArray messages)
+    private static JsonArray ConvertInput(JsonArray messages, out string? instructions)
     {
         var converted = new JsonArray();
+        var instructionText = new StringBuilder();
         foreach (var messageNode in messages)
         {
             if (messageNode is not JsonObject message)
@@ -320,6 +353,18 @@ internal static class OpenAiResponsesBridge
             }
 
             var role = message["role"]?.GetValue<string>();
+            if (string.Equals(role, "system", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "developer", StringComparison.OrdinalIgnoreCase))
+            {
+                var text = ToText(message["content"]);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    if (instructionText.Length > 0) instructionText.Append("\n\n");
+                    instructionText.Append(text);
+                }
+                continue;
+            }
+
             if (string.Equals(role, "tool", StringComparison.OrdinalIgnoreCase))
             {
                 converted.Add(new JsonObject
@@ -332,10 +377,17 @@ internal static class OpenAiResponsesBridge
             }
 
             var toolCalls = message["tool_calls"] as JsonArray;
-            var responseMessage = message.DeepClone().AsObject();
-            responseMessage.Remove("tool_calls");
-            ConvertMessageContent(responseMessage);
-            if (responseMessage["content"] is not null || toolCalls is null || toolCalls.Count == 0)
+            var responseMessage = new JsonObject
+            {
+                ["type"] = "message",
+                ["role"] = role
+            };
+            if (ConvertMessageContent(message["content"], role) is { } content)
+            {
+                responseMessage["content"] = content;
+            }
+
+            if (responseMessage["content"] is not null)
             {
                 converted.Add(responseMessage);
             }
@@ -363,14 +415,30 @@ internal static class OpenAiResponsesBridge
             }
         }
 
+        instructions = instructionText.Length == 0 ? null : instructionText.ToString();
         return converted;
     }
 
-    private static void ConvertMessageContent(JsonObject message)
+    private static JsonNode? ConvertMessageContent(JsonNode? contentNode, string? role)
     {
-        if (message["content"] is not JsonArray content)
+        var textType = string.Equals(role, "assistant", StringComparison.OrdinalIgnoreCase)
+            ? "output_text"
+            : "input_text";
+        if (contentNode is JsonValue value && value.TryGetValue<string>(out var text))
         {
-            return;
+            return new JsonArray
+            {
+                new JsonObject
+                {
+                    ["type"] = textType,
+                    ["text"] = text
+                }
+            };
+        }
+
+        if (contentNode is not JsonArray content)
+        {
+            return contentNode?.DeepClone();
         }
 
         var converted = new JsonArray();
@@ -385,25 +453,32 @@ internal static class OpenAiResponsesBridge
             var type = part["type"]?.GetValue<string>();
             if (string.Equals(type, "text", StringComparison.OrdinalIgnoreCase))
             {
-                part["type"] = "input_text";
+                var convertedPart = part.DeepClone().AsObject();
+                convertedPart["type"] = textType;
+                converted.Add(convertedPart);
+                continue;
             }
-            else if (string.Equals(type, "image_url", StringComparison.OrdinalIgnoreCase))
+
+            if (string.Equals(type, "image_url", StringComparison.OrdinalIgnoreCase))
             {
-                part["type"] = "input_image";
-                if (part["image_url"] is JsonObject imageUrl && imageUrl["url"] is { } url)
+                var convertedPart = part.DeepClone().AsObject();
+                convertedPart["type"] = "input_image";
+                if (convertedPart["image_url"] is JsonObject imageUrl && imageUrl["url"] is { } url)
                 {
-                    part["image_url"] = url.DeepClone();
+                    convertedPart["image_url"] = url.DeepClone();
                     if (imageUrl["detail"] is { } detail)
                     {
-                        part["detail"] = detail.DeepClone();
+                        convertedPart["detail"] = detail.DeepClone();
                     }
                 }
+                converted.Add(convertedPart);
+                continue;
             }
 
             converted.Add(part.DeepClone());
         }
 
-        message["content"] = converted;
+        return converted;
     }
 
     private static string ToText(JsonNode? content)
