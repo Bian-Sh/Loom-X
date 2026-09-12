@@ -10,17 +10,19 @@
 
 - `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter 'FullyQualifiedName~GatewayViewContractTests|FullyQualifiedName~GatewayViewModelDeletionTests' --no-restore`：20/20 通过。
 - `dotnet test LoomX.slnx --no-restore`：575/575 通过。
-- `dotnet build LoomX.slnx --no-restore`：0 错误，2 个既有包/分析器警告。
-- `pwsh -File scripts/publish-desktop.ps1 -Configuration Release`：发布目录 `outputs/20260912-214813`，仅包含 `LoomX.exe`。
+- `dotnet build LoomX.slnx --no-restore`：0 错误，7 个既有包、编译器和分析器警告。
+- `pwsh -File scripts/publish-desktop.ps1 -Configuration Release`：发布目录 `outputs/20260912-222034`，包含 `LoomX.exe`（322560 bytes）。
 
-## 轻量验证清单
+## 完整验证清单
 
 | 检查项 | 结果 | 证据 |
 | --- | --- | --- |
 | tasks.md 全部完成 | PASS | 3/3 任务已勾选 |
-| 改动范围与任务一致 | PASS | `GatewayViewModel`、删除回归测试、hotfix 产物和验证报告 |
-| 编译通过 | PASS | `dotnet build LoomX.slnx --no-restore` |
-| 相关测试通过 | PASS | 20/20 契约与删除测试通过 |
+| proposal/design 目标覆盖 | PASS | 路由删除、开关上下文解析及其它删除入口均有实现和测试证据 |
+| 场景覆盖 | PASS | 未选中 Combo 的 route 删除/开关，以及 Combo、Provider、模型删除均通过伪造 SQLite 数据验证 |
+| 编译通过 | PASS | `dotnet build LoomX.slnx --no-restore`，0 错误 |
+| 相关测试通过 | PASS | 20/20 定向测试、575/575 全量测试通过 |
+| 关联 Superpowers Design Doc | SKIP | `.comet.yaml` 的 `design_doc` 为 `null`，本 change 使用自身 `design.md` |
 | 安全检查 | PASS | 未新增密钥、Authorization、unsafe 或外部输入记录 |
 | 自动代码审查 | SKIP | `review_mode: off`，按 hotfix 预设跳过 |
 
