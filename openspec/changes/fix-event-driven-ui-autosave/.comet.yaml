@@ -14,7 +14,7 @@ base_ref: 14ce553bc62269a09e5d2d960f3f9972a65396ad
 design_doc: null
 plan: null
 verify_result: pending
-verification_report: null
+verification_report: docs/superpowers/reports/2026-09-12-fix-event-driven-ui-autosave-verify.md
 branch_status: pending
 created_at: 2026-09-12
 verified_at: null
