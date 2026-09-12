@@ -47,7 +47,7 @@
                     <Popup PlacementTarget="{Binding #comboPickerButton}" Placement="Bottom" IsLightDismissEnabled="True" IsOpen="{Binding IsComboPickerOpen, Mode=TwoWay}" HorizontalOffset="0" VerticalOffset="4">
                       <Border Width="250" MaxHeight="260" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
                         <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsControl ItemsSource="{Binding ComboOptions}"><ItemsControl.ItemTemplate><DataTemplate>
-                          <CheckBox Tag="{Binding}" IsChecked="{Binding IsSelected, Mode=OneWay}" Click="EndpointComboOption_OnClick" Padding="7,6">
+                          <CheckBox Tag="{Binding}" IsChecked="{Binding IsSelected, Mode=OneWay}" IsEnabled="{Binding !IsDeleted}" Click="EndpointComboOption_OnClick" Padding="7,6">
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBlock Text="{Binding Name}"/><TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="muted" FontSize="10"/></Grid>
                           </CheckBox>
                         </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>

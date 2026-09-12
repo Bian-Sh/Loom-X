@@ -1298,7 +1298,10 @@
     <value>、</value>
   </data>
   <data name="gateway.combo.disabled">
-    <value>全局停用</value>
+    <value>停用</value>
+  </data>
+  <data name="gateway.combo.missing">
+    <value>不存在</value>
   </data>
   <data name="gateway.endpoint.noRoutes">
     <value>無路由</value>

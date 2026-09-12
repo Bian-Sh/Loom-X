@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using LoomX.Configuration;
+using LoomX.Localization;
 using LoomX.Services;
 using LoomX.ViewModels;
 using Xunit;
@@ -74,6 +75,67 @@ public sealed class GatewayViewModelDeletionTests
     }
 
     [Fact]
+    public async Task ComboAddUpdatesEveryEndpointPicker()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            using var gatewayService = new GatewayProcessService();
+            using var dataStore = new AppDataStore(configService, gatewayService);
+            await dataStore.InitializeAsync();
+            using var viewModel = new GatewayViewModel(dataStore);
+            await WaitForAsync(() => viewModel.Endpoints.Count > 0 && viewModel.Combos.Count == 0);
+
+            viewModel.AddComboCommand.Execute(null);
+
+            await WaitForAsync(() => viewModel.Combos.Count == 1 && viewModel.Endpoints.All(endpoint => endpoint.ComboOptions.Count == 1));
+            var added = viewModel.Combos[0];
+            Assert.All(viewModel.Endpoints, endpoint =>
+            {
+                var option = Assert.Single(endpoint.ComboOptions);
+                Assert.Equal(added.Id, option.ComboId);
+                Assert.Equal(added.Name, option.Name);
+                Assert.False(option.IsSelected);
+            });
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
+    public async Task ComboToggleUpdatesEveryEndpointPicker()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            var combo = await configService.CreateGatewayComboAsync(new GatewayComboInput("待停用组合", true, 0));
+            using var gatewayService = new GatewayProcessService();
+            using var dataStore = new AppDataStore(configService, gatewayService);
+            await dataStore.InitializeAsync();
+            using var viewModel = new GatewayViewModel(dataStore);
+            await WaitForAsync(() => viewModel.Combos.Count == 1 && viewModel.Endpoints.All(endpoint => endpoint.ComboOptions.Count == 1));
+
+            viewModel.ToggleComboCommand.Execute(viewModel.Combos.Single(item => item.Id == combo.Id));
+
+            await WaitForAsync(() => viewModel.Endpoints.All(endpoint => !endpoint.ComboOptions.Single().ComboEnabled));
+            Assert.All(viewModel.Endpoints, endpoint =>
+                Assert.Equal(ResourceLookup.Resolve("gateway.combo.disabled"), endpoint.ComboOptions.Single().StatusText));
+        }
+        finally
+        {
+            DeleteDirectory(directory);
+        }
+    }
+
+    [Fact]
     public async Task ComboDeleteRemovesTheRequestedCombo()
     {
         var directory = CreateDirectory();
@@ -84,17 +146,28 @@ public sealed class GatewayViewModelDeletionTests
             using var configService = new ConfigSnapshotService(configPath);
             var first = await configService.CreateGatewayComboAsync(new GatewayComboInput("第一个组合", true, 0));
             var second = await configService.CreateGatewayComboAsync(new GatewayComboInput("第二个组合", true, 1));
+            await configService.UpdateGatewayEndpointComboBindingsAsync("openai", new GatewayEndpointComboSelectionInput([first.Id]));
             using var gatewayService = new GatewayProcessService();
             using var dataStore = new AppDataStore(configService, gatewayService);
             await dataStore.InitializeAsync();
             using var viewModel = new GatewayViewModel(dataStore);
-            await WaitForAsync(() => viewModel.Combos.Count == 2);
+            await WaitForAsync(() => viewModel.Combos.Count == 2 && viewModel.Endpoints.All(endpoint => endpoint.ComboOptions.Count == 2));
 
             viewModel.RemoveComboCommand.Execute(viewModel.Combos.Single(item => item.Id == first.Id));
 
-            await WaitForAsync(() => viewModel.Combos.Count == 1);
+            await WaitForAsync(() => viewModel.Combos.Count == 1 && viewModel.Endpoints.All(endpoint => endpoint.ComboOptions.Single(item => item.ComboId == first.Id).StatusText == ResourceLookup.Resolve("gateway.combo.missing")));
             Assert.Equal(second.Id, viewModel.Combos[0].Id);
+            Assert.All(viewModel.Endpoints, endpoint =>
+            {
+                Assert.Equal(2, endpoint.ComboOptions.Count);
+                Assert.Equal("第一个组合", endpoint.ComboOptions.Single(item => item.ComboId == first.Id).Name);
+            });
             Assert.Single(await configService.ListGatewayCombosAsync());
+
+            var openAi = viewModel.Endpoints.Single(endpoint => endpoint.Key == "openai");
+            await viewModel.ToggleEndpointComboAsync(openAi.ComboOptions.Single(item => item.ComboId == second.Id));
+            Assert.True(openAi.ComboOptions.Single(item => item.ComboId == second.Id).IsSelected);
+            Assert.Equal(second.Id, Assert.Single((await configService.ListGatewayEndpointsAsync()).Single(endpoint => endpoint.Key == "openai").Combos).ComboId);
         }
         finally
         {

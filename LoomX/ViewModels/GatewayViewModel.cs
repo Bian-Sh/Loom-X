@@ -208,7 +208,13 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             var name = Loc("gateway.combo.new.name"); var index = 2;
             while (Combos.Any(item => string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))) name = LocFormat("gateway.combo.new.name.dup", index++);
             GatewayComboResponse? response = null;
-            await RunGatewayMutationAsync(async () => response = await dataStore.CreateGatewayComboAsync(new GatewayComboInput(name, true, Combos.Count)));
+            await RunGatewayMutationAsync(async () =>
+            {
+                response = await dataStore.CreateGatewayComboAsync(new GatewayComboInput(name, true, Combos.Count));
+                var added = GatewayComboEditorViewModel.FromResponse(response);
+                Combos.Add(added);
+                SyncEndpointComboOption(added);
+            });
             SelectedCombo = response is null ? null : Combos.FirstOrDefault(item => item.Id == response.Id);
             if (SelectedCombo is not null) SelectedCombo.IsExpanded = true;
             SetStatus("gateway.combo.add.success");
@@ -227,7 +233,11 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             {
                 if (!IsCurrentCombo(combo) || !combo.HasPendingChanges) return;
                 var response = await dataStore.UpdateGatewayComboAsync(comboId, new GatewayComboInput(combo.Name, combo.Enabled, combo.SortOrder));
-                FindCurrentCombo(comboId)?.ApplyResponse(response);
+                if (FindCurrentCombo(comboId) is { } current)
+                {
+                    current.ApplyResponse(response);
+                    SyncEndpointComboOption(current);
+                }
                 saved = true;
             });
             if (saved) SetStatus("gateway.combo.save.success");
@@ -239,12 +249,12 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
 
     public async Task ToggleEndpointComboAsync(GatewayComboBindingOption? option)
     {
-        if (option?.Owner is not { } endpoint) return;
+        if (option?.Owner is not { } endpoint || option.IsDeleted) return;
         var previous = option.IsSelected;
         option.IsSelected = !previous;
         try
         {
-            var selected = endpoint.ComboOptions.Where(item => item.IsSelected).Select(item => item.ComboId).ToArray();
+            var selected = endpoint.ComboOptions.Where(item => !item.IsDeleted && item.IsSelected).Select(item => item.ComboId).ToArray();
             GatewayEndpointResponse? response = null;
             await RunGatewayMutationAsync(async () => response = await dataStore.UpdateGatewayEndpointComboBindingsAsync(endpoint.Key, new GatewayEndpointComboSelectionInput(selected)));
             if (response is null) return;
@@ -445,7 +455,11 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
                 if (current is null) return;
                 current.Enabled = !current.Enabled;
                 var response = await dataStore.UpdateGatewayComboAsync(current.Id, new GatewayComboInput(current.Name, current.Enabled, current.SortOrder));
-                FindCurrentCombo(current.Id)?.ApplyResponse(response);
+                if (FindCurrentCombo(current.Id) is { } updated)
+                {
+                    updated.ApplyResponse(response);
+                    SyncEndpointComboOption(updated);
+                }
                 saved = true;
             });
             if (saved) SetStatus("gateway.combo.save.success");
@@ -460,6 +474,7 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             var comboId = combo.Id;
             await RunGatewayMutationAsync(() => dataStore.DeleteGatewayComboAsync(comboId));
             if (FindCurrentCombo(comboId) is { } current) Combos.Remove(current);
+            foreach (var endpoint in Endpoints) endpoint.MarkComboDeleted(comboId);
             if (SelectedCombo?.Id == comboId) SelectedCombo = null;
             SetStatus("gateway.combo.remove.success");
         }
@@ -524,6 +539,10 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     private static void Renumber(GatewayComboEditorViewModel combo) { for (var i = 0; i < combo.Routes.Count; i++) combo.Routes[i].SortOrder = i; }
 
     private GatewayComboEditorViewModel? FindCurrentCombo(Guid id) => Combos.FirstOrDefault(item => item.Id == id);
+    private void SyncEndpointComboOption(GatewayComboEditorViewModel combo)
+    {
+        foreach (var endpoint in Endpoints) endpoint.ApplyCombo(combo);
+    }
     private GatewayComboEditorViewModel? FindRouteOwner(Guid id) => Combos.FirstOrDefault(combo => combo.Routes.Any(item => !item.IsPlaceholder && item.Id == id));
     private GatewayRouteEditorViewModel? FindCurrentRoute(Guid id) => FindRouteOwner(id)?.Routes.FirstOrDefault(item => !item.IsPlaceholder && item.Id == id);
     private bool IsCurrentCombo(GatewayComboEditorViewModel combo) => FindCurrentCombo(combo.Id) is not null;
@@ -625,15 +644,25 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
     public void ApplyBindings(GatewayEndpointResponse response, IReadOnlyList<GatewayComboEditorViewModel> combos)
     {
         var selected = response.Combos.ToDictionary(item => item.ComboId);
+        var deleted = ComboOptions.Where(item => item.IsDeleted).ToArray();
         ComboOptions.Clear();
         foreach (var combo in combos.OrderBy(item => item.SortOrder))
         {
             selected.TryGetValue(combo.Id, out var binding);
             ComboOptions.Add(new GatewayComboBindingOption(this, combo.Id, combo.Name, combo.Enabled, binding is not null && binding.Enabled));
         }
+        foreach (var option in deleted.Where(item => combos.All(combo => combo.Id != item.ComboId))) ComboOptions.Add(option);
         OnPropertyChanged(nameof(SelectedComboCount));
         OnPropertyChanged(nameof(SelectedComboSummary));
     }
+    internal void ApplyCombo(GatewayComboEditorViewModel combo)
+    {
+        if (ComboOptions.FirstOrDefault(item => item.ComboId == combo.Id) is { } option)
+            option.ApplyCombo(combo.Name, combo.Enabled);
+        else
+            ComboOptions.Add(new GatewayComboBindingOption(this, combo.Id, combo.Name, combo.Enabled, false));
+    }
+    internal void MarkComboDeleted(Guid comboId) => ComboOptions.FirstOrDefault(item => item.ComboId == comboId)?.MarkDeleted();
     internal void OnComboOptionChanged()
     {
         OnPropertyChanged(nameof(SelectedComboCount));
@@ -651,20 +680,31 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
 public sealed class GatewayComboBindingOption : NotifyViewModel
 {
     private bool isSelected;
+    private string name;
+    private bool comboEnabled;
+    private bool isDeleted;
     public GatewayEndpointEditorViewModel Owner { get; }
     public Guid ComboId { get; }
-    public string Name { get; }
-    public bool ComboEnabled { get; }
+    public string Name { get => name; private set { if (SetProperty(ref name, value)) Owner.OnComboOptionChanged(); } }
+    public bool ComboEnabled { get => comboEnabled; private set { if (SetProperty(ref comboEnabled, value)) OnPropertyChanged(nameof(StatusText)); } }
+    public bool IsDeleted { get => isDeleted; private set { if (SetProperty(ref isDeleted, value)) OnPropertyChanged(nameof(StatusText)); } }
     public bool IsSelected { get => isSelected; set { if (SetProperty(ref isSelected, value)) Owner.OnComboOptionChanged(); } }
-    public string StatusText => ComboEnabled ? "" : ResourceLookup.Resolve("gateway.combo.disabled");
+    public string StatusText => IsDeleted ? ResourceLookup.Resolve("gateway.combo.missing") : ComboEnabled ? "" : ResourceLookup.Resolve("gateway.combo.disabled");
     public GatewayComboBindingOption(GatewayEndpointEditorViewModel owner, Guid comboId, string name, bool comboEnabled, bool isSelected)
     {
         Owner = owner;
         ComboId = comboId;
-        Name = name;
-        ComboEnabled = comboEnabled;
+        this.name = name;
+        this.comboEnabled = comboEnabled;
         this.isSelected = isSelected;
     }
+    internal void ApplyCombo(string comboName, bool enabled)
+    {
+        Name = comboName;
+        ComboEnabled = enabled;
+        IsDeleted = false;
+    }
+    internal void MarkDeleted() => IsDeleted = true;
     internal void RefreshLocalization() => OnPropertyChanged(nameof(StatusText));
 }
 public sealed class GatewayComboEditorViewModel : NotifyViewModel

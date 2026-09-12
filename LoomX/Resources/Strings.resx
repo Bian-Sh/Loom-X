@@ -1444,7 +1444,10 @@
     <value>、</value>
   </data>
   <data name="gateway.combo.disabled">
-    <value>全局停用</value>
+    <value>停用</value>
+  </data>
+  <data name="gateway.combo.missing">
+    <value>不存在</value>
   </data>
 
   <!-- ========== Phase 2: GatewayRoute / RecentRequest 派生状态 ========== -->

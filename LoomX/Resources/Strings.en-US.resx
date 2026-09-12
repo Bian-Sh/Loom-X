@@ -457,7 +457,8 @@
   <data name="gateway.endpoint.reasoning.failure.toast"><value>Reasoning effort save failed</value></data>
   <data name="gateway.combo.summary.empty"><value>No exposed combos</value></data>
   <data name="gateway.combo.summary.separator"><value>, </value></data>
-  <data name="gateway.combo.disabled"><value>Globally disabled</value></data>
+  <data name="gateway.combo.disabled"><value>Disabled</value></data>
+  <data name="gateway.combo.missing"><value>Missing</value></data>
   <data name="gateway.endpoint.noRoutes"><value>No routes</value></data>
   <data name="gateway.endpoint.hasRequests"><value>Handling requests</value></data>
   <data name="gateway.endpoint.ready"><value>Ready</value></data>

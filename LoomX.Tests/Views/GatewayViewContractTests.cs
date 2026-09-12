@@ -1,5 +1,7 @@
 using System.IO;
+using System.Globalization;
 using LoomX.Configuration;
+using LoomX.Localization;
 using LoomX.ViewModels;
 using Xunit;
 
@@ -242,6 +244,22 @@ public sealed class GatewayViewContractTests
         Assert.Equal("共享模型、备用模型", openAi.SelectedComboSummary);
         Assert.Equal(["minimal", "low", "medium", "high"], ollama.ReasoningEffortOptions);
         Assert.Equal("high", ollama.ReasoningEffort);
+    }
+
+    [Fact]
+    public void ComboPickerStatusLabelsAreLocalizedAndDeletedItemsAreDisabled()
+    {
+        Assert.Equal("停用", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("zh-CN")));
+        Assert.Equal("Disabled", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("en-US")));
+        Assert.Equal("無効", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("ja-JP")));
+        Assert.Equal("停用", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("zh-TW")));
+        Assert.Equal("不存在", ResourceLookup.Resolve("gateway.combo.missing", new CultureInfo("zh-CN")));
+        Assert.Equal("Missing", ResourceLookup.Resolve("gateway.combo.missing", new CultureInfo("en-US")));
+        Assert.Equal("存在しません", ResourceLookup.Resolve("gateway.combo.missing", new CultureInfo("ja-JP")));
+        Assert.Equal("不存在", ResourceLookup.Resolve("gateway.combo.missing", new CultureInfo("zh-TW")));
+
+        var gatewaySource = ReadDesktopFile("Views", "GatewayView.axaml");
+        Assert.Contains("IsEnabled=\"{Binding !IsDeleted}\"", gatewaySource, StringComparison.Ordinal);
     }
 
     [Fact]

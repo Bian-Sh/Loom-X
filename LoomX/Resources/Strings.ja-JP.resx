@@ -1298,7 +1298,10 @@
     <value>、</value>
   </data>
   <data name="gateway.combo.disabled">
-    <value>グローバル無効</value>
+    <value>無効</value>
+  </data>
+  <data name="gateway.combo.missing">
+    <value>存在しません</value>
   </data>
   <data name="gateway.endpoint.noRoutes">
     <value>ルートなし</value>
