@@ -540,6 +540,8 @@ public sealed class AppDataStore : IDisposable
         };
         var endpoints = CurrentConfig.GatewayEndpoints.Select(item => string.Equals(item.Key, result.Key, StringComparison.OrdinalIgnoreCase) ? endpoint : item).ToArray();
         CurrentConfig = WithConfig(CurrentConfig, endpoints: endpoints);
+        var boundComboIds = GatewayEndpoints.SelectMany(item => item.Combos).Select(item => item.ComboId).ToHashSet();
+        GatewayCombos = GatewayCombos.Where(item => !item.IsDeleted || boundComboIds.Contains(item.Id)).ToArray();
     }
 
     private void ApplyComboSnapshot(GatewayComboResponse result)
@@ -694,6 +696,7 @@ public sealed class AppDataStore : IDisposable
         var fields = ConfigurationChangeFields.None;
         if (!string.Equals(before.Name, after.Name, StringComparison.Ordinal)) fields |= ConfigurationChangeFields.ComboIdentity;
         if (before.Enabled != after.Enabled) fields |= ConfigurationChangeFields.ComboAvailability;
+        if (before.IsDeleted != after.IsDeleted) fields |= ConfigurationChangeFields.ComboIdentity;
         if (before.SortOrder != after.SortOrder) fields |= ConfigurationChangeFields.ComboOrder;
         return fields;
     }

@@ -1,11 +1,11 @@
 # 修复方案
 
-保留现有增量保存架构，在 `GatewayViewModel` 的 Combo 新增、保存、启停和删除成功路径中调用一个局部同步方法。该方法把当前组合状态投影到每个 `GatewayEndpointEditorViewModel.ComboOptions`：新增时追加未选项，更新时修改名称与启用状态，删除时将既有 option 标记为 tombstone 而不移除。
+在 `GatewayComboEntity` 增加持久化 `IsDeleted` 字段，并为旧 SQLite 库补列迁移。删除组合时，如果仍存在 Endpoint binding 则只标记删除并保留路由、名称、ID 和全部 binding；没有 binding 的组合继续物理删除。Endpoint binding 更新允许提交已删除但仍勾选的 ID，取消最后一个 binding 后清理对应软删除组合。运行时配置过滤 `IsDeleted` 组合，避免已删除组合参与路由。
 
-`GatewayComboBindingOption` 的名称、启用状态和删除状态改为可通知属性；`StatusText` 先判断删除状态，再判断启用状态，并从资源键解析“不存在”或“停用”。删除项在 XAML 中禁用交互，避免把已不存在的 Combo ID 提交给配置服务。文化切换继续通过现有 `RefreshLocalization` 刷新派生文案。
+Endpoint DTO 携带组合删除状态。`GatewayEndpointEditorViewModel.ApplyBindings` 对已删除且仍绑定的组合重建 tombstone，保留勾选；用户取消勾选后从该 Endpoint 下拉移除。组合以相同 ID 更新恢复时清除删除状态并同步所有下拉项。删除状态和启用状态均通过资源键解析，`不存在` 使用红色显示，`停用` 保持普通状态色。
 
-测试直接构造 ViewModel option 验证属性通知、多语言文案和 tombstone 优先级，并使用临时 SQLite 驱动真实新增、启停和删除命令，验证所有 Endpoint 的下拉集合与持久化结果同步。
+测试使用临时 SQLite 覆盖软删除保留数据、Endpoint binding、重载后的勾选状态、取消最后绑定后的清理、同 ID 恢复和缺列迁移，并保留新增/启停的局部同步回归覆盖。
 
 ## 范围确认
 
-实现预计超过 4 个文件仅因 `Strings.resx`、`Strings.en-US.resx`、`Strings.ja-JP.resx`、`Strings.zh-TW.resx` 必须保持资源对等。用户已确认继续 Hotfix，不升级为完整 Comet 流程。
+实现涉及数据库实体、管理服务、运行时快照、桌面状态和视图契约。用户已确认继续 Hotfix，不升级为完整 Comet 流程。

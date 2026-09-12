@@ -4,6 +4,7 @@
     <Style Selector="ItemsControl.endpoint-list"><Setter Property="Background" Value="Transparent"/></Style>
     <Style Selector="Border.endpoint-card"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/></Style>
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
+    <Style Selector="TextBlock.combo-missing"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}"/></Style>
     <Style Selector="Button.icon"><Setter Property="Width" Value="34"/><Setter Property="Height" Value="34"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="9"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
     <Style Selector="ComboBox.endpoint-reasoning"><Setter Property="MinWidth" Value="112"/><Setter Property="Height" Value="30"/></Style>
     <Style Selector="Border.drag-handle"><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/><Setter Property="Cursor" Value="SizeAll"/></Style>
@@ -47,8 +48,8 @@
                     <Popup PlacementTarget="{Binding #comboPickerButton}" Placement="Bottom" IsLightDismissEnabled="True" IsOpen="{Binding IsComboPickerOpen, Mode=TwoWay}" HorizontalOffset="0" VerticalOffset="4">
                       <Border Width="250" MaxHeight="260" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
                         <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsControl ItemsSource="{Binding ComboOptions}"><ItemsControl.ItemTemplate><DataTemplate>
-                          <CheckBox Tag="{Binding}" IsChecked="{Binding IsSelected, Mode=OneWay}" IsEnabled="{Binding !IsDeleted}" Click="EndpointComboOption_OnClick" Padding="7,6">
-                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBlock Text="{Binding Name}"/><TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="muted" FontSize="10"/></Grid>
+                          <CheckBox Tag="{Binding}" IsChecked="{Binding IsSelected, Mode=OneWay}" Click="EndpointComboOption_OnClick" Padding="7,6">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBlock Text="{Binding Name}"/><TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="muted" FontSize="10" IsVisible="{Binding !IsDeleted}"/><TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="combo-missing" FontSize="10" IsVisible="{Binding IsDeleted}"/></Grid>
                           </CheckBox>
                         </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
                       </Border>
@@ -76,7 +77,10 @@
                   <Grid RowDefinitions="Auto,Auto">
                     <Border Padding="8,7" Background="{DynamicResource SurfaceSubtleBrush}"><Grid ColumnDefinitions="32,*,Auto,Auto" ColumnSpacing="8">
                       <Button Classes="icon" Tag="{Binding}" Click="ToggleCombo_OnClick" ToolTip.Tip="{l:Locale gateway.combo.expand.tooltip}"><Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%"><Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform></Path></Button>
-                      <TextBox Grid.Column="1" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" FontWeight="SemiBold" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center" LostFocus="ComboName_OnLostFocus"/>
+                      <Grid Grid.Column="1" RowDefinitions="Auto,Auto">
+                        <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" FontWeight="SemiBold" BorderThickness="0" Background="Transparent" VerticalContentAlignment="Center" LostFocus="ComboName_OnLostFocus"/>
+                        <TextBlock Grid.Row="1" Text="{Binding StatusText}" Classes="combo-missing" FontSize="10" IsVisible="{Binding IsDeleted}"/>
+                      </Grid>
                       <ToggleSwitch Grid.Column="2" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleComboCommand}" CommandParameter="{Binding}" OnContent="" OffContent="" ToolTip.Tip="{l:Locale gateway.combo.toggle.tooltip}"/>
                       <Button Grid.Column="3" Classes="icon" Command="{Binding $parent[UserControl].DataContext.RemoveComboCommand}" CommandParameter="{Binding}" ToolTip.Tip="{l:Locale gateway.combo.remove.tooltip}" AutomationProperties.Name="{l:Locale gateway.combo.remove.tooltip}"><Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="14" Height="14"/></Button>
                     </Grid></Border>

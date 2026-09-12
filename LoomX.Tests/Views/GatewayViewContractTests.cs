@@ -247,7 +247,7 @@ public sealed class GatewayViewContractTests
     }
 
     [Fact]
-    public void ComboPickerStatusLabelsAreLocalizedAndDeletedItemsAreDisabled()
+    public void ComboPickerStatusLabelsAreLocalizedAndDeletedItemsRemainInteractive()
     {
         Assert.Equal("停用", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("zh-CN")));
         Assert.Equal("Disabled", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("en-US")));
@@ -259,7 +259,9 @@ public sealed class GatewayViewContractTests
         Assert.Equal("不存在", ResourceLookup.Resolve("gateway.combo.missing", new CultureInfo("zh-TW")));
 
         var gatewaySource = ReadDesktopFile("Views", "GatewayView.axaml");
-        Assert.Contains("IsEnabled=\"{Binding !IsDeleted}\"", gatewaySource, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsEnabled=\"{Binding !IsDeleted}\"", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"combo-missing\"", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("DangerBrush", gatewaySource, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -122,6 +122,36 @@ public sealed class ConfigurationDatabaseMigrationTests
         }
     }
 
+    [Fact]
+    public async Task ExistingDatabase_MissingComboDeletedColumn_GetsDefaultValue()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-combo-migration-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using (var context = new ConfigurationDbContext(options))
+            {
+                await ConfigurationDatabase.InitializeAsync(context);
+                context.GatewayCombos.Add(new GatewayComboEntity { Name = "旧组合" });
+                await context.SaveChangesAsync();
+                await context.Database.ExecuteSqlRawAsync("ALTER TABLE GatewayCombos DROP COLUMN IsDeleted");
+                context.ChangeTracker.Clear();
+            }
+
+            await using (var migratedContext = new ConfigurationDbContext(options))
+            {
+                await ConfigurationDatabase.InitializeAsync(migratedContext);
+                var combo = await migratedContext.GatewayCombos.SingleAsync();
+                Assert.False(combo.IsDeleted);
+                Assert.Contains("IsDeleted", await ReadColumnsAsync(migratedContext, "GatewayCombos"));
+            }
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
     private static Task<int> InsertComboAsync(ConfigurationDbContext context, Guid id, string endpointKey, string name, bool enabled, int sortOrder) =>
         context.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO GatewayCombos (Id, EndpointKey, Name, Enabled, SortOrder) VALUES ({id.ToString()}, {endpointKey}, {name}, {enabled}, {sortOrder})");
 

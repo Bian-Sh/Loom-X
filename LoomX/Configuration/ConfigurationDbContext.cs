@@ -72,6 +72,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.Property(item => item.Id).HasConversion<string>();
             entity.HasIndex(item => item.Name).IsUnique();
             entity.Property(item => item.Name).HasMaxLength(256).IsRequired().UseCollation("NOCASE");
+            entity.Property(item => item.IsDeleted).HasDefaultValue(false);
             entity.HasMany(item => item.Routes).WithOne(item => item.Combo).HasForeignKey(item => item.ComboId).OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(item => item.EndpointBindings).WithOne(item => item.Combo).HasForeignKey(item => item.ComboId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -216,6 +217,7 @@ public sealed class GatewayComboEntity
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public bool Enabled { get; set; } = true;
+    public bool IsDeleted { get; set; }
     public int SortOrder { get; set; }
     public List<GatewayRouteEntity> Routes { get; set; } = [];
     public List<GatewayEndpointComboBindingEntity> EndpointBindings { get; set; } = [];
@@ -366,7 +368,7 @@ public static class ConfigurationDatabase
                     "Id", "ProviderId", "ModelId", "DisplayName", "ConfigId", "Family", "BaseUrl", "ProtectedApiKey", "ApiMode",
                     "ContextLength", "MaxTokens", "Vision", "Temperature", "TopP", "HeadersJson", "ExtraJson", "OwnedBy", "RemoteFamily", "RemoteContextLength", "RemoteMaxTokens", "RemoteVision", "Enabled", "SortOrder")
                 || !await HasColumnsAsync(connection, "GatewayEndpoints", cancellationToken, "Key", "DisplayName", "PublicPath", "Enabled", "ProtectedApiKey", "ReasoningEffort")
-                || !await HasColumnsAsync(connection, "GatewayCombos", cancellationToken, "Id", "Name", "Enabled", "SortOrder")
+                || !await HasColumnsAsync(connection, "GatewayCombos", cancellationToken, "Id", "Name", "Enabled", "IsDeleted", "SortOrder")
                 || await HasColumnAsync(connection, "GatewayCombos", "EndpointKey", cancellationToken)
                 || !await HasColumnsAsync(connection, "GatewayEndpointComboBindings", cancellationToken, "EndpointKey", "ComboId", "Enabled", "SortOrder")
                 || !await HasColumnsAsync(connection, "GatewayRoutes", cancellationToken, "Id", "ComboId", "ModelId", "Enabled", "SortOrder")
@@ -533,6 +535,13 @@ public static class ConfigurationDatabase
             }
         }
         await EnsureGatewaySchemaAsync(dbContext, cancellationToken);
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE GatewayCombos ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
+        }
         await dbContext.Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS AssistantPreferences (
                 Id INTEGER NOT NULL CONSTRAINT PK_AssistantPreferences PRIMARY KEY,
@@ -608,6 +617,7 @@ public static class ConfigurationDatabase
                         Id TEXT NOT NULL CONSTRAINT PK_GatewayCombos PRIMARY KEY,
                         Name TEXT NOT NULL COLLATE NOCASE,
                         Enabled INTEGER NOT NULL,
+                        IsDeleted INTEGER NOT NULL DEFAULT 0,
                         SortOrder INTEGER NOT NULL,
                         CONSTRAINT UQ_GatewayCombos_Name UNIQUE (Name)
                     )
@@ -639,7 +649,7 @@ public static class ConfigurationDatabase
                 foreach (var combo in migratedCombos)
                 {
                     await ExecuteNonQueryAsync(connection, transaction,
-                        "INSERT INTO GatewayCombos__new (Id, Name, Enabled, SortOrder) VALUES ($id, $name, $enabled, $sortOrder)",
+                        "INSERT INTO GatewayCombos__new (Id, Name, Enabled, IsDeleted, SortOrder) VALUES ($id, $name, $enabled, 0, $sortOrder)",
                         cancellationToken,
                         ("$id", combo.Id.ToString()), ("$name", combo.Name), ("$enabled", combo.Enabled ? 1 : 0), ("$sortOrder", combo.SortOrder));
 

@@ -89,7 +89,7 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
                 },
                 Providers = resolvedProviders,
                 Models = models,
-                GatewayCombos = combos.OrderBy(combo => combo.SortOrder).ThenBy(combo => combo.Name, StringComparer.OrdinalIgnoreCase).Select(combo => new ResolvedGatewayComboConfig
+                GatewayCombos = combos.Where(combo => !combo.IsDeleted).OrderBy(combo => combo.SortOrder).ThenBy(combo => combo.Name, StringComparer.OrdinalIgnoreCase).Select(combo => new ResolvedGatewayComboConfig
                 {
                     Id = combo.Id,
                     Name = combo.Name,
@@ -261,7 +261,12 @@ public sealed class DatabaseConfigurationProvider(ConfigurationDbContext dbConte
     private async Task ApplyComboAsync(Guid comboId, CancellationToken cancellationToken)
     {
         var combo = await dbContext.GatewayCombos.AsNoTracking().Include(item => item.Routes).ThenInclude(item => item.Model).ThenInclude(item => item.Provider).SingleOrDefaultAsync(item => item.Id == comboId, cancellationToken);
-        if (combo is null) return;
+        if (combo is null || combo.IsDeleted)
+        {
+            var currentSnapshot = Current;
+            Volatile.Write(ref current, WithCurrent(currentSnapshot, combos: currentSnapshot.GatewayCombos.Where(item => item.Id != comboId).ToArray()));
+            return;
+        }
         var snapshot = Current;
         var modelLookup = snapshot.Models.ToDictionary(item => ModelKey(item.ProviderId, item.ModelId), StringComparer.OrdinalIgnoreCase);
         var routes = combo.Routes.OrderBy(item => item.SortOrder).Where(item => item.Model.Provider.Enabled && item.Model.Enabled).Select(item => modelLookup.TryGetValue(ModelKey(item.Model.Provider.BusinessId, item.Model.ModelId), out var model) ? new ResolvedGatewayRouteConfig { Model = model, Enabled = item.Enabled, SortOrder = item.SortOrder } : null).Where(item => item is not null).Cast<ResolvedGatewayRouteConfig>().ToArray();

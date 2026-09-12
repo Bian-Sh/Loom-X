@@ -677,6 +677,7 @@ public static class LoomXTools
         ["id"] = JsonValue.Create(combo.Id),
         ["name"] = combo.Name,
         ["enabled"] = combo.Enabled,
+        ["is_deleted"] = combo.IsDeleted,
         ["sort_order"] = combo.SortOrder,
         ["routes"] = new JsonArray(combo.Routes.Select(route => (JsonNode?)ToSafeJson(route)).ToArray()),
         ["endpoints"] = new JsonArray(combo.Endpoints.Select(endpoint => (JsonNode?)new JsonObject
