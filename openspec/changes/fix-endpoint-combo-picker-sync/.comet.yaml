@@ -14,7 +14,7 @@ base_ref: e2fe3db3802c5db191ecd3c619ad84035f1d7129
 design_doc: null
 plan: null
 verify_result: pending
-verification_report: docs/superpowers/reports/2026-09-12-fix-endpoint-combo-picker-sync-verify.md
+verification_report: docs/superpowers/reports/2026-09-13-fix-endpoint-combo-picker-sync-verify.md
 branch_status: handled
 created_at: 2026-09-12
 verified_at: null
