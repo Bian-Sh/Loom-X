@@ -18,7 +18,7 @@ verification_report: docs/superpowers/reports/2026-09-13-fix-endpoint-combo-pick
 branch_status: handled
 created_at: 2026-09-12
 verified_at: 2026-09-12
-archived: false
+archived: true
 direct_override: null
 handoff_context: null
 handoff_hash: null

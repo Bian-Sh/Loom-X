@@ -1,5 +1,6 @@
 {
   "openspec_proposal": "openspec/changes/fix-endpoint-combo-picker-sync/proposal.md",
   "openspec_design": "openspec/changes/fix-endpoint-combo-picker-sync/design.md",
-  "openspec_tasks": "openspec/changes/fix-endpoint-combo-picker-sync/tasks.md"
+  "openspec_tasks": "openspec/changes/fix-endpoint-combo-picker-sync/tasks.md",
+  "archive_directory": "openspec/changes/archive/2026-09-12-fix-endpoint-combo-picker-sync"
 }
