@@ -104,7 +104,6 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(MainWindowViewModel.SelectedNavigationOffset) && sender is MainWindowViewModel viewModel)
         {
             var targetOffset = viewModel.SelectedNavigationOffset;
-            logger.LogInformation("左侧导航选中框切换请求 {TargetOffset}", targetOffset);
             // 等待当前导航命令完成页面通知，避免首次创建页面阻塞动画的首帧。
             Dispatcher.UIThread.Post(() =>
             {
@@ -141,7 +140,6 @@ public partial class MainWindow : Window
         navigationSelectionAnimationFrom = fromOffset;
         navigationSelectionAnimationTarget = targetOffset;
         navigationSelectionAnimationStopwatch = Stopwatch.StartNew();
-        logger.LogInformation("左侧导航选中框动画开始 {FromOffset} -> {TargetOffset}", fromOffset, targetOffset);
         navigationSelectionAnimationTimer.Start();
     }
 
@@ -159,7 +157,6 @@ public partial class MainWindow : Window
             SetNavigationSelectionOffset(navigationSelectionAnimationTarget);
             navigationSelectionAnimationTimer.Stop();
             navigationSelectionAnimationStopwatch = null;
-            logger.LogInformation("左侧导航选中框动画完成 {TargetOffset}", navigationSelectionAnimationTarget);
             return;
         }
 

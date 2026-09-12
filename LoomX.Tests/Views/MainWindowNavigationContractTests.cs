@@ -71,6 +71,9 @@ public sealed class MainWindowNavigationContractTests
         Assert.DoesNotContain("navigationSelectionOutline.RenderTransform = new TranslateTransform", codeBehindSource, StringComparison.Ordinal);
         Assert.Contains("Dispatcher.UIThread.Post(() =>", codeBehindSource, StringComparison.Ordinal);
         Assert.Contains("DispatcherPriority.Background", codeBehindSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("左侧导航选中框切换请求", codeBehindSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("左侧导航选中框动画开始", codeBehindSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("左侧导航选中框动画完成", codeBehindSource, StringComparison.Ordinal);
     }
 
     [Fact]
