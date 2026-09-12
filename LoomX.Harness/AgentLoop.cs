@@ -10,7 +10,7 @@ namespace LoomX.Assistant;
 public delegate Task<bool> ToolApprovalGate(ToolCall toolCall, ToolDefinition tool, CancellationToken cancellationToken);
 
 /// <summary>
-/// 小助手最小 Agent 循环：
+/// 最小 Agent 循环：
 /// 用户 → 模型 →（工具调用 → 工具结果 → 模型）→ 回答。
 /// 支持 streaming、tool calling、cancellation、timeout、max steps 与错误恢复。
 /// </summary>
@@ -20,17 +20,23 @@ public sealed class AgentLoop
     private readonly ToolRegistry toolRegistry;
     private readonly ILogger<AgentLoop> logger;
     private readonly ToolApprovalGate? approvalGate;
+    private readonly Func<Exception, string> failureFormatter;
+    private readonly Func<int, string> maxStepsFormatter;
 
     public AgentLoop(
         IModelClient modelClient,
         ToolRegistry toolRegistry,
         ILogger<AgentLoop> logger,
-        ToolApprovalGate? approvalGate = null)
+        ToolApprovalGate? approvalGate = null,
+        Func<Exception, string>? failureFormatter = null,
+        Func<int, string>? maxStepsFormatter = null)
     {
         this.modelClient = modelClient;
         this.toolRegistry = toolRegistry;
         this.logger = logger;
         this.approvalGate = approvalGate;
+        this.failureFormatter = failureFormatter ?? (exception => exception.Message);
+        this.maxStepsFormatter = maxStepsFormatter ?? (steps => $"超过最大步骤数：{steps}");
     }
 
     public async IAsyncEnumerable<AgentEvent> RunAsync(
@@ -47,6 +53,7 @@ public sealed class AgentLoop
         session.MarkRunning();
         session.AddMessage(ChatMessage.User(userMessage));
         yield return AgentEvent.Create(session.Id, AgentEventKind.SessionStarted);
+        yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1] };
 
         var completed = false;
         var cancelled = false;
@@ -54,10 +61,12 @@ public sealed class AgentLoop
 
         for (var step = 0; step < session.Options.MaxSteps && !completed && !cancelled && failedDetail is null; step++)
         {
+            yield return AgentEvent.Create(session.Id, AgentEventKind.StepStarted) with { Step = step + 1 };
             using var stepTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             stepTimeout.CancelAfter(session.Options.ModelTimeout);
 
             var textBuilder = new StringBuilder();
+            var blocks = new List<ChatContentBlock>();
             var toolCalls = new List<ToolCall>();
             var finishReason = "stop";
             var completionReceived = false;
@@ -84,14 +93,14 @@ public sealed class AgentLoop
                     }
                     else
                     {
-                        logger.LogWarning("小助手模型请求超时 {SessionId} 步骤 {Step}", session.Id, step + 1);
-                        failedDetail = ModelErrorFormatter.Format(ModelErrorKind.Timeout);
+                        logger.LogWarning("Agent 模型请求超时 {SessionId} 步骤 {Step}", session.Id, step + 1);
+                        failedDetail = failureFormatter(new ModelClientException("模型请求超时。", ModelErrorKind.Timeout));
                     }
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, "小助手模型请求失败 {SessionId} 步骤 {Step}", session.Id, step + 1);
-                    failedDetail = ModelErrorFormatter.FormatException(exception);
+                    logger.LogError(exception, "Agent 模型请求失败 {SessionId} 步骤 {Step}", session.Id, step + 1);
+                    failedDetail = failureFormatter(exception);
                 }
 
                 if (!moved || streamEvent is null) break;
@@ -100,14 +109,23 @@ public sealed class AgentLoop
                 {
                     case TextDeltaEvent textDelta:
                         textBuilder.Append(textDelta.Text);
+                        AppendBlock(blocks, ChatContentKind.Text, textDelta.Text);
                         yield return AgentEvent.Create(session.Id, AgentEventKind.TextDelta) with { Text = textDelta.Text };
+                        break;
+                    case ReasoningDeltaEvent reasoningDelta:
+                        AppendBlock(blocks, ChatContentKind.Thinking, reasoningDelta.Text, reasoningDelta.IsSummary);
+                        yield return AgentEvent.Create(session.Id, AgentEventKind.ReasoningDelta) with
+                        {
+                            Text = reasoningDelta.Text,
+                            IsSummary = reasoningDelta.IsSummary,
+                        };
                         break;
                     case ModelToolCallEvent toolCallEvent:
                         // 防御：忽略 name 为空的无效工具调用（部分上游会附带空占位调用），
                         // 避免其被误判为「未注册工具」并以空 tool_call_id 回传历史导致 400。
                         if (string.IsNullOrWhiteSpace(toolCallEvent.ToolCall.Name))
                         {
-                            logger.LogWarning("小助手忽略了空名称的工具调用 {SessionId} 步骤 {Step}", session.Id, step + 1);
+                            logger.LogWarning("Agent 忽略了空名称的工具调用 {SessionId} 步骤 {Step}", session.Id, step + 1);
                             break;
                         }
                         toolCalls.Add(toolCallEvent.ToolCall);
@@ -123,10 +141,10 @@ public sealed class AgentLoop
 
             if (!completionReceived)
             {
-                failedDetail = ModelErrorFormatter.Format(
-                    ModelErrorKind.Unknown,
-                    upstreamMessage: "模型响应无效：服务未返回完成事件。请检查 Provider 协议、余额或额度。");
-                logger.LogWarning("小助手模型响应缺少完成事件 {SessionId} 步骤 {Step}", session.Id, step + 1);
+                failedDetail = failureFormatter(new ModelClientException(
+                    "模型响应无效：服务未返回完成事件。", ModelErrorKind.Unknown,
+                    upstreamMessage: "模型响应无效：服务未返回完成事件。"));
+                logger.LogWarning("Agent 模型响应缺少完成事件 {SessionId} 步骤 {Step}", session.Id, step + 1);
                 break;
             }
 
@@ -136,14 +154,16 @@ public sealed class AgentLoop
             // 保留首次出现的完整调用（arguments 已逐步追加完整）。
             var dedupedToolCalls = DedupeToolCallsById(toolCalls);
 
+            blocks.AddRange(dedupedToolCalls.Select(call => new ChatContentBlock(ChatContentKind.ToolCall, ToolCall: call)));
             session.AddMessage(ChatMessage.AssistantToolCalls(
                 dedupedToolCalls,
-                textBuilder.Length > 0 ? textBuilder.ToString() : null));
+                textBuilder.Length > 0 ? textBuilder.ToString() : null) with { Blocks = blocks });
+            yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1], Step = step + 1 };
 
             if (dedupedToolCalls.Count == 0)
             {
                 completed = true;
-                logger.LogDebug("小助手任务完成 {SessionId} 步骤 {Step} 结束原因 {FinishReason}", session.Id, step + 1, finishReason);
+                logger.LogDebug("Agent 任务完成 {SessionId} 步骤 {Step} 结束原因 {FinishReason}", session.Id, step + 1, finishReason);
                 break;
             }
 
@@ -181,8 +201,9 @@ public sealed class AgentLoop
 
                     if (!approved)
                     {
-                        logger.LogInformation("小助手工具调用被用户拒绝 {ToolName}", toolCall.Name);
+                        logger.LogInformation("Agent 工具调用被用户拒绝 {ToolName}", toolCall.Name);
                         session.AddMessage(ChatMessage.ToolResult(toolCall, "用户拒绝了这次修改操作，没有执行。"));
+                        yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1] };
                         yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallCompleted) with
                         {
                             ToolName = toolCall.Name,
@@ -202,13 +223,14 @@ public sealed class AgentLoop
                 }
 
                 session.AddMessage(ChatMessage.ToolResult(toolCall, result!.Content));
+                yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1] };
 
                 yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallCompleted) with
                 {
                     ToolName = toolCall.Name,
                     ToolCallId = toolCall.Id,
                     Success = result.Success,
-                    Detail = result.Success ? null : result.Content,
+                    Detail = result.Success ? null : ModelErrorClassifier.SanitizeUpstreamMessage(result.Content),
                 };
             }
         }
@@ -216,6 +238,7 @@ public sealed class AgentLoop
         if (cancelled)
         {
             session.MarkCancelled();
+            yield return AgentEvent.Create(session.Id, AgentEventKind.TaskCancelled);
             yield break;
         }
 
@@ -229,8 +252,16 @@ public sealed class AgentLoop
         session.MarkFailed();
         yield return AgentEvent.Create(session.Id, AgentEventKind.TaskFailed) with
         {
-            Detail = failedDetail ?? ModelErrorFormatter.FormatMaxStepsExceeded(session.Options.MaxSteps),
+            Detail = failedDetail ?? maxStepsFormatter(session.Options.MaxSteps),
         };
+    }
+
+    private static void AppendBlock(List<ChatContentBlock> blocks, ChatContentKind kind, string delta, bool summary = false)
+    {
+        if (blocks.Count > 0 && blocks[^1].Kind == kind && blocks[^1].IsSummary == summary)
+            blocks[^1] = blocks[^1] with { Text = blocks[^1].Text + delta };
+        else
+            blocks.Add(new ChatContentBlock(kind, delta, summary));
     }
 
     /// <summary>修改类操作（写/删）才需要逐条批准；只读与外部测试直接放行。</summary>
@@ -274,7 +305,7 @@ public sealed class AgentLoop
     {
         if (!toolRegistry.TryGet(toolCall.Name, out var tool) || tool is null)
         {
-            logger.LogWarning("小助手调用了未注册的工具 {ToolName}", toolCall.Name);
+            logger.LogWarning("Agent 调用了未注册的工具 {ToolName}", toolCall.Name);
             return (ToolResult.Fail($"未注册的工具：{toolCall.Name}"), false);
         }
 
@@ -297,12 +328,12 @@ public sealed class AgentLoop
         catch (OperationCanceledException)
         {
             if (cancellationToken.IsCancellationRequested) return (null, true);
-            logger.LogWarning("小助手工具执行超时 {ToolName}", tool.Name);
+            logger.LogWarning("Agent 工具执行超时 {ToolName}", tool.Name);
             return (ToolResult.Fail("工具执行超时。"), false);
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "小助手工具执行失败 {ToolName}", tool.Name);
+            logger.LogError(exception, "Agent 工具执行失败 {ToolName}", tool.Name);
             return (ToolResult.Fail($"工具执行失败：{exception.Message}"), false);
         }
     }

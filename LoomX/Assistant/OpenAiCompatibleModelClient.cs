@@ -92,10 +92,10 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             ApplyCodexRequestHeaders(httpRequest);
         }
 
-        ProviderExecutionResult result;
+        ProviderStreamingResult result;
         try
         {
-            result = await executionPipeline.ExecuteAsync(
+            result = await executionPipeline.ExecuteStreamingAsync(
                 httpClient,
                 httpRequest,
                 new ProviderExecutionContext(providerId, model, "openai", endpoint),
@@ -103,20 +103,29 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger?.LogError(exception, "小助手模型连接失败 {BaseUrl}", baseUrl);
+            logger?.LogError(exception, "AI 助手模型连接失败 {BaseUrl}", baseUrl);
             throw new ModelClientException(
                 "无法连接模型服务。",
                 ModelErrorKind.ConnectionFailed,
                 innerException: exception);
         }
 
+        await using var response = result;
         if (!result.IsSuccess)
         {
             var statusCode = (int)result.StatusCode;
-            var (errorCode, upstreamMessage) = ReadErrorBody(result.Body);
+            var errorBytes = new byte[ModelErrorClassifier.MaxErrorBodyBytes];
+            var length = 0;
+            while (length < errorBytes.Length)
+            {
+                var read = await result.Body.ReadAsync(errorBytes.AsMemory(length), cancellationToken);
+                if (read == 0) break;
+                length += read;
+            }
+            var (errorCode, upstreamMessage) = ReadErrorBody(errorBytes[..length]);
             var kind = ModelErrorClassifier.Classify(statusCode, errorCode);
             logger?.LogWarning(
-                "小助手模型服务返回错误 {BaseUrl} {StatusCode} {ErrorCode} {Kind}",
+                "AI 助手模型服务返回错误 {BaseUrl} {StatusCode} {ErrorCode} {Kind}",
                 baseUrl, statusCode, errorCode ?? "-", kind);
             throw new ModelClientException(
                 $"模型服务返回错误状态 {statusCode}。",
@@ -126,13 +135,10 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 upstreamMessage);
         }
 
-        using var reader = new StringReader(result.BodyText);
+        using var reader = new StreamReader(result.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);
         if (useResponsesEndpoint)
         {
-            var responsesBody = await reader.ReadToEndAsync(cancellationToken);
-            var chatSse = ConvertResponsesBody(responsesBody, result.ContentType);
-            using var translatedReader = new StringReader(chatSse);
-            await foreach (var streamEvent in ParseChatCompletionsSseAsync(translatedReader, cancellationToken))
+            await foreach (var streamEvent in ParseResponsesBodyAsync(reader, cancellationToken))
             {
                 yield return RestoreToolName(streamEvent, wireToOriginalToolNames);
             }
@@ -146,68 +152,174 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         }
     }
 
-    private string ConvertResponsesBody(string body, string? contentType)
+    private async IAsyncEnumerable<ModelStreamEvent> ParseResponsesBodyAsync(
+        TextReader reader,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(body))
+        string? firstLine;
+        do { firstLine = await reader.ReadLineAsync(cancellationToken); }
+        while (firstLine is not null && string.IsNullOrWhiteSpace(firstLine));
+
+        if (firstLine is null)
         {
-            throw new ModelClientException(
-                "模型服务返回空响应。",
-                ModelErrorKind.Unknown,
+            throw new ModelClientException("模型服务返回空响应。", ModelErrorKind.Unknown,
                 upstreamMessage: "模型响应无效。请检查 Provider 协议与账户额度。");
         }
 
-        try
+        if (firstLine.TrimStart().StartsWith("data:", StringComparison.OrdinalIgnoreCase)
+            || firstLine.TrimStart().StartsWith("event:", StringComparison.OrdinalIgnoreCase)
+            || firstLine.StartsWith(':'))
         {
-            var trimmedBody = body.TrimStart();
-            var isSse = trimmedBody.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
-                || trimmedBody.StartsWith("event:", StringComparison.OrdinalIgnoreCase)
-                || (string.Equals(contentType, "text/event-stream", StringComparison.OrdinalIgnoreCase)
-                    && !trimmedBody.StartsWith("{", StringComparison.Ordinal)
-                    && !trimmedBody.StartsWith("[", StringComparison.Ordinal));
-            if (isSse)
+            await foreach (var item in ParseResponsesSseAsync(new PrefixedTextReader(firstLine, reader), cancellationToken))
+                yield return item;
+            yield break;
+        }
+
+        var body = firstLine + "\n" + await reader.ReadToEndAsync(cancellationToken);
+        foreach (var item in ParseResponsesJson(body)) yield return item;
+    }
+
+    private static async IAsyncEnumerable<ModelStreamEvent> ParseResponsesSseAsync(
+        TextReader reader,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var toolCalls = new Dictionary<string, ToolCallBuilder>(StringComparer.Ordinal);
+        var data = new List<string>();
+        var completed = false;
+        var hasText = false;
+
+        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        {
+            if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
             {
-                var chatSse = OpenAiResponsesBridge.CreateChatCompletionsSse(body, model);
-                if (!chatSse.Contains("\"content\":", StringComparison.Ordinal)
-                    && !chatSse.Contains("\"tool_calls\":", StringComparison.Ordinal))
-                {
-                    throw InvalidResponsesException("模型响应没有文本或工具调用。");
-                }
-
-                return chatSse;
+                data.Add(line[5..].TrimStart());
+                continue;
             }
+            if (line.Length != 0) continue;
 
-            if (JsonNode.Parse(body) is JsonObject responsesResponse)
+            foreach (var item in ProcessResponsesFrame(data, toolCalls, ref completed, ref hasText)) yield return item;
+            data.Clear();
+            if (completed) yield break;
+        }
+
+        foreach (var item in ProcessResponsesFrame(data, toolCalls, ref completed, ref hasText)) yield return item;
+        if (!completed) throw InvalidResponsesException("Responses 流未包含完成事件。");
+    }
+
+    private static IReadOnlyList<ModelStreamEvent> ProcessResponsesFrame(
+        List<string> data,
+        Dictionary<string, ToolCallBuilder> toolCalls,
+        ref bool completed,
+        ref bool hasText)
+    {
+        if (data.Count == 0) return [];
+        var payloadText = string.Join('\n', data);
+        if (payloadText == "[DONE]") return [];
+
+        JsonObject payload;
+        try { payload = JsonNode.Parse(payloadText) as JsonObject ?? throw new JsonException(); }
+        catch (JsonException exception) { throw InvalidResponsesException("Responses 流包含无法解析的事件。", exception); }
+
+        var type = payload["type"]?.GetValue<string>();
+        switch (type)
+        {
+            case "response.output_text.delta":
+                if (payload["delta"]?.GetValue<string>() is not { Length: > 0 } text) return [];
+                hasText = true;
+                return [new TextDeltaEvent(text)];
+            case "response.reasoning_text.delta":
+            case "response.reasoning.delta":
+                return payload["delta"]?.GetValue<string>() is { Length: > 0 } reasoning
+                    ? [new ReasoningDeltaEvent(reasoning)] : [];
+            case "response.reasoning_summary_text.delta":
+                return payload["delta"]?.GetValue<string>() is { Length: > 0 } summary
+                    ? [new ReasoningDeltaEvent(summary, true)] : [];
+            case "response.output_item.added":
+            case "response.output_item.done":
+                if (payload["item"] is JsonObject item
+                    && item["type"]?.GetValue<string>() == "function_call"
+                    && item["id"]?.GetValue<string>() is { Length: > 0 } itemId)
+                {
+                    if (!toolCalls.TryGetValue(itemId, out var builder))
+                    {
+                        builder = new ToolCallBuilder();
+                        toolCalls[itemId] = builder;
+                    }
+                    builder.Id = item["call_id"]?.GetValue<string>() ?? itemId;
+                    builder.Name = item["name"]?.GetValue<string>() ?? builder.Name;
+                    if (item["arguments"]?.GetValue<string>() is { Length: > 0 } arguments)
+                        builder.AppendArguments(arguments);
+                }
+                return [];
+            case "response.function_call_arguments.delta":
+            case "response.function_call_arguments.done":
+                var fragment = payload["delta"]?.GetValue<string>() ?? payload["arguments"]?.GetValue<string>();
+                if (payload["item_id"]?.GetValue<string>() is { Length: > 0 } callId
+                    && toolCalls.TryGetValue(callId, out var callBuilder)
+                    && fragment is { Length: > 0 })
+                    callBuilder.AppendArguments(fragment);
+                return [];
+            case "response.completed":
+                completed = true;
+                var calls = toolCalls.Values.Where(item => !string.IsNullOrWhiteSpace(item.Name))
+                    .Select(item => (ModelStreamEvent)new ModelToolCallEvent(item.ToToolCall())).ToList();
+                if (!hasText && calls.Count == 0)
+                    throw InvalidResponsesException("Responses 流没有文本或工具调用。");
+                calls.Add(new ModelCompletedEvent(calls.Count > 0 ? "tool_calls" : "stop"));
+                return calls;
+            case "response.failed":
+            case "error":
+                throw InvalidResponsesException("Responses 流返回失败事件。");
+            default:
+                return [];
+        }
+    }
+
+    private static IEnumerable<ModelStreamEvent> ParseResponsesJson(string body)
+    {
+        ThrowIfStructuredError(body);
+        JsonObject? response;
+        try { response = JsonNode.Parse(body) as JsonObject; }
+        catch (JsonException exception)
+        {
+            throw InvalidResponsesException("模型响应格式无效。请检查 Provider 的 Responses API 配置。", exception);
+        }
+        if (response?["output"] is not JsonArray { Count: > 0 } output)
+            throw InvalidResponsesException("模型响应没有输出内容。");
+
+        var hasContent = false;
+        foreach (var item in output.OfType<JsonObject>())
+        {
+            switch (item["type"]?.GetValue<string>())
             {
-                ThrowIfStructuredError(body);
-                if (responsesResponse["output"] is not JsonArray { Count: > 0 })
-                {
-                    throw InvalidResponsesException("模型响应没有输出内容。");
-                }
-
-                var chatResponse = OpenAiResponsesBridge.CreateChatCompletionsResponse(responsesResponse, model);
-                var choice = chatResponse["choices"]?[0];
-                var message = choice?["message"];
-                if (message?["content"] is null && message?["tool_calls"] is not JsonArray { Count: > 0 })
-                {
-                    throw InvalidResponsesException("模型响应没有文本或工具调用。");
-                }
-
-                return $"data: {chatResponse.ToJsonString()}\n\ndata: [DONE]\n\n";
+                case "reasoning":
+                    foreach (var block in item["content"] as JsonArray ?? [])
+                        if (block?["text"]?.GetValue<string>() is { Length: > 0 } raw)
+                            yield return new ReasoningDeltaEvent(raw);
+                    foreach (var block in item["summary"] as JsonArray ?? [])
+                        if (block?["text"]?.GetValue<string>() is { Length: > 0 } summary)
+                            yield return new ReasoningDeltaEvent(summary, true);
+                    break;
+                case "message":
+                    foreach (var block in item["content"] as JsonArray ?? [])
+                        if (block?["type"]?.GetValue<string>() == "output_text"
+                            && block["text"]?.GetValue<string>() is { Length: > 0 } text)
+                        {
+                            hasContent = true;
+                            yield return new TextDeltaEvent(text);
+                        }
+                    break;
+                case "function_call" when item["name"]?.GetValue<string>() is { Length: > 0 } name:
+                    hasContent = true;
+                    yield return new ModelToolCallEvent(new ToolCall(
+                        item["call_id"]?.GetValue<string>() ?? item["id"]?.GetValue<string>() ?? string.Empty,
+                        name, item["arguments"]?.GetValue<string>() ?? "{}"));
+                    break;
             }
         }
-        catch (ModelClientException)
-        {
-            throw;
-        }
-        catch (Exception exception) when (exception is InvalidDataException or JsonException)
-        {
-            logger?.LogWarning(exception, "小助手模型 Responses 响应无法转换 {BaseUrl}", baseUrl);
-        }
-
-        throw new ModelClientException(
-            "模型服务返回无效响应。",
-            ModelErrorKind.Unknown,
-            upstreamMessage: "模型响应格式无效。请检查 Provider 的 Responses API 配置。");
+        if (!hasContent) throw InvalidResponsesException("模型响应没有文本或工具调用。");
+        yield return new ModelCompletedEvent(output.OfType<JsonObject>().Any(item => item["type"]?.GetValue<string>() == "function_call")
+            ? "tool_calls" : "stop");
     }
 
     private static void ThrowIfStructuredError(string body)
@@ -303,6 +415,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         }
 
         var message = choice["message"] as JsonObject;
+        if (ReadReasoning(message) is { Length: > 0 } reasoning)
+            yield return new ReasoningDeltaEvent(reasoning);
         if (message?["content"]?.GetValue<string>() is { Length: > 0 } content)
         {
             yield return new TextDeltaEvent(content);
@@ -370,6 +484,12 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                     completionEmitted = true;
                 }
 
+                else
+                {
+                    yield return new ModelCompletedEvent("stop");
+                    completionEmitted = true;
+                }
+
                 break;
             }
 
@@ -388,6 +508,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             var choices = chunk?["choices"] as JsonArray;
             var choice = choices is { Count: > 0 } ? choices[0] : null;
             var delta = choice?["delta"];
+            if (ReadReasoning(delta) is { Length: > 0 } reasoning)
+                yield return new ReasoningDeltaEvent(reasoning);
             if (delta?["content"]?.GetValue<string>() is { Length: > 0 } content)
             {
                 yield return new TextDeltaEvent(content);
@@ -397,6 +519,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             // 工具调用位于 choice.message.tool_calls 而不是 delta.tool_calls。
             if (delta is null && choice?["message"] is JsonObject message)
             {
+                if (ReadReasoning(message) is { Length: > 0 } messageReasoning)
+                    yield return new ReasoningDeltaEvent(messageReasoning);
                 if (message["content"]?.GetValue<string>() is { Length: > 0 } messageContent)
                 {
                     yield return new TextDeltaEvent(messageContent);
@@ -485,22 +609,14 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             }
         }
 
-        // 一些兼容端点只发送 [DONE] 之前的增量后直接关闭连接，
-        // 没有 finish_reason，也可能省略 [DONE]。结束时仍需把完整工具调用交给 AgentLoop。
-        if (!completionEmitted && toolCallBuilders.Count > 0)
-        {
-            var toolCalls = DrainToolCalls(toolCallBuilders, idToBuilder);
-            foreach (var toolCall in toolCalls)
-            {
-                yield return new ModelToolCallEvent(toolCall);
-            }
-
-            if (toolCalls.Length > 0)
-            {
-                yield return new ModelCompletedEvent("tool_calls");
-            }
-        }
+        if (!completionEmitted)
+            throw InvalidResponsesException("Chat Completions 流未包含完成事件。");
     }
+
+    private static string? ReadReasoning(JsonNode? node) =>
+        node?["reasoning_content"]?.GetValue<string>()
+        ?? node?["reasoning_text"]?.GetValue<string>()
+        ?? node?["reasoning"]?.GetValue<string>();
 
     private static ToolCall[] DrainToolCalls(
         IDictionary<int, ToolCallBuilder> toolCallBuilders,

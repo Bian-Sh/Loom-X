@@ -89,7 +89,7 @@
     <value>定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。</value>
   </data>
   <data name="nav.assistant">
-    <value>小助手</value>
+    <value>AI 助手</value>
   </data>
   <data name="nav.assistant.description">
     <value>用自然语言配置 Provider、诊断连通性、接入中转站。</value>
@@ -1489,6 +1489,18 @@
   <data name="assistant.cancel">
     <value>取消</value>
   </data>
+  <data name="assistant.copy.tooltip"><value>复制消息</value></data>
+  <data name="assistant.copied"><value>消息已复制</value></data>
+  <data name="assistant.jump.tooltip"><value>跳至最新消息</value></data>
+  <data name="assistant.process.thinking"><value>思考</value></data>
+  <data name="assistant.process.summary"><value>思考摘要</value></data>
+  <data name="assistant.process.steps"><value>处理步骤</value></data>
+  <data name="assistant.step.call"><value>调用工具 {0}</value></data>
+  <data name="assistant.step.approval"><value>等待你批准修改：{0}</value></data>
+  <data name="assistant.step.completed"><value>{0} 完成</value></data>
+  <data name="assistant.step.failed"><value>{0} 失败：{1}</value></data>
+  <data name="assistant.task.cancelled"><value>已取消。</value></data>
+  <data name="assistant.persistence.failed"><value>当前会话包含敏感内容或存储失败，后续消息未保存。</value></data>
   <data name="assistant.input.watermark">
     <value>输入消息，Enter 发送…</value>
   </data>
@@ -1532,7 +1544,7 @@
     <value>高</value>
   </data>
   <data name="assistant.approval.title">
-    <value>小助手请求修改</value>
+    <value>AI 助手请求修改</value>
   </data>
   <data name="assistant.approval.approve">
     <value>批准</value>

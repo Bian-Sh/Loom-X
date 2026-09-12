@@ -7,7 +7,9 @@ namespace LoomX.Tests.Assistant;
 public sealed class AgentLoopTests
 {
     private static AgentLoop CreateLoop(IModelClient modelClient, ToolRegistry? registry = null) =>
-        new(modelClient, registry ?? new ToolRegistry(), NullLogger<AgentLoop>.Instance);
+        new(modelClient, registry ?? new ToolRegistry(), NullLogger<AgentLoop>.Instance,
+            failureFormatter: ModelErrorFormatter.FormatException,
+            maxStepsFormatter: ModelErrorFormatter.FormatMaxStepsExceeded);
 
     private static async Task<List<AgentEvent>> CollectAsync(
         IAsyncEnumerable<AgentEvent> events,
@@ -217,6 +219,30 @@ public sealed class AgentLoopTests
 
         Assert.Equal(AgentSessionState.Failed, session.State);
         Assert.Equal(AgentEventKind.TaskFailed, events[^1].Kind);
+    }
+
+    [Fact]
+    public async Task ReasoningAndStageText_RetainOrderedBlocksAcrossToolStep()
+    {
+        var registry = new ToolRegistry();
+        registry.Register(MockTools.CreateListProvidersTool());
+        var client = new ScriptedModelClient(
+            [new ReasoningDeltaEvent("原文"), new ReasoningDeltaEvent("摘要", true),
+                new TextDeltaEvent("先检查"), new ModelToolCallEvent(new ToolCall("c1", "mock.list_providers", "{}")),
+                new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("最终回复"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        var events = await CollectAsync(CreateLoop(client, registry).RunAsync(session, "查询"));
+
+        Assert.Equal(2, events.Count(item => item.Kind == AgentEventKind.StepStarted));
+        Assert.Equal("原文", session.Messages[1].Blocks[0].Text);
+        Assert.False(session.Messages[1].Blocks[0].IsSummary);
+        Assert.True(session.Messages[1].Blocks[1].IsSummary);
+        Assert.Equal("先检查", session.Messages[1].Blocks[2].Text);
+        Assert.Equal(ChatContentKind.ToolCall, session.Messages[1].Blocks[3].Kind);
+        Assert.Equal("最终回复", session.Messages[^1].Content);
+        Assert.Equal(AgentEventKind.TaskCompleted, events[^1].Kind);
     }
 
     [Fact]

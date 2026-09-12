@@ -204,7 +204,7 @@ public static class LoomXHost
             }
             catch (Exception exception)
             {
-                logger.LogWarning(exception, "小助手偏好旧版 JSON 迁移检查失败");
+                logger.LogWarning(exception, "AI 助手偏好旧版 JSON 迁移检查失败");
             }
         });
     }

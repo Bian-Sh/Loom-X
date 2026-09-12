@@ -13,7 +13,7 @@ public sealed record ToolApprovalRequest(string ToolCallId, string ToolName, str
 public sealed class AssistantService
 {
     private const string SystemPrompt = """
-        你是 LoomX 内置的小助手，帮助用户配置与诊断 LoomX（AI 网关/路由器）。
+        你是 LoomX 内置的 AI 助手，帮助用户配置与诊断 LoomX（AI 网关/路由器）。
         规则：
         1. 配置类操作遵循：读取 → 备份 → 修改 → 验证 → 测试，不要跳步。
         2. 涉及中转站/Provider/模型概念时先用 skill.list / skill.load 加载对应 Skill 再行动。
@@ -152,31 +152,47 @@ public sealed class AssistantService
         ArgumentException.ThrowIfNullOrWhiteSpace(userMessage);
         if (!runLock.Wait(0))
         {
-            throw new InvalidOperationException("小助手正在运行中，请先等待或取消。");
+            throw new InvalidOperationException("AI 助手正在运行中，请先等待或取消。");
         }
 
         try
         {
             if (IsRunning)
             {
-                throw new InvalidOperationException("小助手正在运行中，请先等待或取消。");
+                throw new InvalidOperationException("AI 助手正在运行中，请先等待或取消。");
             }
 
             var modelClient = await modelClientFactory.TryCreateAsync(cancellationToken);
             if (modelClient is null)
             {
-                throw new InvalidOperationException("小助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
+                throw new InvalidOperationException("AI 助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
             }
 
             currentRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var persistenceBlocked = false;
             try
             {
                 var approvalGate = PermissionMode == AssistantPermissionMode.AskEachTime
                     ? BuildApprovalGate()
                     : null;
-                var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate);
+                var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate,
+                    ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded);
                 await foreach (var agentEvent in loop.RunAsync(CurrentSession, userMessage, currentRun.Token))
                 {
+                    if (agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta or AgentEventKind.MessageCompleted))
+                        CurrentSession.RecordActivity(agentEvent);
+                    if (!persistenceBlocked && agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta))
+                    {
+                        var failedToSave = false;
+                        try { await sessionStore.SaveAsync(CurrentSession, CancellationToken.None); }
+                        catch (Exception exception)
+                        {
+                            persistenceBlocked = true;
+                            failedToSave = true;
+                            logger.LogError(exception, "AI 助手会话无法继续保存 {SessionId}", CurrentSession.Id);
+                        }
+                        if (failedToSave) yield return AgentEvent.Create(CurrentSession.Id, AgentEventKind.PersistenceFailed);
+                    }
                     yield return agentEvent;
                 }
             }
@@ -187,11 +203,11 @@ public sealed class AssistantService
 
                 try
                 {
-                    await sessionStore.SaveAsync(CurrentSession, cancellationToken);
+                    if (!persistenceBlocked) await sessionStore.SaveAsync(CurrentSession, CancellationToken.None);
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, "小助手会话保存失败 {SessionId}", CurrentSession.Id);
+                    logger.LogError(exception, "AI 助手会话保存失败 {SessionId}", CurrentSession.Id);
                 }
             }
         }

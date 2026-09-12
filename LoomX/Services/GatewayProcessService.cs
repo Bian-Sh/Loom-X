@@ -96,7 +96,7 @@ public sealed class GatewayProcessService : IDisposable
             {
                 // 偏好迁移失败不阻止助手使用，正常启动时仍会再次尝试。
                 app.Services.GetRequiredService<ILogger<GatewayProcessService>>()
-                    .LogWarning(exception, "小助手偏好旧版 JSON 迁移检查失败");
+                    .LogWarning(exception, "AI 助手偏好旧版 JSON 迁移检查失败");
             }
         }
         finally

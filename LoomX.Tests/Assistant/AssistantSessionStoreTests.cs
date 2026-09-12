@@ -1,5 +1,6 @@
 using Xunit;
 using LoomX.Assistant;
+using System.Text.Json.Nodes;
 
 namespace LoomX.Tests.Assistant;
 
@@ -119,6 +120,76 @@ public sealed class AssistantSessionStoreTests : IDisposable
         store.Delete(session.Id);
 
         Assert.Empty(store.List());
+    }
+
+    [Fact]
+    public async Task Append_RetainsOrderedReasoningBlocksAndStableHeader()
+    {
+        var session = new AgentSession();
+        session.RestoreMessage(ChatMessage.User("查询"));
+        session.MarkRunning();
+        await store.SaveAsync(session);
+        var path = Path.Combine(rootDirectory, session.Id + ".jsonl");
+        var firstLine = File.ReadLines(path).First();
+
+        session.RestoreMessage(ChatMessage.Assistant("答案") with
+        {
+            Blocks = [new ChatContentBlock(ChatContentKind.Thinking, "原文"),
+                new ChatContentBlock(ChatContentKind.Thinking, "摘要", true),
+                new ChatContentBlock(ChatContentKind.Text, "答案")],
+        });
+        session.MarkCompleted();
+        await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => store.SaveAsync(session)));
+
+        var lines = File.ReadAllLines(path);
+        Assert.Equal(firstLine, lines[0]);
+        Assert.Equal(2, lines.Count(line => JsonNode.Parse(line)?["type"]?.GetValue<string>() == "message"));
+        var loaded = await store.LoadAsync(session.Id);
+        Assert.Equal("原文", loaded!.Messages[^1].Blocks[0].Text);
+        Assert.True(loaded.Messages[^1].Blocks[1].IsSummary);
+        Assert.Equal(session.Messages[^1].Timestamp, loaded.Messages[^1].Timestamp);
+        Assert.Equal(AgentSessionState.Completed, loaded.State);
+    }
+
+    [Fact]
+    public async Task V1MigrationAndBrokenTail_PreservePriorMessages()
+    {
+        var id = Guid.NewGuid().ToString("N");
+        Directory.CreateDirectory(rootDirectory);
+        var path = Path.Combine(rootDirectory, id + ".jsonl");
+        var savedAt = new DateTimeOffset(2025, 1, 2, 3, 4, 5, TimeSpan.Zero);
+        await File.WriteAllTextAsync(path, $"{{\"type\":\"meta\",\"version\":1,\"session_id\":\"{id}\",\"state\":\"Completed\",\"updated_at\":\"{savedAt:O}\"}}\n" +
+            "{\"type\":\"message\",\"role\":\"User\",\"content\":\"旧消息\"}\n" +
+            "{\"type\":\"message\",\"role\":\"Assistant\",\"content\":\"旧回答\"}\n" +
+            "{\"type\":");
+
+        var session = await store.LoadAsync(id);
+        Assert.Equal(2, session!.Messages.Count);
+        Assert.Equal(savedAt, session.Messages[0].Timestamp);
+        session.RestoreMessage(ChatMessage.User("新消息"));
+        await store.SaveAsync(session);
+
+        var lines = File.ReadAllLines(path);
+        Assert.Equal("session", JsonNode.Parse(lines[0])?["type"]?.GetValue<string>());
+        Assert.Equal(3, lines.Count(line => JsonNode.Parse(line)?["type"]?.GetValue<string>() == "message"));
+        Assert.Equal(3, (await store.LoadAsync(id))!.Messages.Count);
+    }
+
+    [Fact]
+    public async Task V2BrokenTail_IsRepairedBeforeAppending()
+    {
+        var session = new AgentSession();
+        session.RestoreMessage(ChatMessage.User("先前消息"));
+        await store.SaveAsync(session);
+        var path = Path.Combine(rootDirectory, session.Id + ".jsonl");
+        await File.AppendAllTextAsync(path, "{\"type\":");
+        Assert.Single((await store.LoadAsync(session.Id))!.Messages);
+
+        session.RestoreMessage(ChatMessage.Assistant("后来回答"));
+        await store.SaveAsync(session);
+
+        Assert.All(File.ReadAllLines(path), line => Assert.NotNull(JsonNode.Parse(line)));
+        Assert.Equal(2, (await store.LoadAsync(session.Id))!.Messages.Count);
     }
 
     [Theory]

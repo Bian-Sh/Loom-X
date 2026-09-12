@@ -17,7 +17,7 @@
   <data name="nav.activity"><value>Activity</value></data>
   <data name="nav.activity.title"><value>Activity</value></data>
   <data name="nav.activity.description"><value>Review recent request activity.</value></data>
-  <data name="nav.assistant"><value>Assistant</value></data>
+  <data name="nav.assistant"><value>AI Assistant</value></data>
   <data name="nav.assistant.description"><value>Configure providers, diagnose connectivity, and onboard relays in natural language.</value></data>
   <data name="nav.console"><value>Console</value></data>
   <data name="nav.console.description"><value>Inspect runtime diagnostics.</value></data>
@@ -471,6 +471,18 @@
   <data name="assistant.new_session"><value>＋ New chat</value></data>
   <data name="assistant.send"><value>Send</value></data>
   <data name="assistant.cancel"><value>Cancel</value></data>
+  <data name="assistant.copy.tooltip"><value>Copy message</value></data>
+  <data name="assistant.copied"><value>Message copied</value></data>
+  <data name="assistant.jump.tooltip"><value>Jump to latest message</value></data>
+  <data name="assistant.process.thinking"><value>Thinking</value></data>
+  <data name="assistant.process.summary"><value>Thinking summary</value></data>
+  <data name="assistant.process.steps"><value>Processing steps</value></data>
+  <data name="assistant.step.call"><value>Calling tool {0}</value></data>
+  <data name="assistant.step.approval"><value>Waiting for approval: {0}</value></data>
+  <data name="assistant.step.completed"><value>{0} completed</value></data>
+  <data name="assistant.step.failed"><value>{0} failed: {1}</value></data>
+  <data name="assistant.task.cancelled"><value>Cancelled.</value></data>
+  <data name="assistant.persistence.failed"><value>This chat contains sensitive content or could not be saved. Subsequent messages are not persisted.</value></data>
   <data name="assistant.input.watermark"><value>Type a message, Enter to send…</value></data>
   <data name="assistant.history.delete.tooltip"><value>Delete this chat</value></data>
   <data name="assistant.permission.auto"><value>Auto-approve</value></data>
@@ -485,7 +497,7 @@
   <data name="assistant.reasoning.low"><value>Low</value></data>
   <data name="assistant.reasoning.medium"><value>Medium</value></data>
   <data name="assistant.reasoning.high"><value>High</value></data>
-  <data name="assistant.approval.title"><value>Assistant requests a change</value></data>
+  <data name="assistant.approval.title"><value>AI Assistant requests a change</value></data>
   <data name="assistant.approval.approve"><value>Approve</value></data>
   <data name="assistant.approval.reject"><value>Reject</value></data>
   <data name="assistant.task.failed"><value>Task failed</value></data>

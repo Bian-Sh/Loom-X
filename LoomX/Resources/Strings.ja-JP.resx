@@ -45,7 +45,7 @@
     <value>プロトコル変換、アップストリーム遅延、HTTP エラーを特定し、プライバシー保護された追跡可能なコンテキストを保持します。</value>
   </data>
   <data name="nav.assistant">
-    <value>アシスタント</value>
+    <value>AI アシスタント</value>
   </data>
   <data name="nav.assistant.description">
     <value>自然言語で Provider の設定・疎通診断・リレー接続を行います。</value>
@@ -1339,6 +1339,18 @@
   <data name="assistant.cancel">
     <value>キャンセル</value>
   </data>
+  <data name="assistant.copy.tooltip"><value>メッセージをコピー</value></data>
+  <data name="assistant.copied"><value>メッセージをコピーしました</value></data>
+  <data name="assistant.jump.tooltip"><value>最新のメッセージへ</value></data>
+  <data name="assistant.process.thinking"><value>思考</value></data>
+  <data name="assistant.process.summary"><value>思考の要約</value></data>
+  <data name="assistant.process.steps"><value>処理手順</value></data>
+  <data name="assistant.step.call"><value>ツール {0} を実行</value></data>
+  <data name="assistant.step.approval"><value>変更の承認を待機中：{0}</value></data>
+  <data name="assistant.step.completed"><value>{0} 完了</value></data>
+  <data name="assistant.step.failed"><value>{0} 失敗：{1}</value></data>
+  <data name="assistant.task.cancelled"><value>キャンセルしました。</value></data>
+  <data name="assistant.persistence.failed"><value>機密情報が含まれるか保存に失敗したため、以降のメッセージは保存されません。</value></data>
   <data name="assistant.input.watermark">
     <value>メッセージを入力、Enter で送信…</value>
   </data>
@@ -1382,7 +1394,7 @@
     <value>高</value>
   </data>
   <data name="assistant.approval.title">
-    <value>アシスタントが変更を要求</value>
+    <value>AI アシスタントが変更を要求</value>
   </data>
   <data name="assistant.approval.approve">
     <value>承認</value>

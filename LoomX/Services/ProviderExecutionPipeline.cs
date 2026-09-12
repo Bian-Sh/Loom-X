@@ -32,9 +32,30 @@ public sealed record ProviderExecutionResult(
     public string BodyText => Encoding.UTF8.GetString(Body);
 }
 
+/// <summary>调用方负责释放响应和正文流；成功响应不预读正文。</summary>
+public sealed class ProviderStreamingResult(HttpResponseMessage response, Stream body) : IAsyncDisposable
+{
+    public HttpStatusCode StatusCode => response.StatusCode;
+    public string? ContentType => response.Content.Headers.ContentType?.MediaType;
+    public Stream Body => body;
+    public bool IsSuccess => response.IsSuccessStatusCode;
+
+    public async ValueTask DisposeAsync()
+    {
+        await body.DisposeAsync();
+        response.Dispose();
+    }
+}
+
 public interface IProviderExecutionPipeline
 {
     Task<ProviderExecutionResult> ExecuteAsync(
+        HttpClient httpClient,
+        HttpRequestMessage request,
+        ProviderExecutionContext context,
+        CancellationToken cancellationToken);
+
+    Task<ProviderStreamingResult> ExecuteStreamingAsync(
         HttpClient httpClient,
         HttpRequestMessage request,
         ProviderExecutionContext context,
@@ -47,6 +68,40 @@ public interface IProviderExecutionPipeline
 /// </summary>
 public sealed class ProviderExecutionPipeline : IProviderExecutionPipeline
 {
+    public async Task<ProviderStreamingResult> ExecuteStreamingAsync(
+        HttpClient httpClient,
+        HttpRequestMessage request,
+        ProviderExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(httpClient);
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        try
+        {
+            Stream body = await response.Content.ReadAsStreamAsync(cancellationToken);
+            foreach (var encoding in response.Content.Headers.ContentEncoding.Reverse())
+            {
+                body = encoding.Trim().ToLowerInvariant() switch
+                {
+                    "gzip" => new GZipStream(body, CompressionMode.Decompress),
+                    "deflate" => new DeflateStream(body, CompressionMode.Decompress),
+                    "br" => new BrotliStream(body, CompressionMode.Decompress),
+                    "identity" => body,
+                    _ => throw new NotSupportedException($"不支持的响应压缩格式：{encoding}"),
+                };
+            }
+            return new ProviderStreamingResult(response, body);
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
+    }
+
     public async Task<ProviderExecutionResult> ExecuteAsync(
         HttpClient httpClient,
         HttpRequestMessage request,

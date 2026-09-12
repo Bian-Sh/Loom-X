@@ -28,16 +28,17 @@ public sealed class AssistantViewModelTests
     }
 
     [Fact]
-    public void Project_ToolEvents_AddStatusMessages()
+    public void Project_ToolEvents_AggregatesCollapsedSteps()
     {
         var viewModel = CreateViewModel();
 
         viewModel.Project(Event(AgentEventKind.ToolCallStarted) with { ToolName = "loomx.list_providers" });
         viewModel.Project(Event(AgentEventKind.ToolCallCompleted) with { ToolName = "loomx.list_providers", Success = true });
 
-        var statusMessages = viewModel.Messages.Where(message => message.IsStatus).ToArray();
-        Assert.Contains(statusMessages, message => message.Text.Contains("loomx.list_providers") && message.Text.Contains("调用工具"));
-        Assert.Contains(statusMessages, message => message.Text.Contains("完成"));
+        var steps = Assert.Single(viewModel.Messages, message => message.IsProcess);
+        Assert.False(steps.IsExpanded);
+        Assert.Contains("调用工具 loomx.list_providers", steps.Text);
+        Assert.Contains("完成", steps.Text);
     }
 
     [Fact]
@@ -48,7 +49,7 @@ public sealed class AssistantViewModelTests
         viewModel.Project(Event(AgentEventKind.ToolCallCompleted) with { ToolName = "loomx.test_provider", Success = false, Detail = "auth_failed" });
 
         var last = viewModel.Messages[^1];
-        Assert.True(last.IsStatus);
+        Assert.True(last.IsProcess);
         Assert.Contains("auth_failed", last.Text);
     }
 
@@ -94,7 +95,32 @@ public sealed class AssistantViewModelTests
 
         viewModel.Project(Event(AgentEventKind.ToolApprovalRequested) with { ToolName = "loomx.update_provider" });
 
-        Assert.Contains(viewModel.Messages, message => message.IsStatus && message.Text.Contains("等待你批准") && message.Text.Contains("loomx.update_provider"));
+        Assert.Contains(viewModel.Messages, message => message.IsProcess && message.Text.Contains("等待你批准") && message.Text.Contains("loomx.update_provider"));
+    }
+
+    [Fact]
+    public void Project_ReasoningAndSteps_DefaultCollapsed_CompletionCollapsesExpandedProcess()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.Project(Event(AgentEventKind.StepStarted));
+        viewModel.Project(Event(AgentEventKind.ReasoningDelta) with { Text = "原始思考" });
+        viewModel.Project(Event(AgentEventKind.ReasoningDelta) with { Text = "摘要", IsSummary = true });
+        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "先检查" });
+        viewModel.Project(Event(AgentEventKind.ToolCallStarted) with { ToolName = "loomx.inspect" });
+        var processes = viewModel.Messages.Where(item => item.IsProcess).ToArray();
+        Assert.Equal(3, processes.Length);
+        Assert.All(processes, item => Assert.False(item.IsExpanded));
+        Assert.Equal("原始思考", processes[0].Text);
+        Assert.True(processes[1].IsSummary);
+
+        processes[0].IsExpanded = true;
+        processes[2].IsExpanded = true;
+        viewModel.Project(Event(AgentEventKind.StepStarted));
+        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "**完成**" });
+        viewModel.Project(Event(AgentEventKind.TaskCompleted));
+
+        Assert.All(processes, item => Assert.False(item.IsExpanded));
+        Assert.Equal("**完成**", viewModel.Messages.Last(item => item.IsAssistantMessage).Markdown.ToString());
     }
 
     [Fact]

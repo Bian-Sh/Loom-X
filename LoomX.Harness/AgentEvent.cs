@@ -1,12 +1,15 @@
 namespace LoomX.Assistant;
 
 /// <summary>
-/// 小助手结构化事件类型。UI 通过 Activity Projection 消费这些事件，不直接绑定 Harness 内部状态。
+/// Agent 结构化事件类型。UI 通过事件投影，不直接绑定内部状态。
 /// </summary>
 public enum AgentEventKind
 {
     SessionStarted,
+    StepStarted,
     TextDelta,
+    ReasoningDelta,
+    MessageCompleted,
     ToolCallStarted,
     ToolCallCompleted,
     SkillLoaded,
@@ -14,6 +17,8 @@ public enum AgentEventKind
     SubagentCompleted,
     TaskCompleted,
     TaskFailed,
+    TaskCancelled,
+    PersistenceFailed,
     WaitingForUser,
     ToolApprovalRequested,
 
@@ -35,11 +40,15 @@ public sealed record AgentEvent(
     AgentEventKind Kind,
     DateTimeOffset Timestamp)
 {
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public string? Text { get; init; }
     public string? ToolName { get; init; }
     public string? ToolCallId { get; init; }
     public bool? Success { get; init; }
     public string? Detail { get; init; }
+    public int? Step { get; init; }
+    public bool IsSummary { get; init; }
+    public ChatMessage? Message { get; init; }
 
     public static AgentEvent Create(string sessionId, AgentEventKind kind) =>
         new(sessionId, kind, DateTimeOffset.UtcNow);

@@ -7,6 +7,9 @@
              x:Class="LoomX.Views.AssistantView">
   <UserControl.Styles>
     <Style Selector="Button.icon"><Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="7"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style Selector="StackPanel.user-message StackPanel.user-actions"><Setter Property="Opacity" Value="0"/></Style>
+    <Style Selector="StackPanel.user-message:pointerover StackPanel.user-actions"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="StackPanel.user-message:focus-within StackPanel.user-actions"><Setter Property="Opacity" Value="1"/></Style>
     <Style Selector="ComboBox.toolbar"><Setter Property="Height" Value="30"/><Setter Property="FontSize" Value="12"/></Style>
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
   </UserControl.Styles>
@@ -31,11 +34,15 @@
           </DataTemplate>
         </ComboBox.ItemTemplate>
       </ComboBox>
-      <Button Grid.Column="1" Content="{l:Locale assistant.new_session}" Command="{Binding NewSessionCommand}" Margin="8,0,0,0" />
+      <Button Grid.Column="1" Classes="icon" Command="{Binding NewSessionCommand}" Margin="8,0,0,0"
+              ToolTip.Tip="{l:Locale assistant.new_session}" AutomationProperties.Name="{l:Locale assistant.new_session}">
+        <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="15" Height="15"/>
+      </Button>
     </Grid>
 
     <!-- 消息流 -->
-    <ScrollViewer Grid.Row="1" x:Name="MessageScroll">
+    <Grid Grid.Row="1">
+    <ScrollViewer x:Name="MessageScroll">
       <ItemsControl ItemsSource="{Binding Messages}">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
@@ -49,35 +56,53 @@
                          TextWrapping="Wrap"
                          Margin="4,0" />
 
+              <Expander IsVisible="{Binding IsProcess}" Header="{Binding Label}"
+                        IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
+                        HorizontalAlignment="Stretch" Margin="4,2" FontSize="12">
+                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Opacity="0.72" Margin="12,4,4,8"/>
+              </Expander>
+
               <!-- 用户消息：右对齐气泡 -->
-              <Border IsVisible="{Binding IsUser}"
-                      HorizontalAlignment="Right"
-                      MaxWidth="560"
-                      Padding="10,8"
-                      CornerRadius="10"
-                      Background="{DynamicResource AccentSoftBrush}"
-                      BorderBrush="{DynamicResource AccentBrush}"
-                      BorderThickness="1">
-                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
-              </Border>
+              <StackPanel Classes="user-message" IsVisible="{Binding IsUser}" HorizontalAlignment="Right" MaxWidth="560">
+                <Border Padding="10,8" CornerRadius="7" Background="{DynamicResource AccentSoftBrush}"
+                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                  <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
+                </Border>
+                <StackPanel Classes="user-actions" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5" Height="25">
+                  <TextBlock Text="{Binding DisplayTime}" Classes="muted" FontSize="10" VerticalAlignment="Center"/>
+                  <Button Classes="icon" Tag="{Binding}" Click="CopyMessage_OnClick" Width="24" Height="24"
+                          ToolTip.Tip="{l:Locale assistant.copy.tooltip}" AutomationProperties.Name="{l:Locale assistant.copy.tooltip}">
+                    <Path Classes="icon-glyph" Data="M 9,8 H 20 V 23 H 9 Z M 5,18 H 4 V 4 H 16 V 8" Width="13" Height="13"/>
+                  </Button>
+                </StackPanel>
+              </StackPanel>
 
               <!-- 助手消息：Markdown 实时渲染 -->
-              <Border IsVisible="{Binding IsAssistantMessage}"
-                      HorizontalAlignment="Left"
-                      MaxWidth="640"
-                      Padding="10,8"
-                      CornerRadius="10"
-                      Background="{DynamicResource SurfaceBrush}"
-                      BorderBrush="{DynamicResource BorderBrush}"
-                      BorderThickness="1">
-                <md:MarkdownRenderer MarkdownBuilder="{Binding Markdown}" />
-              </Border>
+              <StackPanel IsVisible="{Binding IsAssistantMessage}" HorizontalAlignment="Left" MaxWidth="640">
+                <Border Padding="10,8" CornerRadius="7" Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                  <md:MarkdownRenderer MarkdownBuilder="{Binding Markdown}" />
+                </Border>
+                <StackPanel Orientation="Horizontal" Spacing="5" Height="25">
+                  <TextBlock Text="{Binding DisplayTime}" Classes="muted" FontSize="10" VerticalAlignment="Center"/>
+                  <Button Classes="icon" Tag="{Binding}" Click="CopyMessage_OnClick" Width="24" Height="24"
+                          ToolTip.Tip="{l:Locale assistant.copy.tooltip}" AutomationProperties.Name="{l:Locale assistant.copy.tooltip}">
+                    <Path Classes="icon-glyph" Data="M 9,8 H 20 V 23 H 9 Z M 5,18 H 4 V 4 H 16 V 8" Width="13" Height="13"/>
+                  </Button>
+                </StackPanel>
+              </StackPanel>
 
             </Grid>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
     </ScrollViewer>
+    <Button x:Name="JumpButton" Classes="icon" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+            Margin="0,0,0,12" IsVisible="False" Click="JumpButton_OnClick"
+            ToolTip.Tip="{l:Locale assistant.jump.tooltip}" AutomationProperties.Name="{l:Locale assistant.jump.tooltip}">
+      <Path Classes="icon-glyph" Data="M 16,5 V 24 M 9,18 L 16,25 L 23,18" Width="16" Height="16"/>
+    </Button>
+    </Grid>
 
     <!-- 逐条批准：待批准的修改操作卡片 -->
     <Border Grid.Row="2"
@@ -96,8 +121,14 @@
           <TextBlock Text="{Binding ArgumentsSummary}" Classes="muted" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap" MaxHeight="60"
                      IsVisible="{Binding HasArguments}"/>
         </StackPanel>
-        <Button Grid.Column="1" Content="{l:Locale assistant.approval.approve}" Command="{Binding ApproveCommand}" VerticalAlignment="Center"/>
-        <Button Grid.Column="2" Content="{l:Locale assistant.approval.reject}" Command="{Binding RejectCommand}" VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Classes="icon" Command="{Binding ApproveCommand}" VerticalAlignment="Center"
+                ToolTip.Tip="{l:Locale assistant.approval.approve}" AutomationProperties.Name="{l:Locale assistant.approval.approve}">
+          <Path Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15"/>
+        </Button>
+        <Button Grid.Column="2" Classes="icon" Command="{Binding RejectCommand}" VerticalAlignment="Center"
+                ToolTip.Tip="{l:Locale assistant.approval.reject}" AutomationProperties.Name="{l:Locale assistant.approval.reject}">
+          <Path Classes="icon-glyph" Data="M 7,7 L 25,25 M 25,7 L 7,25" Width="15" Height="15"/>
+        </Button>
       </Grid>
     </Border>
 
@@ -140,13 +171,19 @@
               </Grid>
             </Button>
             <Button Grid.Column="2"
-                    Content="{l:Locale assistant.send}"
+                    Classes="icon"
                     Command="{Binding SendCommand}"
-                    IsVisible="{Binding !IsRunning}" />
+                    ToolTip.Tip="{l:Locale assistant.send}" AutomationProperties.Name="{l:Locale assistant.send}"
+                    IsVisible="{Binding !IsRunning}">
+              <Path Classes="icon-glyph" Data="M 4,16 L 28,4 L 21,28 L 16,18 Z M 16,18 L 28,4" Width="16" Height="16"/>
+            </Button>
             <Button Grid.Column="2"
-                    Content="{l:Locale assistant.cancel}"
+                    Classes="icon"
                     Command="{Binding CancelCommand}"
-                    IsVisible="{Binding IsRunning}" />
+                    ToolTip.Tip="{l:Locale assistant.cancel}" AutomationProperties.Name="{l:Locale assistant.cancel}"
+                    IsVisible="{Binding IsRunning}">
+              <Path Classes="icon-glyph" Data="M 8,8 H 24 V 24 H 8 Z" Width="14" Height="14"/>
+            </Button>
             </Grid>
           </Border>
         </Grid>

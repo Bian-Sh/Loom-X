@@ -14,6 +14,8 @@ public abstract record ModelStreamEvent;
 
 public sealed record TextDeltaEvent(string Text) : ModelStreamEvent;
 
+public sealed record ReasoningDeltaEvent(string Text, bool IsSummary = false) : ModelStreamEvent;
+
 public sealed record ModelToolCallEvent(ToolCall ToolCall) : ModelStreamEvent;
 
 public sealed record ModelCompletedEvent(string FinishReason) : ModelStreamEvent;

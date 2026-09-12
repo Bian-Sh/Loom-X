@@ -86,7 +86,7 @@ public sealed class AssistantTester
             { StatusCode: >= 200 and < 300 } => "provider_ok",
             _ => "request_rejected",
         };
-        logger?.LogInformation("小助手测试 Provider {ProviderId} {Diagnosis} {StatusCode}", provider.BusinessId, result["diagnosis"]?.GetValue<string>(), probe.StatusCode);
+        logger?.LogInformation("AI 助手测试 Provider {ProviderId} {Diagnosis} {StatusCode}", provider.BusinessId, result["diagnosis"]?.GetValue<string>(), probe.StatusCode);
         return result;
     }
 
@@ -133,7 +133,7 @@ public sealed class AssistantTester
             { StatusCode: >= 200 and < 300 } => "model_ok",
             _ => "request_rejected",
         };
-        logger?.LogInformation("小助手测试模型 {ProviderId}/{ModelId} {Diagnosis} {StatusCode}", provider.BusinessId, model.ModelId, result["diagnosis"]?.GetValue<string>(), probe.StatusCode);
+        logger?.LogInformation("AI 助手测试模型 {ProviderId}/{ModelId} {Diagnosis} {StatusCode}", provider.BusinessId, model.ModelId, result["diagnosis"]?.GetValue<string>(), probe.StatusCode);
         return result;
     }
 
@@ -164,7 +164,7 @@ public sealed class AssistantTester
             _ when enabledCombos == 0 => "no_enabled_combo",
             _ => "endpoint_ok",
         };
-        logger?.LogInformation("小助手测试 Endpoint {EndpointKey} {Diagnosis}", endpoint.Key, result["diagnosis"]?.GetValue<string>());
+        logger?.LogInformation("AI 助手测试 Endpoint {EndpointKey} {Diagnosis}", endpoint.Key, result["diagnosis"]?.GetValue<string>());
         return result;
     }
 

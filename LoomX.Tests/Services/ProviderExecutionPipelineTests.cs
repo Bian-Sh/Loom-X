@@ -162,6 +162,14 @@ public sealed class ProviderExecutionPipelineTests
     {
         public ProviderExecutionContext? Context { get; private set; }
 
+        public async Task<ProviderStreamingResult> ExecuteStreamingAsync(
+            HttpClient httpClient, HttpRequestMessage request, ProviderExecutionContext context, CancellationToken cancellationToken)
+        {
+            var result = await ExecuteAsync(httpClient, request, context, cancellationToken);
+            var response = new HttpResponseMessage(result.StatusCode) { Content = new ByteArrayContent(result.Body) };
+            return new ProviderStreamingResult(response, await response.Content.ReadAsStreamAsync(cancellationToken));
+        }
+
         public Task<ProviderExecutionResult> ExecuteAsync(
             HttpClient httpClient,
             HttpRequestMessage request,

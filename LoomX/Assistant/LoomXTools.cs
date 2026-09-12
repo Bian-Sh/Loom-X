@@ -72,7 +72,7 @@ public static class LoomXTools
                     return ToolResult.Fail(new JsonObject
                     {
                         ["error"] = "assistant_model_not_configured",
-                        ["message"] = "小助手模型尚未配置，无法调起诊断工人。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。",
+                        ["message"] = "AI 助手模型尚未配置，无法调起诊断工人。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。",
                     }.ToJsonString(OutputJsonOptions));
                 }
 

@@ -30,6 +30,7 @@ public sealed record AgentSessionOptions
 public sealed class AgentSession
 {
     private readonly List<ChatMessage> messages = [];
+    private readonly List<AgentEvent> activities = [];
 
     public AgentSession(AgentSessionOptions? options = null)
     {
@@ -50,11 +51,13 @@ public sealed class AgentSession
     public AgentSessionState State { get; private set; } = AgentSessionState.Created;
 
     public IReadOnlyList<ChatMessage> Messages => messages;
+    public IReadOnlyList<AgentEvent> Activities => activities;
 
     internal void AddMessage(ChatMessage message) => messages.Add(message);
 
     /// <summary>从持久化恢复消息（不清空系统提示之外的校验，内容由存储层保证安全）。</summary>
     internal void RestoreMessage(ChatMessage message) => messages.Add(message);
+    internal void RecordActivity(AgentEvent activity) => activities.Add(activity);
 
     /// <summary>从持久化恢复状态；Running 属于崩溃残留，恢复为 Cancelled。</summary>
     internal void RestoreState(AgentSessionState state) =>

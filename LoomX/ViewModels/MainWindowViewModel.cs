@@ -63,7 +63,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
         providersViewModel = new ProvidersViewModel(this.dataStore, this.toastService, this.loggerFactory.CreateLogger<ProvidersViewModel>());
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
         activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
-        assistantViewModel = new AssistantViewModel(gatewayService, this.loggerFactory);
+        assistantViewModel = new AssistantViewModel(gatewayService, this.loggerFactory, this.toastService);
         updateCoordinator = new UpdateCoordinator(this.dataStore, logger: this.loggerFactory.CreateLogger<UpdateCoordinator>());
         settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, localizer: LocalizerFactory.Create<SettingsViewModel>());
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));

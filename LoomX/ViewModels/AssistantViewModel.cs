@@ -18,26 +18,32 @@ public sealed class AssistantViewModel : NotifyViewModel
     private readonly GatewayProcessService gatewayService;
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantViewModel> logger;
+    private readonly ToastService? toastService;
 
     private string inputText = string.Empty;
     private string statusText = string.Empty;
     private bool isRunning;
+    private bool hasPersistenceWarning;
     private AssistantSessionSummary? selectedSession;
     private ChatMessageViewModel? streamingMessage;
+    private ChatMessageViewModel? currentReasoning;
+    private ChatMessageViewModel? currentSteps;
     private bool suppressSelectionLoad;
     private bool isModelPickerOpen;
     private string selectedModelSummary = string.Empty;
+    private string selectedModelName = string.Empty;
     private string modelSearchTerm = string.Empty;
     private AssistantPermissionOption selectedPermissionMode;
     private AssistantReasoningOption selectedReasoningEffort;
     private ApprovalRequestViewModel? pendingApproval;
     private IReadOnlyList<AssistantModelGroupViewModel> allModelGroups = [];
 
-    public AssistantViewModel(GatewayProcessService gatewayService, ILoggerFactory? loggerFactory = null)
+    public AssistantViewModel(GatewayProcessService gatewayService, ILoggerFactory? loggerFactory = null, ToastService? toastService = null)
     {
         this.gatewayService = gatewayService;
         this.loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
         logger = this.loggerFactory.CreateLogger<AssistantViewModel>();
+        this.toastService = toastService;
 
         SendCommand = new AsyncCommand(SendAsync, () => !IsRunning && !string.IsNullOrWhiteSpace(InputText));
         CancelCommand = new DelegateCommand(Cancel);
@@ -64,7 +70,6 @@ public sealed class AssistantViewModel : NotifyViewModel
 
         RefreshSessions();
         RefreshModelSummary();
-        AddSystemMessage("我是 LoomX 小助手，可以帮你配置 Provider、诊断连通性、接入中转站。请选择模型后即可开始。");
     }
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
@@ -140,6 +145,7 @@ public sealed class AssistantViewModel : NotifyViewModel
         {
             if (!SetProperty(ref selectedReasoningEffort, value)) return;
             ResolveService()?.ReasoningEffort = value.Value;
+            UpdateModelSummary();
         }
     }
 
@@ -181,9 +187,10 @@ public sealed class AssistantViewModel : NotifyViewModel
         if (text.Length == 0) return;
 
         InputText = string.Empty;
+        hasPersistenceWarning = false;
         Messages.Add(new ChatMessageViewModel(ChatRole.User, text));
         IsRunning = true;
-        StatusText = "小助手正在工作…";
+        StatusText = "AI 助手正在工作…";
         AssistantService? service = null;
 
         try
@@ -191,14 +198,14 @@ public sealed class AssistantViewModel : NotifyViewModel
             service = await EnsureServiceAsync();
             if (service is null)
             {
-                AddSystemMessage("小助手服务初始化失败，请查看控制台日志。");
+                AddSystemMessage("AI 助手服务初始化失败，请查看控制台日志。");
                 return;
             }
 
             service.ApprovalHandler = ShowApprovalAsync;
             await foreach (var agentEvent in service.SendAsync(text))
             {
-                Dispatcher.UIThread.Post(() => Project(agentEvent));
+                await Dispatcher.UIThread.InvokeAsync(() => Project(agentEvent));
             }
         }
         catch (InvalidOperationException exception)
@@ -207,8 +214,8 @@ public sealed class AssistantViewModel : NotifyViewModel
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "小助手运行失败");
-            Dispatcher.UIThread.Post(() => AddSystemMessage("小助手运行失败，请查看控制台日志。"));
+            logger.LogError(exception, "AI 助手运行失败");
+            Dispatcher.UIThread.Post(() => AddSystemMessage("AI 助手运行失败，请查看控制台日志。"));
         }
         finally
         {
@@ -216,8 +223,10 @@ public sealed class AssistantViewModel : NotifyViewModel
             Dispatcher.UIThread.Post(() =>
             {
                 IsRunning = false;
-                StatusText = string.Empty;
+                if (!hasPersistenceWarning) StatusText = string.Empty;
                 streamingMessage = null;
+                currentReasoning = null;
+                currentSteps = null;
                 RefreshSessions();
             });
         }
@@ -228,25 +237,50 @@ public sealed class AssistantViewModel : NotifyViewModel
     {
         switch (agentEvent.Kind)
         {
+            case AgentEventKind.StepStarted:
+                streamingMessage = null;
+                currentReasoning = null;
+                currentSteps = null;
+                break;
+
             case AgentEventKind.TextDelta:
-                streamingMessage ??= AppendStreamingMessage();
+                streamingMessage ??= AppendStreamingMessage(agentEvent.Timestamp);
                 streamingMessage.Append(agentEvent.Text ?? string.Empty);
+                break;
+
+            case AgentEventKind.ReasoningDelta:
+                if (currentReasoning is null || currentReasoning.IsSummary != agentEvent.IsSummary)
+                {
+                    currentReasoning = ChatMessageViewModel.Process(ResourceLookup.Resolve(agentEvent.IsSummary
+                        ? "assistant.process.summary" : "assistant.process.thinking"), agentEvent.IsSummary,
+                        timestamp: agentEvent.Timestamp);
+                    Messages.Add(currentReasoning);
+                }
+                currentReasoning.Append(agentEvent.Text ?? string.Empty);
+                break;
+
+            case AgentEventKind.MessageCompleted:
+                if (agentEvent.Message?.Role == ChatRole.Assistant && streamingMessage is not null)
+                    streamingMessage.IsStreaming = false;
                 break;
 
             case AgentEventKind.ToolCallStarted:
                 streamingMessage = null;
-                Messages.Add(ChatMessageViewModel.Status($"⚙ 调用工具 {agentEvent.ToolName}"));
+                currentSteps ??= AppendSteps(agentEvent.Timestamp);
+                currentSteps.Append(string.Format(ResourceLookup.Resolve("assistant.step.call"), agentEvent.ToolName) + "\n");
                 break;
 
             case AgentEventKind.ToolApprovalRequested:
                 streamingMessage = null;
-                Messages.Add(ChatMessageViewModel.Status($"✋ 等待你批准修改：{agentEvent.ToolName}"));
+                currentSteps ??= AppendSteps(agentEvent.Timestamp);
+                currentSteps.Append(string.Format(ResourceLookup.Resolve("assistant.step.approval"), agentEvent.ToolName) + "\n");
                 break;
 
             case AgentEventKind.ToolCallCompleted:
-                Messages.Add(agentEvent.Success == true
-                    ? ChatMessageViewModel.Status($"✓ {agentEvent.ToolName} 完成")
-                    : ChatMessageViewModel.Status($"✗ {agentEvent.ToolName} 失败：{agentEvent.Detail}"));
+                currentSteps ??= AppendSteps(agentEvent.Timestamp);
+                currentSteps.Append(agentEvent.Success == true
+                    ? string.Format(ResourceLookup.Resolve("assistant.step.completed"), agentEvent.ToolName) + "\n"
+                    : string.Format(ResourceLookup.Resolve("assistant.step.failed"), agentEvent.ToolName, agentEvent.Detail) + "\n");
                 break;
 
             case AgentEventKind.SkillLoaded:
@@ -273,6 +307,17 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             case AgentEventKind.TaskCompleted:
                 streamingMessage = null;
+                foreach (var process in Messages.Where(item => item.IsProcess)) process.IsExpanded = false;
+                break;
+
+            case AgentEventKind.TaskCancelled:
+                streamingMessage = null;
+                Messages.Add(ChatMessageViewModel.Status(ResourceLookup.Resolve("assistant.task.cancelled")));
+                break;
+
+            case AgentEventKind.PersistenceFailed:
+                hasPersistenceWarning = true;
+                StatusText = ResourceLookup.Resolve("assistant.persistence.failed");
                 break;
         }
     }
@@ -283,7 +328,7 @@ public sealed class AssistantViewModel : NotifyViewModel
         var service = await EnsureServiceAsync();
         if (service is null)
         {
-            AddSystemMessage("小助手服务初始化失败，请查看控制台日志。");
+            AddSystemMessage("AI 助手服务初始化失败，请查看控制台日志。");
             return;
         }
 
@@ -360,7 +405,8 @@ public sealed class AssistantViewModel : NotifyViewModel
             var service = await EnsureServiceAsync();
             if (service is null)
             {
-                SelectedModelSummary = fallback;
+                selectedModelName = fallback;
+                UpdateModelSummary();
                 return;
             }
 
@@ -370,26 +416,32 @@ public sealed class AssistantViewModel : NotifyViewModel
             {
                 var firstGroup = groups.FirstOrDefault();
                 var firstModel = firstGroup?.Models.FirstOrDefault();
-                SelectedModelSummary = firstModel is null
+                selectedModelName = firstModel is null
                     ? fallback
                     : $"{firstGroup!.ProviderDisplayName} / {firstModel.ModelId}";
+                UpdateModelSummary();
                 RefreshSessions();
                 return;
             }
 
             var group = groups.FirstOrDefault(item =>
                 string.Equals(item.ProviderBusinessId, preferredProvider, StringComparison.OrdinalIgnoreCase));
-            SelectedModelSummary = group is null
+            selectedModelName = group is null
                 ? preferredModel
                 : $"{group.ProviderDisplayName} / {preferredModel}";
+            UpdateModelSummary();
             RefreshSessions();
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception, "小助手模型摘要刷新失败");
-            SelectedModelSummary = fallback;
+            logger.LogWarning(exception, "AI 助手模型摘要刷新失败");
+            selectedModelName = fallback;
+            UpdateModelSummary();
         }
     }
+
+    private void UpdateModelSummary() => SelectedModelSummary = string.IsNullOrEmpty(selectedModelName)
+        ? string.Empty : $"{selectedModelName} · {SelectedReasoningEffort.Label}";
 
     /// <summary>逐条批准模式的 UI 审批桥：弹出审批卡片并等待用户决定。</summary>
     private Task<bool> ShowApprovalAsync(ToolApprovalRequest request)
@@ -412,8 +464,12 @@ public sealed class AssistantViewModel : NotifyViewModel
     private void NewSession()
     {
         ResolveService()?.NewSession();
+        hasPersistenceWarning = false;
+        StatusText = string.Empty;
         Messages.Clear();
         streamingMessage = null;
+        currentReasoning = null;
+        currentSteps = null;
         suppressSelectionLoad = true;
         try
         {
@@ -468,20 +524,51 @@ public sealed class AssistantViewModel : NotifyViewModel
 
         Messages.Clear();
         streamingMessage = null;
-        foreach (var message in service.CurrentSession.Messages.Where(item => item.Role != ChatRole.System))
+        currentReasoning = null;
+        currentSteps = null;
+        var session = service.CurrentSession;
+        var hasToolActivities = session.Activities.Any(item => item.Kind == AgentEventKind.ToolCallStarted);
+        var history = session.Messages.Where(item => item.Role != ChatRole.System)
+            .Select(item => (Timestamp: item.Timestamp, Message: (ChatMessage?)item, Activity: (AgentEvent?)null))
+            .Concat(session.Activities.Select(item => (item.Timestamp, Message: (ChatMessage?)null, Activity: (AgentEvent?)item)))
+            .OrderBy(item => item.Timestamp).ToArray();
+        foreach (var entry in history)
         {
-            if (message.Role == ChatRole.Tool) continue; // 工具结果详情不重复展示
-            if (string.IsNullOrWhiteSpace(message.Content) && message.ToolCalls.Count > 0)
+            if (entry.Activity is { } activity)
             {
-                Messages.Add(ChatMessageViewModel.Status($"⚙ 调用工具 {string.Join("、", message.ToolCalls.Select(call => call.Name))}"));
+                if (activity.Kind is not (AgentEventKind.SessionStarted or AgentEventKind.MessageCompleted)) Project(activity);
+                continue;
+            }
+            var message = entry.Message!;
+            if (message.Role == ChatRole.Tool) continue;
+            if (message.Role == ChatRole.User)
+            {
+                Messages.Add(new ChatMessageViewModel(message.Role, message.Content ?? string.Empty, message.Timestamp));
                 continue;
             }
 
-            if (!string.IsNullOrWhiteSpace(message.Content))
+            if (message.Blocks.Count > 0)
             {
-                Messages.Add(new ChatMessageViewModel(message.Role, message.Content!));
+                foreach (var block in message.Blocks)
+                {
+                    if (block.Kind == ChatContentKind.Thinking)
+                        Project(new AgentEvent(session.Id, AgentEventKind.ReasoningDelta, message.Timestamp)
+                        { Text = block.Text, IsSummary = block.IsSummary });
+                    else if (block.Kind == ChatContentKind.Text)
+                        Project(new AgentEvent(session.Id, AgentEventKind.TextDelta, message.Timestamp) { Text = block.Text });
+                }
             }
+            else if (!string.IsNullOrWhiteSpace(message.Content))
+                Project(new AgentEvent(session.Id, AgentEventKind.TextDelta, message.Timestamp) { Text = message.Content });
+
+            Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message });
+            if (!hasToolActivities && message.ToolCalls.Count > 0)
+                Messages.Add(ChatMessageViewModel.Process(ResourceLookup.Resolve("assistant.process.steps"), false,
+                    string.Join('\n', message.ToolCalls.Select(call => string.Format(ResourceLookup.Resolve("assistant.step.call"), call.Name))), message.Timestamp));
         }
+        streamingMessage = null;
+        currentReasoning = null;
+        currentSteps = null;
     }
 
     private void RefreshSessions()
@@ -492,14 +579,23 @@ public sealed class AssistantViewModel : NotifyViewModel
         foreach (var summary in service.ListSessions()) Sessions.Add(summary);
     }
 
-    private ChatMessageViewModel AppendStreamingMessage()
+    private ChatMessageViewModel AppendStreamingMessage(DateTimeOffset? timestamp = null)
     {
-        var message = new ChatMessageViewModel(ChatRole.Assistant, string.Empty) { IsStreaming = true };
+        var message = new ChatMessageViewModel(ChatRole.Assistant, string.Empty, timestamp) { IsStreaming = true };
         Messages.Add(message);
         return message;
     }
 
+    private ChatMessageViewModel AppendSteps(DateTimeOffset? timestamp = null)
+    {
+        var steps = ChatMessageViewModel.Process(ResourceLookup.Resolve("assistant.process.steps"), timestamp: timestamp);
+        Messages.Add(steps);
+        return steps;
+    }
+
     private void AddSystemMessage(string text) => Messages.Add(ChatMessageViewModel.Status(text));
+
+    public void NotifyCopied() => toastService?.Show(ResourceLookup.Resolve("assistant.copied"), ToastLevel.Success);
 }
 
 /// <summary>修改权限下拉项。</summary>
@@ -596,12 +692,21 @@ public sealed class ChatMessageViewModel : NotifyViewModel
 {
     private string text;
     private bool isStreaming;
+    private bool isExpanded;
+    private readonly ChatEntryKind kind;
 
-    public ChatMessageViewModel(ChatRole role, string text)
+    public ChatMessageViewModel(ChatRole role, string text, DateTimeOffset? timestamp = null)
+        : this(role, text, ChatEntryKind.Message, timestamp)
+    {
+    }
+
+    private ChatMessageViewModel(ChatRole role, string text, ChatEntryKind kind, DateTimeOffset? timestamp)
     {
         Role = role;
         this.text = text;
-        if (role == ChatRole.Assistant && !IsStatus)
+        this.kind = kind;
+        Timestamp = timestamp ?? DateTimeOffset.UtcNow;
+        if (IsAssistantMessage)
         {
             Markdown.Append(text);
         }
@@ -609,11 +714,27 @@ public sealed class ChatMessageViewModel : NotifyViewModel
 
     public ChatRole Role { get; }
 
-    public bool IsStatus { get; private init; }
+    public bool IsStatus => kind == ChatEntryKind.Status;
 
-    public bool IsUser => Role == ChatRole.User;
+    public bool IsProcess => kind == ChatEntryKind.Process;
 
-    public bool IsAssistantMessage => Role == ChatRole.Assistant && !IsStatus;
+    public bool IsSummary { get; private init; }
+
+    public string Label { get; private init; } = string.Empty;
+
+    public DateTimeOffset Timestamp { get; }
+
+    public string DisplayTime => Timestamp.ToLocalTime().ToString("HH:mm");
+
+    public bool IsExpanded
+    {
+        get => isExpanded;
+        set => SetProperty(ref isExpanded, value);
+    }
+
+    public bool IsUser => Role == ChatRole.User && kind == ChatEntryKind.Message;
+
+    public bool IsAssistantMessage => Role == ChatRole.Assistant && kind == ChatEntryKind.Message;
 
     /// <summary>助手消息的 Markdown 构建器（LiveMarkdown 实时渲染，流式追加即更新）。</summary>
     public LiveMarkdown.Avalonia.ObservableStringBuilder Markdown { get; } = new();
@@ -634,9 +755,13 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     {
         Text += delta;
         if (IsAssistantMessage) Markdown.Append(delta);
-        OnPropertyChanged(nameof(Text));
     }
 
     public static ChatMessageViewModel Status(string text) =>
-        new(ChatRole.Assistant, text) { IsStatus = true };
+        new(ChatRole.Assistant, text, ChatEntryKind.Status, null);
+
+    public static ChatMessageViewModel Process(string label, bool summary = false, string text = "", DateTimeOffset? timestamp = null) =>
+        new(ChatRole.Assistant, text, ChatEntryKind.Process, timestamp) { Label = label, IsSummary = summary };
 }
+
+public enum ChatEntryKind { Message, Status, Process }
