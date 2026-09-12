@@ -1596,6 +1596,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         if (!suppressConfigurationRefresh
             && sender is ProviderEditorViewModel provider
             && ProviderEditorViewModel.IsPersistedProperty(args.PropertyName)
+            && args.PropertyName is not nameof(ProviderEditorViewModel.Headers)
             && provider.HasUnsavedChanges)
             _ = SaveProviderAsync(provider);
     }
