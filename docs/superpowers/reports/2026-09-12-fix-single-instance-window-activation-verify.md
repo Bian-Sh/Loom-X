@@ -4,6 +4,19 @@
 
 通过。LoomX 重复启动时，第二实例会通过用户会话内命名管道向首实例发送激活请求；首实例恢复最小化窗口、执行 Avalonia 激活和 Windows 原生前置，第二实例随后退出。
 
+## OpenSpec 一致性
+
+| 维度 | 状态 |
+|---|---|
+| 完整性 | PASS，3/3 任务完成，无 delta spec |
+| 正确性 | PASS，proposal 的 4 项目标均有实现和验收证据 |
+| 一致性 | PASS，实现符合 change design 与关联 Design Doc |
+
+- `InstanceActivationClient` 使用当前 Windows Session ID 隔离管道，固定发送 `activate`，并以短超时有限重试。
+- `InstanceActivationServer` 随首实例生命周期监听，只接受固定命令，通过 UI dispatcher 激活主窗口。
+- `MainWindow` 恢复最小化状态，并组合 Avalonia `Activate()`、Windows 前台授权、原生前置和任务栏闪烁降级。
+- 未发现 CRITICAL、WARNING 或 SUGGESTION 问题；可以进入归档阶段。
+
 ## 自动验证
 
 - `InstanceActivationTests`：3/3 通过，覆盖短超时重试、固定激活命令校验和通信失败降级。
