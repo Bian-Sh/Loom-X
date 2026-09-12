@@ -11,6 +11,7 @@ using LoomX.Services;
 using LoomX.ViewModels;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace LoomX;
 public partial class MainWindow : Window
@@ -274,6 +275,22 @@ public partial class MainWindow : Window
 
     private void ToggleWindowState() => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
+    internal void ActivateFromSecondaryLaunch()
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(ActivateFromSecondaryLaunch);
+            return;
+        }
+
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+        Show();
+        Activate();
+        var nativeActivated = !OperatingSystem.IsWindows() || NativeWindowActivation.TryBringToFront(this);
+        logger.LogInformation("重复启动请求已激活主窗口 {NativeActivated} {ProcessId}", nativeActivated, Environment.ProcessId);
+    }
+
     public void ApplyAppearance(bool enabled, int opacity, int blurAmount, string algorithm)
     {
         // 算法选择已固定为 Acrylic；保留参数仅兼容旧版调用方和配置数据。
@@ -327,6 +344,61 @@ public partial class MainWindow : Window
     internal static SolidColorBrush CreateOpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
         ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
         : new SolidColorBrush(Color.FromArgb(255, 230, 240, 243));
+}
+
+internal static class NativeWindowActivation
+{
+    internal static bool TryBringToFront(Window window)
+    {
+        var handle = window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        if (handle == IntPtr.Zero) return false;
+
+        ShowWindow(handle, ShowWindowRestore);
+        SetWindowPos(handle, HwndTopmost, 0, 0, 0, 0, SetWindowPosNoMove | SetWindowPosNoSize | SetWindowPosShowWindow);
+        SetWindowPos(handle, HwndNotTopmost, 0, 0, 0, 0, SetWindowPosNoMove | SetWindowPosNoSize | SetWindowPosShowWindow);
+        BringWindowToTop(handle);
+        var activated = SetForegroundWindow(handle) && GetForegroundWindow() == handle;
+        if (!activated)
+            FlashWindow(handle, true);
+        return activated;
+    }
+
+    private static readonly IntPtr HwndTopmost = new(-1);
+    private static readonly IntPtr HwndNotTopmost = new(-2);
+    private const int ShowWindowRestore = 9;
+    private const uint SetWindowPosNoSize = 0x0001;
+    private const uint SetWindowPosNoMove = 0x0002;
+    private const uint SetWindowPosShowWindow = 0x0040;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr handle, int command);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool BringWindowToTop(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FlashWindow(IntPtr handle, [MarshalAs(UnmanagedType.Bool)] bool invert);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(
+        IntPtr handle,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
 }
 
 internal static class AppearanceBrushUpdater
