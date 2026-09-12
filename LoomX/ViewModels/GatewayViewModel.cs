@@ -467,12 +467,12 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     }
     private async Task ToggleRouteAsync(GatewayRouteEditorViewModel? route)
     {
-        if (route is null) return;
+        if (route is null || FindRouteOwner(route.Id) is not { } owner) return;
         try
         {
             await RunGatewayMutationAsync(async () =>
             {
-                var current = FindCurrentRoute(route.Id);
+                var current = owner.Routes.FirstOrDefault(item => !item.IsPlaceholder && item.Id == route.Id);
                 if (current is null) return;
                 current.Enabled = !current.Enabled;
                 await SaveRouteAsync(current);
@@ -483,8 +483,8 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     }
     private async Task RemoveRouteAsync(GatewayRouteEditorViewModel? route)
     {
-        if (route is null || SelectedCombo is null || !IsCurrentRoute(route)) return;
-        var comboId = SelectedCombo.Id;
+        if (route is null || FindRouteOwner(route.Id) is not { } owner) return;
+        var comboId = owner.Id;
         var routeId = route.Id;
         try
         {
@@ -524,7 +524,8 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
     private static void Renumber(GatewayComboEditorViewModel combo) { for (var i = 0; i < combo.Routes.Count; i++) combo.Routes[i].SortOrder = i; }
 
     private GatewayComboEditorViewModel? FindCurrentCombo(Guid id) => Combos.FirstOrDefault(item => item.Id == id);
-    private GatewayRouteEditorViewModel? FindCurrentRoute(Guid id) => SelectedCombo?.Routes.FirstOrDefault(item => !item.IsPlaceholder && item.Id == id);
+    private GatewayComboEditorViewModel? FindRouteOwner(Guid id) => Combos.FirstOrDefault(combo => combo.Routes.Any(item => !item.IsPlaceholder && item.Id == id));
+    private GatewayRouteEditorViewModel? FindCurrentRoute(Guid id) => FindRouteOwner(id)?.Routes.FirstOrDefault(item => !item.IsPlaceholder && item.Id == id);
     private bool IsCurrentCombo(GatewayComboEditorViewModel combo) => FindCurrentCombo(combo.Id) is not null;
     private bool IsCurrentRoute(GatewayRouteEditorViewModel route) => FindCurrentRoute(route.Id) is not null;
 
