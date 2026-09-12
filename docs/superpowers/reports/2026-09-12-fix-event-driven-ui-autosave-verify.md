@@ -9,9 +9,9 @@
 | 检查项 | 结果 | 证据 |
 | --- | --- | --- |
 | tasks.md 全部完成 | PASS | 3 项任务均为 `[x]`。 |
-| 改动范围与任务一致 | PASS | 提交 `700c934` 仅包含 ViewModel、XAML、交互契约测试和本次 Comet/OpenSpec 产物。 |
+| 改动范围与任务一致 | PASS | 提交 `700c934`、`3b16e30` 仅包含 ViewModel、XAML、交互契约测试和本次 Comet/OpenSpec 产物。 |
 | 编译通过 | PASS | `dotnet build LoomX.slnx --no-restore`，0 错误。 |
-| 相关测试通过 | PASS | `dotnet test LoomX.Tests\\LoomX.Tests.csproj --no-build --logger "console;verbosity=minimal"`，549 passed，0 failed。 |
+| 相关测试通过 | PASS | 最终修正后再次执行 `dotnet test LoomX.Tests\\LoomX.Tests.csproj --no-build --logger "console;verbosity=minimal"`，549 passed，0 failed。 |
 | 安全检查 | PASS | 未新增密钥、Authorization、请求正文或不安全操作；日志仍使用结构化摘要。 |
 | 代码审查策略 | PASS | `.comet.yaml` 为 `review_mode: off`，按配置跳过自动代码审查；已完成实现边界和竞态专项复核。 |
 
