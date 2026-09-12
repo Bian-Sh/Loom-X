@@ -184,7 +184,8 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("private readonly SemaphoreSlim providerSaveLock", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("private readonly SemaphoreSlim modelSaveLock", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("_ = SaveProviderAsync(provider);", viewModelSource, StringComparison.Ordinal);
-        Assert.Contains("_ = SaveModelAsync(provider, model);", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("_ = SaveModelAsync(provider, model, enabledOnly", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("dataStore.UpdateModelEnabledAsync(model.Id, model.Enabled)", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("ProviderEditorViewModel.IsPersistedProperty(args.PropertyName)", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("ModelEditorViewModel.IsPersistedProperty(args.PropertyName)", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("UpdateSourceTrigger=PropertyChanged", viewSource, StringComparison.Ordinal);

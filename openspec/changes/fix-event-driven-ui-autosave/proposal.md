@@ -14,3 +14,7 @@
 2. 用户编辑事件直接触发串行自动保存，不再使用 `DebouncedAutoSaver` 协调配置页面保存。
 3. 数据库加载和保存响应只能更新 UI/保存标记，不能再次触发保存；连续输入时旧响应不能清除较新的脏状态。
 4. Gateway、Providers、Settings 的可交互控件保持一致，并有契约测试覆盖。
+
+## 复验补充
+
+模型列表中的 Enable Toggle 仍属于高频单字段操作。若沿用完整 Model 保存与全量配置广播，会重复读取 Provider、Settings、Endpoint、Combo，并错误触发主窗口透明度应用，造成明显卡顿和大量控制台日志。本次修复还必须保证该 Toggle 只更新对应模型的 `Enabled` 字段并发布一次 `Model/LocalSave` 事件。

@@ -170,6 +170,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
 
     private void OnConfigurationChanged(object? sender, ConfigurationChangedEventArgs args)
     {
+        if (args.Source == ConfigurationChangeSource.LocalSave && args.Kind != ConfigurationChangeKind.Settings) return;
         void Apply()
         {
             if (dataStore.Settings is { } settings)
@@ -1148,7 +1149,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     private Task SaveModelAsync() => SaveModelAsync(SelectedProvider, SelectedModel);
 
-    private async Task SaveModelAsync(ProviderEditorViewModel? provider, ModelEditorViewModel? model)
+    private async Task SaveModelAsync(ProviderEditorViewModel? provider, ModelEditorViewModel? model, bool enabledOnly = false)
     {
         if (provider is null || model is null) return;
         await modelSaveLock.WaitAsync();
@@ -1159,8 +1160,14 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             suppressConfigurationRefresh = true;
             try
             {
-                var input = model.ToInput();
-                var response = model.Id == Guid.Empty ? await dataStore.CreateModelAsync(provider.Id, input) : await dataStore.UpdateModelAsync(model.Id, input);
+                ModelResponse response;
+                if (enabledOnly && model.Id != Guid.Empty)
+                    response = await dataStore.UpdateModelEnabledAsync(model.Id, model.Enabled);
+                else
+                {
+                    var input = model.ToInput();
+                    response = model.Id == Guid.Empty ? await dataStore.CreateModelAsync(provider.Id, input) : await dataStore.UpdateModelAsync(model.Id, input);
+                }
                 if (!provider.Models.Contains(model)) provider.Models.Add(model);
                 model.ApplySaveResult(response, editRevision);
                 SetStatus("providers.model.save.success");
@@ -1635,7 +1642,10 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             && SelectedProvider is { } provider
             && ModelEditorViewModel.IsPersistedProperty(args.PropertyName)
             && model.HasUnsavedChanges)
-            _ = SaveModelAsync(provider, model);
+        {
+            var enabledOnly = args.PropertyName == nameof(ModelEditorViewModel.Enabled) && model.Id != Guid.Empty;
+            _ = SaveModelAsync(provider, model, enabledOnly);
+        }
     }
 
     private void UpdateSummary()

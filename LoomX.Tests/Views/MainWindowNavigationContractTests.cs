@@ -106,6 +106,15 @@ public sealed class MainWindowNavigationContractTests
         Assert.DoesNotContain("public ICommand RefreshCommand", overviewViewModel, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AppearanceRefreshOnlyRespondsToSettingsChanges()
+    {
+        var vmPath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
+        var source = File.ReadAllText(vmPath);
+
+        Assert.Contains("if (args.Source == ConfigurationChangeSource.LocalSave && args.Kind != ConfigurationChangeKind.Settings) return;", source, StringComparison.Ordinal);
+    }
+
     private static string ExtractTopLevelType(string source, string declaration)
     {
         var start = source.IndexOf(declaration, StringComparison.Ordinal);

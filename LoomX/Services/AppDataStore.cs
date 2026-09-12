@@ -153,6 +153,27 @@ public sealed class AppDataStore : IDisposable
         return result;
     }
 
+    internal async Task<ModelResponse> UpdateModelEnabledAsync(Guid id, bool enabled, CancellationToken cancellationToken = default)
+    {
+        var existing = Providers.SelectMany(provider => provider.Models).FirstOrDefault(model => model.Id == id) ?? throw new KeyNotFoundException("模型不存在。");
+        await configService.UpdateModelEnabledAsync(id, enabled, cancellationToken);
+        var result = existing with { Enabled = enabled };
+        var runtimeProvider = gatewayService.GetHostedService<IDatabaseConfigurationProvider>();
+        ResolvedAppConfig? refreshedConfig = null;
+        if (runtimeProvider is not null && gatewayService.State == GatewayState.Running)
+        {
+            await runtimeProvider.ReloadAsync(cancellationToken);
+            refreshedConfig = runtimeProvider.Current;
+        }
+        else if (enabled)
+        {
+            // 禁用项不在精简运行时快照中；重新启用时只加载一次配置以恢复完整路由信息。
+            refreshedConfig = await configService.LoadAsync(cancellationToken);
+        }
+        await ApplyLocalModelSaveAsync(result, refreshedConfig, cancellationToken);
+        return result;
+    }
+
     public async Task<IReadOnlyList<ModelResponse>> UpdateModelOrderAsync(Guid providerId, ModelOrderInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.UpdateModelOrderAsync(providerId, input, cancellationToken);
@@ -361,6 +382,59 @@ public sealed class AppDataStore : IDisposable
             isLoading = false;
             stateLock.Release();
         }
+    }
+
+    private async Task ApplyLocalModelSaveAsync(ModelResponse result, ResolvedAppConfig? refreshedConfig, CancellationToken cancellationToken)
+    {
+        await stateLock.WaitAsync(cancellationToken);
+        try
+        {
+            var provider = Providers.FirstOrDefault(item => string.Equals(item.BusinessId, result.ProviderId, StringComparison.OrdinalIgnoreCase));
+            if (provider is not null)
+            {
+                var models = provider.Models.ToList();
+                var index = models.FindIndex(item => item.Id == result.Id);
+                if (index >= 0) models[index] = result;
+                else models.Add(result);
+                Providers = Providers.Select(item => ReferenceEquals(item, provider) ? item with { Models = models, ModelCount = models.Count } : item).ToArray();
+            }
+
+            EnabledGatewayModels = Providers
+                .Where(item => item.Enabled)
+                .SelectMany(item => item.Models.Where(model => model.Enabled).Select(model => new GatewayModelSourceResponse(model.Id, model.DisplayName, item.DisplayName)))
+                .ToArray();
+
+            if (refreshedConfig is not null)
+                CurrentConfig = refreshedConfig;
+            else if (!result.Enabled)
+            {
+                var disabledModel = CurrentConfig.Models.FirstOrDefault(model => string.Equals(model.ProviderId, result.ProviderId, StringComparison.OrdinalIgnoreCase) && string.Equals(model.ModelId, result.ModelId, StringComparison.OrdinalIgnoreCase));
+                if (disabledModel is not null)
+                {
+                    CurrentConfig = new ResolvedAppConfig
+                    {
+                        Server = CurrentConfig.Server,
+                        Settings = CurrentConfig.Settings,
+                        Providers = CurrentConfig.Providers,
+                        Models = CurrentConfig.Models.Where(model => !ReferenceEquals(model, disabledModel)).ToArray(),
+                        GatewayCombos = CurrentConfig.GatewayCombos
+                            .Select(combo => new ResolvedGatewayComboConfig
+                            {
+                                Id = combo.Id,
+                                Name = combo.Name,
+                                Enabled = combo.Enabled,
+                                SortOrder = combo.SortOrder,
+                                Routes = combo.Routes.Where(route => !ReferenceEquals(route.Model, disabledModel)).ToArray()
+                            })
+                            .ToArray(),
+                        GatewayEndpoints = CurrentConfig.GatewayEndpoints
+                    };
+                }
+            }
+        }
+        finally { stateLock.Release(); }
+
+        ConfigurationChanged?.Invoke(this, new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Model, result.Id));
     }
 
     private void OnActivityEnqueued(object? sender, ActivityEventInput input) => _ = HandleActivityEnqueuedAsync(input);

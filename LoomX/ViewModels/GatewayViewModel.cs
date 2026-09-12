@@ -151,6 +151,18 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
 
     private void OnConfigurationChanged(object? sender, ConfigurationChangedEventArgs args)
     {
+        if (args.Source == ConfigurationChangeSource.LocalSave && args.Kind == ConfigurationChangeKind.Model)
+        {
+            void ApplyModelSnapshot()
+            {
+                ReloadAvailableModelsFromSnapshot();
+                FilterModels(modelSearchTerm);
+            }
+            if (Dispatcher.UIThread.CheckAccess()) ApplyModelSnapshot();
+            else Dispatcher.UIThread.Post(ApplyModelSnapshot);
+            return;
+        }
+
         if (gatewayMutationDepth > 0 || isRefreshing)
         {
             refreshPending = true;
@@ -333,6 +345,13 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
         var models = await dataStore.ListEnabledGatewayModelsAsync();
         AvailableModels.Clear();
         foreach (var model in models) AvailableModels.Add(new GatewayModelOption(model.Id, model.ModelName, model.ProviderName));
+    }
+
+    private void ReloadAvailableModelsFromSnapshot()
+    {
+        AvailableModels.Clear();
+        foreach (var model in dataStore.EnabledGatewayModels)
+            AvailableModels.Add(new GatewayModelOption(model.Id, model.ModelName, model.ProviderName));
     }
     public async Task AddRouteAsync(GatewayModelOption? option)
     {

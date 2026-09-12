@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using LoomX.Activity;
 using LoomX.Configuration;
@@ -129,6 +130,74 @@ public sealed class AppDataStoreTests
     }
 
     [Fact]
+    public async Task ModelEnabledUpdatePreservesUnrelatedDesktopSnapshots()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            var configLogger = new RecordingLogger<ConfigSnapshotService>();
+            using var configService = new ConfigSnapshotService(configPath, configLogger);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            await store.InitializeAsync();
+            var provider = await store.CreateProviderAsync(new ProviderInput("toggle-provider", "Toggle Provider", "https://example.com", "openai", true, null, false, null));
+            var model = await store.CreateModelAsync(provider.Id, new ModelInput("toggle-model", "Toggle Model", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+            var settingsBefore = store.Settings;
+            var serverBefore = store.CurrentConfig.Server;
+            var events = new List<ConfigurationChangedEventArgs>();
+            store.ConfigurationChanged += (_, args) => events.Add(args);
+            configLogger.Messages.Clear();
+
+            var updated = await store.UpdateModelEnabledAsync(model.Id, false);
+
+            Assert.False(updated.Enabled);
+            Assert.Same(settingsBefore, store.Settings);
+            Assert.Same(serverBefore, store.CurrentConfig.Server);
+            Assert.DoesNotContain(store.CurrentConfig.Models, item => item.ModelId == model.ModelId && item.ProviderId == provider.BusinessId);
+            Assert.DoesNotContain(store.EnabledGatewayModels, item => item.Id == model.Id);
+            var change = Assert.Single(events);
+            Assert.Equal(ConfigurationChangeKind.Model, change.Kind);
+            Assert.Equal(model.Id, change.EntityId);
+            Assert.DoesNotContain(configLogger.Messages, message => message.Contains("数据库配置重载", StringComparison.Ordinal));
+            Assert.DoesNotContain(configLogger.Messages, message => message.Contains("配置快照同步读取", StringComparison.Ordinal));
+            Assert.DoesNotContain(configLogger.Messages, message => message.Contains("Provider 列表读取", StringComparison.Ordinal));
+
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={configPath}").Options;
+            await using var db = new ConfigurationDbContext(options);
+            Assert.False((await db.Models.AsNoTracking().SingleAsync(item => item.Id == model.Id)).Enabled);
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
+    public async Task ModelEnabledUpdateCanBeReenabledWithoutFullDesktopReload()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            await store.InitializeAsync();
+            var provider = await store.CreateProviderAsync(new ProviderInput("reenable-provider", "Re-enable Provider", "https://example.com", "openai", true, null, false, null));
+            var model = await store.CreateModelAsync(provider.Id, new ModelInput("reenable-model", "Re-enable Model", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+
+            await store.UpdateModelEnabledAsync(model.Id, false);
+            Assert.DoesNotContain(store.CurrentConfig.Models, item => item.ModelId == model.ModelId);
+            await store.UpdateModelEnabledAsync(model.Id, true);
+
+            Assert.Contains(store.CurrentConfig.Models, item => item.ModelId == model.ModelId && item.ProviderId == provider.BusinessId);
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
     public async Task FailedConfigurationWriteKeepsExistingSnapshot()
     {
         var directory = CreateDirectory();
@@ -223,6 +292,15 @@ public sealed class AppDataStoreTests
         var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={path}").Options;
         await using var db = new ConfigurationDbContext(options);
         await ConfigurationDatabase.InitializeAsync(db);
+    }
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception));
     }
 
     private static async Task SeedActivitiesAsync(string path, int count)

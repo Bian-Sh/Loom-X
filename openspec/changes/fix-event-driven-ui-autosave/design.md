@@ -6,4 +6,6 @@ Settings 移除防抖保存器，属性变更事件直接进入串行保存锁�
 
 所有编辑型 TextBox 显式使用 `Mode=TwoWay, UpdateSourceTrigger=PropertyChanged`。Gateway 组合名称保留 `LostFocus` 作为编辑完成提交点，但源值先在每次输入时更新；Providers、Settings 的属性变更事件直接自动保存。只读显示和搜索框不进入持久化保存路径。
 
+模型 `Enabled` Toggle 使用窄更新路径：数据库执行单条模型启用字段更新，不调用通用配置服务的完整 `ReloadAsync`，桌面数据中心只更新对应 Provider 的模型投影和启用模型列表，并发布一次 `ConfigurationChangeKind.Model`。运行中的网关配置 Provider 仅在已启动时重载一次，以确保请求路由及时生效；主窗口外观应用仅响应 `ConfigurationChangeKind.Settings`。
+
 同步、拖拽、批量切换等已有操作在进入数据库写入前使用同一保存锁，避免并发操作读取旧编辑快照。保留 `DebouncedAutoSaver` 类及其独立单元测试供兼容代码使用，但桌面配置 ViewModel 不再依赖它。
