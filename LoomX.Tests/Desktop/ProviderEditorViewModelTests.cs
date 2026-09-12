@@ -152,6 +152,87 @@ public sealed class ProviderEditorViewModelTests
         Assert.Equal("draft", viewModel.Headers[0].Value);
     }
 
+    [Fact]
+    public void ApiKeyEditIsIncludedBeforePropertyChangedSubscribersSave()
+    {
+        var viewModel = ProviderEditorViewModel.FromResponse(new ProviderResponse(
+            Guid.NewGuid(),
+            "provider",
+            "Provider",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []));
+        ProviderInput? inputAtNotification = null;
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.ApiKey)) inputAtNotification = viewModel.ToInput();
+        };
+
+        viewModel.ApiKey = "new-secret";
+
+        Assert.NotNull(inputAtNotification);
+        Assert.Equal("new-secret", inputAtNotification!.ApiKey);
+    }
+
+    [Fact]
+    public void OlderSaveResultDoesNotClearNewerEditRevision()
+    {
+        var viewModel = ProviderEditorViewModel.FromResponse(new ProviderResponse(
+            Guid.NewGuid(),
+            "provider",
+            "Provider",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []));
+
+        viewModel.DisplayName = "第一版";
+        var firstRevision = viewModel.EditRevision;
+        viewModel.DisplayName = "第二版";
+        var secondRevision = viewModel.EditRevision;
+
+        viewModel.ApplySaveResult(new ProviderResponse(
+            viewModel.Id,
+            "provider",
+            "第一版",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []), firstRevision);
+
+        Assert.True(secondRevision > firstRevision);
+        Assert.True(viewModel.HasUnsavedChanges);
+        Assert.Equal("第二版", viewModel.DisplayName);
+
+        viewModel.ApplySaveResult(new ProviderResponse(
+            viewModel.Id,
+            "provider",
+            "第二版",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []), secondRevision);
+
+        Assert.False(viewModel.HasUnsavedChanges);
+    }
+
     [Theory]
     [InlineData("  grox  ")]
     [InlineData("PROVIDER-ID")]
@@ -263,5 +344,32 @@ public sealed class ProviderEditorViewModelTests
         Assert.False(viewModel.HasUnsavedChanges);
         viewModel.Enabled = false;
         Assert.True(viewModel.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public void ModelLocalizationRefreshDoesNotCreateUnsavedChanges()
+    {
+        var viewModel = ModelEditorViewModel.FromResponse(new ModelResponse(
+            Guid.NewGuid(),
+            "provider",
+            "model",
+            "模型",
+            null,
+            "unknown",
+            null,
+            null,
+            128000,
+            4096,
+            false,
+            null,
+            null,
+            true,
+            false,
+            "{}",
+            "{}"));
+
+        viewModel.RefreshLocalization();
+
+        Assert.False(viewModel.HasUnsavedChanges);
     }
 }

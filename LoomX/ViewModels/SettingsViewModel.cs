@@ -71,7 +71,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private string status;
     private bool hasProxyPassword;
     private bool suppressAutoSave;
-    private readonly DebouncedAutoSaver autoSaver;
+    private readonly SemaphoreSlim saveLock = new(1, 1);
 
     public static IReadOnlyList<SettingOption> LanguageOptions { get; } =
     [
@@ -91,10 +91,10 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         {
             if (!SetProperty(ref selectedLanguage, value)) return;
             LocaleService.SetCulture(value.Value);
-            QueueAutoSave();
+            SaveAfterEdit();
         }
     }
-    public SettingOption SelectedTheme { get => selectedTheme; set { if (SetProperty(ref selectedTheme, value)) QueueAutoSave(); } }
+    public SettingOption SelectedTheme { get => selectedTheme; set { if (SetProperty(ref selectedTheme, value)) SaveAfterEdit(); } }
     public SettingOption SelectedProxyMode
     {
         get => selectedProxyMode;
@@ -103,23 +103,23 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             if (!SetProperty(ref selectedProxyMode, value)) return;
             OnPropertyChanged(nameof(IsCustomProxyVisible));
             OnPropertyChanged(nameof(ProxyStatus));
-            QueueAutoSave();
+            SaveAfterEdit();
         }
     }
-    public string ProxyHost { get => proxyHost; set { if (SetProperty(ref proxyHost, value)) { OnPropertyChanged(nameof(ProxyStatus)); QueueAutoSave(); } } }
-    public int ProxyPort { get => proxyPort; set { if (SetProperty(ref proxyPort, value)) { OnPropertyChanged(nameof(ProxyStatus)); QueueAutoSave(); } } }
-    public string ProxyUsername { get => proxyUsername; set { if (SetProperty(ref proxyUsername, value)) QueueAutoSave(); } }
-    public string ProxyPassword { get => proxyPassword; set { if (SetProperty(ref proxyPassword, value)) QueueAutoSave(); } }
-    public bool ClearProxyPassword { get => clearProxyPassword; set { if (SetProperty(ref clearProxyPassword, value)) QueueAutoSave(); } }
+    public string ProxyHost { get => proxyHost; set { if (SetProperty(ref proxyHost, value)) { OnPropertyChanged(nameof(ProxyStatus)); SaveAfterEdit(); } } }
+    public int ProxyPort { get => proxyPort; set { if (SetProperty(ref proxyPort, value)) { OnPropertyChanged(nameof(ProxyStatus)); SaveAfterEdit(); } } }
+    public string ProxyUsername { get => proxyUsername; set { if (SetProperty(ref proxyUsername, value)) SaveAfterEdit(); } }
+    public string ProxyPassword { get => proxyPassword; set { if (SetProperty(ref proxyPassword, value)) SaveAfterEdit(); } }
+    public bool ClearProxyPassword { get => clearProxyPassword; set { if (SetProperty(ref clearProxyPassword, value)) SaveAfterEdit(); } }
     public bool HasProxyPassword { get => hasProxyPassword; private set => SetProperty(ref hasProxyPassword, value); }
-    public bool AutoCheckUpdates { get => autoCheckUpdates; set { if (SetProperty(ref autoCheckUpdates, value)) QueueAutoSave(); } }
-    public bool UseProxyForUpdates { get => useProxyForUpdates; set { if (SetProperty(ref useProxyForUpdates, value)) QueueAutoSave(); } }
-    public bool DiagnosticsEnabled { get => diagnosticsEnabled; set { if (SetProperty(ref diagnosticsEnabled, value)) QueueAutoSave(); } }
-    public bool LogStackTrace { get => logStackTrace; set { if (SetProperty(ref logStackTrace, value)) { LoggingBootstrap.SetIncludeStackTrace(value); QueueAutoSave(); } } }
-    public bool TransparencyEnabled { get => transparencyEnabled; set { if (SetProperty(ref transparencyEnabled, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
-    public int TransparencyOpacity { get => transparencyOpacity; set { if (SetProperty(ref transparencyOpacity, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
-    public int BlurAmount { get => blurAmount; set { if (SetProperty(ref blurAmount, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); QueueAutoSave(); } } }
-    public SettingOption SelectedLogRetention { get => selectedLogRetention; set { if (SetProperty(ref selectedLogRetention, value)) { OnPropertyChanged(nameof(LogRetentionDays)); QueueAutoSave(); } } }
+    public bool AutoCheckUpdates { get => autoCheckUpdates; set { if (SetProperty(ref autoCheckUpdates, value)) SaveAfterEdit(); } }
+    public bool UseProxyForUpdates { get => useProxyForUpdates; set { if (SetProperty(ref useProxyForUpdates, value)) SaveAfterEdit(); } }
+    public bool DiagnosticsEnabled { get => diagnosticsEnabled; set { if (SetProperty(ref diagnosticsEnabled, value)) SaveAfterEdit(); } }
+    public bool LogStackTrace { get => logStackTrace; set { if (SetProperty(ref logStackTrace, value)) { LoggingBootstrap.SetIncludeStackTrace(value); SaveAfterEdit(); } } }
+    public bool TransparencyEnabled { get => transparencyEnabled; set { if (SetProperty(ref transparencyEnabled, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); SaveAfterEdit(); } } }
+    public int TransparencyOpacity { get => transparencyOpacity; set { if (SetProperty(ref transparencyOpacity, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); SaveAfterEdit(); } } }
+    public int BlurAmount { get => blurAmount; set { if (SetProperty(ref blurAmount, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); SaveAfterEdit(); } } }
+    public SettingOption SelectedLogRetention { get => selectedLogRetention; set { if (SetProperty(ref selectedLogRetention, value)) { OnPropertyChanged(nameof(LogRetentionDays)); SaveAfterEdit(); } } }
     public int LogRetentionDays => int.Parse(SelectedLogRetention.Value);
     public bool IsBusy { get => isBusy; private set { if (SetProperty(ref isBusy, value)) { OnPropertyChanged(nameof(IsNotBusy)); } } }
     public bool IsNotBusy => !IsBusy;
@@ -157,7 +157,6 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         OpenDataDirectoryCommand = new AsyncCommand(OpenDataDirectoryAsync);
         ClearLogsCommand = new AsyncCommand(ClearLogsAsync);
         ExportDiagnosticsCommand = new AsyncCommand(ExportDiagnosticsAsync);
-        autoSaver = new DebouncedAutoSaver(() => SaveAsync(), logger: logger);
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;
         _ = LoadAsync();
@@ -208,48 +207,55 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
 
     private async Task SaveAsync(CancellationToken cancellationToken = default)
     {
-        IsBusy = true;
-        Status = Loc("settings.status.saving");
+        await saveLock.WaitAsync(cancellationToken);
         try
         {
-            var input = new AppSettingsInput(
-                SelectedLanguage.Value,
-                SelectedTheme.Value,
-                SelectedProxyMode.Value,
-                ProxyHost,
-                ProxyPort,
-                string.IsNullOrWhiteSpace(ProxyUsername) ? null : ProxyUsername,
-                string.IsNullOrWhiteSpace(ProxyPassword) ? null : ProxyPassword,
-                ClearProxyPassword,
-                AutoCheckUpdates,
-                "stable",
-                DiagnosticsEnabled,
-                LogRetentionDays,
-                LogStackTrace,
-                TransparencyEnabled,
-                TransparencyOpacity,
-                BlurAmount,
-                AcrylicTransparencyAlgorithm,
-                UseProxyForUpdates);
-            var response = await dataStore.UpdateSettingsAsync(input, cancellationToken);
-            HasProxyPassword = response.HasProxyPassword;
-            Status = string.Format(Loc("settings.status.saved"), DateTime.Now.ToString("HH:mm:ss"));
-            logger.LogInformation("设置保存完成 {ProxyMode} {AutoCheckUpdates} {UseProxyForUpdates} {DiagnosticsEnabled}", response.ProxyMode, response.AutoCheckUpdates, response.UseProxyForUpdates, response.DiagnosticsEnabled);
+            IsBusy = true;
+            Status = Loc("settings.status.saving");
+            try
+            {
+                var input = new AppSettingsInput(
+                    SelectedLanguage.Value,
+                    SelectedTheme.Value,
+                    SelectedProxyMode.Value,
+                    ProxyHost,
+                    ProxyPort,
+                    string.IsNullOrWhiteSpace(ProxyUsername) ? null : ProxyUsername,
+                    string.IsNullOrWhiteSpace(ProxyPassword) ? null : ProxyPassword,
+                    ClearProxyPassword,
+                    AutoCheckUpdates,
+                    "stable",
+                    DiagnosticsEnabled,
+                    LogRetentionDays,
+                    LogStackTrace,
+                    TransparencyEnabled,
+                    TransparencyOpacity,
+                    BlurAmount,
+                    AcrylicTransparencyAlgorithm,
+                    UseProxyForUpdates);
+                var response = await dataStore.UpdateSettingsAsync(input, cancellationToken);
+                HasProxyPassword = response.HasProxyPassword;
+                Status = string.Format(Loc("settings.status.saved"), DateTime.Now.ToString("HH:mm:ss"));
+                logger.LogInformation("设置保存完成 {ProxyMode} {AutoCheckUpdates} {UseProxyForUpdates} {DiagnosticsEnabled}", response.ProxyMode, response.AutoCheckUpdates, response.UseProxyForUpdates, response.DiagnosticsEnabled);
+            }
+            catch (Exception exception)
+            {
+                Status = string.Format(Loc("settings.status.save.failed"), exception.Message);
+                toastService.Show(Loc("settings.status.save.failed.toast"), ToastLevel.Error);
+                logger.LogError(exception, "设置保存失败");
+            }
         }
-        catch (Exception exception)
+        finally
         {
-            Status = string.Format(Loc("settings.status.save.failed"), exception.Message);
-            toastService.Show(Loc("settings.status.save.failed.toast"), ToastLevel.Error);
-            logger.LogError(exception, "设置保存失败");
+            IsBusy = false;
+            saveLock.Release();
         }
-        finally { IsBusy = false; }
     }
 
-    private void QueueAutoSave()
+    private void SaveAfterEdit()
     {
         if (suppressAutoSave) return;
-        Status = Loc("settings.status.waiting");
-        autoSaver.Trigger();
+        _ = SaveAsync();
     }
 
     private async Task TestProxyAsync()
@@ -373,9 +379,8 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     {
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
         LocaleService.CultureChanged -= OnCultureChanged;
-        // 尽力把待存的设置在退出前落库
-        _ = autoSaver.FlushAsync();
-        autoSaver.Dispose();
+        // 尽力把待存的设置在退出前落库；属性变更本身已按事件串行保存。
+        _ = SaveAsync();
         if (ownsUpdateCoordinator) updateCoordinator.Dispose();
     }
 }

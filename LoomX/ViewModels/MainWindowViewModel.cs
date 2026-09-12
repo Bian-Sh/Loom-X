@@ -760,8 +760,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private double syncIconAngle;
     private string providerSearchQuery = "";
     private string modelSearchQuery = "";
-    private readonly DebouncedAutoSaver providerAutoSaver;
-    private readonly DebouncedAutoSaver modelAutoSaver;
+    private readonly SemaphoreSlim providerSaveLock = new(1, 1);
+    private readonly SemaphoreSlim modelSaveLock = new(1, 1);
     private ModelEditorViewModel? draggingModel;
     private ModelEditorViewModel? modelDragPlaceholder;
     private ProviderEditorViewModel? modelDragOwnerProvider;
@@ -942,8 +942,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         this.logger = logger;
         _loc = localizer ?? LocalizerFactory.Create<ProvidersViewModel>();
         this.healthService = healthService ?? new ProviderHealthService(httpClient);
-        providerAutoSaver = new DebouncedAutoSaver(SaveDirtyProvidersAsync, logger: logger);
-        modelAutoSaver = new DebouncedAutoSaver(SaveDirtyModelsAsync, logger: logger);
         Providers.CollectionChanged += ProvidersChanged;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;
@@ -1073,11 +1071,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     {
         Providers.CollectionChanged -= ProvidersChanged;
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
-        // 尽力把待存的编辑在退出前落库
-        _ = providerAutoSaver.FlushAsync();
-        _ = modelAutoSaver.FlushAsync();
-        providerAutoSaver.Dispose();
-        modelAutoSaver.Dispose();
+        // 尽力把待存的编辑在退出前落库；保存锁由未完成的异步操作自行释放。
+        _ = SavePendingChangesAsync();
         connectionCancellation?.Cancel();
         healthVerificationCancellation?.Cancel();
         healthVerificationCancellation?.Dispose();
@@ -1090,25 +1085,10 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
 
     private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = Loc("providers.edit.new.displayname"), ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); SetStatus("providers.status.edit.new"); }
 
-    internal void QueueProviderAutoSave(ProviderEditorViewModel provider)
-    {
-        // 保存动作扫描全部未保存的 Provider，快速切换编辑对象时不会丢掉先前对象的待存编辑。
-        providerAutoSaver.Trigger();
-    }
-
-    private async Task SaveDirtyProvidersAsync()
+    private async Task SavePendingChangesAsync()
     {
         foreach (var provider in Providers.ToArray())
             if (provider.HasUnsavedChanges) await SaveProviderAsync(provider);
-    }
-
-    internal void QueueModelAutoSave(ProviderEditorViewModel provider, ModelEditorViewModel model)
-    {
-        modelAutoSaver.Trigger();
-    }
-
-    private async Task SaveDirtyModelsAsync()
-    {
         foreach (var provider in Providers.ToArray())
             foreach (var model in provider.Models.ToArray())
                 if (model.HasUnsavedChanges) await SaveModelAsync(provider, model);
@@ -1120,31 +1100,40 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     {
         var provider = target;
         if (provider is null) return;
-        if (!provider.HasUnsavedChanges) return;
-        suppressConfigurationRefresh = true;
+        await providerSaveLock.WaitAsync();
         try
         {
-            var input = provider.ToInput();
-            var response = provider.Id == Guid.Empty ? await dataStore.CreateProviderAsync(input) : await dataStore.UpdateProviderAsync(provider.Id, input);
-            provider.ApplySaveResult(response);
-            UpdateSummary();
-            if (provider.IncompleteHeaderCount > 0)
+            if (!provider.HasUnsavedChanges) return;
+            var editRevision = provider.EditRevision;
+            suppressConfigurationRefresh = true;
+            try
             {
-                SetStatus("providers.save.success.pendingHeaders", provider.IncompleteHeaderCount);
-                if (provider.IncompleteHeaderCount > lastIncompleteHeaderWarningCount)
-                    toastService.Show(LocFormat("providers.headers.pending", provider.IncompleteHeaderCount), ToastLevel.Warning);
-                lastIncompleteHeaderWarningCount = provider.IncompleteHeaderCount;
-                logger?.LogWarning("Provider 保存完成但存在未完成请求头 {ProviderId} {IncompleteHeaderCount}", provider.BusinessId, provider.IncompleteHeaderCount);
+                var input = provider.ToInput();
+                var response = provider.Id == Guid.Empty ? await dataStore.CreateProviderAsync(input) : await dataStore.UpdateProviderAsync(provider.Id, input);
+                provider.ApplySaveResult(response, editRevision);
+                UpdateSummary();
+                if (provider.IncompleteHeaderCount > 0)
+                {
+                    SetStatus("providers.save.success.pendingHeaders", provider.IncompleteHeaderCount);
+                    if (provider.IncompleteHeaderCount > lastIncompleteHeaderWarningCount)
+                        toastService.Show(LocFormat("providers.headers.pending", provider.IncompleteHeaderCount), ToastLevel.Warning);
+                    lastIncompleteHeaderWarningCount = provider.IncompleteHeaderCount;
+                    logger?.LogWarning("Provider 保存完成但存在未完成请求头 {ProviderId} {IncompleteHeaderCount}", provider.BusinessId, provider.IncompleteHeaderCount);
+                }
+                else
+                {
+                    lastIncompleteHeaderWarningCount = 0;
+                    SetStatus("providers.save.success");
+                    logger?.LogInformation("Provider 保存完成 {ProviderId}", provider.BusinessId);
+                }
             }
-            else
+            catch (Exception exception) { logger?.LogError(exception, "Provider 保存失败 {ProviderId}", provider.BusinessId); SetStatus("providers.save.failure", exception.Message); }
+            finally
             {
-                lastIncompleteHeaderWarningCount = 0;
-                SetStatus("providers.save.success");
-                logger?.LogInformation("Provider 保存完成 {ProviderId}", provider.BusinessId);
+                suppressConfigurationRefresh = false;
             }
         }
-        catch (Exception exception) { logger?.LogError(exception, "Provider 保存失败 {ProviderId}", provider.BusinessId); SetStatus("providers.save.failure", exception.Message); }
-        finally { suppressConfigurationRefresh = false; }
+        finally { providerSaveLock.Release(); }
     }
 
     private async Task DeleteProviderAsync(ProviderEditorViewModel? provider = null)
@@ -1162,18 +1151,24 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private async Task SaveModelAsync(ProviderEditorViewModel? provider, ModelEditorViewModel? model)
     {
         if (provider is null || model is null) return;
-        if (!model.HasUnsavedChanges) return;
-        suppressConfigurationRefresh = true;
+        await modelSaveLock.WaitAsync();
         try
         {
-            var input = model.ToInput();
-            var response = model.Id == Guid.Empty ? await dataStore.CreateModelAsync(provider.Id, input) : await dataStore.UpdateModelAsync(model.Id, input);
-            if (!provider.Models.Contains(model)) provider.Models.Add(model);
-            model.ApplySaveResult(response);
-            SetStatus("providers.model.save.success");
+            if (!model.HasUnsavedChanges) return;
+            var editRevision = model.EditRevision;
+            suppressConfigurationRefresh = true;
+            try
+            {
+                var input = model.ToInput();
+                var response = model.Id == Guid.Empty ? await dataStore.CreateModelAsync(provider.Id, input) : await dataStore.UpdateModelAsync(model.Id, input);
+                if (!provider.Models.Contains(model)) provider.Models.Add(model);
+                model.ApplySaveResult(response, editRevision);
+                SetStatus("providers.model.save.success");
+            }
+            catch (Exception exception) { SetStatus("providers.model.save.failure", exception.Message); }
+            finally { suppressConfigurationRefresh = false; }
         }
-        catch (Exception exception) { SetStatus("providers.model.save.failure", exception.Message); }
-        finally { suppressConfigurationRefresh = false; }
+        finally { modelSaveLock.Release(); }
     }
 
     private Task DeleteModelAsync() => DeleteModelAsync(SelectedModel);
@@ -1299,7 +1294,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         modelSyncCancellation = requestCancellation;
         var token = requestCancellation.Token;
         // 同步会按响应重建模型行，先落库待存编辑
-        await modelAutoSaver.FlushAsync();
+        await SavePendingChangesAsync();
         SetStatus("providers.sync.running");
         IsModelSyncing = true;
         StartModelSyncAnimation();
@@ -1480,7 +1475,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         ClearModelDragState();
         RenumberModels(provider);
         // 排序保存前先落库待存的模型编辑，避免旧 SortOrder 回写
-        await modelAutoSaver.FlushAsync();
+        await SavePendingChangesAsync();
         suppressConfigurationRefresh = true;
         try
         {
@@ -1527,7 +1522,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         if (models.Length == 0) return;
         var enabled = !models.All(model => model.Enabled);
         // 先落库待存的编辑，再整体切换，避免覆盖
-        await modelAutoSaver.FlushAsync();
+        await SavePendingChangesAsync();
         suppressConfigurationRefresh = true;
         try
         {
@@ -1598,8 +1593,11 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             changedProvider.ResetHealthForConfigurationChange();
         UpdateSummary();
         // 行内编辑不改变列表成员，不再逐键触发 FilteredProviders 重算，避免 ListBox 每键重置。
-        if (!suppressConfigurationRefresh && sender is ProviderEditorViewModel provider && provider.HasUnsavedChanges)
-            QueueProviderAutoSave(provider);
+        if (!suppressConfigurationRefresh
+            && sender is ProviderEditorViewModel provider
+            && ProviderEditorViewModel.IsPersistedProperty(args.PropertyName)
+            && provider.HasUnsavedChanges)
+            _ = SaveProviderAsync(provider);
     }
     private void ProvidersChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
     {
@@ -1632,8 +1630,11 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             OnPropertyChanged(nameof(AllModelsEnabled));
             OnPropertyChanged(nameof(EnabledModelSummary));
         }
-        if (!suppressConfigurationRefresh && SelectedProvider is { } provider && model.HasUnsavedChanges)
-            QueueModelAutoSave(provider, model);
+        if (!suppressConfigurationRefresh
+            && SelectedProvider is { } provider
+            && ModelEditorViewModel.IsPersistedProperty(args.PropertyName)
+            && model.HasUnsavedChanges)
+            _ = SaveModelAsync(provider, model);
     }
 
     private void UpdateSummary()
@@ -1676,6 +1677,8 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     private DateTimeOffset? healthLastCheckedAt;
     private string? healthFailureCode;
     private bool isDirty;
+    private long editRevision;
+    private long savedEditRevision;
     private bool isModelDragPreviewOwner;
     private bool suppressDirtyTracking;
     private bool suppressCliIdentityVersionChange;
@@ -1685,7 +1688,7 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     public IReadOnlyList<EndpointFormatOption> EndpointFormatOptions { get; } = EndpointFormatOption.All;
     public EndpointFormatOption SelectedEndpointFormat { get => EndpointFormatOption.FromValue(EndpointFormat); set { if (value is not null) EndpointFormat = value.Value; } }
     public bool IsEndpointFormatVisible => string.Equals(ApiMode, "openai", StringComparison.OrdinalIgnoreCase);
-    public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set { if (SetProperty(ref apiKey, value)) apiKeyEdited = true; } } public bool IsApiKeyVisible { get => isApiKeyVisible; private set { if (SetProperty(ref isApiKeyVisible, value)) { OnPropertyChanged(nameof(IsApiKeyHidden)); OnPropertyChanged(nameof(ApiKeyPasswordChar)); OnPropertyChanged(nameof(ApiKeyVisibilityToolTip)); } } } public bool IsApiKeyHidden => !IsApiKeyVisible; public char ApiKeyPasswordChar => IsApiKeyVisible ? '\0' : '●'; public string ApiKeyVisibilityToolTip => IsApiKeyVisible ? ResourceLookup.Resolve("providers.apikey.visibility.hide") : ResourceLookup.Resolve("providers.apikey.visibility.show"); public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; } public string ApiKeyWatermark => HasApiKey ? ResourceLookup.Resolve("providers.apikey.configured") : ResourceLookup.Resolve("providers.apikey.watermark");
+    public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public bool UseProxy { get => useProxy; set => SetProperty(ref useProxy, value); } public string ApiKey { get => apiKey; set { if (string.Equals(apiKey, value, StringComparison.Ordinal)) return; apiKeyEdited = true; SetProperty(ref apiKey, value); } } public bool IsApiKeyVisible { get => isApiKeyVisible; private set { if (SetProperty(ref isApiKeyVisible, value)) { OnPropertyChanged(nameof(IsApiKeyHidden)); OnPropertyChanged(nameof(ApiKeyPasswordChar)); OnPropertyChanged(nameof(ApiKeyVisibilityToolTip)); } } } public bool IsApiKeyHidden => !IsApiKeyVisible; public char ApiKeyPasswordChar => IsApiKeyVisible ? '\0' : '●'; public string ApiKeyVisibilityToolTip => IsApiKeyVisible ? ResourceLookup.Resolve("providers.apikey.visibility.hide") : ResourceLookup.Resolve("providers.apikey.visibility.show"); public string HeadersJson { get => headersJson; private set => SetProperty(ref headersJson, value); } public bool HasApiKey { get; private set; } public string ApiKeyWatermark => HasApiKey ? ResourceLookup.Resolve("providers.apikey.configured") : ResourceLookup.Resolve("providers.apikey.watermark");
     public ProviderHealthState HealthState => healthState;
     public ProviderHealthFailureKind HealthFailureKind => healthFailureKind;
     public int? HealthStatusCode => healthStatusCode;
@@ -1726,7 +1729,8 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
         }
     }
     public string HealthTooltipText => $"{HealthStatusText} · {HealthDetailText}";
-    public bool HasUnsavedChanges => Id == Guid.Empty || isDirty;
+    internal long EditRevision => editRevision;
+    public bool HasUnsavedChanges => Id == Guid.Empty || isDirty || editRevision != savedEditRevision;
     public ObservableCollection<ModelEditorViewModel> Models { get; } = [];
     public bool IsModelDragPreviewOwner { get => isModelDragPreviewOwner; set => SetProperty(ref isModelDragPreviewOwner, value); }
     public bool HasModels => Models.Any(model => model.IsRealModel);
@@ -1784,9 +1788,10 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     {
         PropertyChanged += (_, args) =>
         {
-            if (!suppressDirtyTracking && IsPersistedProperty(args.PropertyName) && !isDirty)
+            if (!suppressDirtyTracking && IsPersistedProperty(args.PropertyName))
             {
                 isDirty = true;
+                editRevision++;
                 OnPropertyChanged(nameof(HasUnsavedChanges));
             }
         };
@@ -1848,32 +1853,39 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
                 isDirty = false;
                 OnPropertyChanged(nameof(HasUnsavedChanges));
             }
+            savedEditRevision = editRevision;
         }
     }
     public void ToggleApiKeyVisibility() => IsApiKeyVisible = !IsApiKeyVisible;
     /// <summary>自动保存成功后只回填服务端生成的标识与密钥状态，不重写用户正在编辑的文本，也不重建 Headers 行，避免打断输入。</summary>
-    public void ApplySaveResult(ProviderResponse response)
+    public void ApplySaveResult(ProviderResponse response, long? savedRevision = null)
     {
+        var currentRevision = editRevision;
+        var canApplySecret = savedRevision is null || savedRevision >= currentRevision;
         suppressDirtyTracking = true;
         try
         {
             Id = response.Id;
             HasApiKey = response.HasApiKey;
             OnPropertyChanged(nameof(ApiKeyWatermark));
-            if (response.ApiKey is not null || !response.HasApiKey)
+            if (canApplySecret && (response.ApiKey is not null || !response.HasApiKey))
                 SetApiKeyFromResponse(response.ApiKey ?? "");
-            else
+            else if (canApplySecret)
                 apiKeyEdited = false;
             LoadCliVersionsFromCache();
         }
         finally
         {
             suppressDirtyTracking = false;
-            if (isDirty)
+            var requestedRevision = savedRevision ?? editRevision;
+            var wasDirty = HasUnsavedChanges;
+            if (requestedRevision >= editRevision)
             {
                 isDirty = false;
-                OnPropertyChanged(nameof(HasUnsavedChanges));
+                savedEditRevision = editRevision;
             }
+            else savedEditRevision = Math.Max(savedEditRevision, requestedRevision);
+            if (wasDirty != HasUnsavedChanges) OnPropertyChanged(nameof(HasUnsavedChanges));
         }
     }
     public void AddHeader() => Headers.Add(new HeaderEditorViewModel());
@@ -1935,7 +1947,7 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
         return result;
     }
     private static bool IsIncomplete(HeaderEditorViewModel header) => string.IsNullOrWhiteSpace(header.Name) || string.IsNullOrWhiteSpace(header.Value);
-    private static bool IsPersistedProperty(string? propertyName) => propertyName is nameof(BusinessId) or nameof(DisplayName) or nameof(BaseUrl) or nameof(ModelListUrl) or nameof(ApiMode) or nameof(EndpointFormat) or nameof(Enabled) or nameof(UseProxy) or nameof(ApiKey) or nameof(HeadersJson) or nameof(Headers);
+    internal static bool IsPersistedProperty(string? propertyName) => propertyName is nameof(BusinessId) or nameof(DisplayName) or nameof(BaseUrl) or nameof(ModelListUrl) or nameof(ApiMode) or nameof(EndpointFormat) or nameof(Enabled) or nameof(UseProxy) or nameof(ApiKey) or nameof(HeadersJson) or nameof(Headers);
     internal static Dictionary<string, string>? ParseDictionary(string json) => string.IsNullOrWhiteSpace(json) ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(json);
 
     // ---------- CLI 身份模拟 ----------
@@ -2217,6 +2229,9 @@ public sealed class ModelEditorViewModel : NotifyViewModel
 {
     public Guid Id { get; set; } public string ProviderId { get; set; } = "";
     private bool isDirty;
+    private long editRevision;
+    private long savedEditRevision;
+    private bool suppressDirtyTracking;
     private bool isDragging;
     private bool isPlaceholder;
     private string modelId = ""; private string displayName = ""; private string family = "claude"; private string configId = ""; private string baseUrl = ""; private string apiMode = ""; private int contextLength = 128000; private int maxTokens = 4096; private bool vision; private double? temperature; private double? topP; private bool enabled = true; private string apiKey = ""; private bool clearApiKey; private string headersJson = "{}"; private string extraJson = "{}";
@@ -2225,11 +2240,17 @@ public sealed class ModelEditorViewModel : NotifyViewModel
     {
         PropertyChanged += (_, args) =>
         {
-            if (args.PropertyName is not nameof(HasApiKey) and not nameof(HasUnsavedChanges) and not nameof(SortOrder) and not nameof(IsDragging))
+            if (!suppressDirtyTracking && IsPersistedProperty(args.PropertyName))
+            {
                 isDirty = true;
+                editRevision++;
+                OnPropertyChanged(nameof(HasUnsavedChanges));
+            }
         };
     }
-    public bool HasUnsavedChanges => Id == Guid.Empty || isDirty;
+    internal static bool IsPersistedProperty(string? propertyName) => propertyName is nameof(ModelId) or nameof(DisplayName) or nameof(Family) or nameof(ConfigId) or nameof(BaseUrl) or nameof(ApiMode) or nameof(ContextLength) or nameof(MaxTokens) or nameof(Vision) or nameof(Temperature) or nameof(TopP) or nameof(Enabled) or nameof(ApiKey) or nameof(ClearApiKey) or nameof(HeadersJson) or nameof(ExtraJson);
+    internal long EditRevision => editRevision;
+    public bool HasUnsavedChanges => Id == Guid.Empty || isDirty || editRevision != savedEditRevision;
     public string ModelId { get => modelId; set => SetProperty(ref modelId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string Family { get => family; set => SetProperty(ref family, value); } public string ConfigId { get => configId; set => SetProperty(ref configId, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ApiMode { get => apiMode; set => SetProperty(ref apiMode, value); } public int ContextLength { get => contextLength; set => SetProperty(ref contextLength, value); } public int MaxTokens { get => maxTokens; set => SetProperty(ref maxTokens, value); } public bool Vision { get => vision; set => SetProperty(ref vision, value); } public double? Temperature { get => temperature; set => SetProperty(ref temperature, value); } public double? TopP { get => topP; set => SetProperty(ref topP, value); } public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); } public string ApiKey { get => apiKey; set => SetProperty(ref apiKey, value); } public bool ClearApiKey { get => clearApiKey; set => SetProperty(ref clearApiKey, value); } public string HeadersJson { get => headersJson; set => SetProperty(ref headersJson, value); } public string ExtraJson { get => extraJson; set => SetProperty(ref extraJson, value); } public bool HasApiKey { get; private set; }
     public string? OwnedBy { get => ownedBy; private set => SetProperty(ref ownedBy, value); }
     public string? RemoteFamily { get => remoteFamily; private set => SetProperty(ref remoteFamily, value); }
@@ -2253,23 +2274,36 @@ public sealed class ModelEditorViewModel : NotifyViewModel
     {
         var value = new ModelEditorViewModel { Id = response.Id, ProviderId = response.ProviderId, ModelId = response.ModelId, DisplayName = response.DisplayName, ConfigId = response.ConfigId ?? "", Family = response.Family, BaseUrl = response.BaseUrl ?? "", ApiMode = response.ApiMode ?? "", ContextLength = response.ContextLength, MaxTokens = response.MaxTokens, Vision = response.Vision, Temperature = response.Temperature, TopP = response.TopP, Enabled = response.Enabled, HasApiKey = response.HasApiKey, HeadersJson = response.HeadersJson, ExtraJson = response.ExtraJson, ownedBy = response.OwnedBy, remoteFamily = response.RemoteFamily, remoteContextLength = response.RemoteContextLength, remoteMaxTokens = response.RemoteMaxTokens, remoteVision = response.RemoteVision, sortOrder = response.SortOrder };
         value.isDirty = false;
+        value.savedEditRevision = value.editRevision;
         return value;
     }
     public static ModelEditorViewModel CreatePlaceholder() => new() { IsPlaceholder = true };
     /// <summary>自动保存成功后只回填服务端标识与远程元数据，不重写用户正在编辑的文本。</summary>
-    internal void ApplySaveResult(ModelResponse response)
+    internal void ApplySaveResult(ModelResponse response, long? savedRevision = null)
     {
-        Id = response.Id;
-        ProviderId = response.ProviderId;
-        HasApiKey = response.HasApiKey;
-        OwnedBy = response.OwnedBy;
-        RemoteFamily = response.RemoteFamily;
-        RemoteContextLength = response.RemoteContextLength;
-        RemoteMaxTokens = response.RemoteMaxTokens;
-        RemoteVision = response.RemoteVision;
-        SortOrder = response.SortOrder;
-        isDirty = false;
-        OnPropertyChanged(nameof(HasUnsavedChanges));
+        suppressDirtyTracking = true;
+        try
+        {
+            Id = response.Id;
+            ProviderId = response.ProviderId;
+            HasApiKey = response.HasApiKey;
+            OwnedBy = response.OwnedBy;
+            RemoteFamily = response.RemoteFamily;
+            RemoteContextLength = response.RemoteContextLength;
+            RemoteMaxTokens = response.RemoteMaxTokens;
+            RemoteVision = response.RemoteVision;
+            SortOrder = response.SortOrder;
+        }
+        finally { suppressDirtyTracking = false; }
+        var requestedRevision = savedRevision ?? editRevision;
+        var wasDirty = HasUnsavedChanges;
+        if (requestedRevision >= editRevision)
+        {
+            isDirty = false;
+            savedEditRevision = editRevision;
+        }
+        else savedEditRevision = Math.Max(savedEditRevision, requestedRevision);
+        if (wasDirty != HasUnsavedChanges) OnPropertyChanged(nameof(HasUnsavedChanges));
     }
     public ModelInput ToInput() => new(ModelId, DisplayName, string.IsNullOrWhiteSpace(ConfigId) ? null : ConfigId, Family, string.IsNullOrWhiteSpace(BaseUrl) ? null : BaseUrl, string.IsNullOrWhiteSpace(ApiMode) ? null : ApiMode, ContextLength, MaxTokens, Vision, Temperature, TopP, Enabled, string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey, ClearApiKey, ProviderEditorViewModel.ParseDictionary(HeadersJson), JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ExtraJson), OwnedBy, RemoteFamily, RemoteContextLength, RemoteMaxTokens, RemoteVision, SortOrder);
     internal static ModelInput CreateRemoteInput(string apiMode, ProvidersViewModel.RemoteModelDescriptor descriptor) => new(descriptor.ModelId, descriptor.ModelId, null, descriptor.Family ?? "unknown", null, apiMode, descriptor.ContextLength ?? 128000, descriptor.MaxTokens ?? 4096, descriptor.Vision ?? false, null, null, true, null, false, null, null, descriptor.OwnedBy, descriptor.Family, descriptor.ContextLength, descriptor.MaxTokens, descriptor.Vision);

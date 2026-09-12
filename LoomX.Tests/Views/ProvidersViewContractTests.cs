@@ -156,7 +156,7 @@ public sealed class ProvidersViewContractTests
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
         var source = File.ReadAllText(path);
 
-        Assert.Contains("public bool HasUnsavedChanges => Id == Guid.Empty || isDirty;", source, StringComparison.Ordinal);
+        Assert.Contains("public bool HasUnsavedChanges => Id == Guid.Empty || isDirty || editRevision != savedEditRevision;", source, StringComparison.Ordinal);
         Assert.Contains("if (!provider.HasUnsavedChanges) return;", source, StringComparison.Ordinal);
         Assert.Contains("if (!model.HasUnsavedChanges) return;", source, StringComparison.Ordinal);
     }
@@ -180,11 +180,14 @@ public sealed class ProvidersViewContractTests
         Assert.DoesNotContain("ModelEditorToggle_OnClick", codeBehindSource, StringComparison.Ordinal);
         Assert.Contains("provider.PropertyChanged += ProviderChanged;", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("model.PropertyChanged += ModelChanged;", viewModelSource, StringComparison.Ordinal);
-        // 防抖与串行化由共享的 DebouncedAutoSaver 承担，保存动作扫描全部未保存项，避免切换编辑对象时丢保存。
-        Assert.Contains("providerAutoSaver = new DebouncedAutoSaver(SaveDirtyProvidersAsync, logger: logger);", viewModelSource, StringComparison.Ordinal);
-        Assert.Contains("modelAutoSaver = new DebouncedAutoSaver(SaveDirtyModelsAsync, logger: logger);", viewModelSource, StringComparison.Ordinal);
-        Assert.Contains("QueueProviderAutoSave(provider)", viewModelSource, StringComparison.Ordinal);
-        Assert.Contains("QueueModelAutoSave(provider, model)", viewModelSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("DebouncedAutoSaver", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("private readonly SemaphoreSlim providerSaveLock", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("private readonly SemaphoreSlim modelSaveLock", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("_ = SaveProviderAsync(provider);", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("_ = SaveModelAsync(provider, model);", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("ProviderEditorViewModel.IsPersistedProperty(args.PropertyName)", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("ModelEditorViewModel.IsPersistedProperty(args.PropertyName)", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("UpdateSourceTrigger=PropertyChanged", viewSource, StringComparison.Ordinal);
     }
 
     [Fact]

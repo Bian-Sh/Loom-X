@@ -118,6 +118,17 @@ public sealed class GatewayViewContractTests
     }
 
     [Fact]
+    public void ComboNameUpdatesSourceBeforeEditCompletedSave()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+        var codeBehindSource = ReadDesktopFile("Views", "GatewayView.axaml.cs");
+
+        Assert.Contains("Text=\"{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", source, StringComparison.Ordinal);
+        Assert.Contains("LostFocus=\"ComboName_OnLostFocus\"", source, StringComparison.Ordinal);
+        Assert.Contains("await viewModel.SaveComboChangesAsync(combo)", codeBehindSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GatewaySeparatesEndpointBindingsFromGlobalComboEditor()
     {
         var source = ReadDesktopFile("Views", "GatewayView.axaml");

@@ -12,6 +12,19 @@ namespace LoomX.Tests.Views;
 public sealed class SettingsViewContractTests
 {
     [Fact]
+    public void EditableSettingsUseImmediateSourceUpdatesAndDirectSaveEvents()
+    {
+        var viewSource = ReadDesktopFile("Views", "SettingsView.axaml");
+        var viewModelSource = ReadDesktopFile("ViewModels", "SettingsViewModel.cs");
+
+        Assert.Contains("Text=\"{Binding ProxyHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ProxyPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", viewSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("DebouncedAutoSaver", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("private readonly SemaphoreSlim saveLock", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("private void SaveAfterEdit()", viewModelSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void AppearanceValuesUseIntegerSlidersWithStableReadouts()
     {
         var source = ReadDesktopFile("Views", "SettingsView.axaml");
