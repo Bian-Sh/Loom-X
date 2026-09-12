@@ -147,6 +147,7 @@ public sealed class ConfigSnapshotService : IDisposable
             .Select(model => new GatewayModelSourceResponse(model.Id, model.DisplayName, model.Provider.DisplayName))
             .ToArrayAsync(cancellationToken);
     }
+    public Task<IReadOnlyList<GatewayRouteResponse>> ListRoutesForModelAsync(Guid modelId, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.ListRoutesForModelAsync(modelId, token), cancellationToken);
     public Task<IReadOnlyList<GatewayEndpointResponse>> ListGatewayEndpointsAsync(CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.ListGatewayEndpointsAsync(token), cancellationToken);
     public Task<IReadOnlyList<GatewayComboResponse>> ListGatewayCombosAsync(CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.ListGatewayCombosAsync(token), cancellationToken);
     public Task<GatewayEndpointResponse> SetGatewayEndpointEnabledAsync(string key, bool enabled, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.SetGatewayEndpointEnabledAsync(key, enabled, token), cancellationToken);
@@ -169,8 +170,8 @@ public sealed class ConfigSnapshotService : IDisposable
         {
             await using var db = CreateContext();
             var provider = new DatabaseConfigurationProvider(db, CreateProviderLogger());
-            await provider.ReloadAsync(cancellationToken);
-            var service = new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider);
+            // 桌面保存完成后由 AppDataStore 做局部快照与运行时投影更新；管理写入不再预先读取整套配置。
+            var service = new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider, reloadProviderAfterWrite: false);
             var result = await operation(service, cancellationToken);
             return result;
         }

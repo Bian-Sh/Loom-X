@@ -1,0 +1,13 @@
+{
+  "change": "incremental-config-edit",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "8cbb0ca304c523696950d1112bebe88139d2c87b1d73beadbaee06e464b73918",
+  "files": [
+    { "path": "openspec/changes/incremental-config-edit/proposal.md", "sha256": "e3a318ec0c3c13e1dd6c350724c313d019dbd72c9aa2e41b600e209aae20bd2f" },
+    { "path": "openspec/changes/incremental-config-edit/design.md", "sha256": "1fb0eaef2353d0ea32d1879e8daf1faa226a7111381388d23c89db70f407e158" },
+    { "path": "openspec/changes/incremental-config-edit/tasks.md", "sha256": "78dae1c91f2112b59ad70fe842397b33c2ec743b270257433d6024a3e9e44964" }
+  ]
+}

@@ -1,3 +1,11 @@
+---
+comet_change: incremental-config-edit
+role: technical-design
+canonical_spec: openspec
+language: zh-CN
+status: draft
+---
+
 # LoomX 配置控件增量保存与定向通知设计
 
 ## 背景与范围

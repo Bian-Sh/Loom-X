@@ -171,6 +171,8 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private void OnConfigurationChanged(object? sender, ConfigurationChangedEventArgs args)
     {
         if (args.Source == ConfigurationChangeSource.LocalSave && args.Kind != ConfigurationChangeKind.Settings) return;
+        // 外观属性变更已经在 Settings 页即时预览，保存事件不重复应用窗口效果。
+        if (args.Source == ConfigurationChangeSource.LocalSave) return;
         void Apply()
         {
             if (dataStore.Settings is { } settings)
@@ -532,6 +534,8 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         if (refreshInProgress) return;
         if (args.Source == ConfigurationChangeSource.LocalSave)
         {
+            if (args.Kind == ConfigurationChangeKind.Settings) return;
+            if (!AffectsOverviewTopology(args)) return;
             // 本机编辑保存已由数据中心更新快照，直接应用即可，避免再次全量刷新形成事件回声。
             if (Dispatcher.UIThread.CheckAccess()) ApplyConfigSnapshot();
             else Dispatcher.UIThread.Post(ApplyConfigSnapshot);
@@ -539,6 +543,20 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         }
         if (Dispatcher.UIThread.CheckAccess()) _ = RefreshAsync();
         else Dispatcher.UIThread.Post(() => { if (!refreshInProgress) _ = RefreshAsync(); });
+    }
+
+    private static bool AffectsOverviewTopology(ConfigurationChangedEventArgs args)
+    {
+        if (args.Fields == ConfigurationChangeFields.None) return args.Kind != ConfigurationChangeKind.Settings;
+        return args.Kind switch
+        {
+            ConfigurationChangeKind.Provider => args.Fields.HasFlag(ConfigurationChangeFields.ProviderIdentity) || args.Fields.HasFlag(ConfigurationChangeFields.ProviderAvailability),
+            ConfigurationChangeKind.Model => args.Fields.HasFlag(ConfigurationChangeFields.ModelIdentity) || args.Fields.HasFlag(ConfigurationChangeFields.ModelAvailability) || args.Fields.HasFlag(ConfigurationChangeFields.ModelMetadata),
+            ConfigurationChangeKind.GatewayEndpoint => args.Fields.HasFlag(ConfigurationChangeFields.EndpointAvailability) || args.Fields.HasFlag(ConfigurationChangeFields.EndpointBindings),
+            ConfigurationChangeKind.GatewayCombo => args.Fields.HasFlag(ConfigurationChangeFields.ComboIdentity) || args.Fields.HasFlag(ConfigurationChangeFields.ComboAvailability) || args.Fields.HasFlag(ConfigurationChangeFields.ComboOrder),
+            ConfigurationChangeKind.GatewayRoute => true,
+            _ => false
+        };
     }
 
     private void OnGatewayStateChanged(object? sender, EventArgs args)
@@ -2259,6 +2277,7 @@ public sealed class ModelEditorViewModel : NotifyViewModel
             }
         };
     }
+
     internal static bool IsPersistedProperty(string? propertyName) => propertyName is nameof(ModelId) or nameof(DisplayName) or nameof(Family) or nameof(ConfigId) or nameof(BaseUrl) or nameof(ApiMode) or nameof(ContextLength) or nameof(MaxTokens) or nameof(Vision) or nameof(Temperature) or nameof(TopP) or nameof(Enabled) or nameof(ApiKey) or nameof(ClearApiKey) or nameof(HeadersJson) or nameof(ExtraJson);
     internal long EditRevision => editRevision;
     public bool HasUnsavedChanges => Id == Guid.Empty || isDirty || editRevision != savedEditRevision;

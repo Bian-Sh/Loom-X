@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using LoomX.Configuration;
+using LoomX.Services;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
@@ -245,5 +246,7 @@ public sealed class DiagnosticSubagent
         public ResolvedModelConfig? FindModel(string? modelName) => null;
 
         public Task ReloadAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+        public Task ApplyLocalChangeAsync(ConfigurationChangedEventArgs change, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

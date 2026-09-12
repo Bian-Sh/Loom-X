@@ -151,7 +151,8 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
 
     private void OnConfigurationChanged(object? sender, ConfigurationChangedEventArgs args)
     {
-        if (args.Source == ConfigurationChangeSource.LocalSave && args.Kind == ConfigurationChangeKind.Model)
+        if (args.Source == ConfigurationChangeSource.LocalSave && args.Kind == ConfigurationChangeKind.Model
+            && (args.Fields == ConfigurationChangeFields.None || args.Fields.HasFlag(ConfigurationChangeFields.ModelIdentity) || args.Fields.HasFlag(ConfigurationChangeFields.ModelAvailability)))
         {
             void ApplyModelSnapshot()
             {
@@ -162,6 +163,22 @@ public sealed class GatewayViewModel : NotifyViewModel, IDisposable
             else Dispatcher.UIThread.Post(ApplyModelSnapshot);
             return;
         }
+
+        if (args.Source == ConfigurationChangeSource.LocalSave && args.Kind == ConfigurationChangeKind.Provider
+            && (args.Fields == ConfigurationChangeFields.None || args.Fields.HasFlag(ConfigurationChangeFields.ProviderIdentity) || args.Fields.HasFlag(ConfigurationChangeFields.ProviderAvailability)))
+        {
+            void ApplyProviderSnapshot()
+            {
+                ReloadAvailableModelsFromSnapshot();
+                FilterModels(modelSearchTerm);
+            }
+            if (Dispatcher.UIThread.CheckAccess()) ApplyProviderSnapshot();
+            else Dispatcher.UIThread.Post(ApplyProviderSnapshot);
+            return;
+        }
+
+        // 本页的 Endpoint、Combo、Route 保存已经在对应编辑器中回填结果；事件只用于其它页面的快照同步，不能再次触发整页刷新。
+        if (args.Source == ConfigurationChangeSource.LocalSave) return;
 
         if (gatewayMutationDepth > 0 || isRefreshing)
         {

@@ -72,6 +72,8 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private bool hasProxyPassword;
     private bool suppressAutoSave;
     private readonly SemaphoreSlim saveLock = new(1, 1);
+    private readonly object saveScheduleLock = new();
+    private CancellationTokenSource? saveDebounceCancellation;
 
     public static IReadOnlyList<SettingOption> LanguageOptions { get; } =
     [
@@ -255,7 +257,33 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private void SaveAfterEdit()
     {
         if (suppressAutoSave) return;
-        _ = SaveAsync();
+        CancellationTokenSource cancellation;
+        lock (saveScheduleLock)
+        {
+            saveDebounceCancellation?.Cancel();
+            saveDebounceCancellation?.Dispose();
+            cancellation = new CancellationTokenSource();
+            saveDebounceCancellation = cancellation;
+        }
+        _ = SaveAfterDelayAsync(cancellation);
+    }
+
+    private async Task SaveAfterDelayAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            await Task.Delay(150, cancellation.Token);
+            await SaveAsync();
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
+        finally
+        {
+            lock (saveScheduleLock)
+            {
+                if (ReferenceEquals(saveDebounceCancellation, cancellation)) saveDebounceCancellation = null;
+            }
+            cancellation.Dispose();
+        }
     }
 
     private async Task TestProxyAsync()
@@ -380,6 +408,11 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
         LocaleService.CultureChanged -= OnCultureChanged;
         // 尽力把待存的设置在退出前落库；属性变更本身已按事件串行保存。
+        lock (saveScheduleLock)
+        {
+            saveDebounceCancellation?.Cancel();
+            saveDebounceCancellation = null;
+        }
         _ = SaveAsync();
         if (ownsUpdateCoordinator) updateCoordinator.Dispose();
     }

@@ -130,6 +130,37 @@ public sealed class AppDataStoreTests
     }
 
     [Fact]
+    public async Task SettingsFieldWriteDoesNotReloadTheFullConfiguration()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            var logger = new RecordingLogger<ConfigSnapshotService>();
+            using var configService = new ConfigSnapshotService(configPath, logger);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            await store.InitializeAsync();
+            logger.Messages.Clear();
+            var events = new List<ConfigurationChangedEventArgs>();
+            store.ConfigurationChanged += (_, args) => events.Add(args);
+
+            var current = store.Settings!;
+            var changed = current with { DiagnosticsEnabled = !current.DiagnosticsEnabled };
+            await store.UpdateSettingsAsync(new AppSettingsInput(changed.Language, changed.Theme, changed.ProxyMode, changed.ProxyHost, changed.ProxyPort, changed.ProxyUsername, null, false, changed.AutoCheckUpdates, changed.UpdateChannel, changed.DiagnosticsEnabled, changed.LogRetentionDays, changed.LogStackTrace, changed.TransparencyEnabled, changed.TransparencyOpacity, changed.BlurAmount, changed.TransparencyAlgorithm, changed.UseProxyForUpdates));
+
+            var change = Assert.Single(events);
+            Assert.Equal(ConfigurationChangeKind.Settings, change.Kind);
+            Assert.True(change.Fields.HasFlag(ConfigurationChangeFields.DiagnosticsEnabled));
+            Assert.DoesNotContain(logger.Messages, message => message.Contains("数据库配置重载", StringComparison.Ordinal));
+            Assert.DoesNotContain(logger.Messages, message => message.Contains("配置快照同步读取", StringComparison.Ordinal));
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
     public async Task ModelEnabledUpdatePreservesUnrelatedDesktopSnapshots()
     {
         var directory = CreateDirectory();
@@ -193,6 +224,64 @@ public sealed class AppDataStoreTests
             await store.UpdateModelEnabledAsync(model.Id, true);
 
             Assert.Contains(store.CurrentConfig.Models, item => item.ModelId == model.ModelId && item.ProviderId == provider.BusinessId);
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
+    public async Task ReenablingModelRestoresItsExistingGatewayRoutesFromTargetedRead()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            await store.InitializeAsync();
+            var provider = await store.CreateProviderAsync(new ProviderInput("route-provider", "Route Provider", "https://example.com", "openai", true, null, false, null));
+            var model = await store.CreateModelAsync(provider.Id, new ModelInput("route-model", "Route Model", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+            var combo = await store.CreateGatewayComboAsync(new GatewayComboInput("route-combo", true, 0));
+            await store.CreateGatewayRouteAsync(combo.Id, new GatewayRouteInput(model.Id, true, 0));
+
+            await store.UpdateModelEnabledAsync(model.Id, false);
+            Assert.Empty(store.CurrentConfig.GatewayCombos.Single(item => item.Id == combo.Id).Routes);
+            await store.UpdateModelEnabledAsync(model.Id, true);
+
+            Assert.Contains(store.CurrentConfig.GatewayCombos.Single(item => item.Id == combo.Id).Routes, item => item.Model.ModelId == model.ModelId);
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
+    public async Task ProviderAndGatewayFieldWritesAvoidFullSnapshotReloads()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            var logger = new RecordingLogger<ConfigSnapshotService>();
+            using var configService = new ConfigSnapshotService(configPath, logger);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            await store.InitializeAsync();
+            var provider = await store.CreateProviderAsync(new ProviderInput("field-provider", "Field Provider", "https://example.com", "openai", true, null, false, null));
+            var model = await store.CreateModelAsync(provider.Id, new ModelInput("field-model", "Field Model", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+            var combo = await store.CreateGatewayComboAsync(new GatewayComboInput("field-combo", true, 0));
+            var route = await store.CreateGatewayRouteAsync(combo.Id, new GatewayRouteInput(model.Id, true, 0));
+            logger.Messages.Clear();
+
+            await store.UpdateProviderAsync(provider.Id, new ProviderInput(provider.BusinessId, provider.DisplayName, provider.BaseUrl, provider.ApiMode, false, null, false, null));
+            await store.SetGatewayEndpointEnabledAsync("openai", false);
+            await store.UpdateGatewayComboAsync(combo.Id, new GatewayComboInput(combo.Name, false, combo.SortOrder));
+            await store.UpdateGatewayRouteAsync(route.Id, new GatewayRouteInput(route.ModelId, false, route.SortOrder));
+
+            Assert.DoesNotContain(logger.Messages, message => message.Contains("数据库配置重载", StringComparison.Ordinal));
+            Assert.DoesNotContain(logger.Messages, message => message.Contains("配置快照同步读取", StringComparison.Ordinal));
         }
         finally { DeleteDirectory(directory); }
     }

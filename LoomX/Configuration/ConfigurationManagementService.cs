@@ -31,7 +31,10 @@ internal static class AppearanceSettingsLimits
     public static int NormalizeBlurAmount(int value) => Math.Clamp(value, MinimumBlurAmount, MaximumBlurAmount);
 }
 
-public sealed class ConfigurationManagementService(IDbContextFactory<ConfigurationDbContext> dbContextFactory, IDatabaseConfigurationProvider configurationProvider)
+public sealed class ConfigurationManagementService(
+    IDbContextFactory<ConfigurationDbContext> dbContextFactory,
+    IDatabaseConfigurationProvider configurationProvider,
+    bool reloadProviderAfterWrite = true)
 {
     public async Task<IReadOnlyList<ProviderResponse>> ListProvidersAsync(CancellationToken cancellationToken = default)
     {
@@ -53,6 +56,16 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
             .ThenBy(model => model.ModelId)
             .Select(model => new GatewayModelSourceResponse(model.Id, model.DisplayName, model.Provider.DisplayName))
             .ToArrayAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<GatewayRouteResponse>> ListRoutesForModelAsync(Guid modelId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var routes = await db.GatewayRoutes.AsNoTracking()
+            .Include(item => item.Model).ThenInclude(item => item.Provider)
+            .Where(item => item.ModelId == modelId)
+            .ToArrayAsync(cancellationToken);
+        return routes.Select(ToGatewayRouteResponse).ToArray();
     }
 
     public async Task<AppSettingsResponse> GetSettingsAsync(CancellationToken cancellationToken = default)
@@ -86,7 +99,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         settings.BlurAmount = AppearanceSettingsLimits.NormalizeBlurAmount(input.BlurAmount);
         settings.TransparencyAlgorithm = NormalizeTransparencyAlgorithm(input.TransparencyAlgorithm);
         await db.SaveChangesAsync(cancellationToken);
-        await configurationProvider.ReloadAsync(cancellationToken);
+        await ReloadProviderAsync(cancellationToken);
         return ToResponse(settings);
     }
 
@@ -99,7 +112,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         provider.ProtectedApiKey = ProtectApiKey(input.ApiKey);
         db.Providers.Add(provider);
         await db.SaveChangesAsync(cancellationToken);
-        await configurationProvider.ReloadAsync(cancellationToken);
+        await ReloadProviderAsync(cancellationToken);
         return ToResponse(provider);
     }
 
@@ -112,7 +125,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         provider.BusinessId = input.BusinessId.Trim(); provider.DisplayName = input.DisplayName.Trim(); provider.BaseUrl = NormalizeUrl(input.BaseUrl); provider.ModelListUrl = NormalizeOptionalModelListUrl(input.ModelListUrl); provider.ApiMode = NormalizeProviderMode(input.ApiMode); provider.EndpointFormat = NormalizeEndpointFormat(input.EndpointFormat); provider.Enabled = input.Enabled; provider.UseProxy = input.UseProxy; provider.HeadersJson = Serialize(input.Headers);
         ApplyApiKey(provider, input.ApiKey, input.ClearApiKey);
         await db.SaveChangesAsync(cancellationToken);
-        await configurationProvider.ReloadAsync(cancellationToken);
+        await ReloadProviderAsync(cancellationToken);
         return ToResponse(provider);
     }
 
@@ -121,7 +134,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var provider = await db.Providers.Include(item => item.Models).SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("Provider 不存在。");
         if (provider.Models.Count > 0) throw new InvalidOperationException("Provider 仍被模型引用，请先删除模型。");
-        db.Providers.Remove(provider); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
+        db.Providers.Remove(provider); await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken);
     }
 
     public async Task<ModelResponse> CreateModelAsync(Guid providerId, ModelInput input, CancellationToken cancellationToken = default)
@@ -132,7 +145,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         if (await db.Models.AnyAsync(model => model.ProviderId == providerId && model.ModelId == input.ModelId.Trim(), cancellationToken)) throw new InvalidOperationException("Model ID 已存在。");
         var nextSortOrder = (await db.Models.Where(item => item.ProviderId == providerId).Select(item => (int?)item.SortOrder).MaxAsync(cancellationToken) ?? -1) + 1;
         var model = new ModelEntity { ProviderId = providerId, ModelId = input.ModelId.Trim(), DisplayName = input.DisplayName.Trim(), ConfigId = input.ConfigId?.Trim(), Family = input.Family.Trim(), BaseUrl = NormalizeOptionalUrl(input.BaseUrl), ApiMode = NormalizeOptionalModes(input.ApiMode), ContextLength = input.ContextLength, MaxTokens = input.MaxTokens, Vision = input.Vision, Temperature = input.Temperature, TopP = input.TopP, Enabled = input.Enabled, HeadersJson = Serialize(input.Headers), ExtraJson = Serialize(input.Extra), OwnedBy = NormalizeOptionalText(input.OwnedBy), RemoteFamily = NormalizeOptionalText(input.RemoteFamily), RemoteContextLength = input.RemoteContextLength, RemoteMaxTokens = input.RemoteMaxTokens, RemoteVision = input.RemoteVision, SortOrder = input.SortOrder ?? nextSortOrder };
-        model.ProtectedApiKey = ProtectApiKey(input.ApiKey); db.Models.Add(model); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToResponse(provider, model);
+        model.ProtectedApiKey = ProtectApiKey(input.ApiKey); db.Models.Add(model); await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken); return ToResponse(provider, model);
     }
 
     public async Task<ModelResponse> UpdateModelAsync(Guid id, ModelInput input, CancellationToken cancellationToken = default)
@@ -141,7 +154,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var model = await db.Models.Include(item => item.Provider).SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("Model 不存在。");
         if (await db.Models.AnyAsync(item => item.Id != id && item.ProviderId == model.ProviderId && item.ModelId == input.ModelId.Trim(), cancellationToken)) throw new InvalidOperationException("Model ID 已存在。");
-        model.ModelId = input.ModelId.Trim(); model.DisplayName = input.DisplayName.Trim(); model.ConfigId = input.ConfigId?.Trim(); model.Family = input.Family.Trim(); model.BaseUrl = NormalizeOptionalUrl(input.BaseUrl); model.ApiMode = NormalizeOptionalModes(input.ApiMode); model.ContextLength = input.ContextLength; model.MaxTokens = input.MaxTokens; model.Vision = input.Vision; model.Temperature = input.Temperature; model.TopP = input.TopP; model.Enabled = input.Enabled; model.HeadersJson = Serialize(input.Headers); model.ExtraJson = Serialize(input.Extra); model.OwnedBy = NormalizeOptionalText(input.OwnedBy); model.RemoteFamily = NormalizeOptionalText(input.RemoteFamily); model.RemoteContextLength = input.RemoteContextLength; model.RemoteMaxTokens = input.RemoteMaxTokens; model.RemoteVision = input.RemoteVision; if (input.SortOrder is int sortOrder) model.SortOrder = sortOrder; ApplyApiKey(model, input.ApiKey, input.ClearApiKey); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToResponse(model.Provider, model);
+        model.ModelId = input.ModelId.Trim(); model.DisplayName = input.DisplayName.Trim(); model.ConfigId = input.ConfigId?.Trim(); model.Family = input.Family.Trim(); model.BaseUrl = NormalizeOptionalUrl(input.BaseUrl); model.ApiMode = NormalizeOptionalModes(input.ApiMode); model.ContextLength = input.ContextLength; model.MaxTokens = input.MaxTokens; model.Vision = input.Vision; model.Temperature = input.Temperature; model.TopP = input.TopP; model.Enabled = input.Enabled; model.HeadersJson = Serialize(input.Headers); model.ExtraJson = Serialize(input.Extra); model.OwnedBy = NormalizeOptionalText(input.OwnedBy); model.RemoteFamily = NormalizeOptionalText(input.RemoteFamily); model.RemoteContextLength = input.RemoteContextLength; model.RemoteMaxTokens = input.RemoteMaxTokens; model.RemoteVision = input.RemoteVision; if (input.SortOrder is int sortOrder) model.SortOrder = sortOrder; ApplyApiKey(model, input.ApiKey, input.ClearApiKey); await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken); return ToResponse(model.Provider, model);
     }
 
     public async Task<IReadOnlyList<ModelResponse>> UpdateModelOrderAsync(Guid providerId, ModelOrderInput input, CancellationToken cancellationToken = default)
@@ -155,7 +168,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
             if (byId.TryGetValue(id, out var model)) model.SortOrder = order++;
         foreach (var model in models.Where(item => !requested.Contains(item.Id)).OrderBy(item => item.SortOrder).ThenBy(item => item.ModelId, StringComparer.OrdinalIgnoreCase)) model.SortOrder = order++;
         await db.SaveChangesAsync(cancellationToken);
-        await configurationProvider.ReloadAsync(cancellationToken);
+        await ReloadProviderAsync(cancellationToken);
         var provider = await db.Providers.AsNoTracking().SingleAsync(item => item.Id == providerId, cancellationToken);
         return models.OrderBy(item => item.SortOrder).Select(model => ToResponse(provider, model)).ToArray();
     }
@@ -165,7 +178,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var model = await db.Models.SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("Model 不存在。");
         if (await db.GatewayRoutes.AnyAsync(item => item.ModelId == id, cancellationToken)) throw new InvalidOperationException("模型仍被网关路由引用，请先从 Combo 中移除模型。");
-        db.Models.Remove(model); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
+        db.Models.Remove(model); await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<GatewayEndpointResponse>> ListGatewayEndpointsAsync(CancellationToken cancellationToken = default)
@@ -194,7 +207,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var endpoint = await LoadEndpointAsync(db, key, cancellationToken) ?? throw new KeyNotFoundException("Endpoint 不存在。");
-        endpoint.Enabled = enabled; await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToGatewayResponse(endpoint);
+        endpoint.Enabled = enabled; await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken); return ToGatewayResponse(endpoint);
     }
 
     public async Task<GatewayEndpointResponse> RotateGatewayApiKeyAsync(string key, CancellationToken cancellationToken = default)
@@ -204,7 +217,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         var endpoint = await LoadEndpointAsync(db, key, cancellationToken) ?? throw new KeyNotFoundException("Endpoint 不存在。");
         endpoint.ProtectedApiKey = ProtectedApiKeyStore.Protect(GatewayEndpointSettings.GenerateApiKey());
         await db.SaveChangesAsync(cancellationToken);
-        await configurationProvider.ReloadAsync(cancellationToken);
+        await ReloadProviderAsync(cancellationToken);
         return ToGatewayResponse(endpoint);
     }
 
@@ -217,7 +230,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         if (!string.Equals(value?.Trim(), normalized, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("Reasoning effort 仅支持 minimal、low、medium 或 high。");
         endpoint.ReasoningEffort = normalized;
         await db.SaveChangesAsync(cancellationToken);
-        await configurationProvider.ReloadAsync(cancellationToken);
+        await ReloadProviderAsync(cancellationToken);
         return ToGatewayResponse(endpoint);
     }
 
@@ -247,7 +260,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         }
 
         await db.SaveChangesAsync(cancellationToken);
-        await configurationProvider.ReloadAsync(cancellationToken);
+        await ReloadProviderAsync(cancellationToken);
         var result = await LoadEndpointAsync(db, endpointKey, cancellationToken) ?? throw new KeyNotFoundException("Endpoint 不存在。");
         return ToGatewayResponse(result);
     }
@@ -258,7 +271,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         var name = NormalizeComboName(input.Name);
         if (await db.GatewayCombos.AnyAsync(item => item.Name == name, cancellationToken)) throw new InvalidOperationException("Combo 模型名已存在。");
         var combo = new GatewayComboEntity { Name = name, Enabled = input.Enabled, SortOrder = input.SortOrder };
-        db.GatewayCombos.Add(combo); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
+        db.GatewayCombos.Add(combo); await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken);
         var result = await LoadComboAsync(db, combo.Id, cancellationToken) ?? throw new KeyNotFoundException("Combo 模型不存在。");
         return ToGatewayComboResponse(result);
     }
@@ -270,7 +283,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         var name = NormalizeComboName(input.Name);
         if (await db.GatewayCombos.AnyAsync(item => item.Id != id && item.Name == name, cancellationToken)) throw new InvalidOperationException("Combo 模型名已存在。");
         combo.Name = name; combo.Enabled = input.Enabled; combo.SortOrder = input.SortOrder;
-        await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
+        await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken);
         var result = await LoadComboAsync(db, id, cancellationToken) ?? throw new KeyNotFoundException("Combo 模型不存在。");
         return ToGatewayComboResponse(result);
     }
@@ -279,7 +292,7 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var combo = await db.GatewayCombos.SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("Combo 模型不存在。");
-        db.GatewayCombos.Remove(combo); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
+        db.GatewayCombos.Remove(combo); await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken);
     }
 
     public async Task<GatewayRouteResponse> CreateGatewayRouteAsync(Guid comboId, GatewayRouteInput input, CancellationToken cancellationToken = default)
@@ -289,20 +302,23 @@ public sealed class ConfigurationManagementService(IDbContextFactory<Configurati
         var model = await db.Models.Include(item => item.Provider).SingleOrDefaultAsync(item => item.Id == input.ModelId, cancellationToken) ?? throw new KeyNotFoundException("模型不存在。");
         if (await db.GatewayRoutes.AnyAsync(item => item.ComboId == comboId && item.ModelId == input.ModelId, cancellationToken)) throw new InvalidOperationException("模型已在当前 Combo 中。");
         var route = new GatewayRouteEntity { ComboId = comboId, ModelId = input.ModelId, Enabled = input.Enabled, SortOrder = input.SortOrder };
-        db.GatewayRoutes.Add(route); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); route.Model = model; return ToGatewayRouteResponse(route);
+        db.GatewayRoutes.Add(route); await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken); route.Model = model; return ToGatewayRouteResponse(route);
     }
 
     public async Task<GatewayRouteResponse> UpdateGatewayRouteAsync(Guid id, GatewayRouteInput input, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
         var route = await db.GatewayRoutes.Include(item => item.Model).ThenInclude(item => item.Provider).SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("路由不存在。");
-        route.Enabled = input.Enabled; route.SortOrder = input.SortOrder; await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken); return ToGatewayRouteResponse(route);
+        route.Enabled = input.Enabled; route.SortOrder = input.SortOrder; await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken); return ToGatewayRouteResponse(route);
     }
 
     public async Task DeleteGatewayRouteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken); var route = await db.GatewayRoutes.SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("路由不存在。"); db.GatewayRoutes.Remove(route); await db.SaveChangesAsync(cancellationToken); await configurationProvider.ReloadAsync(cancellationToken);
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken); var route = await db.GatewayRoutes.SingleOrDefaultAsync(item => item.Id == id, cancellationToken) ?? throw new KeyNotFoundException("路由不存在。"); db.GatewayRoutes.Remove(route); await db.SaveChangesAsync(cancellationToken); await ReloadProviderAsync(cancellationToken);
     }
+
+    private Task ReloadProviderAsync(CancellationToken cancellationToken) =>
+        reloadProviderAfterWrite ? configurationProvider.ReloadAsync(cancellationToken) : Task.CompletedTask;
 
     private static GatewayEndpointResponse ToGatewayResponse(GatewayEndpointEntity endpoint) => new(endpoint.Key, endpoint.DisplayName, endpoint.PublicPath, endpoint.Enabled, endpoint.ComboBindings.OrderBy(item => item.SortOrder).Select(item => new GatewayEndpointComboResponse(item.ComboId, item.Combo.Name, item.Combo.Enabled, item.Enabled, item.SortOrder)).ToArray(), ReadApiKey(endpoint.ProtectedApiKey), GatewayEndpointSettings.NormalizeReasoningEffort(endpoint.ReasoningEffort));
     private static GatewayComboResponse ToGatewayComboResponse(GatewayComboEntity combo) => new(combo.Id, combo.Name, combo.Enabled, combo.SortOrder, combo.Routes.OrderBy(item => item.SortOrder).Select(ToGatewayRouteResponse).ToArray(), combo.EndpointBindings.OrderBy(item => item.SortOrder).Select(item => new GatewayComboEndpointResponse(item.EndpointKey, item.Endpoint.DisplayName, item.Enabled, item.SortOrder)).ToArray());
