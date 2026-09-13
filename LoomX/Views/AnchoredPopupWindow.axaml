@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LoomX.Views.AnchoredPopupWindow"
+        Title="AnchoredPopup"
+        Width="320" Height="240"
+        SystemDecorations="None"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        CanResize="False"
+        SizeToContent="WidthAndHeight"
+        WindowStartupLocation="Manual"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent">
+
+  <!-- 尖角 + 面板：尖角后声明，压在面板顶边之上盖掉那一段描边，形成闭环 -->
+  <Grid x:Name="root" RowDefinitions="Auto,Auto">
+    <Border x:Name="panel" Grid.Row="1"
+            Background="{DynamicResource PopupBackgroundBrush}"
+            BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1"
+            CornerRadius="14" ClipToBounds="True"/>
+    <Path x:Name="arrow" Grid.Row="0"
+          Width="14" Height="9"
+          HorizontalAlignment="Left" VerticalAlignment="Top"
+          Fill="{DynamicResource PopupBackgroundBrush}"
+          Stroke="{DynamicResource BorderStrongBrush}" StrokeThickness="1" StrokeLineCap="Round"
+          Data="M 0.7,8.5 L 7,1 L 13.3,8.5"/>
+  </Grid>
+</Window>

@@ -1523,6 +1523,15 @@
   <data name="assistant.history.delete.tooltip">
     <value>删除此会话</value>
   </data>
+  <data name="assistant.history.rename.tooltip">
+    <value>重命名会话</value>
+  </data>
+  <data name="assistant.history.renamed">
+    <value>会话已重命名</value>
+  </data>
+  <data name="assistant.history.rename.failed">
+    <value>重命名失败</value>
+  </data>
   <data name="assistant.permission.auto">
     <value>自动批准</value>
   </data>

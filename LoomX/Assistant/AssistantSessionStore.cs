@@ -15,6 +15,9 @@ public sealed record AssistantSessionSummary(
 {
     /// <summary>列表展示用的更新时间（本地时区）。</summary>
     public string DisplayUpdatedAt => UpdatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
+
+    /// <summary>标题是否来自用户自定义 / AI 摘要（true 时不再被自动标题覆盖）。</summary>
+    public bool HasCustomTitle { get; init; }
 }
 
 /// <summary>
@@ -29,12 +32,61 @@ public sealed class AssistantSessionStore
     private readonly string rootDirectory;
     private readonly ILogger<AssistantSessionStore>? logger;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> writeLocks = new();
+    private readonly SemaphoreSlim titleLock = new(1, 1);
 
     public AssistantSessionStore(string? rootDirectory = null, ILogger<AssistantSessionStore>? logger = null)
     {
         this.rootDirectory = rootDirectory ?? Path.Combine(AppDataPaths.RootDirectory, "AssistantSessions");
         this.logger = logger;
     }
+
+    /// <summary>
+    /// 会话标题索引（sessionId → 标题）。与 jsonl 分开存，避免为了改一个标题去重写整个会话文件。
+    /// 没有记录的会话回退到“首条用户消息截断”。
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, string>> LoadTitlesAsync(CancellationToken cancellationToken = default)
+    {
+        var path = TitleIndexPath;
+        if (!File.Exists(path)) return new Dictionary<string, string>(StringComparer.Ordinal);
+        await titleLock.WaitAsync(cancellationToken);
+        try
+        {
+            var json = await File.ReadAllTextAsync(path, cancellationToken);
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(json, StoreJsonOptions)
+                   ?? new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+        catch (JsonException exception)
+        {
+            logger?.LogWarning(exception, "会话标题索引损坏，按空索引处理");
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+        finally { titleLock.Release(); }
+    }
+
+    /// <summary>写入会话标题；空标题表示清除（回到自动标题）。</summary>
+    public async Task SetTitleAsync(string sessionId, string? title, CancellationToken cancellationToken = default)
+    {
+        Directory.CreateDirectory(rootDirectory);
+        await titleLock.WaitAsync(cancellationToken);
+        try
+        {
+            var titles = File.Exists(TitleIndexPath)
+                ? JsonSerializer.Deserialize<Dictionary<string, string>>(
+                    await File.ReadAllTextAsync(TitleIndexPath, cancellationToken), StoreJsonOptions)
+                  ?? new Dictionary<string, string>(StringComparer.Ordinal)
+                : new Dictionary<string, string>(StringComparer.Ordinal);
+
+            if (string.IsNullOrWhiteSpace(title)) titles.Remove(sessionId);
+            else titles[sessionId] = title.Trim();
+
+            var tempPath = TitleIndexPath + ".tmp";
+            await File.WriteAllTextAsync(tempPath, JsonSerializer.Serialize(titles, StoreJsonOptions), cancellationToken);
+            File.Move(tempPath, TitleIndexPath, overwrite: true);
+        }
+        finally { titleLock.Release(); }
+    }
+
+    private string TitleIndexPath => Path.Combine(rootDirectory, "titles.json");
 
     public async Task SaveAsync(AgentSession session, CancellationToken cancellationToken = default)
     {
@@ -245,6 +297,9 @@ public sealed class AssistantSessionStore
     public IReadOnlyList<AssistantSessionSummary> List()
     {
         if (!Directory.Exists(rootDirectory)) return [];
+        var titles = File.Exists(TitleIndexPath)
+            ? SafeLoadTitles()
+            : new Dictionary<string, string>(StringComparer.Ordinal);
         var summaries = new List<AssistantSessionSummary>();
         foreach (var path in Directory.EnumerateFiles(rootDirectory, "*.jsonl"))
         {
@@ -284,12 +339,18 @@ public sealed class AssistantSessionStore
                 }
 
                 if (meta is null) continue;
+                var sessionId = meta["session_id"]!.GetValue<string>();
+                var hasCustomTitle = titles.TryGetValue(sessionId, out var customTitle)
+                                     && !string.IsNullOrWhiteSpace(customTitle);
                 summaries.Add(new AssistantSessionSummary(
-                    meta["session_id"]!.GetValue<string>(),
-                    Truncate(firstUserContent ?? "（空会话）", 40),
+                    sessionId,
+                    hasCustomTitle ? customTitle! : Truncate(Flatten(firstUserContent) ?? "（空会话）", 40),
                     state == nameof(AgentSessionState.Running) ? nameof(AgentSessionState.Cancelled) : state ?? nameof(AgentSessionState.Created),
                     updatedAt,
-                    messageCount));
+                    messageCount)
+                {
+                    HasCustomTitle = hasCustomTitle,
+                });
             }
             catch (JsonException)
             {
@@ -304,9 +365,38 @@ public sealed class AssistantSessionStore
     {
         var path = PathFor(sessionId);
         if (File.Exists(path)) File.Delete(path);
+        if (File.Exists(TitleIndexPath))
+        {
+            var titles = SafeLoadTitles();
+            if (titles.Remove(sessionId)) _ = SetTitleAsync(sessionId, null);
+        }
     }
 
     private string PathFor(string sessionId) => Path.Combine(rootDirectory, $"{sessionId}.jsonl");
+
+    private Dictionary<string, string> SafeLoadTitles()
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(TitleIndexPath), StoreJsonOptions)
+                   ?? new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+        catch (Exception exception) when (exception is JsonException or IOException)
+        {
+            logger?.LogWarning(exception, "会话标题索引读取失败，按空索引处理");
+            return new Dictionary<string, string>(StringComparer.Ordinal);
+        }
+    }
+
+    /// <summary>标题只取一行：折叠换行/多余空白，避免长粘贴把列表撑成多行。</summary>
+    private static string? Flatten(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var collapsed = string.Join(' ', text.Split('\n', '\r', '\t')
+            .Select(line => line.Trim())
+            .Where(line => line.Length > 0));
+        return collapsed.Length == 0 ? null : collapsed;
+    }
 
     /// <summary>兜底扫描：sk-/Bearer 形态的长值不允许落盘。</summary>
     internal static bool SecretLeakScan(string json)

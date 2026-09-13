@@ -196,6 +196,18 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.DoesNotContain(events, item => item.Kind == AgentEventKind.ToolApprovalRequested);
     }
 
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData("   \n  ", null)]
+    [InlineData("简单标题", "简单标题")]
+    [InlineData("“带引号的标题”", "带引号的标题")]
+    [InlineData("前置说明。\n第二行才是标题：这里的字也很多，超过二十个字就会被硬裁掉", "前置说明")]
+    [InlineData("标题：", "标题")] // 尾部标点被裁掉后仍有效
+    public void NormalizeTitle_TakesFirstMeaningfulLine_TrimsQuotes_CapsTo20(string? raw, string? expected)
+    {
+        Assert.Equal(expected, AssistantService.NormalizeTitle(raw));
+    }
+
     private static ToolRegistry CreateWriteToolRegistry(Action onExecuted)
     {
         var registry = new ToolRegistry();

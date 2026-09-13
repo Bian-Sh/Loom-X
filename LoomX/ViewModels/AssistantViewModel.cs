@@ -27,7 +27,7 @@ public sealed class AssistantViewModel : NotifyViewModel
     private string? lastUserText;
     private string errorMessage = string.Empty;
     private DispatcherTimer? elapsedTimer;
-    private AssistantSessionSummary? selectedSession;
+    private AssistantSessionItemViewModel? selectedSession;
     private ChatMessageViewModel? streamingMessage;
     private ChatMessageViewModel? currentGroup;
     private bool suppressSelectionLoad;
@@ -51,7 +51,7 @@ public sealed class AssistantViewModel : NotifyViewModel
         SendCommand = new AsyncCommand(() => SendAsync(false), () => !IsRunning && !string.IsNullOrWhiteSpace(InputText));
         CancelCommand = new DelegateCommand(Cancel);
         NewSessionCommand = new DelegateCommand(NewSession);
-        LoadSessionCommand = new AsyncCommand(parameter => LoadSessionAsync(parameter as AssistantSessionSummary));
+        LoadSessionCommand = new AsyncCommand(parameter => LoadSessionAsync(parameter as AssistantSessionItemViewModel));
         RetryCommand = new AsyncCommand(() => SendAsync(true), () => !IsRunning && !string.IsNullOrWhiteSpace(lastUserText));
         DismissErrorCommand = new DelegateCommand(ClearError);
 
@@ -106,7 +106,8 @@ public sealed class AssistantViewModel : NotifyViewModel
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
 
-    public ObservableCollection<AssistantSessionSummary> Sessions { get; } = [];
+    /// <summary>历史会话列表。条目是 ViewModel 包装，支持行内改名与删除。</summary>
+    public ObservableCollection<AssistantSessionItemViewModel> Sessions { get; } = [];
 
     /// <summary>模型选择弹层中的 Provider 分组（foldout）。</summary>
     public ObservableCollection<AssistantModelGroupViewModel> ModelGroups { get; } = [];
@@ -169,7 +170,7 @@ public sealed class AssistantViewModel : NotifyViewModel
     private void ClearError() => ErrorMessage = string.Empty;
 
     /// <summary>历史会话选择；选中即载入。</summary>
-    public AssistantSessionSummary? SelectedSession
+    public AssistantSessionItemViewModel? SelectedSession
     {
         get => selectedSession;
         set
@@ -307,7 +308,31 @@ public sealed class AssistantViewModel : NotifyViewModel
                 streamingMessage = null;
                 currentGroup = null;
                 RefreshSessions();
+                _ = TryAutoTitleAsync(service);
             });
+        }
+    }
+
+    /// <summary>
+    /// 一轮对话结束后给会话起标题：只有还没有自定义/摘要标题时才调模型，
+    /// 失败静默（标题是锦上添花，不该打扰用户）。
+    /// </summary>
+    private async Task TryAutoTitleAsync(AssistantService? service)
+    {
+        if (service is null) return;
+        try
+        {
+            var sessionId = service.CurrentSession.Id;
+            var hasTitle = service.ListSessions().Any(item => item.SessionId == sessionId && item.HasCustomTitle);
+            if (hasTitle) return;
+
+            var generated = await service.TrySummarizeTitleAsync();
+            if (generated is not null)
+                Dispatcher.UIThread.Post(RefreshSessions);
+        }
+        catch (Exception exception)
+        {
+            logger.LogDebug(exception, "会话摘要标题生成失败（已静默）");
         }
     }
 
@@ -597,20 +622,20 @@ public sealed class AssistantViewModel : NotifyViewModel
     }
 
     /// <summary>删除历史会话；删除当前会话时自动开新会话。</summary>
-    public void DeleteSession(AssistantSessionSummary? summary)
+    public void DeleteSession(AssistantSessionItemViewModel? item)
     {
-        if (summary is null) return;
+        if (item is null) return;
         var service = ResolveService();
         if (service is null) return;
 
-        var wasCurrent = service.CurrentSession.Id == summary.SessionId;
-        service.DeleteSession(summary.SessionId);
+        var wasCurrent = service.CurrentSession.Id == item.SessionId;
+        service.DeleteSession(item.SessionId);
 
         suppressSelectionLoad = true;
         try
         {
             RefreshSessions();
-            if (SelectedSession?.SessionId == summary.SessionId) SelectedSession = null;
+            if (SelectedSession?.SessionId == item.SessionId) SelectedSession = null;
         }
         finally
         {
@@ -623,15 +648,55 @@ public sealed class AssistantViewModel : NotifyViewModel
         }
     }
 
-    private async Task LoadSessionAsync(AssistantSessionSummary? summary)
+    /// <summary>行内改名：回车或失焦提交，空串表示回到自动标题。</summary>
+    public async Task RenameSessionAsync(AssistantSessionItemViewModel item, string? newTitle)
     {
-        if (summary is null) return;
+        var service = ResolveService();
+        if (service is null) return;
+
+        var trimmed = newTitle?.Trim();
+        if (string.Equals(trimmed, item.Summary.Title, StringComparison.Ordinal))
+        {
+            item.CancelRename();
+            return;
+        }
+
+        try
+        {
+            await service.RenameSessionAsync(item.SessionId, trimmed);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "AI 助手会话改名失败 {SessionId}", item.SessionId);
+            toastService?.Show(ResourceLookup.Resolve("assistant.history.rename.failed"), ToastLevel.Error);
+            item.CancelRename();
+            return;
+        }
+
+        var wasCurrent = SelectedSession?.SessionId == item.SessionId;
+        suppressSelectionLoad = true;
+        try
+        {
+            RefreshSessions();
+            if (wasCurrent) SelectedSession = Sessions.FirstOrDefault(candidate => candidate.SessionId == item.SessionId);
+        }
+        finally
+        {
+            suppressSelectionLoad = false;
+        }
+
+        toastService?.Show(ResourceLookup.Resolve("assistant.history.renamed"), ToastLevel.Success);
+    }
+
+    private async Task LoadSessionAsync(AssistantSessionItemViewModel? item)
+    {
+        if (item is null) return;
         ErrorMessage = string.Empty;
         lastUserText = null;
         var service = await EnsureServiceAsync();
         if (service is null) return;
 
-        if (!await service.LoadSessionAsync(summary.SessionId))
+        if (!await service.LoadSessionAsync(item.SessionId))
         {
             AddSystemMessage("会话载入失败（文件可能已损坏或删除）。");
             return;
@@ -702,11 +767,12 @@ public sealed class AssistantViewModel : NotifyViewModel
         if (service is null) return;
 
         var currentId = service.CurrentSession.Id;
-        AssistantSessionSummary? match = null;
+        AssistantSessionItemViewModel? match = null;
         foreach (var summary in service.ListSessions())
         {
-            Sessions.Add(summary);
-            if (summary.SessionId == currentId) match = summary;
+            var item = new AssistantSessionItemViewModel(summary);
+            Sessions.Add(item);
+            if (summary.SessionId == currentId) match = item;
         }
 
         // 只同步标题，不触发载入（载入会清空当前消息）。
@@ -731,6 +797,56 @@ public sealed class AssistantViewModel : NotifyViewModel
     private void AddSystemMessage(string text) => Messages.Add(ChatMessageViewModel.Status(text));
 
     public void NotifyCopied() => toastService?.Show(ResourceLookup.Resolve("assistant.copied"), ToastLevel.Success);
+}
+
+/// <summary>
+/// 历史会话列表条目：包一层以便支持行内改名（编辑态切换）与 hover 操作按钮。
+/// </summary>
+public sealed class AssistantSessionItemViewModel : NotifyViewModel
+{
+    private bool isEditing;
+    private string editText;
+
+    public AssistantSessionItemViewModel(AssistantSessionSummary summary)
+    {
+        Summary = summary;
+        editText = summary.Title;
+    }
+
+    public AssistantSessionSummary Summary { get; }
+
+    public string SessionId => Summary.SessionId;
+
+    public string Title => Summary.Title;
+
+    public string DisplayUpdatedAt => Summary.DisplayUpdatedAt;
+
+    /// <summary>是否处于行内改名状态（文本框替换标题文本）。</summary>
+    public bool IsEditing
+    {
+        get => isEditing;
+        private set
+        {
+            if (SetProperty(ref isEditing, value)) OnPropertyChanged(nameof(IsNotEditing));
+        }
+    }
+
+    public bool IsNotEditing => !isEditing;
+
+    /// <summary>编辑框内容；进入编辑态时重置为当前标题。</summary>
+    public string EditText
+    {
+        get => editText;
+        set => SetProperty(ref editText, value);
+    }
+
+    public void BeginRename()
+    {
+        EditText = Title;
+        IsEditing = true;
+    }
+
+    public void CancelRename() => IsEditing = false;
 }
 
 /// <summary>修改权限下拉项。</summary>

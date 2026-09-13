@@ -1373,6 +1373,15 @@
   <data name="assistant.history.delete.tooltip">
     <value>刪除此對話</value>
   </data>
+  <data name="assistant.history.rename.tooltip">
+    <value>重新命名會話</value>
+  </data>
+  <data name="assistant.history.renamed">
+    <value>會話已重新命名</value>
+  </data>
+  <data name="assistant.history.rename.failed">
+    <value>重新命名失敗</value>
+  </data>
   <data name="assistant.permission.auto">
     <value>自動批准</value>
   </data>

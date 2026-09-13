@@ -499,6 +499,9 @@
   <data name="assistant.status.failed"><value>Request failed</value></data>
   <data name="assistant.input.watermark"><value>Type a message, Enter to send…</value></data>
   <data name="assistant.history.delete.tooltip"><value>Delete this chat</value></data>
+  <data name="assistant.history.rename.tooltip"><value>Rename this chat</value></data>
+  <data name="assistant.history.renamed"><value>Chat renamed</value></data>
+  <data name="assistant.history.rename.failed"><value>Failed to rename</value></data>
   <data name="assistant.permission.auto"><value>Auto-approve</value></data>
   <data name="assistant.permission.ask"><value>Approve each</value></data>
   <data name="assistant.model.none"><value>No model configured</value></data>

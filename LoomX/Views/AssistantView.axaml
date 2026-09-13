@@ -433,60 +433,8 @@
       </Grid>
     </Border>
 
-    <!-- 历史会话浮层：尖角从面板顶边长出，与外框形成闭环 -->
-    <Popup x:Name="historyPopup" PlacementTarget="{Binding #historyButton}" Placement="Bottom"
-           IsLightDismissEnabled="True" IsOpen="{Binding IsHistoryOpen, Mode=TwoWay}"
-           PlacementConstraintAdjustment="None"
-           HorizontalOffset="-135" VerticalOffset="6">
-      <Grid RowDefinitions="Auto,Auto">
-        <Border Grid.Row="1" Width="300" MaxHeight="360"
-                Background="{DynamicResource PopupBackgroundBrush}"
-                BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1"
-                CornerRadius="14" Padding="8" ClipToBounds="True">
-          <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="2">
-              <ItemsControl ItemsSource="{Binding Sessions}">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
-                    <Grid Classes="session-row" Height="46">
-                      <Button Classes="session-row-button" Tag="{Binding}" Click="LoadHistoryItem_OnClick"
-                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                              Background="Transparent" BorderThickness="0" CornerRadius="9" Padding="12,0">
-                        <StackPanel VerticalAlignment="Center" Margin="0,0,26,0">
-                          <TextBlock Text="{Binding Title}" FontSize="13" MaxWidth="248"
-                                     TextTrimming="CharacterEllipsis" HorizontalAlignment="Left"/>
-                          <TextBlock Text="{Binding DisplayUpdatedAt}" Classes="muted" FontSize="11" HorizontalAlignment="Left"/>
-                        </StackPanel>
-                      </Button>
-                      <!-- 删除按钮浮在文字之上：不挤压文字，也不会被长标题挤走 -->
-                      <Button Classes="icon session-delete" Tag="{Binding}" Click="DeleteHistoryItem_OnClick"
-                              HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0"
-                              Width="22" Height="22" CornerRadius="6"
-                              Background="{DynamicResource SurfaceSubtleBrush}"
-                              ToolTip.Tip="{l:Locale assistant.history.delete.tooltip}"
-                              AutomationProperties.Name="{l:Locale assistant.history.delete.tooltip}">
-                        <Path Classes="icon-glyph"
-                              Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6"
-                              Width="13" Height="13"/>
-                      </Button>
-                    </Grid>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <TextBlock Text="{l:Locale assistant.history.empty}" Classes="muted" HorizontalAlignment="Center"
-                         Margin="0,12" IsVisible="{Binding HasNoSessions}"/>
-            </StackPanel>
-          </ScrollViewer>
-        </Border>
-        <!-- 尖角：朝上的等腰三角形，只描两条斜边（不画底边），
-             底边比面板顶边低 1px —— 后声明压在面板之上，把顶边那段盖掉形成闭环 -->
-        <Path Grid.Row="0" Width="14" Height="9" HorizontalAlignment="Center" VerticalAlignment="Top"
-              Margin="0,0,0,-1"
-              Fill="{DynamicResource PopupBackgroundBrush}"
-              Stroke="{DynamicResource BorderStrongBrush}" StrokeThickness="1" StrokeLineCap="Round"
-              Data="M 0.7,8.5 L 7,1 L 13.3,8.5"/>
-      </Grid>
-    </Popup>
+    <!-- 历史会话浮层已改为 AnchoredPopupWindow（独立顶层窗口，可浮出主窗口外、
+         尖角按锚点屏幕坐标动态对齐），内容见 AssistantHistoryPanel。构建逻辑在 code-behind。 -->
 
     <!-- 模型选择弹层：与网关 foldout 同款 -->
     <Popup x:Name="modelPopup" PlacementTarget="{Binding #modelPickerButton}" Placement="Top" IsLightDismissEnabled="True"

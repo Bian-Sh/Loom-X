@@ -116,10 +116,56 @@ public sealed class AssistantSessionStoreTests : IDisposable
         session.MarkRunning();
         session.MarkCompleted();
         await store.SaveAsync(session);
+        await store.SetTitleAsync(session.Id, "手动改名");
 
         store.Delete(session.Id);
 
         Assert.Empty(store.List());
+        Assert.Empty(await store.LoadTitlesAsync());
+    }
+
+    [Fact]
+    public async Task SetTitle_OverridesSummaryTitle_InList()
+    {
+        var session = new AgentSession();
+        session.RestoreMessage(ChatMessage.User("首条用户消息很长很长很长很长很长很长"));
+        session.MarkRunning();
+        session.MarkCompleted();
+        await store.SaveAsync(session);
+
+        await store.SetTitleAsync(session.Id, "自定义标题");
+
+        var summary = Assert.Single(store.List());
+        Assert.Equal("自定义标题", summary.Title);
+        Assert.True(summary.HasCustomTitle);
+    }
+
+    [Fact]
+    public async Task SetTitle_NullTitle_FallsBackToAutoSummary()
+    {
+        var session = new AgentSession();
+        session.RestoreMessage(ChatMessage.User("首条用户消息"));
+        session.MarkRunning();
+        session.MarkCompleted();
+        await store.SaveAsync(session);
+        await store.SetTitleAsync(session.Id, "先有自定义标题");
+
+        await store.SetTitleAsync(session.Id, null);
+
+        var summary = Assert.Single(store.List());
+        Assert.Equal("首条用户消息", summary.Title);
+        Assert.False(summary.HasCustomTitle);
+    }
+
+    [Fact]
+    public async Task LoadTitles_IgnoresBrokenIndexFile()
+    {
+        Directory.CreateDirectory(rootDirectory);
+        await File.WriteAllTextAsync(Path.Combine(rootDirectory, "titles.json"), "{ 不是合法 JSON");
+
+        var titles = await store.LoadTitlesAsync();
+
+        Assert.Empty(titles);
     }
 
     [Fact]

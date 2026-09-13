@@ -1373,6 +1373,15 @@
   <data name="assistant.history.delete.tooltip">
     <value>この会話を削除</value>
   </data>
+  <data name="assistant.history.rename.tooltip">
+    <value>会話の名前を変更</value>
+  </data>
+  <data name="assistant.history.renamed">
+    <value>会話の名前を変更しました</value>
+  </data>
+  <data name="assistant.history.rename.failed">
+    <value>名前の変更に失敗しました</value>
+  </data>
   <data name="assistant.permission.auto">
     <value>自動承認</value>
   </data>

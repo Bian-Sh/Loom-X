@@ -119,8 +119,70 @@ public sealed class AssistantService
 
     public void DeleteSession(string sessionId) => sessionStore.Delete(sessionId);
 
+    /// <summary>重命名历史会话（空值表示回到自动标题）。</summary>
+    public Task RenameSessionAsync(string sessionId, string? title, CancellationToken cancellationToken = default) =>
+        sessionStore.SetTitleAsync(sessionId, title, cancellationToken);
+
     /// <summary>取消当前运行。</summary>
     public void Cancel() => currentRun?.Cancel();
+
+    /// <summary>
+    /// 用助手模型给当前会话起一个短标题（≤ 20 字）。
+    /// 只在会话还没有自定义/摘要标题时调用；失败一律静默（标题是锦上添花，不该打扰用户）。
+    /// </summary>
+    public async Task<string?> TrySummarizeTitleAsync(CancellationToken cancellationToken = default)
+    {
+        var sessionId = CurrentSession.Id;
+        var firstUser = CurrentSession.Messages.FirstOrDefault(item => item.Role == ChatRole.User)?.Content;
+        var firstAnswer = CurrentSession.Messages.FirstOrDefault(item => item.Role == ChatRole.Assistant)?.Content;
+        if (string.IsNullOrWhiteSpace(firstUser) || string.IsNullOrWhiteSpace(firstAnswer)) return null;
+
+        var modelClient = await modelClientFactory.TryCreateAsync(cancellationToken);
+        if (modelClient is null) return null;
+
+        var prompt = $"""
+            给下面这段对话起一个中文标题，要求：不超过 20 个字、只输出标题本身、不要引号和标点结尾、不要复述用户原话。
+
+            用户：{Trim(firstUser, 400)}
+            助手：{Trim(firstAnswer, 400)}
+            """;
+
+        var request = new ModelRequest(
+            [new ChatMessage(ChatRole.User, prompt)],
+            Array.Empty<ToolDefinition>());
+
+        var builder = new System.Text.StringBuilder();
+        await foreach (var streamEvent in modelClient.StreamAsync(request, cancellationToken))
+        {
+            if (streamEvent is TextDeltaEvent delta) builder.Append(delta.Text);
+            else if (streamEvent is ModelCompletedEvent) break;
+        }
+
+        var title = NormalizeTitle(builder.ToString());
+        if (string.IsNullOrEmpty(title)) return null;
+
+        // 用捕获的 sessionId 写回：await 期间用户可能切了会话
+        await sessionStore.SetTitleAsync(sessionId, title, cancellationToken);
+        logger.LogInformation("已为会话 {SessionId} 生成摘要标题", sessionId);
+        return title;
+    }
+
+    private static string Trim(string text, int maxLength)
+    {
+        var flat = text.Replace('\n', ' ').Replace('\r', ' ').Trim();
+        return flat.Length <= maxLength ? flat : flat[..maxLength] + "…";
+    }
+
+    /// <summary>模型输出可能带引号、前缀或整段复述，这里只取第一行并裁到 20 字。</summary>
+    internal static string? NormalizeTitle(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var line = raw.Split('\n', '\r').FirstOrDefault(item => item.Trim().Length > 0);
+        if (line is null) return null;
+        var title = line.Trim().Trim('"', '\'', '“', '”', '《', '》', '。', '：', ':', ' ');
+        if (title.Length == 0) return null;
+        return title.Length <= 20 ? title : title[..20];
+    }
 
     private ToolApprovalGate BuildApprovalGate() => async (toolCall, tool, cancellationToken) =>
     {
