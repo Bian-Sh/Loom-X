@@ -13,6 +13,8 @@
   <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#E0F2F7F8" />
   <SolidColorBrush x:Key="BorderBrush" Color="#8094A6AB" />
   <SolidColorBrush x:Key="BorderStrongBrush" Color="#A0A5B9BD" />
+  <!-- 极淡描边：给组合输入区这类“只勾个轮廓、不抢内容”的容器用。 -->
+  <SolidColorBrush x:Key="BorderSoftBrush" Color="#4D94A6AB" />
 
   <!-- 语义色：用于状态、选中态和日志级别，不参与大面积背景。 -->
   <SolidColorBrush x:Key="TextPrimaryBrush" Color="#172126" />

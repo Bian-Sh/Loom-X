@@ -76,21 +76,31 @@
       <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
     </Style>
 
-    <!-- 输入区：上下两层共用一个外框，内部控件一律“裸奔”，不再各自变色/描边 -->
+    <!-- 输入区：上下两层共用一个外框，内部控件一律“裸奔”，不再各自变色/描边。
+         真正生效的是元素上的本地属性（LocalValue 压得住主题的 :pointerover / :focus Setter），
+         这里的 Style 只做兜底。 -->
     <Style Selector="TextBox.plain">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
     <Style Selector="TextBox.plain:pointerover">
       <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
     <Style Selector="TextBox.plain:focus">
       <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style Selector="TextBox.plain:disabled">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
 
     <!-- 权限 / 模型：沉浸进输入卡的功能区，没有自己的背景与边框 -->
@@ -363,17 +373,25 @@
     <!-- 输入区：上输入框 + 下功能区（权限 / 模型 / 发送）。整张卡一个外框，内部控件不再各自描边 -->
     <Border Grid.Row="3" x:Name="inputCard" Classes="input-card"
             Background="{DynamicResource SurfaceBrush}"
-            BorderBrush="{DynamicResource BorderBrush}"
+            BorderBrush="{DynamicResource BorderSoftBrush}"
             BorderThickness="1"
             CornerRadius="14"
             ClipToBounds="True">
       <Grid RowDefinitions="Auto,Auto">
+        <!-- 底色/描边一律写成本地属性：LocalValue 优先级高于主题里 :pointerover / :focus 的
+             Style Setter，所以上下两层都不会再各自变色、各自描边 -->
         <TextBox Grid.Row="0" x:Name="inputTextBox" Classes="plain"
                  Text="{Binding InputText}"
                  Watermark="{l:Locale assistant.input.watermark}"
                  AcceptsReturn="False"
                  MinHeight="40"
                  Padding="12,10"
+                 Background="Transparent"
+                 BorderBrush="Transparent"
+                 BorderThickness="0"
+                 SelectionBrush="{DynamicResource AccentSoftBrush}"
+                 SelectionForegroundBrush="{DynamicResource TextPrimaryBrush}"
+                 CaretBrush="{DynamicResource AccentBrush}"
                  KeyDown="OnInputKeyDown"
                  GotFocus="InputTextBox_OnGotFocus"
                  LostFocus="InputTextBox_OnLostFocus"/>
