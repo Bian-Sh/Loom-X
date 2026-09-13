@@ -29,8 +29,7 @@ public sealed class AssistantViewModel : NotifyViewModel
     private DispatcherTimer? elapsedTimer;
     private AssistantSessionSummary? selectedSession;
     private ChatMessageViewModel? streamingMessage;
-    private ChatMessageViewModel? currentReasoning;
-    private ChatMessageViewModel? currentSteps;
+    private ChatMessageViewModel? currentGroup;
     private bool suppressSelectionLoad;
     private bool isModelPickerOpen;
     private bool isHistoryOpen;
@@ -306,18 +305,43 @@ public sealed class AssistantViewModel : NotifyViewModel
                 IsRunning = false;
                 if (!hasPersistenceWarning) StatusText = string.Empty;
                 streamingMessage = null;
-                currentReasoning = null;
-                currentSteps = null;
+                currentGroup = null;
                 RefreshSessions();
             });
         }
     }
 
-    /// <summary>把所有过程块标记为结束并默认折叠。</summary>
+    /// <summary>把所有过程 foldout 标记为结束并默认折叠。</summary>
     private void FinishAllProcesses(DateTimeOffset? timestamp = null)
     {
         foreach (var process in Messages.Where(item => item.IsProcess)) process.Finish(timestamp);
+        currentGroup = null;
     }
+
+    /// <summary>结束当前过程 foldout 并断开引用（下一次过程事件会开新的 foldout）。</summary>
+    private void CloseCurrentGroup(DateTimeOffset? timestamp = null)
+    {
+        currentGroup?.Finish(timestamp);
+        currentGroup = null;
+    }
+
+    /// <summary>取得当前过程 foldout；没有就新建一个（与正文同级的消息流条目）。</summary>
+    private ChatMessageViewModel EnsureGroup(DateTimeOffset? timestamp)
+    {
+        if (currentGroup is null)
+        {
+            currentGroup = ChatMessageViewModel.Process(timestamp);
+            Messages.Add(currentGroup);
+        }
+
+        return currentGroup;
+    }
+
+    /// <summary>取得 foldout 内指定标签的子项；标签与上一项相同则复用，不同则另起一项。</summary>
+    private static ProcessItemViewModel EnsureGroupItem(ChatMessageViewModel group, string label) =>
+        group.EnsureItem(label);
+
+    private static string StepLabel => ResourceLookup.Resolve("assistant.process.steps");
 
     /// <summary>AgentEvent → UI 投影（规格 #15：UI 只消费事件）。</summary>
     internal void Project(AgentEvent agentEvent)
@@ -325,56 +349,49 @@ public sealed class AssistantViewModel : NotifyViewModel
         switch (agentEvent.Kind)
         {
             case AgentEventKind.StepStarted:
-                // 新一轮开始：上一轮的思考 / 处理步骤到此结束，冻结耗时并折叠。
-                currentReasoning?.Finish(agentEvent.Timestamp);
-                currentSteps?.Finish(agentEvent.Timestamp);
+                // 新一轮开始：上一轮的过程 foldout 到此结束，冻结耗时并折叠。
+                CloseCurrentGroup(agentEvent.Timestamp);
                 streamingMessage = null;
-                currentReasoning = null;
-                currentSteps = null;
                 break;
 
             case AgentEventKind.TextDelta:
-                // 正文开始输出 = finish_content：思考过程转为可折叠的“已完成 xx”。
-                currentReasoning?.Finish(agentEvent.Timestamp);
-                currentSteps?.Finish(agentEvent.Timestamp);
+                // 正文开始输出 = finish_content：过程 foldout 结束，转为可折叠的“已完成 xx”。
+                CloseCurrentGroup(agentEvent.Timestamp);
                 streamingMessage ??= AppendStreamingMessage(agentEvent.Timestamp);
                 streamingMessage.Append(agentEvent.Text ?? string.Empty);
                 break;
 
             case AgentEventKind.ReasoningDelta:
-                if (currentReasoning is null || currentReasoning.IsSummary != agentEvent.IsSummary)
-                {
-                    currentReasoning = ChatMessageViewModel.Process(ResourceLookup.Resolve(agentEvent.IsSummary
-                        ? "assistant.process.summary" : "assistant.process.thinking"), agentEvent.IsSummary,
-                        timestamp: agentEvent.Timestamp);
-                    Messages.Add(currentReasoning);
-                }
-                currentReasoning.Append(agentEvent.Text ?? string.Empty);
+            {
+                var label = ResourceLookup.Resolve(agentEvent.IsSummary
+                    ? "assistant.process.summary" : "assistant.process.thinking");
+                EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), label).Append(agentEvent.Text ?? string.Empty);
                 break;
+            }
 
             case AgentEventKind.MessageCompleted:
                 if (agentEvent.Message?.Role == ChatRole.Assistant && streamingMessage is not null)
                     streamingMessage.IsStreaming = false;
-                currentReasoning?.Finish(agentEvent.Timestamp);
+                CloseCurrentGroup(agentEvent.Timestamp);
                 break;
 
             case AgentEventKind.ToolCallStarted:
                 streamingMessage = null;
-                currentSteps ??= AppendSteps(agentEvent.Timestamp);
-                currentSteps.Append(string.Format(ResourceLookup.Resolve("assistant.step.call"), agentEvent.ToolName) + "\n");
+                EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), StepLabel)
+                    .Append(string.Format(ResourceLookup.Resolve("assistant.step.call"), agentEvent.ToolName) + "\n");
                 break;
 
             case AgentEventKind.ToolApprovalRequested:
                 streamingMessage = null;
-                currentSteps ??= AppendSteps(agentEvent.Timestamp);
-                currentSteps.Append(string.Format(ResourceLookup.Resolve("assistant.step.approval"), agentEvent.ToolName) + "\n");
+                EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), StepLabel)
+                    .Append(string.Format(ResourceLookup.Resolve("assistant.step.approval"), agentEvent.ToolName) + "\n");
                 break;
 
             case AgentEventKind.ToolCallCompleted:
-                currentSteps ??= AppendSteps(agentEvent.Timestamp);
-                currentSteps.Append(agentEvent.Success == true
-                    ? string.Format(ResourceLookup.Resolve("assistant.step.completed"), agentEvent.ToolName) + "\n"
-                    : string.Format(ResourceLookup.Resolve("assistant.step.failed"), agentEvent.ToolName, agentEvent.Detail) + "\n");
+                EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), StepLabel)
+                    .Append(agentEvent.Success == true
+                        ? string.Format(ResourceLookup.Resolve("assistant.step.completed"), agentEvent.ToolName) + "\n"
+                        : string.Format(ResourceLookup.Resolve("assistant.step.failed"), agentEvent.ToolName, agentEvent.Detail) + "\n");
                 break;
 
             case AgentEventKind.SkillLoaded:
@@ -566,8 +583,7 @@ public sealed class AssistantViewModel : NotifyViewModel
         lastUserText = null;
         Messages.Clear();
         streamingMessage = null;
-        currentReasoning = null;
-        currentSteps = null;
+        currentGroup = null;
         suppressSelectionLoad = true;
         try
         {
@@ -624,8 +640,7 @@ public sealed class AssistantViewModel : NotifyViewModel
 
         Messages.Clear();
         streamingMessage = null;
-        currentReasoning = null;
-        currentSteps = null;
+        currentGroup = null;
         var session = service.CurrentSession;
         var hasToolActivities = session.Activities.Any(item => item.Kind == AgentEventKind.ToolCallStarted);
         var history = session.Messages.Where(item => item.Role != ChatRole.System)
@@ -663,12 +678,16 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message });
             if (!hasToolActivities && message.ToolCalls.Count > 0)
-                Messages.Add(ChatMessageViewModel.Process(ResourceLookup.Resolve("assistant.process.steps"), false,
-                    string.Join('\n', message.ToolCalls.Select(call => string.Format(ResourceLookup.Resolve("assistant.step.call"), call.Name))), message.Timestamp));
+            {
+                var group = ChatMessageViewModel.Process(message.Timestamp);
+                Messages.Add(group);
+                group.EnsureItem(ResourceLookup.Resolve("assistant.process.steps"))
+                    .Append(string.Join('\n', message.ToolCalls.Select(call =>
+                        string.Format(ResourceLookup.Resolve("assistant.step.call"), call.Name))));
+            }
         }
         streamingMessage = null;
-        currentReasoning = null;
-        currentSteps = null;
+        currentGroup = null;
         // 历史会话里的过程块一律是已结束状态。
         FinishAllProcesses();
     }
@@ -708,13 +727,6 @@ public sealed class AssistantViewModel : NotifyViewModel
         var message = new ChatMessageViewModel(ChatRole.Assistant, string.Empty, timestamp) { IsStreaming = true };
         Messages.Add(message);
         return message;
-    }
-
-    private ChatMessageViewModel AppendSteps(DateTimeOffset? timestamp = null)
-    {
-        var steps = ChatMessageViewModel.Process(ResourceLookup.Resolve("assistant.process.steps"), timestamp: timestamp);
-        Messages.Add(steps);
-        return steps;
     }
 
     private void AddSystemMessage(string text) => Messages.Add(ChatMessageViewModel.Status(text));
@@ -841,11 +853,19 @@ public sealed class ChatMessageViewModel : NotifyViewModel
 
     public bool IsStatus => kind == ChatEntryKind.Status;
 
+    /// <summary>
+    /// 过程块 = 思考与工具调用共同的<b>父级 foldout</b>，与助手正文（finish content）同属消息流的一级条目。
+    /// “已处理 / 已完成 xx” 只出现在这一层，子项只负责“思考”“处理步骤”这类标签。
+    /// </summary>
     public bool IsProcess => kind == ChatEntryKind.Process;
 
-    public bool IsSummary { get; private init; }
+    /// <summary>foldout 内的子项：思考、摘要、处理步骤。展开时才显示标签。</summary>
+    public ObservableCollection<ProcessItemViewModel> Items { get; } = [];
 
-    public string Label { get; private init; } = string.Empty;
+    public bool HasItems => Items.Count > 0;
+
+    /// <summary>子项文本的合并结果（供折叠预览与断言使用）。</summary>
+    public string ItemsText => Items.Count == 0 ? string.Empty : string.Join('\n', Items.Select(item => item.Text));
 
     public DateTimeOffset Timestamp { get; }
 
@@ -887,8 +907,8 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     /// </summary>
     public void Finish(DateTimeOffset? timestamp = null)
     {
-        if (finishedAt is not null) return;
-        finishedAt = timestamp ?? DateTimeOffset.UtcNow;
+        // 只在首次结束时冻结耗时；折叠则每次都强制（任务结束时要把展开中的过程块收起来）。
+        finishedAt ??= timestamp ?? DateTimeOffset.UtcNow;
         isExpanded = false;
         OnPropertyChanged(nameof(IsFinished));
         OnPropertyChanged(nameof(CanExpand));
@@ -931,16 +951,38 @@ public sealed class ChatMessageViewModel : NotifyViewModel
         }
     }
 
-    /// <summary>过程块折叠时展示的内部最新一行（不显示“思考/处理步骤”这类标签）。</summary>
+    /// <summary>
+    /// 过程块折叠时展示的内部最新一行 —— 刻意不带“思考 / 处理步骤”标签，
+    /// 标签只在展开后随子项一起出现。
+    /// </summary>
     public string ProcessPreview
     {
         get
         {
-            if (text.Length == 0) return string.Empty;
-            var span = text.AsSpan().TrimEnd();
+            var merged = ItemsText;
+            if (merged.Length == 0) return string.Empty;
+            var span = merged.AsSpan().TrimEnd();
             var index = span.LastIndexOfAny('\r', '\n');
             return (index >= 0 ? span[(index + 1)..] : span).Trim().ToString();
         }
+    }
+
+    /// <summary>子项内容变化时由子项回调，刷新折叠预览。</summary>
+    public void RefreshPreview()
+    {
+        OnPropertyChanged(nameof(ProcessPreview));
+        OnPropertyChanged(nameof(ItemsText));
+        OnPropertyChanged(nameof(HasItems));
+    }
+
+    /// <summary>取得指定标签的子项；与最后一项同标签则复用，否则另起一项。</summary>
+    public ProcessItemViewModel EnsureItem(string label)
+    {
+        if (Items.Count > 0 && Items[^1].Label == label) return Items[^1];
+        var item = new ProcessItemViewModel(label, this);
+        Items.Add(item);
+        RefreshPreview();
+        return item;
     }
 
     public bool IsStreaming
@@ -958,8 +1000,42 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     public static ChatMessageViewModel Status(string text) =>
         new(ChatRole.Assistant, text, ChatEntryKind.Status, null);
 
-    public static ChatMessageViewModel Process(string label, bool summary = false, string text = "", DateTimeOffset? timestamp = null) =>
-        new(ChatRole.Assistant, text, ChatEntryKind.Process, timestamp) { Label = label, IsSummary = summary };
+    /// <summary>新建一个过程 foldout（父级），内容是空的，子项通过 <see cref="EnsureItem"/> 挂进去。</summary>
+    public static ChatMessageViewModel Process(DateTimeOffset? timestamp = null) =>
+        new(ChatRole.Assistant, string.Empty, ChatEntryKind.Process, timestamp);
+}
+
+/// <summary>
+/// 过程 foldout 里的一个子项（思考 / 摘要 / 处理步骤）。
+/// 它<b>不是</b>消息流的一级条目，标签只在父级展开后可见。
+/// </summary>
+public sealed class ProcessItemViewModel : NotifyViewModel
+{
+    private string text = string.Empty;
+
+    public ProcessItemViewModel(string label, ChatMessageViewModel owner)
+    {
+        Label = label;
+        Owner = owner;
+    }
+
+    public string Label { get; }
+
+    public ChatMessageViewModel Owner { get; }
+
+    public string Text
+    {
+        get => text;
+        private set
+        {
+            if (!SetProperty(ref text, value)) return;
+            Owner.RefreshPreview();
+        }
+    }
+
+    public void Append(string delta) => Text += delta;
+
+    public override string ToString() => $"{Label}: {Text}";
 }
 
 public enum ChatEntryKind { Message, Status, Process }
