@@ -186,15 +186,20 @@
                                HorizontalAlignment="Center"
                                Margin="0,2"/>
 
-                    <!-- 过程块：折叠显示内部最新一行，展开才显示“思考 / 处理步骤” -->
+                    <!-- 过程块：流式期间只显示“已处理 xx”，正文开始输出后变成可折叠的“已完成 xx”并默认折叠 -->
                     <Grid IsVisible="{Binding IsProcess}" ColumnDefinitions="Auto,Auto" ColumnSpacing="8"
                           HorizontalAlignment="Left" Margin="0,2">
                       <Border Grid.Column="0" Width="2" CornerRadius="1" Margin="0,3"
                               Background="{DynamicResource SurfaceMutedBrush}" VerticalAlignment="Stretch"/>
                       <StackPanel Grid.Column="1">
+                        <!-- 运行中：不可展开，只有一行计时 -->
+                        <TextBlock Text="{Binding ProcessStatusText}" IsVisible="{Binding !IsFinished}"
+                                   FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}"
+                                   VerticalAlignment="Center" Margin="0,2"/>
+                        <!-- 已结束：可折叠的“已完成 xx” -->
                         <Button Classes="process" Tag="{Binding}" Click="ToggleProcess_OnClick"
-                                ToolTip.Tip="{l:Locale assistant.history.list.tooltip}"
-                                AutomationProperties.Name="{Binding Label}">
+                                IsVisible="{Binding IsFinished}"
+                                AutomationProperties.Name="{Binding ProcessStatusText}">
                           <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
                             <Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="12" Height="12"
                                   Stroke="{DynamicResource TextTertiaryBrush}"
@@ -202,10 +207,7 @@
                                   RenderTransformOrigin="50%,50%">
                               <Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform>
                             </Path>
-                            <TextBlock Grid.Column="1" Text="{Binding ProcessPreview}" IsVisible="{Binding !IsExpanded}"
-                                       TextTrimming="CharacterEllipsis" MaxWidth="520" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Column="1" Text="{Binding Label}" IsVisible="{Binding IsExpanded}"
-                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding ProcessStatusText}" VerticalAlignment="Center"/>
                           </Grid>
                         </Button>
                         <TextBlock Text="{Binding Text}" IsVisible="{Binding IsExpanded}"

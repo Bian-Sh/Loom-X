@@ -26,6 +26,7 @@ public sealed class AssistantViewModel : NotifyViewModel
     private bool hasPersistenceWarning;
     private string? lastUserText;
     private string errorMessage = string.Empty;
+    private DispatcherTimer? elapsedTimer;
     private AssistantSessionSummary? selectedSession;
     private ChatMessageViewModel? streamingMessage;
     private ChatMessageViewModel? currentReasoning;
@@ -78,6 +79,30 @@ public sealed class AssistantViewModel : NotifyViewModel
 
         RefreshSessions();
         RefreshModelSummary();
+        StartElapsedTimer();
+    }
+
+    /// <summary>每秒刷新运行中的过程块耗时；没有 UI 线程（单元测试）时静默降级。</summary>
+    private void StartElapsedTimer()
+    {
+        try
+        {
+            elapsedTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Normal, OnElapsedTick);
+            elapsedTimer.Start();
+        }
+        catch (Exception exception)
+        {
+            logger.LogDebug(exception, "过程块计时器不可用，耗时只在事件到达时刷新");
+        }
+    }
+
+    private void OnElapsedTick(object? sender, EventArgs args)
+    {
+        if (!isRunning) return;
+        foreach (var message in Messages)
+        {
+            if (message.IsProcess && !message.IsFinished) message.RefreshElapsed();
+        }
     }
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
@@ -288,18 +313,30 @@ public sealed class AssistantViewModel : NotifyViewModel
         }
     }
 
+    /// <summary>把所有过程块标记为结束并默认折叠。</summary>
+    private void FinishAllProcesses(DateTimeOffset? timestamp = null)
+    {
+        foreach (var process in Messages.Where(item => item.IsProcess)) process.Finish(timestamp);
+    }
+
     /// <summary>AgentEvent → UI 投影（规格 #15：UI 只消费事件）。</summary>
     internal void Project(AgentEvent agentEvent)
     {
         switch (agentEvent.Kind)
         {
             case AgentEventKind.StepStarted:
+                // 新一轮开始：上一轮的思考 / 处理步骤到此结束，冻结耗时并折叠。
+                currentReasoning?.Finish(agentEvent.Timestamp);
+                currentSteps?.Finish(agentEvent.Timestamp);
                 streamingMessage = null;
                 currentReasoning = null;
                 currentSteps = null;
                 break;
 
             case AgentEventKind.TextDelta:
+                // 正文开始输出 = finish_content：思考过程转为可折叠的“已完成 xx”。
+                currentReasoning?.Finish(agentEvent.Timestamp);
+                currentSteps?.Finish(agentEvent.Timestamp);
                 streamingMessage ??= AppendStreamingMessage(agentEvent.Timestamp);
                 streamingMessage.Append(agentEvent.Text ?? string.Empty);
                 break;
@@ -318,6 +355,7 @@ public sealed class AssistantViewModel : NotifyViewModel
             case AgentEventKind.MessageCompleted:
                 if (agentEvent.Message?.Role == ChatRole.Assistant && streamingMessage is not null)
                     streamingMessage.IsStreaming = false;
+                currentReasoning?.Finish(agentEvent.Timestamp);
                 break;
 
             case AgentEventKind.ToolCallStarted:
@@ -353,6 +391,7 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             case AgentEventKind.TaskFailed:
                 streamingMessage = null;
+                FinishAllProcesses(agentEvent.Timestamp);
                 // Detail 为 ModelErrorFormatter 组装的多行详情（本地化描述 + 状态码/错误码/上游描述）
                 Messages.Add(ChatMessageViewModel.Status($"⚠ {ResourceLookup.Resolve("assistant.task.failed")}：\n{agentEvent.Detail}"));
                 break;
@@ -363,11 +402,12 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             case AgentEventKind.TaskCompleted:
                 streamingMessage = null;
-                foreach (var process in Messages.Where(item => item.IsProcess)) process.IsExpanded = false;
+                FinishAllProcesses(agentEvent.Timestamp);
                 break;
 
             case AgentEventKind.TaskCancelled:
                 streamingMessage = null;
+                FinishAllProcesses(agentEvent.Timestamp);
                 Messages.Add(ChatMessageViewModel.Status(ResourceLookup.Resolve("assistant.task.cancelled")));
                 break;
 
@@ -629,6 +669,8 @@ public sealed class AssistantViewModel : NotifyViewModel
         streamingMessage = null;
         currentReasoning = null;
         currentSteps = null;
+        // 历史会话里的过程块一律是已结束状态。
+        FinishAllProcesses();
     }
 
     /// <summary>
@@ -775,6 +817,7 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     private string text;
     private bool isStreaming;
     private bool isExpanded;
+    private DateTimeOffset? finishedAt;
     private readonly ChatEntryKind kind;
 
     public ChatMessageViewModel(ChatRole role, string text, DateTimeOffset? timestamp = null)
@@ -820,6 +863,57 @@ public sealed class ChatMessageViewModel : NotifyViewModel
 
     /// <summary>过程块折叠箭头的旋转角度：折叠朝右，展开朝下。</summary>
     public double ExpandIconAngle => IsExpanded ? 90 : 0;
+
+    /// <summary>过程块是否已结束（finish_content 之后）。结束后才可折叠。</summary>
+    public bool IsFinished => finishedAt is not null;
+
+    /// <summary>过程块耗时；结束后冻结。</summary>
+    public TimeSpan Elapsed => (finishedAt ?? DateTimeOffset.UtcNow) - Timestamp;
+
+    /// <summary>耗时文案：12s / 1m23s / 1h05m。</summary>
+    public string DurationText => FormatDuration(Elapsed);
+
+    /// <summary>过程块标题：运行中“已处理 12s”，结束后“已完成 12s”。</summary>
+    public string ProcessStatusText => string.Format(
+        ResourceLookup.Resolve(IsFinished ? "assistant.process.completed" : "assistant.process.elapsed"),
+        DurationText);
+
+    /// <summary>只有结束后的过程块才允许展开。</summary>
+    public bool CanExpand => IsFinished;
+
+    /// <summary>
+    /// 结束过程块：冻结耗时并默认折叠（对标大厂 Agent 客户端——
+    /// 流式期间只显示“已处理 xx”，正文开始输出后才变成可展开的“已完成 xx”）。
+    /// </summary>
+    public void Finish(DateTimeOffset? timestamp = null)
+    {
+        if (finishedAt is not null) return;
+        finishedAt = timestamp ?? DateTimeOffset.UtcNow;
+        isExpanded = false;
+        OnPropertyChanged(nameof(IsFinished));
+        OnPropertyChanged(nameof(CanExpand));
+        OnPropertyChanged(nameof(Elapsed));
+        OnPropertyChanged(nameof(DurationText));
+        OnPropertyChanged(nameof(ProcessStatusText));
+        OnPropertyChanged(nameof(ExpandIconAngle));
+        OnPropertyChanged(nameof(IsExpanded));
+    }
+
+    /// <summary>运行中由计时器驱动的耗时刷新。</summary>
+    public void RefreshElapsed()
+    {
+        if (finishedAt is not null) return;
+        OnPropertyChanged(nameof(Elapsed));
+        OnPropertyChanged(nameof(DurationText));
+        OnPropertyChanged(nameof(ProcessStatusText));
+    }
+
+    private static string FormatDuration(TimeSpan value)
+    {
+        if (value.TotalHours >= 1) return $"{(int)value.TotalHours}h{value.Minutes:00}m";
+        if (value.TotalMinutes >= 1) return $"{(int)value.TotalMinutes}m{value.Seconds:00}s";
+        return $"{Math.Max(0, (int)value.TotalSeconds)}s";
+    }
 
     public bool IsUser => Role == ChatRole.User && kind == ChatEntryKind.Message;
 

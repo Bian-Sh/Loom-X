@@ -1352,6 +1352,8 @@
   <data name="assistant.jump.tooltip"><value>最新のメッセージへ</value></data>
   <data name="assistant.process.thinking"><value>思考</value></data>
   <data name="assistant.process.summary"><value>思考の要約</value></data>
+  <data name="assistant.process.elapsed"><value>処理中 {0}</value></data>
+  <data name="assistant.process.completed"><value>完了 {0}</value></data>
   <data name="assistant.process.steps"><value>処理手順</value></data>
   <data name="assistant.step.call"><value>ツール {0} を実行</value></data>
   <data name="assistant.step.approval"><value>変更の承認を待機中：{0}</value></data>
