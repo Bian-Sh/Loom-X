@@ -1509,6 +1509,12 @@
   <data name="assistant.step.failed"><value>{0} 失败：{1}</value></data>
   <data name="assistant.task.cancelled"><value>已取消。</value></data>
   <data name="assistant.persistence.failed"><value>当前会话包含敏感内容或存储失败，后续消息未保存。</value></data>
+  <data name="assistant.status.working"><value>AI 助手正在工作…</value></data>
+  <data name="assistant.error.service_unavailable"><value>AI 助手服务初始化失败，请查看控制台日志。</value></data>
+  <data name="assistant.error.unexpected"><value>请求失败，请重试或查看控制台日志。</value></data>
+  <data name="assistant.error.retry"><value>重试</value></data>
+  <data name="assistant.error.dismiss"><value>关闭</value></data>
+  <data name="assistant.status.failed"><value>请求失败</value></data>
   <data name="assistant.input.watermark">
     <value>输入消息，Enter 发送…</value>
   </data>

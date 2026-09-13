@@ -24,6 +24,8 @@ public sealed class AssistantViewModel : NotifyViewModel
     private string statusText = string.Empty;
     private bool isRunning;
     private bool hasPersistenceWarning;
+    private string? lastUserText;
+    private string errorMessage = string.Empty;
     private AssistantSessionSummary? selectedSession;
     private ChatMessageViewModel? streamingMessage;
     private ChatMessageViewModel? currentReasoning;
@@ -46,10 +48,12 @@ public sealed class AssistantViewModel : NotifyViewModel
         logger = this.loggerFactory.CreateLogger<AssistantViewModel>();
         this.toastService = toastService;
 
-        SendCommand = new AsyncCommand(SendAsync, () => !IsRunning && !string.IsNullOrWhiteSpace(InputText));
+        SendCommand = new AsyncCommand(() => SendAsync(false), () => !IsRunning && !string.IsNullOrWhiteSpace(InputText));
         CancelCommand = new DelegateCommand(Cancel);
         NewSessionCommand = new DelegateCommand(NewSession);
         LoadSessionCommand = new AsyncCommand(parameter => LoadSessionAsync(parameter as AssistantSessionSummary));
+        RetryCommand = new AsyncCommand(() => SendAsync(true), () => !IsRunning && !string.IsNullOrWhiteSpace(lastUserText));
+        DismissErrorCommand = new DelegateCommand(ClearError);
 
         PermissionModeOptions =
         [
@@ -88,6 +92,12 @@ public sealed class AssistantViewModel : NotifyViewModel
     public ICommand NewSessionCommand { get; }
     public ICommand LoadSessionCommand { get; }
 
+    /// <summary>请求失败卡片上的「重试」：重发最后一条用户输入，不重复追加用户气泡。</summary>
+    public ICommand RetryCommand { get; }
+
+    /// <summary>请求失败卡片上的「关闭」。</summary>
+    public ICommand DismissErrorCommand { get; }
+
     public IReadOnlyList<AssistantPermissionOption> PermissionModeOptions { get; }
 
     public IReadOnlyList<AssistantReasoningOption> ReasoningEffortOptions { get; }
@@ -112,9 +122,27 @@ public sealed class AssistantViewModel : NotifyViewModel
         get => isRunning;
         private set
         {
-            if (SetProperty(ref isRunning, value)) (SendCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+            if (SetProperty(ref isRunning, value))
+            {
+                (SendCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+                (RetryCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+            }
         }
     }
+
+    /// <summary>请求失败态：在消息流底部展示失败卡片（不是输入框上方的固定文本）。</summary>
+    public string ErrorMessage
+    {
+        get => errorMessage;
+        private set
+        {
+            if (SetProperty(ref errorMessage, value)) OnPropertyChanged(nameof(HasError));
+        }
+    }
+
+    public bool HasError => errorMessage.Length > 0;
+
+    private void ClearError() => ErrorMessage = string.Empty;
 
     /// <summary>历史会话选择；选中即载入。</summary>
     public AssistantSessionSummary? SelectedSession
@@ -205,16 +233,19 @@ public sealed class AssistantViewModel : NotifyViewModel
         return ResolveService();
     }
 
-    private async Task SendAsync()
+    /// <param name="isRetry">重试时不重复追加用户气泡，直接复用上一次的用户输入。</param>
+    private async Task SendAsync(bool isRetry)
     {
-        var text = InputText.Trim();
+        var text = isRetry ? lastUserText ?? string.Empty : InputText.Trim();
         if (text.Length == 0) return;
 
-        InputText = string.Empty;
+        if (!isRetry) InputText = string.Empty;
+        lastUserText = text;
         hasPersistenceWarning = false;
-        Messages.Add(new ChatMessageViewModel(ChatRole.User, text));
+        ErrorMessage = string.Empty;
+        if (!isRetry) Messages.Add(new ChatMessageViewModel(ChatRole.User, text));
         IsRunning = true;
-        StatusText = "AI 助手正在工作…";
+        StatusText = ResourceLookup.Resolve("assistant.status.working");
         AssistantService? service = null;
 
         try
@@ -222,7 +253,7 @@ public sealed class AssistantViewModel : NotifyViewModel
             service = await EnsureServiceAsync();
             if (service is null)
             {
-                AddSystemMessage("AI 助手服务初始化失败，请查看控制台日志。");
+                ErrorMessage = ResourceLookup.Resolve("assistant.error.service_unavailable");
                 return;
             }
 
@@ -234,12 +265,13 @@ public sealed class AssistantViewModel : NotifyViewModel
         }
         catch (InvalidOperationException exception)
         {
-            Dispatcher.UIThread.Post(() => AddSystemMessage(exception.Message));
+            logger.LogWarning(exception, "AI 助手请求被拒绝");
+            Dispatcher.UIThread.Post(() => ErrorMessage = exception.Message);
         }
         catch (Exception exception)
         {
             logger.LogError(exception, "AI 助手运行失败");
-            Dispatcher.UIThread.Post(() => AddSystemMessage("AI 助手运行失败，请查看控制台日志。"));
+            Dispatcher.UIThread.Post(() => ErrorMessage = ResourceLookup.Resolve("assistant.error.unexpected"));
         }
         finally
         {
@@ -490,6 +522,8 @@ public sealed class AssistantViewModel : NotifyViewModel
         ResolveService()?.NewSession();
         hasPersistenceWarning = false;
         StatusText = string.Empty;
+        ErrorMessage = string.Empty;
+        lastUserText = null;
         Messages.Clear();
         streamingMessage = null;
         currentReasoning = null;
@@ -537,6 +571,8 @@ public sealed class AssistantViewModel : NotifyViewModel
     private async Task LoadSessionAsync(AssistantSessionSummary? summary)
     {
         if (summary is null) return;
+        ErrorMessage = string.Empty;
+        lastUserText = null;
         var service = await EnsureServiceAsync();
         if (service is null) return;
 
@@ -595,13 +631,34 @@ public sealed class AssistantViewModel : NotifyViewModel
         currentSteps = null;
     }
 
-    /// <summary>重新加载历史会话列表（打开历史浮层前调用，保证列表是最新的）。</summary>
+    /// <summary>
+    /// 重新加载历史会话列表（打开历史浮层前调用，保证列表是最新的），
+    /// 并把当前服务会话同步到 <see cref="SelectedSession"/>，让标题区跟着更新。
+    /// </summary>
     public void RefreshSessions()
     {
         Sessions.Clear();
         var service = ResolveService();
         if (service is null) return;
-        foreach (var summary in service.ListSessions()) Sessions.Add(summary);
+
+        var currentId = service.CurrentSession.Id;
+        AssistantSessionSummary? match = null;
+        foreach (var summary in service.ListSessions())
+        {
+            Sessions.Add(summary);
+            if (summary.SessionId == currentId) match = summary;
+        }
+
+        // 只同步标题，不触发载入（载入会清空当前消息）。
+        suppressSelectionLoad = true;
+        try
+        {
+            SelectedSession = match;
+        }
+        finally
+        {
+            suppressSelectionLoad = false;
+        }
     }
 
     private ChatMessageViewModel AppendStreamingMessage(DateTimeOffset? timestamp = null)

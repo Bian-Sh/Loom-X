@@ -75,50 +75,95 @@
     <Style Selector="Button.session-row-button:pointerover">
       <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
     </Style>
+
+    <!-- 输入区：上下两层共用一个外框，内部控件一律“裸奔”，不再各自变色/描边 -->
+    <Style Selector="TextBox.plain">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.plain:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style Selector="TextBox.plain:focus">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <!-- 权限 / 模型：沉浸进输入卡的功能区，没有自己的背景与边框 -->
+    <Style Selector="ComboBox.bare">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="2,0"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Height" Value="24"/>
+    </Style>
+    <Style Selector="ComboBox.bare:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ComboBox.bare:focus">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.bare">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="4,0"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="CornerRadius" Value="7"/>
+    </Style>
+    <Style Selector="Button.bare:pointerover">
+      <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}"/>
+    </Style>
   </UserControl.Styles>
 
-  <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="12">
+  <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
 
     <!-- 标题区：会话名居中（右侧图标不参与居中计算），右侧只放图标 -->
-    <Grid Grid.Row="0" Height="30">
+    <Grid Grid.Row="0" Height="22">
       <TextBlock Text="{Binding CurrentSessionTitle}"
                  HorizontalAlignment="Center"
                  VerticalAlignment="Center"
                  MaxWidth="480"
-                 FontSize="14"
+                 FontSize="13"
                  FontWeight="SemiBold"
                  TextTrimming="CharacterEllipsis"
                  TextWrapping="NoWrap"/>
       <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
-        <Button x:Name="historyButton" Classes="icon" Click="HistoryButton_OnClick"
+        <Button x:Name="historyButton" Classes="icon" Width="22" Height="22" CornerRadius="7"
+                Click="HistoryButton_OnClick"
                 ToolTip.Tip="{l:Locale assistant.history.list.tooltip}"
                 AutomationProperties.Name="{l:Locale assistant.history.list.tooltip}">
           <Path Classes="icon-glyph"
                 Data="M 12,3 A 9,9 0 1 0 12,21 A 9,9 0 1 0 12,3 M 12,7.5 V 12.3 L 15.6,14.3"
-                Width="16" Height="16"/>
+                Width="14" Height="14"/>
         </Button>
-        <Button Classes="icon" Command="{Binding NewSessionCommand}"
+        <Button Classes="icon" Width="22" Height="22" CornerRadius="7" Command="{Binding NewSessionCommand}"
                 ToolTip.Tip="{l:Locale assistant.session.new}"
                 AutomationProperties.Name="{l:Locale assistant.session.new}">
-          <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="16" Height="16"/>
+          <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="14" Height="14"/>
         </Button>
       </StackPanel>
     </Grid>
 
-    <!-- 消息流 -->
-    <Border Grid.Row="1"
-            Background="{DynamicResource SurfaceSubtleBrush}"
-            BorderBrush="{DynamicResource BorderBrush}"
-            BorderThickness="1"
-            CornerRadius="18"
-            Padding="14,12">
-      <Grid>
-        <ScrollViewer x:Name="MessageScroll">
-          <Grid>
+    <!-- 消息流：不画外框，消息直接铺在页面上 -->
+    <Grid Grid.Row="1">
+      <ScrollViewer x:Name="MessageScroll" Padding="0,2">
+        <StackPanel>
 
             <!-- 空态 -->
             <StackPanel IsVisible="{Binding HasNoMessages}" Spacing="10"
-                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,56">
+                        HorizontalAlignment="Center" Margin="0,64">
               <Path Classes="icon-glyph"
                     Data="M 6,9 C 6,7.3 8.2,6 11,6 H 21 C 23.8,6 26,7.3 26,9 V 17 C 26,18.7 23.8,20 21,20 H 15 L 10.5,24 V 20 C 7.9,19.7 6,18.5 6,17 Z M 12,11 H 20 M 12,14.5 H 17"
                     Width="36" Height="36" Stroke="{DynamicResource TextTertiaryBrush}"/>
@@ -208,10 +253,45 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-          </Grid>
-        </ScrollViewer>
+            <!-- 运行态：跟在流式输出末尾，位置随内容走 -->
+            <StackPanel IsVisible="{Binding IsRunning}" Orientation="Horizontal" Spacing="8"
+                        HorizontalAlignment="Left" Margin="0,10,0,2">
+              <ProgressBar IsIndeterminate="True" Width="46" Height="3" MinHeight="0"
+                           VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+              <TextBlock Text="{Binding StatusText}" FontSize="12" Classes="muted" VerticalAlignment="Center"
+                         IsVisible="{Binding StatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}"/>
+            </StackPanel>
 
-        <Button x:Name="JumpButton" Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            <!-- 失败态：请求失败卡片，带重试 -->
+            <Border IsVisible="{Binding HasError}" HorizontalAlignment="Left" MaxWidth="560" Margin="0,12,0,2"
+                    Padding="12,10" CornerRadius="12"
+                    Background="{DynamicResource DangerSoftBrush}"
+                    BorderBrush="{DynamicResource DangerBorderBrush}" BorderThickness="1">
+              <StackPanel Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Path Classes="icon-glyph" Data="M 16,5 L 28,26 H 4 Z M 16,11 V 18 M 16,21.5 V 23"
+                        Width="15" Height="15" Stroke="{DynamicResource DangerBrush}"/>
+                  <TextBlock Text="{l:Locale assistant.status.failed}" FontWeight="SemiBold" FontSize="13"
+                             VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Classes="muted" TextWrapping="Wrap"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Command="{Binding RetryCommand}" Height="28" MinHeight="0" Padding="14,0"
+                          CornerRadius="9" Background="{DynamicResource AccentBrush}" Foreground="White"
+                          BorderThickness="0" FontSize="12">
+                    <TextBlock Text="{l:Locale assistant.error.retry}"/>
+                  </Button>
+                  <Button Command="{Binding DismissErrorCommand}" Classes="bare">
+                    <TextBlock Text="{l:Locale assistant.error.dismiss}"/>
+                  </Button>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+        </StackPanel>
+      </ScrollViewer>
+
+      <Button x:Name="JumpButton" Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Margin="0,0,8,4" IsVisible="False" Click="JumpButton_OnClick"
                 ToolTip.Tip="{l:Locale assistant.jump.tooltip}"
                 AutomationProperties.Name="{l:Locale assistant.jump.tooltip}">
@@ -221,8 +301,7 @@
             <TextBlock Text="{l:Locale assistant.jump.tooltip}" VerticalAlignment="Center"/>
           </StackPanel>
         </Button>
-      </Grid>
-    </Border>
+    </Grid>
 
     <!-- 逐条批准：待批准的修改操作卡片 -->
     <Border Grid.Row="2"
@@ -259,67 +338,60 @@
       </Grid>
     </Border>
 
-    <!-- 输入区：上输入框 + 下工具栏（权限 / 模型 / 发送）。两层之间不再有分割线 -->
-    <Grid Grid.Row="3" RowDefinitions="Auto,Auto">
-      <TextBlock Grid.Row="0" Text="{Binding StatusText}" FontSize="11" Classes="muted" Margin="2,0,0,6"
-                 IsVisible="{Binding StatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
-      <Border Grid.Row="1" x:Name="inputCard" Classes="input-card"
-              Background="{DynamicResource SurfaceBrush}"
-              BorderBrush="{DynamicResource BorderBrush}"
-              BorderThickness="1"
-              CornerRadius="18"
-              ClipToBounds="True">
-        <Grid RowDefinitions="Auto,Auto">
-          <TextBox Grid.Row="0" x:Name="inputTextBox"
-                   Text="{Binding InputText}"
-                   Watermark="{l:Locale assistant.input.watermark}"
-                   AcceptsReturn="False"
-                   BorderThickness="0"
-                   Background="Transparent"
-                   MinHeight="46"
-                   Padding="14,12"
-                   KeyDown="OnInputKeyDown"
-                   GotFocus="InputTextBox_OnGotFocus"
-                   LostFocus="InputTextBox_OnLostFocus"/>
-          <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="10,0,10,10">
-            <!-- 修改权限 -->
-            <ComboBox Grid.Column="0" Classes="toolbar"
-                      ItemsSource="{Binding PermissionModeOptions}"
-                      SelectedItem="{Binding SelectedPermissionMode, Mode=TwoWay}"
-                      VerticalAlignment="Center"/>
-            <!-- 模型指定（foldout 弹层，只走 Provider 模型） -->
-            <Button Grid.Column="1" x:Name="modelPickerButton"
-                    HorizontalContentAlignment="Stretch" HorizontalAlignment="Right"
-                    Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                    Padding="8,4" MinWidth="180" MaxWidth="320" CornerRadius="9"
-                    Click="ModelPicker_OnClick"
-                    ToolTip.Tip="{l:Locale assistant.model.select.tooltip}"
-                    AutomationProperties.Name="{l:Locale assistant.model.select.tooltip}">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                <TextBlock Text="{Binding SelectedModelSummary}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                <PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="12" Height="12" VerticalAlignment="Center"/>
-              </Grid>
-            </Button>
-            <!-- 发送 / 取消：主色圆形按钮，一屏唯一主动作 -->
-            <Button Grid.Column="2" x:Name="sendButton" Width="36" Height="36" CornerRadius="18" Padding="0"
-                    Background="{DynamicResource AccentBrush}" BorderThickness="0" Margin="8,0,0,0"
-                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                    Command="{Binding SendCommand}" IsVisible="{Binding !IsRunning}"
-                    ToolTip.Tip="{l:Locale assistant.send}" AutomationProperties.Name="{l:Locale assistant.send}">
-              <Path Classes="icon-glyph" Data="M 21,3 L 10.5,13.5 M 21,3 L 14.5,21 L 10.5,13.5 M 10.5,13.5 L 3,10.2 L 21,3"
-                    Width="18" Height="18" Stroke="White"/>
-            </Button>
-            <Button Grid.Column="2" Width="36" Height="36" CornerRadius="18" Padding="0"
-                    Background="{DynamicResource WarningBrush}" BorderThickness="0" Margin="8,0,0,0"
-                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                    Command="{Binding CancelCommand}" IsVisible="{Binding IsRunning}"
-                    ToolTip.Tip="{l:Locale assistant.cancel}" AutomationProperties.Name="{l:Locale assistant.cancel}">
-              <Path Classes="icon-glyph" Data="M 9,9 H 23 V 23 H 9 Z" Width="16" Height="16" Stroke="White"/>
-            </Button>
-          </Grid>
+    <!-- 输入区：上输入框 + 下功能区（权限 / 模型 / 发送）。整张卡一个外框，内部控件不再各自描边 -->
+    <Border Grid.Row="3" x:Name="inputCard" Classes="input-card"
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="14"
+            ClipToBounds="True">
+      <Grid RowDefinitions="Auto,Auto">
+        <TextBox Grid.Row="0" x:Name="inputTextBox" Classes="plain"
+                 Text="{Binding InputText}"
+                 Watermark="{l:Locale assistant.input.watermark}"
+                 AcceptsReturn="False"
+                 MinHeight="40"
+                 Padding="12,10"
+                 KeyDown="OnInputKeyDown"
+                 GotFocus="InputTextBox_OnGotFocus"
+                 LostFocus="InputTextBox_OnLostFocus"/>
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="8,0,8,6">
+          <!-- 修改权限：沉浸在功能区里，没有自己的背景 -->
+          <ComboBox Grid.Column="0" Classes="bare"
+                    ItemsSource="{Binding PermissionModeOptions}"
+                    SelectedItem="{Binding SelectedPermissionMode, Mode=TwoWay}"
+                    VerticalAlignment="Center"/>
+          <!-- 模型指定（foldout 弹层，只走 Provider 模型） -->
+          <Button Grid.Column="1" x:Name="modelPickerButton" Classes="bare"
+                  HorizontalContentAlignment="Stretch" HorizontalAlignment="Right"
+                  MinWidth="160" MaxWidth="320"
+                  Click="ModelPicker_OnClick"
+                  ToolTip.Tip="{l:Locale assistant.model.select.tooltip}"
+                  AutomationProperties.Name="{l:Locale assistant.model.select.tooltip}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+              <TextBlock Text="{Binding SelectedModelSummary}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+              <PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="11" Height="11" VerticalAlignment="Center"/>
+            </Grid>
+          </Button>
+          <!-- 发送 / 取消：主色圆形按钮，一屏唯一主动作 -->
+          <Button Grid.Column="2" x:Name="sendButton" Width="28" Height="28" CornerRadius="14" Padding="0"
+                  Background="{DynamicResource AccentBrush}" BorderThickness="0" Margin="6,0,0,0"
+                  MinHeight="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  Command="{Binding SendCommand}" IsVisible="{Binding !IsRunning}"
+                  ToolTip.Tip="{l:Locale assistant.send}" AutomationProperties.Name="{l:Locale assistant.send}">
+            <Path Classes="icon-glyph" Data="M 21,3 L 10.5,13.5 M 21,3 L 14.5,21 L 10.5,13.5 M 10.5,13.5 L 3,10.2 L 21,3"
+                  Width="14" Height="14" Stroke="White"/>
+          </Button>
+          <Button Grid.Column="2" Width="28" Height="28" CornerRadius="14" Padding="0"
+                  Background="{DynamicResource WarningBrush}" BorderThickness="0" Margin="6,0,0,0"
+                  MinHeight="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  Command="{Binding CancelCommand}" IsVisible="{Binding IsRunning}"
+                  ToolTip.Tip="{l:Locale assistant.cancel}" AutomationProperties.Name="{l:Locale assistant.cancel}">
+            <Path Classes="icon-glyph" Data="M 9,9 H 23 V 23 H 9 Z" Width="12" Height="12" Stroke="White"/>
+          </Button>
         </Grid>
-      </Border>
-    </Grid>
+      </Grid>
+    </Border>
 
     <!-- 历史会话浮层：尖角从面板顶边长出，与外框形成闭环 -->
     <Popup x:Name="historyPopup" PlacementTarget="{Binding #historyButton}" Placement="Bottom"
@@ -366,13 +438,13 @@
             </StackPanel>
           </ScrollViewer>
         </Border>
-        <!-- 尖角：12×12 方块旋转 45°，只保留上与左两条边；后声明 → 盖住面板顶边那一段 -->
-        <Border Grid.Row="0" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Top"
-                Margin="0,3,0,0" RenderTransformOrigin="50%,50%"
-                Background="{DynamicResource PopupBackgroundBrush}"
-                BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1,0,0,1">
-          <Border.RenderTransform><RotateTransform Angle="45"/></Border.RenderTransform>
-        </Border>
+        <!-- 尖角：朝上的等腰三角形，只描两条斜边（不画底边），
+             底边比面板顶边低 1px —— 后声明压在面板之上，把顶边那段盖掉形成闭环 -->
+        <Path Grid.Row="0" Width="14" Height="9" HorizontalAlignment="Center" VerticalAlignment="Top"
+              Margin="0,0,0,-1"
+              Fill="{DynamicResource PopupBackgroundBrush}"
+              Stroke="{DynamicResource BorderStrongBrush}" StrokeThickness="1" StrokeLineCap="Round"
+              Data="M 0.7,8.5 L 7,1 L 13.3,8.5"/>
       </Grid>
     </Popup>
 
