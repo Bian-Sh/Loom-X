@@ -168,6 +168,19 @@ public sealed class AssistantViewModelTests
     }
 
     [Fact]
+    public void NewSession_LeavesMessageStreamEmpty_NoSystemNotice()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "之前的对话" });
+        Assert.NotEmpty(viewModel.Messages);
+
+        viewModel.NewSessionCommand.Execute(null);
+
+        // 空会话就该回到空态，不塞“新会话已开始”这类系统提示
+        Assert.Empty(viewModel.Messages);
+    }
+
+    [Fact]
     public void ModelOption_MatchesSearchByDisplayNameOrModelId()
     {
         var option = new AssistantModelOptionViewModel("p1", "gpt-4o-mini", "GPT 4o Mini");

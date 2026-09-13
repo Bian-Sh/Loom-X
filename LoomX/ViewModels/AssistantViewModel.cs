@@ -593,8 +593,7 @@ public sealed class AssistantViewModel : NotifyViewModel
         {
             suppressSelectionLoad = false;
         }
-
-        AddSystemMessage("新会话已开始。");
+        // 刻意不在消息流里插“新会话已开始”：空会话就该回到空态，别拿系统提示占位置。
     }
 
     /// <summary>删除历史会话；删除当前会话时自动开新会话。</summary>
