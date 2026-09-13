@@ -50,6 +50,24 @@
     <Style Selector="Button:pressed">
       <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />
     </Style>
+    <!-- 主行动按钮：一屏只出现一次 -->
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Opacity" Value="0.88" />
+    </Style>
+    <Style Selector="Button.primary:pressed">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Opacity" Value="0.78" />
+    </Style>
+    <Style Selector="Button.primary:disabled">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
     <Style Selector="TextBox, ComboBox, NumericUpDown">
       <Setter Property="MinHeight" Value="36" />
       <Setter Property="Padding" Value="10,7" />

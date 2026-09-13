@@ -30,6 +30,7 @@ public sealed class AssistantViewModel : NotifyViewModel
     private ChatMessageViewModel? currentSteps;
     private bool suppressSelectionLoad;
     private bool isModelPickerOpen;
+    private bool isHistoryOpen;
     private string selectedModelSummary = string.Empty;
     private string selectedModelName = string.Empty;
     private string modelSearchTerm = string.Empty;
@@ -67,6 +68,9 @@ public sealed class AssistantViewModel : NotifyViewModel
         var service = ResolveService();
         selectedPermissionMode = PermissionModeOptions.First(item => item.Mode == (service?.PermissionMode ?? AssistantPermissionMode.AutoApprove));
         selectedReasoningEffort = ReasoningEffortOptions.First(item => item.Value == (service?.ReasoningEffort ?? AssistantPreferences.DefaultReasoningEffort));
+
+        Messages.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNoMessages));
+        Sessions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNoSessions));
 
         RefreshSessions();
         RefreshModelSummary();
@@ -112,19 +116,39 @@ public sealed class AssistantViewModel : NotifyViewModel
         }
     }
 
-    /// <summary>历史会话下拉选择；选中即载入。</summary>
+    /// <summary>历史会话选择；选中即载入。</summary>
     public AssistantSessionSummary? SelectedSession
     {
         get => selectedSession;
         set
         {
             if (!SetProperty(ref selectedSession, value)) return;
+            OnPropertyChanged(nameof(CurrentSessionTitle));
             if (value is not null && !suppressSelectionLoad)
             {
                 _ = LoadSessionAsync(value);
             }
         }
     }
+
+    /// <summary>标题区展示的会话名；未选中历史会话时回退到“新会话”。</summary>
+    public string CurrentSessionTitle =>
+        string.IsNullOrWhiteSpace(selectedSession?.Title)
+            ? ResourceLookup.Resolve("assistant.session.new")
+            : selectedSession!.Title;
+
+    /// <summary>历史会话浮层开关（双向绑定到 Popup）。</summary>
+    public bool IsHistoryOpen
+    {
+        get => isHistoryOpen;
+        set => SetProperty(ref isHistoryOpen, value);
+    }
+
+    /// <summary>消息流为空时展示空态。</summary>
+    public bool HasNoMessages => Messages.Count == 0;
+
+    /// <summary>历史会话浮层没有任何记录。</summary>
+    public bool HasNoSessions => Sessions.Count == 0;
 
     /// <summary>修改权限模式；切换即持久化到助手偏好。</summary>
     public AssistantPermissionOption SelectedPermissionMode
@@ -571,7 +595,8 @@ public sealed class AssistantViewModel : NotifyViewModel
         currentSteps = null;
     }
 
-    private void RefreshSessions()
+    /// <summary>重新加载历史会话列表（打开历史浮层前调用，保证列表是最新的）。</summary>
+    public void RefreshSessions()
     {
         Sessions.Clear();
         var service = ResolveService();
@@ -729,8 +754,15 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     public bool IsExpanded
     {
         get => isExpanded;
-        set => SetProperty(ref isExpanded, value);
+        set
+        {
+            if (!SetProperty(ref isExpanded, value)) return;
+            OnPropertyChanged(nameof(ExpandIconAngle));
+        }
     }
+
+    /// <summary>过程块折叠箭头的旋转角度：折叠朝右，展开朝下。</summary>
+    public double ExpandIconAngle => IsExpanded ? 90 : 0;
 
     public bool IsUser => Role == ChatRole.User && kind == ChatEntryKind.Message;
 
@@ -742,7 +774,22 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     public string Text
     {
         get => text;
-        private set => SetProperty(ref text, value);
+        private set
+        {
+            if (SetProperty(ref text, value)) OnPropertyChanged(nameof(ProcessPreview));
+        }
+    }
+
+    /// <summary>过程块折叠时展示的内部最新一行（不显示“思考/处理步骤”这类标签）。</summary>
+    public string ProcessPreview
+    {
+        get
+        {
+            if (text.Length == 0) return string.Empty;
+            var span = text.AsSpan().TrimEnd();
+            var index = span.LastIndexOfAny('\r', '\n');
+            return (index >= 0 ? span[(index + 1)..] : span).Trim().ToString();
+        }
     }
 
     public bool IsStreaming

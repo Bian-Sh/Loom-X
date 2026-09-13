@@ -24,9 +24,11 @@ public partial class AssistantView : UserControl
         DataContextChanged += (_, _) =>
         {
             modelPopup.DataContext = DataContext;
+            historyPopup.DataContext = DataContext;
             HookAutoScroll();
         };
         modelPopup.DataContext = DataContext;
+        historyPopup.DataContext = DataContext;
         HookAutoScroll();
     }
 
@@ -93,6 +95,41 @@ public partial class AssistantView : UserControl
             viewModel.SendCommand.Execute(null);
             args.Handled = true;
         }
+    }
+
+    /// <summary>标题区历史会话图标：切换浮层，并在打开前刷新列表。</summary>
+    private void HistoryButton_OnClick(object? sender, RoutedEventArgs args)
+    {
+        if (DataContext is not AssistantViewModel viewModel) return;
+        var next = !viewModel.IsHistoryOpen;
+        if (next) viewModel.RefreshSessions();
+        viewModel.IsHistoryOpen = next;
+    }
+
+    /// <summary>历史会话项主体：载入该会话（删除按钮独立处理，不走到这里）。</summary>
+    private void LoadHistoryItem_OnClick(object? sender, RoutedEventArgs args)
+    {
+        if (sender is not Button { Tag: AssistantSessionSummary summary }) return;
+        if (DataContext is not AssistantViewModel viewModel) return;
+        viewModel.IsHistoryOpen = false;
+        if (viewModel.LoadSessionCommand.CanExecute(summary)) viewModel.LoadSessionCommand.Execute(summary);
+    }
+
+    /// <summary>过程块（思考 / 处理步骤）折叠与展开。</summary>
+    private void ToggleProcess_OnClick(object? sender, RoutedEventArgs args)
+    {
+        if (sender is Button { Tag: ChatMessageViewModel message }) message.IsExpanded = !message.IsExpanded;
+    }
+
+    /// <summary>输入框获得焦点：整张输入卡边框高亮（取代中间的分割线）。</summary>
+    private void InputTextBox_OnGotFocus(object? sender, GotFocusEventArgs args)
+    {
+        if (!inputCard.Classes.Contains("focused")) inputCard.Classes.Add("focused");
+    }
+
+    private void InputTextBox_OnLostFocus(object? sender, RoutedEventArgs args)
+    {
+        inputCard.Classes.Remove("focused");
     }
 
     /// <summary>历史会话项内回收站：删除该会话（不触发选中载入）。</summary>

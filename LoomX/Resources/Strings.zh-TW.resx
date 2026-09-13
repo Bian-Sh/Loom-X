@@ -1333,6 +1333,11 @@
   <data name="assistant.history.placeholder">
     <value>歷史會話…</value>
   </data>
+  <data name="assistant.session.new"><value>新會話</value></data>
+  <data name="assistant.history.list.tooltip"><value>歷史對話</value></data>
+  <data name="assistant.history.empty"><value>尚無歷史對話</value></data>
+  <data name="assistant.empty.title"><value>還沒有對話</value></data>
+  <data name="assistant.empty.description"><value>輸入第一則訊息開始，或從右上角的歷史對話繼續。</value></data>
   <data name="assistant.new_session">
     <value>＋ 新會話</value>
   </data>

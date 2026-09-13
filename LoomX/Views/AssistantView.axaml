@@ -6,103 +6,223 @@
              xmlns:l="using:LoomX.Localization"
              x:Class="LoomX.Views.AssistantView">
   <UserControl.Styles>
-    <Style Selector="Button.icon"><Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="7"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
-    <Style Selector="StackPanel.user-message StackPanel.user-actions"><Setter Property="Opacity" Value="0"/></Style>
-    <Style Selector="StackPanel.user-message:pointerover StackPanel.user-actions"><Setter Property="Opacity" Value="1"/></Style>
-    <Style Selector="StackPanel.user-message:focus-within StackPanel.user-actions"><Setter Property="Opacity" Value="1"/></Style>
-    <Style Selector="ComboBox.toolbar"><Setter Property="Height" Value="30"/><Setter Property="FontSize" Value="12"/></Style>
-    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
-  </UserControl.Styles>
-  <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
+    <!-- 图标按钮：30×30 圆形圆角，无边框，hover 才出底 -->
+    <Style Selector="Button.icon">
+      <Setter Property="Width" Value="30"/>
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.icon:pointerover">
+      <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}"/>
+    </Style>
 
-    <!-- 顶部：历史会话（项内右侧回收站删除）+ 新会话 -->
-    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-      <ComboBox Grid.Column="0"
-                ItemsSource="{Binding Sessions}"
-                SelectedItem="{Binding SelectedSession}"
-                PlaceholderText="{l:Locale assistant.history.placeholder}">
-        <ComboBox.ItemTemplate>
-          <DataTemplate>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" MinWidth="220">
-              <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-              <Button Grid.Column="1" Classes="icon" Tag="{Binding}" Click="DeleteHistoryItem_OnClick"
-                      ToolTip.Tip="{l:Locale assistant.history.delete.tooltip}"
-                      AutomationProperties.Name="{l:Locale assistant.history.delete.tooltip}">
-                <Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="13" Height="13"/>
-              </Button>
-            </Grid>
-          </DataTemplate>
-        </ComboBox.ItemTemplate>
-      </ComboBox>
-      <Button Grid.Column="1" Classes="icon" Command="{Binding NewSessionCommand}" Margin="8,0,0,0"
-              ToolTip.Tip="{l:Locale assistant.new_session}" AutomationProperties.Name="{l:Locale assistant.new_session}">
-        <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="15" Height="15"/>
-      </Button>
+    <!-- 过程块折叠头：无 header 背景，只靠 2px 淡竖线做分割 -->
+    <Style Selector="Button.process">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0,2"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="Button.process:pointerover">
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+
+    <!-- 消息悬浮操作区（时间 / 复制） -->
+    <Style Selector="StackPanel.msg-body StackPanel.msg-actions"><Setter Property="Opacity" Value="0"/></Style>
+    <Style Selector="StackPanel.msg-body:pointerover StackPanel.msg-actions"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="StackPanel.msg-body:focus-within StackPanel.msg-actions"><Setter Property="Opacity" Value="1"/></Style>
+
+    <!-- 跳至最新消息：胶囊按钮 -->
+    <Style Selector="Button.pill">
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="999"/>
+      <Setter Property="Padding" Value="12,6"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+    </Style>
+
+    <Style Selector="ComboBox.toolbar">
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="FontSize" Value="12"/>
+    </Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
+
+    <!-- 输入卡：输入框获得焦点时整卡边框高亮（取代中间的分割线） -->
+    <Style Selector="Border.input-card.focused">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+      <Setter Property="BorderThickness" Value="1.5"/>
+    </Style>
+
+    <!-- 历史会话项：删除按钮默认不显示，划入该项才显示 -->
+    <Style Selector="Grid.session-row Button.session-delete"><Setter Property="Opacity" Value="0"/></Style>
+    <Style Selector="Grid.session-row:pointerover Button.session-delete"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="Button.session-row-button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="12">
+
+    <!-- 标题区：会话名居中（右侧图标不参与居中计算），右侧只放图标 -->
+    <Grid Grid.Row="0" Height="30">
+      <TextBlock Text="{Binding CurrentSessionTitle}"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"
+                 MaxWidth="480"
+                 FontSize="14"
+                 FontWeight="SemiBold"
+                 TextTrimming="CharacterEllipsis"
+                 TextWrapping="NoWrap"/>
+      <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <Button x:Name="historyButton" Classes="icon" Click="HistoryButton_OnClick"
+                ToolTip.Tip="{l:Locale assistant.history.list.tooltip}"
+                AutomationProperties.Name="{l:Locale assistant.history.list.tooltip}">
+          <Path Classes="icon-glyph"
+                Data="M 12,3 A 9,9 0 1 0 12,21 A 9,9 0 1 0 12,3 M 12,7.5 V 12.3 L 15.6,14.3"
+                Width="16" Height="16"/>
+        </Button>
+        <Button Classes="icon" Command="{Binding NewSessionCommand}"
+                ToolTip.Tip="{l:Locale assistant.session.new}"
+                AutomationProperties.Name="{l:Locale assistant.session.new}">
+          <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="16" Height="16"/>
+        </Button>
+      </StackPanel>
     </Grid>
 
     <!-- 消息流 -->
-    <Grid Grid.Row="1">
-    <ScrollViewer x:Name="MessageScroll">
-      <ItemsControl ItemsSource="{Binding Messages}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <Grid Margin="0,4">
+    <Border Grid.Row="1"
+            Background="{DynamicResource SurfaceSubtleBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="18"
+            Padding="14,12">
+      <Grid>
+        <ScrollViewer x:Name="MessageScroll">
+          <Grid>
 
-              <!-- 状态/工具消息 -->
-              <TextBlock IsVisible="{Binding IsStatus}"
-                         Text="{Binding Text}"
-                         FontSize="12"
-                         Opacity="0.65"
-                         TextWrapping="Wrap"
-                         Margin="4,0" />
+            <!-- 空态 -->
+            <StackPanel IsVisible="{Binding HasNoMessages}" Spacing="10"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,56">
+              <Path Classes="icon-glyph"
+                    Data="M 6,9 C 6,7.3 8.2,6 11,6 H 21 C 23.8,6 26,7.3 26,9 V 17 C 26,18.7 23.8,20 21,20 H 15 L 10.5,24 V 20 C 7.9,19.7 6,18.5 6,17 Z M 12,11 H 20 M 12,14.5 H 17"
+                    Width="36" Height="36" Stroke="{DynamicResource TextTertiaryBrush}"/>
+              <TextBlock Text="{l:Locale assistant.empty.title}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+              <TextBlock Text="{l:Locale assistant.empty.description}" Classes="muted" FontSize="12"
+                         TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300" HorizontalAlignment="Center"/>
+            </StackPanel>
 
-              <Expander IsVisible="{Binding IsProcess}" Header="{Binding Label}"
-                        IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
-                        HorizontalAlignment="Stretch" Margin="4,2" FontSize="12">
-                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" Opacity="0.72" Margin="12,4,4,8"/>
-              </Expander>
+            <ItemsControl ItemsSource="{Binding Messages}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid>
 
-              <!-- 用户消息：右对齐气泡 -->
-              <StackPanel Classes="user-message" IsVisible="{Binding IsUser}" HorizontalAlignment="Right" MaxWidth="560">
-                <Border Padding="10,8" CornerRadius="7" Background="{DynamicResource AccentSoftBrush}"
-                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
-                  <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
-                </Border>
-                <StackPanel Classes="user-actions" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5" Height="25">
-                  <TextBlock Text="{Binding DisplayTime}" Classes="muted" FontSize="10" VerticalAlignment="Center"/>
-                  <Button Classes="icon" Tag="{Binding}" Click="CopyMessage_OnClick" Width="24" Height="24"
-                          ToolTip.Tip="{l:Locale assistant.copy.tooltip}" AutomationProperties.Name="{l:Locale assistant.copy.tooltip}">
-                    <Path Classes="icon-glyph" Data="M 9,8 H 20 V 23 H 9 Z M 5,18 H 4 V 4 H 16 V 8" Width="13" Height="13"/>
-                  </Button>
-                </StackPanel>
-              </StackPanel>
+                    <!-- 状态行 -->
+                    <TextBlock IsVisible="{Binding IsStatus}"
+                               Text="{Binding Text}"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextTertiaryBrush}"
+                               TextWrapping="Wrap"
+                               HorizontalAlignment="Center"
+                               Margin="0,2"/>
 
-              <!-- 助手消息：Markdown 实时渲染 -->
-              <StackPanel IsVisible="{Binding IsAssistantMessage}" HorizontalAlignment="Left" MaxWidth="640">
-                <Border Padding="10,8" CornerRadius="7" Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
-                  <md:MarkdownRenderer MarkdownBuilder="{Binding Markdown}" />
-                </Border>
-                <StackPanel Orientation="Horizontal" Spacing="5" Height="25">
-                  <TextBlock Text="{Binding DisplayTime}" Classes="muted" FontSize="10" VerticalAlignment="Center"/>
-                  <Button Classes="icon" Tag="{Binding}" Click="CopyMessage_OnClick" Width="24" Height="24"
-                          ToolTip.Tip="{l:Locale assistant.copy.tooltip}" AutomationProperties.Name="{l:Locale assistant.copy.tooltip}">
-                    <Path Classes="icon-glyph" Data="M 9,8 H 20 V 23 H 9 Z M 5,18 H 4 V 4 H 16 V 8" Width="13" Height="13"/>
-                  </Button>
-                </StackPanel>
-              </StackPanel>
+                    <!-- 过程块：折叠显示内部最新一行，展开才显示“思考 / 处理步骤” -->
+                    <Grid IsVisible="{Binding IsProcess}" ColumnDefinitions="Auto,Auto" ColumnSpacing="8"
+                          HorizontalAlignment="Left" Margin="0,2">
+                      <Border Grid.Column="0" Width="2" CornerRadius="1" Margin="0,3"
+                              Background="{DynamicResource SurfaceMutedBrush}" VerticalAlignment="Stretch"/>
+                      <StackPanel Grid.Column="1">
+                        <Button Classes="process" Tag="{Binding}" Click="ToggleProcess_OnClick"
+                                ToolTip.Tip="{l:Locale assistant.history.list.tooltip}"
+                                AutomationProperties.Name="{Binding Label}">
+                          <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
+                            <Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="12" Height="12"
+                                  Stroke="{DynamicResource TextTertiaryBrush}"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  RenderTransformOrigin="50%,50%">
+                              <Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform>
+                            </Path>
+                            <TextBlock Grid.Column="1" Text="{Binding ProcessPreview}" IsVisible="{Binding !IsExpanded}"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="520" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Label}" IsVisible="{Binding IsExpanded}"
+                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
+                          </Grid>
+                        </Button>
+                        <TextBlock Text="{Binding Text}" IsVisible="{Binding IsExpanded}"
+                                   FontSize="12" LineHeight="19" TextWrapping="Wrap" MaxWidth="560"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="20,4,4,2"/>
+                      </StackPanel>
+                    </Grid>
 
-            </Grid>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </ScrollViewer>
-    <Button x:Name="JumpButton" Classes="icon" HorizontalAlignment="Center" VerticalAlignment="Bottom"
-            Margin="0,0,0,12" IsVisible="False" Click="JumpButton_OnClick"
-            ToolTip.Tip="{l:Locale assistant.jump.tooltip}" AutomationProperties.Name="{l:Locale assistant.jump.tooltip}">
-      <Path Classes="icon-glyph" Data="M 16,5 V 24 M 9,18 L 16,25 L 23,18" Width="16" Height="16"/>
-    </Button>
-    </Grid>
+                    <!-- 用户消息：右对齐气泡 -->
+                    <StackPanel Classes="msg-body" IsVisible="{Binding IsUser}" HorizontalAlignment="Right"
+                                MaxWidth="560" Margin="0,6">
+                      <Border Padding="12,10" CornerRadius="18,18,6,18" Background="{DynamicResource AccentSoftBrush}">
+                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="14" LineHeight="22"/>
+                      </Border>
+                      <StackPanel Classes="msg-actions" Orientation="Horizontal" HorizontalAlignment="Right"
+                                  Spacing="4" Height="24" Margin="0,2,4,0">
+                        <TextBlock Text="{Binding DisplayTime}" Classes="muted" FontSize="10" VerticalAlignment="Center"/>
+                        <Button Classes="icon" Tag="{Binding}" Click="CopyMessage_OnClick" Width="24" Height="24"
+                                ToolTip.Tip="{l:Locale assistant.copy.tooltip}"
+                                AutomationProperties.Name="{l:Locale assistant.copy.tooltip}">
+                          <Path Classes="icon-glyph" Data="M 9,8 H 20 V 23 H 9 Z M 5,18 H 4 V 4 H 16 V 8" Width="13" Height="13"/>
+                        </Button>
+                      </StackPanel>
+                    </StackPanel>
+
+                    <!-- 助手消息：Markdown 实时渲染 -->
+                    <StackPanel Classes="msg-body" IsVisible="{Binding IsAssistantMessage}" HorizontalAlignment="Left"
+                                MaxWidth="640" Margin="0,6">
+                      <Border Padding="12,10" CornerRadius="18,18,18,6" Background="{DynamicResource SurfaceBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <md:MarkdownRenderer MarkdownBuilder="{Binding Markdown}" />
+                      </Border>
+                      <StackPanel Classes="msg-actions" Orientation="Horizontal" Spacing="4" Height="24" Margin="4,2,0,0">
+                        <TextBlock Text="{Binding DisplayTime}" Classes="muted" FontSize="10" VerticalAlignment="Center"/>
+                        <Button Classes="icon" Tag="{Binding}" Click="CopyMessage_OnClick" Width="24" Height="24"
+                                ToolTip.Tip="{l:Locale assistant.copy.tooltip}"
+                                AutomationProperties.Name="{l:Locale assistant.copy.tooltip}">
+                          <Path Classes="icon-glyph" Data="M 9,8 H 20 V 23 H 9 Z M 5,18 H 4 V 4 H 16 V 8" Width="13" Height="13"/>
+                        </Button>
+                      </StackPanel>
+                    </StackPanel>
+
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+          </Grid>
+        </ScrollViewer>
+
+        <Button x:Name="JumpButton" Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,0,8,4" IsVisible="False" Click="JumpButton_OnClick"
+                ToolTip.Tip="{l:Locale assistant.jump.tooltip}"
+                AutomationProperties.Name="{l:Locale assistant.jump.tooltip}">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Path Classes="icon-glyph" Data="M 16,5 V 24 M 9,18 L 16,25 L 23,18" Width="13" Height="13"
+                  Stroke="{DynamicResource AccentBrush}"/>
+            <TextBlock Text="{l:Locale assistant.jump.tooltip}" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+      </Grid>
+    </Border>
 
     <!-- 逐条批准：待批准的修改操作卡片 -->
     <Border Grid.Row="2"
@@ -110,48 +230,58 @@
             Background="{DynamicResource WarningSoftBrush}"
             BorderBrush="{DynamicResource WarningBorderBrush}"
             BorderThickness="1"
-            CornerRadius="10"
-            Padding="12,10">
+            CornerRadius="14"
+            Padding="14,12">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" DataContext="{Binding PendingApproval}">
         <StackPanel Spacing="4">
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
-            <TextBlock Text="{l:Locale assistant.approval.title}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-            <TextBlock Grid.Column="1" Text="{Binding ToolName}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center"/>
-          </Grid>
-          <TextBlock Text="{Binding ArgumentsSummary}" Classes="muted" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap" MaxHeight="60"
-                     IsVisible="{Binding HasArguments}"/>
+          <TextBlock Text="{l:Locale assistant.approval.title}" FontWeight="SemiBold" FontSize="13"/>
+          <TextBlock Text="{Binding ToolName}" FontFamily="Consolas" FontSize="12" Classes="muted"/>
+          <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="8" Padding="8,6"
+                  IsVisible="{Binding HasArguments}">
+            <TextBlock Text="{Binding ArgumentsSummary}" FontSize="11" FontFamily="Consolas" Classes="muted"
+                       TextWrapping="Wrap" MaxHeight="60"/>
+          </Border>
         </StackPanel>
-        <Button Grid.Column="1" Classes="icon" Command="{Binding ApproveCommand}" VerticalAlignment="Center"
-                ToolTip.Tip="{l:Locale assistant.approval.approve}" AutomationProperties.Name="{l:Locale assistant.approval.approve}">
-          <Path Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15"/>
+        <Button Grid.Column="1" Command="{Binding RejectCommand}" VerticalAlignment="Center"
+                Height="34" Padding="14,0" CornerRadius="11" BorderThickness="1"
+                Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource WarningBorderBrush}"
+                ToolTip.Tip="{l:Locale assistant.approval.reject}"
+                AutomationProperties.Name="{l:Locale assistant.approval.reject}">
+          <TextBlock Text="{l:Locale assistant.approval.reject}"/>
         </Button>
-        <Button Grid.Column="2" Classes="icon" Command="{Binding RejectCommand}" VerticalAlignment="Center"
-                ToolTip.Tip="{l:Locale assistant.approval.reject}" AutomationProperties.Name="{l:Locale assistant.approval.reject}">
-          <Path Classes="icon-glyph" Data="M 7,7 L 25,25 M 25,7 L 7,25" Width="15" Height="15"/>
+        <Button Grid.Column="2" Command="{Binding ApproveCommand}" VerticalAlignment="Center"
+                Height="34" Padding="14,0" CornerRadius="11" BorderThickness="0"
+                Background="{DynamicResource SuccessBrush}" Foreground="White"
+                ToolTip.Tip="{l:Locale assistant.approval.approve}"
+                AutomationProperties.Name="{l:Locale assistant.approval.approve}">
+          <TextBlock Text="{l:Locale assistant.approval.approve}"/>
         </Button>
       </Grid>
     </Border>
 
-    <!-- 输入区：上输入框 + 下工具栏（权限 / 模型 / 发送） -->
+    <!-- 输入区：上输入框 + 下工具栏（权限 / 模型 / 发送）。两层之间不再有分割线 -->
     <Grid Grid.Row="3" RowDefinitions="Auto,Auto">
-      <TextBlock Grid.Row="0" Text="{Binding StatusText}" FontSize="12" Opacity="0.65" Margin="2,0,0,4"
+      <TextBlock Grid.Row="0" Text="{Binding StatusText}" FontSize="11" Classes="muted" Margin="2,0,0,6"
                  IsVisible="{Binding StatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
-      <Border Grid.Row="1"
+      <Border Grid.Row="1" x:Name="inputCard" Classes="input-card"
               Background="{DynamicResource SurfaceBrush}"
               BorderBrush="{DynamicResource BorderBrush}"
               BorderThickness="1"
-              CornerRadius="10"
+              CornerRadius="18"
               ClipToBounds="True">
         <Grid RowDefinitions="Auto,Auto">
-          <TextBox Grid.Row="0"
+          <TextBox Grid.Row="0" x:Name="inputTextBox"
                    Text="{Binding InputText}"
                    Watermark="{l:Locale assistant.input.watermark}"
                    AcceptsReturn="False"
                    BorderThickness="0"
                    Background="Transparent"
-                   KeyDown="OnInputKeyDown" />
-          <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="6,0,6,4">
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                   MinHeight="46"
+                   Padding="14,12"
+                   KeyDown="OnInputKeyDown"
+                   GotFocus="InputTextBox_OnGotFocus"
+                   LostFocus="InputTextBox_OnLostFocus"/>
+          <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="10,0,10,10">
             <!-- 修改权限 -->
             <ComboBox Grid.Column="0" Classes="toolbar"
                       ItemsSource="{Binding PermissionModeOptions}"
@@ -161,7 +291,7 @@
             <Button Grid.Column="1" x:Name="modelPickerButton"
                     HorizontalContentAlignment="Stretch" HorizontalAlignment="Right"
                     Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                    Padding="8,4" MinWidth="180" MaxWidth="320"
+                    Padding="8,4" MinWidth="180" MaxWidth="320" CornerRadius="9"
                     Click="ModelPicker_OnClick"
                     ToolTip.Tip="{l:Locale assistant.model.select.tooltip}"
                     AutomationProperties.Name="{l:Locale assistant.model.select.tooltip}">
@@ -170,27 +300,83 @@
                 <PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="12" Height="12" VerticalAlignment="Center"/>
               </Grid>
             </Button>
-            <Button Grid.Column="2"
-                    Classes="icon"
-                    Command="{Binding SendCommand}"
-                    ToolTip.Tip="{l:Locale assistant.send}" AutomationProperties.Name="{l:Locale assistant.send}"
-                    IsVisible="{Binding !IsRunning}">
-              <Path Classes="icon-glyph" Data="M 4,16 L 28,4 L 21,28 L 16,18 Z M 16,18 L 28,4" Width="16" Height="16"/>
+            <!-- 发送 / 取消：主色圆形按钮，一屏唯一主动作 -->
+            <Button Grid.Column="2" x:Name="sendButton" Width="36" Height="36" CornerRadius="18" Padding="0"
+                    Background="{DynamicResource AccentBrush}" BorderThickness="0" Margin="8,0,0,0"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Command="{Binding SendCommand}" IsVisible="{Binding !IsRunning}"
+                    ToolTip.Tip="{l:Locale assistant.send}" AutomationProperties.Name="{l:Locale assistant.send}">
+              <Path Classes="icon-glyph" Data="M 21,3 L 10.5,13.5 M 21,3 L 14.5,21 L 10.5,13.5 M 10.5,13.5 L 3,10.2 L 21,3"
+                    Width="18" Height="18" Stroke="White"/>
             </Button>
-            <Button Grid.Column="2"
-                    Classes="icon"
-                    Command="{Binding CancelCommand}"
-                    ToolTip.Tip="{l:Locale assistant.cancel}" AutomationProperties.Name="{l:Locale assistant.cancel}"
-                    IsVisible="{Binding IsRunning}">
-              <Path Classes="icon-glyph" Data="M 8,8 H 24 V 24 H 8 Z" Width="14" Height="14"/>
+            <Button Grid.Column="2" Width="36" Height="36" CornerRadius="18" Padding="0"
+                    Background="{DynamicResource WarningBrush}" BorderThickness="0" Margin="8,0,0,0"
+                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                    Command="{Binding CancelCommand}" IsVisible="{Binding IsRunning}"
+                    ToolTip.Tip="{l:Locale assistant.cancel}" AutomationProperties.Name="{l:Locale assistant.cancel}">
+              <Path Classes="icon-glyph" Data="M 9,9 H 23 V 23 H 9 Z" Width="16" Height="16" Stroke="White"/>
             </Button>
-            </Grid>
-          </Border>
+          </Grid>
         </Grid>
       </Border>
     </Grid>
 
-    <!-- 模型选择弹层：与网关 model combo 添加子项同款 foldout UI -->
+    <!-- 历史会话浮层：尖角从面板顶边长出，与外框形成闭环 -->
+    <Popup x:Name="historyPopup" PlacementTarget="{Binding #historyButton}" Placement="Bottom"
+           IsLightDismissEnabled="True" IsOpen="{Binding IsHistoryOpen, Mode=TwoWay}"
+           PlacementConstraintAdjustment="None"
+           HorizontalOffset="-135" VerticalOffset="6">
+      <Grid RowDefinitions="Auto,Auto">
+        <Border Grid.Row="1" Width="300" MaxHeight="360"
+                Background="{DynamicResource PopupBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1"
+                CornerRadius="14" Padding="8" ClipToBounds="True">
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="2">
+              <ItemsControl ItemsSource="{Binding Sessions}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Grid Classes="session-row" Height="46">
+                      <Button Classes="session-row-button" Tag="{Binding}" Click="LoadHistoryItem_OnClick"
+                              HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                              Background="Transparent" BorderThickness="0" CornerRadius="9" Padding="12,0">
+                        <StackPanel VerticalAlignment="Center" Margin="0,0,26,0">
+                          <TextBlock Text="{Binding Title}" FontSize="13" MaxWidth="248"
+                                     TextTrimming="CharacterEllipsis" HorizontalAlignment="Left"/>
+                          <TextBlock Text="{Binding DisplayUpdatedAt}" Classes="muted" FontSize="11" HorizontalAlignment="Left"/>
+                        </StackPanel>
+                      </Button>
+                      <!-- 删除按钮浮在文字之上：不挤压文字，也不会被长标题挤走 -->
+                      <Button Classes="icon session-delete" Tag="{Binding}" Click="DeleteHistoryItem_OnClick"
+                              HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,6,0"
+                              Width="22" Height="22" CornerRadius="6"
+                              Background="{DynamicResource SurfaceSubtleBrush}"
+                              ToolTip.Tip="{l:Locale assistant.history.delete.tooltip}"
+                              AutomationProperties.Name="{l:Locale assistant.history.delete.tooltip}">
+                        <Path Classes="icon-glyph"
+                              Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6"
+                              Width="13" Height="13"/>
+                      </Button>
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="{l:Locale assistant.history.empty}" Classes="muted" HorizontalAlignment="Center"
+                         Margin="0,12" IsVisible="{Binding HasNoSessions}"/>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+        <!-- 尖角：12×12 方块旋转 45°，只保留上与左两条边；后声明 → 盖住面板顶边那一段 -->
+        <Border Grid.Row="0" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Top"
+                Margin="0,3,0,0" RenderTransformOrigin="50%,50%"
+                Background="{DynamicResource PopupBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1,0,0,1">
+          <Border.RenderTransform><RotateTransform Angle="45"/></Border.RenderTransform>
+        </Border>
+      </Grid>
+    </Popup>
+
+    <!-- 模型选择弹层：与网关 foldout 同款 -->
     <Popup x:Name="modelPopup" PlacementTarget="{Binding #modelPickerButton}" Placement="Top" IsLightDismissEnabled="True"
            IsOpen="{Binding IsModelPickerOpen, Mode=TwoWay}" HorizontalOffset="0" VerticalOffset="-5">
       <Border Width="360" MaxHeight="420" Background="{DynamicResource PopupBackgroundBrush}"
@@ -204,7 +390,7 @@
                   <DataTemplate DataType="{x:Type vm:AssistantModelGroupViewModel}">
                     <StackPanel Spacing="2" Margin="0,0,0,6">
                       <Button Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
-                              Background="{DynamicResource SurfaceSubtleBrush}" BorderThickness="0" Padding="10,9">
+                              Background="{DynamicResource SurfaceSubtleBrush}" BorderThickness="0" Padding="10,9" CornerRadius="9">
                         <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="8">
                           <Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="14" Height="14" Stroke="{DynamicResource TextSecondaryBrush}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%">
@@ -218,7 +404,7 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate DataType="{x:Type vm:AssistantModelOptionViewModel}">
                             <Button Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
-                                    Background="Transparent" BorderThickness="0" Margin="22,0,0,0" Padding="12,8">
+                                    Background="Transparent" BorderThickness="0" Margin="22,0,0,0" Padding="12,8" CornerRadius="9">
                               <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
                                 <TextBlock Text="{Binding DisplayName}"/>
                                 <Path Grid.Column="1" Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15"

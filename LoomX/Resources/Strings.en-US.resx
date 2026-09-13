@@ -469,6 +469,11 @@
   <data name="providers.connection.status.pending"><value>Connection not tested</value></data>
   <data name="placeholder.empty.body"><value>No additional details.</value></data>
   <data name="assistant.history.placeholder"><value>History…</value></data>
+  <data name="assistant.session.new"><value>New chat</value></data>
+  <data name="assistant.history.list.tooltip"><value>History</value></data>
+  <data name="assistant.history.empty"><value>No history yet</value></data>
+  <data name="assistant.empty.title"><value>No messages yet</value></data>
+  <data name="assistant.empty.description"><value>Send your first message, or open a previous chat from the top-right history.</value></data>
   <data name="assistant.new_session"><value>＋ New chat</value></data>
   <data name="assistant.send"><value>Send</value></data>
   <data name="assistant.cancel"><value>Cancel</value></data>

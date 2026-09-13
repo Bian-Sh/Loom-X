@@ -11,7 +11,11 @@ public sealed record AssistantSessionSummary(
     string Title,
     string State,
     DateTimeOffset UpdatedAt,
-    int MessageCount);
+    int MessageCount)
+{
+    /// <summary>列表展示用的更新时间（本地时区）。</summary>
+    public string DisplayUpdatedAt => UpdatedAt.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
+}
 
 /// <summary>
 /// 会话持久化（规格 #17）：保存 Session/Messages/任务状态，

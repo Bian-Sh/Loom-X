@@ -1333,6 +1333,11 @@
   <data name="assistant.history.placeholder">
     <value>履歴…</value>
   </data>
+  <data name="assistant.session.new"><value>新規チャット</value></data>
+  <data name="assistant.history.list.tooltip"><value>履歴</value></data>
+  <data name="assistant.history.empty"><value>履歴はまだありません</value></data>
+  <data name="assistant.empty.title"><value>まだ会話がありません</value></data>
+  <data name="assistant.empty.description"><value>最初のメッセージを送信するか、右上の履歴から過去の会話を開いてください。</value></data>
   <data name="assistant.new_session">
     <value>＋ 新規チャット</value>
   </data>
