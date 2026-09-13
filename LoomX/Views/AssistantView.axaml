@@ -161,17 +161,6 @@
       <ScrollViewer x:Name="MessageScroll" Padding="0,2">
         <StackPanel>
 
-            <!-- 空态 -->
-            <StackPanel IsVisible="{Binding HasNoMessages}" Spacing="10"
-                        HorizontalAlignment="Center" Margin="0,64">
-              <Path Classes="icon-glyph"
-                    Data="M 6,9 C 6,7.3 8.2,6 11,6 H 21 C 23.8,6 26,7.3 26,9 V 17 C 26,18.7 23.8,20 21,20 H 15 L 10.5,24 V 20 C 7.9,19.7 6,18.5 6,17 Z M 12,11 H 20 M 12,14.5 H 17"
-                    Width="36" Height="36" Stroke="{DynamicResource TextTertiaryBrush}"/>
-              <TextBlock Text="{l:Locale assistant.empty.title}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-              <TextBlock Text="{l:Locale assistant.empty.description}" Classes="muted" FontSize="12"
-                         TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300" HorizontalAlignment="Center"/>
-            </StackPanel>
-
             <ItemsControl ItemsSource="{Binding Messages}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
@@ -292,6 +281,19 @@
 
         </StackPanel>
       </ScrollViewer>
+
+      <!-- 空态：铺在 chat 区域上层而不是滚动内容里，才能在整个聊天区真正垂直 + 水平居中 -->
+      <StackPanel IsVisible="{Binding HasNoMessages}" Spacing="10"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Path Classes="icon-glyph"
+              Data="M 6,9 C 6,7.3 8.2,6 11,6 H 21 C 23.8,6 26,7.3 26,9 V 17 C 26,18.7 23.8,20 21,20 H 15 L 10.5,24 V 20 C 7.9,19.7 6,18.5 6,17 Z M 12,11 H 20 M 12,14.5 H 17"
+              Width="36" Height="36" Stroke="{DynamicResource TextTertiaryBrush}"
+              HorizontalAlignment="Center"/>
+        <TextBlock Text="{l:Locale assistant.empty.title}" FontSize="15" FontWeight="SemiBold"
+                   HorizontalAlignment="Center" TextAlignment="Center"/>
+        <TextBlock Text="{l:Locale assistant.empty.description}" Classes="muted" FontSize="12"
+                   TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300" HorizontalAlignment="Center"/>
+      </StackPanel>
 
       <Button x:Name="JumpButton" Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Margin="0,0,8,4" IsVisible="False" Click="JumpButton_OnClick"
