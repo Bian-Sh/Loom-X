@@ -1,0 +1,6 @@
+{
+  "openspec_proposal": "openspec/changes/fix-assistant-session-switch-lifecycle/proposal.md",
+  "openspec_design": "openspec/changes/fix-assistant-session-switch-lifecycle/design.md",
+  "openspec_tasks": "openspec/changes/fix-assistant-session-switch-lifecycle/tasks.md",
+  "openspec_delta_spec": "openspec/changes/fix-assistant-session-switch-lifecycle/specs/assistant-session-lifecycle/spec.md"
+}

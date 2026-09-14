@@ -224,6 +224,7 @@ public sealed class AssistantService
                 throw new InvalidOperationException("AI 助手正在运行中，请先等待或取消。");
             }
 
+            var runSession = CurrentSession;
             var modelClient = await modelClientFactory.TryCreateAsync(cancellationToken);
             if (modelClient is null)
             {
@@ -239,21 +240,21 @@ public sealed class AssistantService
                     : null;
                 var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate,
                     ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded);
-                await foreach (var agentEvent in loop.RunAsync(CurrentSession, userMessage, currentRun.Token))
+                await foreach (var agentEvent in loop.RunAsync(runSession, userMessage, currentRun.Token))
                 {
                     if (agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta or AgentEventKind.MessageCompleted))
-                        CurrentSession.RecordActivity(agentEvent);
+                        runSession.RecordActivity(agentEvent);
                     if (!persistenceBlocked && agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta))
                     {
                         var failedToSave = false;
-                        try { await sessionStore.SaveAsync(CurrentSession, CancellationToken.None); }
+                        try { await sessionStore.SaveAsync(runSession, CancellationToken.None); }
                         catch (Exception exception)
                         {
                             persistenceBlocked = true;
                             failedToSave = true;
-                            logger.LogError(exception, "AI 助手会话无法继续保存 {SessionId}", CurrentSession.Id);
+                            logger.LogError(exception, "AI 助手会话无法继续保存 {SessionId}", runSession.Id);
                         }
-                        if (failedToSave) yield return AgentEvent.Create(CurrentSession.Id, AgentEventKind.PersistenceFailed);
+                        if (failedToSave) yield return AgentEvent.Create(runSession.Id, AgentEventKind.PersistenceFailed);
                     }
                     yield return agentEvent;
                 }
@@ -265,11 +266,11 @@ public sealed class AssistantService
 
                 try
                 {
-                    if (!persistenceBlocked) await sessionStore.SaveAsync(CurrentSession, CancellationToken.None);
+                    if (!persistenceBlocked) await sessionStore.SaveAsync(runSession, CancellationToken.None);
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, "AI 助手会话保存失败 {SessionId}", CurrentSession.Id);
+                    logger.LogError(exception, "AI 助手会话保存失败 {SessionId}", runSession.Id);
                 }
             }
         }

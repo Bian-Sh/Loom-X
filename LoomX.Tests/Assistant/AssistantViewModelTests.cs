@@ -44,6 +44,24 @@ public sealed class AssistantViewModelTests
     }
 
     [Fact]
+    public void Project_EventFromOtherSession_DoesNotPolluteViewedSession()
+    {
+        var viewModel = CreateViewModel();
+
+        viewModel.Project(
+            AgentEvent.Create("running-session", AgentEventKind.TextDelta) with { Text = "旧会话输出" },
+            "viewed-session");
+
+        Assert.Empty(viewModel.Messages);
+
+        viewModel.Project(
+            AgentEvent.Create("viewed-session", AgentEventKind.TextDelta) with { Text = "当前会话输出" },
+            "viewed-session");
+
+        Assert.Equal("当前会话输出", Assert.Single(viewModel.Messages).Text);
+    }
+
+    [Fact]
     public void Project_ToolEvents_AggregatesCollapsedSteps()
     {
         var viewModel = CreateViewModel();

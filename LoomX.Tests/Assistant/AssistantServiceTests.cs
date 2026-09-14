@@ -120,7 +120,7 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.Contains(service.CurrentSession.Messages, message => message.Content == "查询 Provider");
     }
 
-    [Fact(Skip = "TODO：输出中切换会话会让后续持久化跟随可变 CurrentSession，需固定运行会话并隔离 UI 投影后启用。")]
+    [Fact]
     public async Task SendAsync_SwitchSessionDuringStreaming_PersistsOriginalRunWithoutPollutingViewedSession()
     {
         var model = new SessionSwitchModelClient();

@@ -287,7 +287,7 @@ public sealed class AssistantViewModel : NotifyViewModel
             service.ApprovalHandler = ShowApprovalAsync;
             await foreach (var agentEvent in service.SendAsync(text))
             {
-                await Dispatcher.UIThread.InvokeAsync(() => Project(agentEvent));
+                await Dispatcher.UIThread.InvokeAsync(() => Project(agentEvent, service.CurrentSession.Id));
             }
         }
         catch (InvalidOperationException exception)
@@ -366,8 +366,11 @@ public sealed class AssistantViewModel : NotifyViewModel
     private static string StepLabel => ResourceLookup.Resolve("assistant.process.steps");
 
     /// <summary>AgentEvent → UI 投影（规格 #15：UI 只消费事件）。</summary>
-    internal void Project(AgentEvent agentEvent)
+    internal void Project(AgentEvent agentEvent, string? viewedSessionId = null)
     {
+        if (viewedSessionId is not null &&
+            !string.Equals(agentEvent.SessionId, viewedSessionId, StringComparison.Ordinal)) return;
+
         switch (agentEvent.Kind)
         {
             case AgentEventKind.SessionStarted:
@@ -716,7 +719,8 @@ public sealed class AssistantViewModel : NotifyViewModel
         {
             if (entry.Activity is { } activity)
             {
-                if (activity.Kind is not (AgentEventKind.SessionStarted or AgentEventKind.MessageCompleted)) Project(activity);
+                if (activity.Kind is not (AgentEventKind.SessionStarted or AgentEventKind.MessageCompleted))
+                    Project(activity, session.Id);
                 continue;
             }
             var message = entry.Message!;
@@ -730,7 +734,7 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             if (message.Role == ChatRole.Tool)
             {
-                Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message });
+                Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message }, session.Id);
                 if (!hasToolActivities)
                 {
                     Project(new AgentEvent(session.Id, AgentEventKind.ToolCallCompleted, message.Timestamp)
@@ -738,7 +742,7 @@ public sealed class AssistantViewModel : NotifyViewModel
                         ToolCallId = message.ToolCallId,
                         ToolName = message.ToolName,
                         Success = true,
-                    });
+                    }, session.Id);
                 }
                 continue;
             }
@@ -749,15 +753,15 @@ public sealed class AssistantViewModel : NotifyViewModel
                 {
                     if (block.Kind == ChatContentKind.Thinking)
                         Project(new AgentEvent(session.Id, AgentEventKind.ReasoningDelta, message.Timestamp)
-                        { Text = block.Text, IsSummary = block.IsSummary });
+                        { Text = block.Text, IsSummary = block.IsSummary }, session.Id);
                     else if (block.Kind == ChatContentKind.Text)
-                        Project(new AgentEvent(session.Id, AgentEventKind.TextDelta, message.Timestamp) { Text = block.Text });
+                        Project(new AgentEvent(session.Id, AgentEventKind.TextDelta, message.Timestamp) { Text = block.Text }, session.Id);
                 }
             }
             else if (!string.IsNullOrWhiteSpace(message.Content))
-                Project(new AgentEvent(session.Id, AgentEventKind.TextDelta, message.Timestamp) { Text = message.Content });
+                Project(new AgentEvent(session.Id, AgentEventKind.TextDelta, message.Timestamp) { Text = message.Content }, session.Id);
 
-            Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message });
+            Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message }, session.Id);
         }
         streamingMessage = null;
         currentGroup = null;
