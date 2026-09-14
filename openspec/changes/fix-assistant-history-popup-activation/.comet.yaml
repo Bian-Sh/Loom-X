@@ -1,6 +1,6 @@
 workflow: hotfix
 language: zh-CN
-phase: build
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: c90f1c573e77f7a2f14f06780b9c2affc8667902
 design_doc: null
 plan: null
-verify_result: fail
-verification_report: docs/superpowers/reports/2026-09-14-fix-assistant-history-popup-activation-verify.md
+verify_result: pass
+verification_report: docs/superpowers/reports/2026-09-15-fix-assistant-history-popup-activation-verify.md
 branch_status: handled
 created_at: 2026-09-14
-verified_at: null
+verified_at: 2026-09-15
 archived: false
 direct_override: null
 handoff_context: null
