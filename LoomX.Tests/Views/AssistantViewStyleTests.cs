@@ -33,8 +33,32 @@ public sealed class AssistantViewStyleTests
         Assert.Equal(TextWrapping.Wrap, input.TextWrapping);
         Assert.Equal(ScrollBarVisibility.Auto, input.GetValue(ScrollViewer.VerticalScrollBarVisibilityProperty));
         Assert.Equal(ScrollBarVisibility.Disabled, input.GetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty));
-        Assert.Equal(320, popupSurface.Width);
-        Assert.Equal(400, popupSurface.MaxHeight);
+        Assert.Equal(296, popupSurface.Width);
+        Assert.Equal(360, popupSurface.MaxHeight);
+    }
+
+    [Fact]
+    public void ModelPopupUsesDenseProviderAndModelRows()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var providerButton = new Button();
+        providerButton.Classes.Add("model-provider");
+        var modelButton = new Button();
+        modelButton.Classes.Add("model-option");
+
+        var view = new AssistantView();
+        var root = Assert.IsType<Grid>(view.Content);
+        root.Children.Add(providerButton);
+        root.Children.Add(modelButton);
+        var host = new Window { Content = view };
+        host.Measure(new Size(1180, 760));
+        host.Arrange(new Rect(0, 0, 1180, 760));
+
+        Assert.Equal(32, providerButton.Height);
+        Assert.Equal(new Thickness(8, 6), providerButton.Padding);
+        Assert.Equal(30, modelButton.Height);
+        Assert.Equal(new Thickness(10, 5), modelButton.Padding);
     }
 
     [Fact]
