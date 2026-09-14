@@ -362,6 +362,15 @@
     <Style Selector="TextBox.model-search:focus">
       <Setter Property="Background" Value="Transparent"/>
     </Style>
+    <Style Selector="TextBox.model-search /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.model-search:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.model-search:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
     <Style Selector="Button.model-provider">
       <Setter Property="MinHeight" Value="0"/>
       <Setter Property="Height" Value="32"/>

@@ -1,6 +1,6 @@
 workflow: tweak
 language: zh-CN
-phase: archive
+phase: verify
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: ce6ff7a4bbf7f2ece489a75d9edd109156859f72
 design_doc: null
 plan: null
-verify_result: pass
+verify_result: pending
 verification_report: docs/superpowers/reports/2026-09-14-polish-assistant-chat-layout-verify.md
 branch_status: handled
 created_at: 2026-09-14
-verified_at: 2026-09-14
+verified_at: null
 archived: false
 direct_override: null
 handoff_context: null

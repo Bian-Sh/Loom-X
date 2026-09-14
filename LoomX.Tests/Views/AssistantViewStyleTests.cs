@@ -62,17 +62,38 @@ public sealed class AssistantViewStyleTests
     }
 
     [Fact]
-    public void ModelSearchKeepsPopupMaterialVisible()
+    public void FocusedModelSearchKeepsPopupMaterialVisible()
     {
         AvaloniaTestBootstrap.Ensure();
 
+        var modelSearch = new TextBox();
+        modelSearch.Classes.Add("model-search");
         var view = new AssistantView();
-        var modelSearch = Assert.IsType<TextBox>(view.FindControl<TextBox>("modelSearch"));
+        var root = Assert.IsType<Grid>(view.Content);
+        root.Children.Add(modelSearch);
         var host = new Window { Content = view };
         host.Measure(new Size(1180, 760));
         host.Arrange(new Rect(0, 0, 1180, 760));
+        host.Show();
+        try
+        {
+            Assert.True(modelSearch.Focus());
+            modelSearch.ApplyTemplate();
 
-        Assert.Equal(Brushes.Transparent, modelSearch.Background);
+            var visibleTemplateBackgrounds = modelSearch.GetVisualDescendants()
+                .OfType<Border>()
+                .Where(border => border.Background is ISolidColorBrush brush && brush.Color.A > 0)
+                .Select(border => $"{border.Name ?? "<unnamed>"}: {border.Background}")
+                .ToArray();
+
+            Assert.True(modelSearch.IsFocused);
+            Assert.Equal(Brushes.Transparent, modelSearch.Background);
+            Assert.Empty(visibleTemplateBackgrounds);
+        }
+        finally
+        {
+            host.Close();
+        }
     }
 
     [Fact]
