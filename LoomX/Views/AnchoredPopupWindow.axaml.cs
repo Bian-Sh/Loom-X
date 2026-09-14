@@ -9,7 +9,8 @@ namespace LoomX.Views;
 
 /// <summary>
 /// 锚定浮层：一个独立的无边框顶层窗口，可以浮到主窗口之外（Avalonia 的 Popup 做不到）。
-/// 尖角按锚点的<b>屏幕坐标</b>动态偏移，所以永远精准指向锚点中心，
+/// 默认把面板<b>水平居中</b>在锚点正下方（尖角落在面板中间），再整体夹回屏幕可视区；
+/// 尖角按锚点的<b>屏幕坐标</b>反推偏移，所以永远精准指向锚点中心，
 /// 即便面板被屏幕边缘挤开也不会跑偏。
 /// </summary>
 public partial class AnchoredPopupWindow : Window
@@ -18,9 +19,17 @@ public partial class AnchoredPopupWindow : Window
     private const double ArrowHeight = 9;
     private const double Gap = 6;
 
+    /// <summary>面板圆角半径，必须与 <c>AnchoredPopupWindow.axaml</c> 里 panel 的 CornerRadius 保持一致。</summary>
+    private const double PanelCornerRadius = 14;
+
+    /// <summary>
+    /// 尖角中心距离面板左右边缘的最小距离。尖角底边半宽是 <see cref="ArrowWidth"/> / 2，
+    /// 底边若落进圆角段就会悬空，所以最小内缩 = 圆角半径 + 半个尖角宽。
+    /// </summary>
+    private const double ArrowMinInset = PanelCornerRadius + ArrowWidth / 2;
+
     private Window? ownerWindow;
     private Control? anchor;
-    private double cornerRadius = 14;
 
     public AnchoredPopupWindow()
     {
@@ -91,10 +100,11 @@ public partial class AnchoredPopupWindow : Window
         var screen = Screens.ScreenFromPoint(anchorPoint) ?? Screens.Primary;
         var area = screen?.WorkingArea;
 
-        var left = anchorPoint.X - (ArrowWidth / 2) * scaling;
+        // 先按“面板居中在锚点下方”摆：尖角落在面板正中，正好指向锚点。
+        var left = anchorPoint.X - windowWidth / 2;
         var top = anchorPoint.Y + Gap * scaling;
 
-        // 先按“尖角对准锚点”摆，再夹回屏幕可视区
+        // 再整体夹回屏幕可视区：宁可让尖角偏离面板中心，也不能让面板出屏。
         if (area is { } bounds)
         {
             if (left + windowWidth > bounds.Right) left = bounds.Right - windowWidth;
@@ -105,10 +115,12 @@ public partial class AnchoredPopupWindow : Window
 
         Position = new PixelPoint((int)Math.Round(left), (int)Math.Round(top));
 
-        // 窗口被夹开后，反推尖角应该落在面板的哪个位置
+        // 面板被屏幕挤开后，反推尖角应该落在面板的哪个位置：对准锚点，
+        // 只在会压到面板圆角时向内收 —— 注意不能再动窗口位置，
+        // 否则会像修这个问题之前那样，尖角被推离锚点却又没人补偿。
         var arrowCenterInWindow = (anchorPoint.X - left) / scaling;
-        var limit = Math.Max(cornerRadius, ArrowWidth);
-        var clamped = Math.Clamp(arrowCenterInWindow, limit, Math.Max(limit, panel.Width - limit));
+        var maxInset = Math.Max(ArrowMinInset, panel.Width - ArrowMinInset);
+        var clamped = Math.Clamp(arrowCenterInWindow, ArrowMinInset, maxInset);
         arrow.Margin = new Thickness(clamped - ArrowWidth / 2, 0, 0, -1);
 
         Opacity = 1;

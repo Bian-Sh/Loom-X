@@ -13,7 +13,9 @@
         TransparencyLevelHint="Transparent"
         Background="Transparent">
 
-  <!-- 尖角 + 面板：尖角后声明，压在面板顶边之上盖掉那一段描边，形成闭环 -->
+  <!-- 尖角 + 面板：尖角后声明，压在面板顶边之上盖掉那一段描边，形成闭环。
+       panel 的 CornerRadius 与 AnchoredPopupWindow.axaml.cs 里的 CornerRadius 常量必须一致
+       （尖角的最小内缩是按圆角半径算的）。 -->
   <Grid x:Name="root" RowDefinitions="Auto,Auto">
     <Border x:Name="panel" Grid.Row="1"
             Background="{DynamicResource PopupBackgroundBrush}"
