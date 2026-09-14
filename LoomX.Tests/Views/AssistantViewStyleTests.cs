@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using LoomX.Services;
 using LoomX.ViewModels;
 using LoomX.Views;
 using System.Collections.ObjectModel;
@@ -308,6 +309,81 @@ public sealed class AssistantViewStyleTests
         Assert.Equal(expected, Assert.IsType<double>(method.Invoke(null, [applicationHeight])), 6);
     }
 
+    [Fact]
+    public void PlainEnterIsInterceptedBeforeMultilineTextBoxHandlesIt()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        using var gatewayService = new GatewayProcessService();
+        var viewModel = new AssistantViewModel(gatewayService) { InputText = "测试消息" };
+        var sent = false;
+        var sendCommandField = typeof(AssistantViewModel).GetField(
+            "<SendCommand>k__BackingField",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(sendCommandField);
+        sendCommandField.SetValue(viewModel, new DelegateCommand(() => sent = true));
+
+        var view = new AssistantView { DataContext = viewModel };
+        var host = new Window { Content = view };
+        host.Show();
+        try
+        {
+            var input = Assert.IsType<TextBox>(view.FindControl<TextBox>("inputTextBox"));
+            input.Text = "测试消息";
+            input.CaretIndex = input.Text.Length;
+            Assert.True(input.Focus());
+
+            var args = new KeyEventArgs
+            {
+                RoutedEvent = InputElement.KeyDownEvent,
+                Source = input,
+                Key = Key.Enter,
+                KeyModifiers = KeyModifiers.None,
+            };
+            input.RaiseEvent(args);
+
+            Assert.True(sent);
+            Assert.True(args.Handled);
+            Assert.Equal("测试消息", input.Text);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
+
+    [Theory]
+    [InlineData(KeyModifiers.Shift)]
+    [InlineData(KeyModifiers.Control)]
+    public void ModifiedEnterStillCreatesLineBreak(KeyModifiers modifiers)
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var view = new AssistantView();
+        var host = new Window { Content = view };
+        host.Show();
+        try
+        {
+            var input = Assert.IsType<TextBox>(view.FindControl<TextBox>("inputTextBox"));
+            input.Text = "第一行";
+            input.CaretIndex = input.Text.Length;
+            Assert.True(input.Focus());
+
+            input.RaiseEvent(new KeyEventArgs
+            {
+                RoutedEvent = InputElement.KeyDownEvent,
+                Source = input,
+                Key = Key.Enter,
+                KeyModifiers = modifiers,
+            });
+
+            Assert.Equal("第一行" + Environment.NewLine, input.Text);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
     [Theory]
     [InlineData(Key.Enter, KeyModifiers.None, true)]
     [InlineData(Key.Enter, KeyModifiers.Shift, false)]

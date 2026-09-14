@@ -41,7 +41,7 @@
 - **WHEN** 用户按 Shift+Enter 或 Ctrl+Enter
 - **THEN** 输入框插入换行且不发送消息
 - **WHEN** 用户单独按 Enter
-- **THEN** 当前消息被发送
+- **THEN** 当前消息在多行输入框默认换行处理之前被发送，输入框不得残留新换行
 
 ### Requirement: 状态消息与输入区保持稳定布局
 

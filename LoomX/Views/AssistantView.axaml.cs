@@ -25,6 +25,7 @@ public partial class AssistantView : UserControl
     public AssistantView()
     {
         InitializeComponent();
+        AddHandler(InputElement.KeyDownEvent, OnInputKeyDown, RoutingStrategies.Tunnel);
         MessageScroll.ScrollChanged += MessageScroll_OnScrollChanged;
         MessageScrollBar.ValueChanged += MessageScrollBar_OnValueChanged;
         SizeChanged += (_, _) =>
@@ -138,12 +139,18 @@ public partial class AssistantView : UserControl
 
     private void OnInputKeyDown(object? sender, KeyEventArgs args)
     {
-        if (ShouldSendMessage(args.Key, args.KeyModifiers) &&
-            DataContext is AssistantViewModel viewModel &&
+        if (!ReferenceEquals(args.Source, inputTextBox) ||
+            !ShouldSendMessage(args.Key, args.KeyModifiers))
+        {
+            return;
+        }
+
+        // 多行 TextBox 会在冒泡阶段先消费 Enter，因此必须在父级隧道阶段拦截。
+        args.Handled = true;
+        if (DataContext is AssistantViewModel viewModel &&
             viewModel.SendCommand.CanExecute(null))
         {
             viewModel.SendCommand.Execute(null);
-            args.Handled = true;
         }
     }
 

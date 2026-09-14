@@ -20,7 +20,7 @@
 1. 给新会话按钮增加独立的 3px 横向渲染位移，不改变标题 StackPanel 的测量宽度和历史按钮位置；相较修改整个容器边距，这能精确增加两个按钮的视觉间距并对齐滚动条中心。
 2. 将消息 `ScrollViewer` 的内置纵向滚动条设为 `Hidden`，在消息内容右侧增加独立 `ScrollBar` 专属列，并由代码后置同步 `Extent`、`Viewport`、`Offset` 和拖动值。独立滚动条关闭自动隐藏，不再覆盖消息内容。
 3. 输入框使用 `AcceptsReturn=True`、自动换行和内部纵向滚动。`AssistantView` 在自身尺寸变化时读取顶层窗口客户区高度，将输入框 `MaxHeight` 设置为其 32%；该计算保持为独立纯函数以便测试。
-4. 键盘处理仅拦截既没有 Shift 也没有 Ctrl 修饰键的 Enter 并执行发送；Shift+Enter、Ctrl+Enter 及两者组合都交回 TextBox 默认多行行为。
+4. 键盘处理仅拦截既没有 Shift 也没有 Ctrl 修饰键的 Enter 并执行发送；Shift+Enter、Ctrl+Enter 及两者组合都交回 TextBox 默认多行行为。由于 Avalonia 多行 `TextBox` 会在目标控件的冒泡处理阶段先消费 Enter 并插入换行，发送处理器注册在 `AssistantView` 父级的 `RoutingStrategies.Tunnel` 阶段，并只处理事件源为 `inputTextBox` 的按键，避免普通 XAML `KeyDown` 处理器被默认多行逻辑抢先截断。
 5. 模型弹层固定宽度从 360px 收窄为 256px，最大高度从 420px 调整为 360px；面板间距收至 6px，搜索框、Provider 标题行与模型行分别压缩到约 32px、32px 和 30px，以实际增加每屏可见模型数量。
 6. 模型搜索框背景在普通、悬停和聚焦状态均保持透明，由弹层自身背景统一承接透明或不透明主题；除设置 `TextBox.Background` 外，还通过局部 `/template/ Border#PART_BorderElement` 样式覆盖 Fluent 模板在聚焦态注入的白色背景，同时保留聚焦边框。模型名称列使用剩余宽度布局，越界时显示省略号，并在整行悬停时通过标准 ToolTip 展示完整名称。
 7. 截图中的失败状态来自 `ChatEntryKind.Status`，其 `TextBlock.HorizontalAlignment="Center"` 会让不同宽度的多行状态按自身宽度居中，产生左右漂移，视觉上像消息布局被打散。状态行改为统一左对齐，并让消息 `ItemsControl` 横向拉伸。根 Grid 取消统一 `RowSpacing`，改由聊天区显式提供顶部 10px、底部 2px 边距，避免空的批准行仍叠加行间距。

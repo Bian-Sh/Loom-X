@@ -581,7 +581,6 @@
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  MinHeight="40"
                  Padding="12,10"
-                 KeyDown="OnInputKeyDown"
                  GotFocus="InputTextBox_OnGotFocus"
                  LostFocus="InputTextBox_OnLostFocus"/>
         <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="8,0,8,6">
