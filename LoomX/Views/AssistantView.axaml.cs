@@ -14,6 +14,7 @@ public partial class AssistantView : UserControl
     private const double BottomThreshold = 4;
     private const double HistoryArrowWidth = 14;
     private const double HistoryArrowMinInset = 21;
+    private const double InputMaxHeightRatio = 0.32;
     private AssistantViewModel? observedModel;
     private bool following = true;
     private bool scrollingToBottom;
@@ -23,6 +24,8 @@ public partial class AssistantView : UserControl
     {
         InitializeComponent();
         MessageScroll.ScrollChanged += MessageScroll_OnScrollChanged;
+        SizeChanged += (_, _) => UpdateInputMaxHeight();
+        AttachedToVisualTree += (_, _) => UpdateInputMaxHeight();
         DataContextChanged += (_, _) =>
         {
             modelPopup.DataContext = DataContext;
@@ -92,12 +95,26 @@ public partial class AssistantView : UserControl
 
     private void OnInputKeyDown(object? sender, KeyEventArgs args)
     {
-        if (args.Key == Key.Enter && DataContext is AssistantViewModel viewModel && viewModel.SendCommand.CanExecute(null))
+        if (ShouldSendMessage(args.Key, args.KeyModifiers) &&
+            DataContext is AssistantViewModel viewModel &&
+            viewModel.SendCommand.CanExecute(null))
         {
             viewModel.SendCommand.Execute(null);
             args.Handled = true;
         }
     }
+
+    private void UpdateInputMaxHeight()
+    {
+        var applicationHeight = TopLevel.GetTopLevel(this)?.ClientSize.Height ?? 0;
+        if (applicationHeight > 0) inputTextBox.MaxHeight = CalculateInputMaxHeight(applicationHeight);
+    }
+
+    internal static double CalculateInputMaxHeight(double applicationHeight) =>
+        applicationHeight * InputMaxHeightRatio;
+
+    internal static bool ShouldSendMessage(Key key, KeyModifiers modifiers) =>
+        key == Key.Enter && !modifiers.HasFlag(KeyModifiers.Shift);
 
     /// <summary>标题区历史会话图标：切换平台浮层，并在打开前刷新列表。</summary>
     private void HistoryButton_OnClick(object? sender, RoutedEventArgs args)
