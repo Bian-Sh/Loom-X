@@ -79,6 +79,24 @@
     <Style Selector="TextBox:focus, ComboBox:focus, NumericUpDown:focus">
       <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
     </Style>
+    <Style Selector="TextBox /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" />
+    </Style>
+    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" />
+    </Style>
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" />
+    </Style>
+    <Style Selector="NumericUpDown /template/ TextBox">
+      <Setter Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" />
+    </Style>
+    <Style Selector="TextBox.input-transparent, ComboBox.input-transparent, NumericUpDown.input-transparent">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="TextBox.input-embedded, ComboBox.input-embedded, NumericUpDown.input-embedded">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
     <Style Selector="ListBoxItem:pointerover">
       <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
     </Style>

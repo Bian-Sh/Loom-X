@@ -118,8 +118,8 @@
                               <DataTemplate>
                                 <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,7" ClipToBounds="True">
                                   <Grid ColumnDefinitions="*,2*,Auto">
-                                    <TextBox Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.headers.name.watermark}" BorderThickness="0" Padding="12,9" FontFamily="Consolas" VerticalContentAlignment="Center"/>
-                                    <TextBox Grid.Column="1" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.headers.value.watermark}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0" Padding="12,9" FontFamily="Consolas" VerticalContentAlignment="Center"/>
+                                    <TextBox Classes="input-embedded" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.headers.name.watermark}" BorderThickness="0" Padding="12,9" FontFamily="Consolas" VerticalContentAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Classes="input-embedded" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.headers.value.watermark}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0" Padding="12,9" FontFamily="Consolas" VerticalContentAlignment="Center"/>
                                     <Button Grid.Column="2" Classes="icon-button" Width="34" Height="34" Margin="4" Click="RemoveHeaderButton_OnClick" ToolTip.Tip="{l:Locale providers.headers.remove.tooltip}" AutomationProperties.Name="{l:Locale providers.headers.remove.tooltip}"><Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="14" Height="14"/></Button>
                                   </Grid>
                                 </Border>
