@@ -14,5 +14,5 @@
 
 ## 4. 验证与发布
 
-- [ ] 4.1 运行完整测试、Release 构建、OpenSpec strict validate 和 `git diff --check`，确认无新增失败。
-- [ ] 4.2 通过后台桌面实机验证普通输入与复合输入的透明聚焦效果，并将新的 `win-x64` exe 发布包输出到带可读时间的 `outputs/` 目录。
+- [x] 4.1 运行完整测试、Release 构建、OpenSpec strict validate 和 `git diff --check`，确认无新增失败。
+- [x] 4.2 通过后台桌面实机验证普通输入与复合输入的透明聚焦效果，并将新的 `win-x64` exe 发布包输出到带可读时间的 `outputs/` 目录。
