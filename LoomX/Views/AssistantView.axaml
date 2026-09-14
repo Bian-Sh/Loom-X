@@ -354,6 +354,13 @@
       <Setter Property="MinHeight" Value="0"/>
       <Setter Property="Height" Value="32"/>
       <Setter Property="Padding" Value="8,5"/>
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.model-search:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.model-search:focus">
+      <Setter Property="Background" Value="Transparent"/>
     </Style>
     <Style Selector="Button.model-provider">
       <Setter Property="MinHeight" Value="0"/>
@@ -757,9 +764,9 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate DataType="{x:Type vm:AssistantModelOptionViewModel}">
                             <Button Classes="model-option" Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
-                                    Background="Transparent" BorderThickness="0" Margin="18,0,0,0">
-                              <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="10">
-                                <TextBlock Text="{Binding DisplayName}"/>
+                                    Background="Transparent" BorderThickness="0" Margin="18,0,0,0" ToolTip.Tip="{Binding DisplayName}">
+                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                 <Path Grid.Column="1" Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15"
                                       Stroke="{DynamicResource SuccessBrush}" IsVisible="{Binding IsSelected}"/>
                               </Grid>

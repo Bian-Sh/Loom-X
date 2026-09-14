@@ -62,6 +62,36 @@ public sealed class AssistantViewStyleTests
     }
 
     [Fact]
+    public void ModelSearchKeepsPopupMaterialVisible()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var view = new AssistantView();
+        var modelSearch = Assert.IsType<TextBox>(view.FindControl<TextBox>("modelSearch"));
+        var host = new Window { Content = view };
+        host.Measure(new Size(1180, 760));
+        host.Arrange(new Rect(0, 0, 1180, 760));
+
+        Assert.Equal(Brushes.Transparent, modelSearch.Background);
+    }
+
+    [Fact]
+    public void LongModelNamesUseEllipsisAndFullNameTooltip()
+    {
+        var path = Path.GetFullPath(Path.Combine(
+            AppContext.BaseDirectory,
+            "..", "..", "..", "..", "LoomX", "Views", "AssistantView.axaml"));
+        var source = File.ReadAllText(path);
+
+        Assert.Contains("<Style Selector=\"TextBox.model-search:pointerover\">", source, StringComparison.Ordinal);
+        Assert.Contains("<Style Selector=\"TextBox.model-search:focus\">", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid ColumnDefinitions=\"*,Auto\" ColumnSpacing=\"10\">", source, StringComparison.Ordinal);
+        Assert.Contains("TextTrimming=\"CharacterEllipsis\"", source, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping=\"NoWrap\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{Binding DisplayName}\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void MessageScrollBarExpandsTowardWindowRight()
     {
         AvaloniaTestBootstrap.Ensure();
