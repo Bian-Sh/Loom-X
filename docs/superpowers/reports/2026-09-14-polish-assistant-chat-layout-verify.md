@@ -14,6 +14,7 @@
 
 - `dotnet test LoomX.slnx --no-restore --nologo`：609/609 通过，0 失败，0 跳过。
 - `dotnet build LoomX.slnx --configuration Release --no-restore --nologo`：0 错误，6 个既有警告。
+- 弹层宽度契约 RED：`Expected: 256 / Actual: 296`，1 条失败、9 条通过；实现后 GREEN：10/10 通过。
 - `openspec validate polish-assistant-chat-layout --strict --json`：1/1 change 校验通过，0 issue。
 - `git diff --check ce6ff7a4bbf7f2ece489a75d9edd109156859f72...HEAD`：通过。
 
@@ -33,16 +34,16 @@
    - 测试：`LoomX.Tests/Views/AssistantViewStyleTests.cs:88` 和 `:102`。
    - 实机：760px 客户区下理论上限 243.2px，UIA 取整为 244px；超过上限后出现 `16 x 224px` 内部滚动条。
 4. 模型选择弹层保持紧凑比例
-   - 实现：`LoomX/Views/AssistantView.axaml:733` 使用 296px 外宽、360px 最大高度和 6px 间距；Provider/模型行分别为 32px/30px。
+   - 实现：`LoomX/Views/AssistantView.axaml:733` 使用 256px 外宽、360px 最大高度和 6px 间距；Provider/模型行分别为 32px/30px。
    - 测试：`LoomX.Tests/Views/AssistantViewStyleTests.cs:20` 和 `:41`。
-   - 实机：搜索框 `282 x 32px`，Provider 行 `282 x 32px`，模型行 `264 x 30px`，列表溢出时出现纵向滚动条，思考等级区域保留。
+   - 实机：搜索框 `242 x 32px`，Provider 行 `242 x 32px`，模型行 `224 x 30px`，列表溢出时出现纵向滚动条，思考等级区域保留。
 
 ## 桌面验证产物
 
-- 发布目录：`outputs/LoomX-win-x64-2026-09-14-compact-popup-verify/`
-- 输入框截图：`assistant-composer-max-height.png`
+- 最新发布目录：`outputs/LoomX-win-x64-2026-09-14-model-popup-256px-verify/`
+- 输入框截图：`outputs/LoomX-win-x64-2026-09-14-compact-popup-verify/assistant-composer-max-height.png`
 - 弹层 UIA 几何：`assistant-model-popup-uia.json`
-- 输入框 UIA 几何：`assistant-composer-uia.json`
+- 输入框 UIA 几何：`outputs/LoomX-win-x64-2026-09-14-compact-popup-verify/assistant-composer-uia.json`
 
 当前启用透明主题时，Avalonia `Popup` 使用独立合成层，CUA 的主窗口位图不会包含弹层本体；UIA 树仍完整暴露弹层控件、边界和滚动条。本报告以 UIA 几何、真实控件测试和 XAML 契约三者交叉验证弹层尺寸，不把主窗口截图缺少 Popup 合成层视为功能失败。
 
