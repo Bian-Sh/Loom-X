@@ -80,6 +80,8 @@ public partial class AnchoredPopupWindow : Window
 
     private void PlaceOffscreen()
     {
+        if (ownerWindow is null) return;
+
         var screen = Screens.ScreenFromWindow(ownerWindow) ?? Screens.Primary;
         if (screen is null) return;
         Position = new PixelPoint(screen.WorkingArea.X - 100000, screen.WorkingArea.Y);
