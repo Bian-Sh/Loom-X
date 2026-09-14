@@ -1505,6 +1505,10 @@
   <data name="assistant.process.elapsed"><value>处理中 {0}</value></data>
   <data name="assistant.process.completed"><value>已完成 {0}</value></data>
   <data name="assistant.process.steps"><value>工具调用</value></data>
+  <data name="assistant.tool.function"><value>函数</value></data>
+  <data name="assistant.tool.arguments"><value>参数</value></data>
+  <data name="assistant.tool.result"><value>结果</value></data>
+  <data name="assistant.tool.failed"><value>{0} 失败</value></data>
   <data name="assistant.step.call"><value>调用工具 {0}</value></data>
   <data name="assistant.step.approval"><value>等待你批准修改：{0}</value></data>
   <data name="assistant.step.completed"><value>{0} 完成</value></data>

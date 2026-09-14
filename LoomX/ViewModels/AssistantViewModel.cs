@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Windows.Input;
 using Avalonia.Threading;
 using LoomX.Assistant;
@@ -355,9 +357,11 @@ public sealed class AssistantViewModel : NotifyViewModel
         return currentGroup;
     }
 
-    /// <summary>取得 foldout 内指定标签的子项；标签与上一项相同则复用，不同则另起一项。</summary>
+    /// <summary>取得 foldout 内指定标签的子项；同一轮只保留一个“思考”和一个“工具调用”。</summary>
     private static ProcessItemViewModel EnsureGroupItem(ChatMessageViewModel group, string label) =>
         group.EnsureItem(label);
+
+    private static string ThinkingLabel => ResourceLookup.Resolve("assistant.process.thinking");
 
     private static string StepLabel => ResourceLookup.Resolve("assistant.process.steps");
 
@@ -384,29 +388,37 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             case AgentEventKind.ReasoningDelta:
             {
-                var label = ResourceLookup.Resolve(agentEvent.IsSummary
-                    ? "assistant.process.summary" : "assistant.process.thinking");
-                EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), label).Append(agentEvent.Text ?? string.Empty);
+                EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), ThinkingLabel)
+                    .Append(agentEvent.Text ?? string.Empty);
                 break;
             }
 
             case AgentEventKind.MessageCompleted:
-                if (agentEvent.Message?.Role == ChatRole.Assistant)
+                if (agentEvent.Message is { Role: ChatRole.Assistant } assistantMessage)
                 {
                     if (streamingMessage is not null) streamingMessage.IsStreaming = false;
+                    if (assistantMessage.ToolCalls.Count > 0)
+                    {
+                        var toolItem = EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), StepLabel);
+                        foreach (var toolCall in assistantMessage.ToolCalls) toolItem.RegisterToolCall(toolCall);
+                    }
                     // 带工具调用的 assistant 消息仍是中间步骤；无工具调用才是完整 finish content。
-                    if (agentEvent.Message.ToolCalls.Count == 0)
+                    if (assistantMessage.ToolCalls.Count == 0)
                     {
                         FinishCurrentGroup(agentEvent.Timestamp);
                         streamingMessage = null;
                     }
+                }
+                else if (agentEvent.Message is { Role: ChatRole.Tool } toolMessage)
+                {
+                    EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), StepLabel).RecordToolResult(toolMessage);
                 }
                 break;
 
             case AgentEventKind.ToolCallStarted:
                 streamingMessage = null;
                 EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), StepLabel)
-                    .Append(string.Format(ResourceLookup.Resolve("assistant.step.call"), agentEvent.ToolName) + "\n");
+                    .RegisterToolCall(agentEvent.ToolCallId, agentEvent.ToolName);
                 break;
 
             case AgentEventKind.ToolApprovalRequested:
@@ -417,9 +429,8 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             case AgentEventKind.ToolCallCompleted:
                 EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), StepLabel)
-                    .Append(agentEvent.Success == true
-                        ? string.Format(ResourceLookup.Resolve("assistant.step.completed"), agentEvent.ToolName) + "\n"
-                        : string.Format(ResourceLookup.Resolve("assistant.step.failed"), agentEvent.ToolName, agentEvent.Detail) + "\n");
+                    .CompleteToolCall(agentEvent.ToolCallId, agentEvent.ToolName,
+                        agentEvent.Success == true, agentEvent.Detail);
                 break;
 
             case AgentEventKind.SkillLoaded:
@@ -709,12 +720,26 @@ public sealed class AssistantViewModel : NotifyViewModel
                 continue;
             }
             var message = entry.Message!;
-            if (message.Role == ChatRole.Tool) continue;
             if (message.Role == ChatRole.User)
             {
                 streamingMessage = null;
                 currentGroup = null;
                 Messages.Add(new ChatMessageViewModel(message.Role, message.Content ?? string.Empty, message.Timestamp));
+                continue;
+            }
+
+            if (message.Role == ChatRole.Tool)
+            {
+                Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message });
+                if (!hasToolActivities)
+                {
+                    Project(new AgentEvent(session.Id, AgentEventKind.ToolCallCompleted, message.Timestamp)
+                    {
+                        ToolCallId = message.ToolCallId,
+                        ToolName = message.ToolName,
+                        Success = true,
+                    });
+                }
                 continue;
             }
 
@@ -733,12 +758,6 @@ public sealed class AssistantViewModel : NotifyViewModel
                 Project(new AgentEvent(session.Id, AgentEventKind.TextDelta, message.Timestamp) { Text = message.Content });
 
             Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message });
-            if (!hasToolActivities && message.ToolCalls.Count > 0)
-            {
-                EnsureGroupItem(EnsureGroup(message.Timestamp), StepLabel)
-                    .Append(string.Join('\n', message.ToolCalls.Select(call =>
-                        string.Format(ResourceLookup.Resolve("assistant.step.call"), call.Name))));
-            }
         }
         streamingMessage = null;
         currentGroup = null;
@@ -978,7 +997,7 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     public bool HasItems => Items.Count > 0;
 
     /// <summary>子项文本的合并结果（供折叠预览与断言使用）。</summary>
-    public string ItemsText => Items.Count == 0 ? string.Empty : string.Join('\n', Items.Select(item => item.Text));
+    public string ItemsText => Items.Count == 0 ? string.Empty : string.Join('\n', Items.Select(item => item.DetailsText));
 
     public DateTimeOffset Timestamp { get; }
 
@@ -1027,6 +1046,7 @@ public sealed class ChatMessageViewModel : NotifyViewModel
         OnPropertyChanged(nameof(Elapsed));
         OnPropertyChanged(nameof(DurationText));
         OnPropertyChanged(nameof(ProcessStatusText));
+        foreach (var item in Items) item.NotifyOwnerFinished();
     }
 
     /// <summary>运行中由计时器驱动的耗时刷新。</summary>
@@ -1086,10 +1106,11 @@ public sealed class ChatMessageViewModel : NotifyViewModel
         OnPropertyChanged(nameof(CanExpand));
     }
 
-    /// <summary>取得指定标签的子项；与最后一项同标签则复用，否则另起一项。</summary>
+    /// <summary>取得指定标签的子项；同一标签在整轮内复用，避免过程区重复出现同类 header。</summary>
     public ProcessItemViewModel EnsureItem(string label)
     {
-        if (Items.Count > 0 && Items[^1].Label == label) return Items[^1];
+        var existing = Items.FirstOrDefault(item => item.Label == label);
+        if (existing is not null) return existing;
         var item = new ProcessItemViewModel(label, this);
         Items.Add(item);
         RefreshPreview();
@@ -1121,7 +1142,7 @@ public sealed class ChatMessageViewModel : NotifyViewModel
 }
 
 /// <summary>
-/// 过程 foldout 里的一个子项（思考 / 摘要 / 工具调用）。
+/// 过程 foldout 里的一个子项（思考 / 工具调用）。
 /// 它<b>不是</b>消息流的一级条目，标签只在父级展开后可见。
 /// </summary>
 public sealed class ProcessItemViewModel : NotifyViewModel
@@ -1139,6 +1160,14 @@ public sealed class ProcessItemViewModel : NotifyViewModel
 
     public ChatMessageViewModel Owner { get; }
 
+    public ObservableCollection<ProcessToolCallViewModel> ToolCalls { get; } = [];
+
+    public bool HasToolCalls => ToolCalls.Count > 0;
+
+    public bool IsTextContent => !HasToolCalls;
+
+    public bool IsContentVisible => IsExpanded && IsTextContent;
+
     public bool IsExpanded
     {
         get => isExpanded;
@@ -1147,13 +1176,14 @@ public sealed class ProcessItemViewModel : NotifyViewModel
             if (!SetProperty(ref isExpanded, value)) return;
             OnPropertyChanged(nameof(HeaderText));
             OnPropertyChanged(nameof(ExpandIconAngle));
+            OnPropertyChanged(nameof(IsContentVisible));
         }
     }
 
     public double ExpandIconAngle => IsExpanded ? 90 : 0;
 
-    /// <summary>折叠时显示最新一行，展开时显示固定标签。</summary>
-    public string HeaderText => IsExpanded || string.IsNullOrEmpty(Preview) ? Label : Preview;
+    /// <summary>仅运行中且折叠时显示最新一行；完成后始终显示多语言固定标签。</summary>
+    public string HeaderText => Owner.IsFinished || IsExpanded || string.IsNullOrEmpty(Preview) ? Label : Preview;
 
     private string Preview
     {
@@ -1177,9 +1207,184 @@ public sealed class ProcessItemViewModel : NotifyViewModel
         }
     }
 
+    /// <summary>包含工具参数与结果的完整文本，供测试与无障碍读取。</summary>
+    public string DetailsText => HasToolCalls
+        ? string.Join("\n\n", ToolCalls.Select(call => call.DetailsText))
+        : Text;
+
     public void Append(string delta) => Text += delta;
 
+    public ProcessToolCallViewModel RegisterToolCall(ToolCall toolCall)
+    {
+        var existing = FindToolCall(toolCall.Id, toolCall.Name);
+        if (existing is not null)
+        {
+            existing.UpdateDefinition(toolCall);
+            return existing;
+        }
+
+        var item = new ProcessToolCallViewModel(toolCall, RefreshToolDetails);
+        ToolCalls.Add(item);
+        OnPropertyChanged(nameof(HasToolCalls));
+        OnPropertyChanged(nameof(IsTextContent));
+        OnPropertyChanged(nameof(IsContentVisible));
+        Append(item.CallHeaderText + "\n");
+        RefreshToolDetails();
+        return item;
+    }
+
+    public ProcessToolCallViewModel RegisterToolCall(string? toolCallId, string? toolName)
+    {
+        var existing = FindToolCall(toolCallId, toolName);
+        return existing ?? RegisterToolCall(new ToolCall(
+            string.IsNullOrWhiteSpace(toolCallId) ? $"event-{ToolCalls.Count}" : toolCallId,
+            toolName ?? string.Empty,
+            "{}"));
+    }
+
+    public void RecordToolResult(ChatMessage message)
+    {
+        var item = FindToolCall(message.ToolCallId, message.ToolName)
+                   ?? RegisterToolCall(message.ToolCallId, message.ToolName);
+        item.SetResult(message.Content);
+    }
+
+    public void CompleteToolCall(string? toolCallId, string? toolName, bool success, string? detail)
+    {
+        var item = FindToolCall(toolCallId, toolName) ?? RegisterToolCall(toolCallId, toolName);
+        item.Complete(success, detail);
+        Append(item.CompletionHeaderText + "\n");
+    }
+
+    public void NotifyOwnerFinished() => OnPropertyChanged(nameof(HeaderText));
+
+    private ProcessToolCallViewModel? FindToolCall(string? toolCallId, string? toolName)
+    {
+        if (!string.IsNullOrWhiteSpace(toolCallId))
+        {
+            var byId = ToolCalls.FirstOrDefault(item => item.Id == toolCallId);
+            if (byId is not null) return byId;
+        }
+
+        return string.IsNullOrWhiteSpace(toolName)
+            ? ToolCalls.LastOrDefault()
+            : ToolCalls.LastOrDefault(item => item.Name == toolName);
+    }
+
+    private void RefreshToolDetails()
+    {
+        OnPropertyChanged(nameof(DetailsText));
+        Owner.RefreshPreview();
+    }
+
     public override string ToString() => $"{Label}: {Text}";
+}
+
+/// <summary>单次工具调用的可探索详情；调用参数与完成结果分别独立折叠。</summary>
+public sealed class ProcessToolCallViewModel : NotifyViewModel
+{
+    private static readonly JsonSerializerOptions PrettyJsonOptions = new() { WriteIndented = true };
+    private readonly Action changed;
+    private string id;
+    private string name;
+    private string argumentsJson;
+    private string? result;
+    private string? detail;
+    private bool? success;
+    private bool isCallExpanded;
+    private bool isResultExpanded;
+
+    public ProcessToolCallViewModel(ToolCall toolCall, Action changed)
+    {
+        id = toolCall.Id;
+        name = toolCall.Name;
+        argumentsJson = toolCall.ArgumentsJson;
+        this.changed = changed;
+    }
+
+    public string Id => id;
+
+    public string Name => name;
+
+    public string ArgumentsText => FormatPayload(argumentsJson);
+
+    public string CallHeaderText => string.Format(ResourceLookup.Resolve("assistant.step.call"), Name);
+
+    public string CallDetailText =>
+        $"{ResourceLookup.Resolve("assistant.tool.function")}：{Name}\n{ResourceLookup.Resolve("assistant.tool.arguments")}：\n{ArgumentsText}";
+
+    public bool HasCompletion => success is not null;
+
+    public string CompletionHeaderText => success == true
+        ? string.Format(ResourceLookup.Resolve("assistant.step.completed"), Name)
+        : string.Format(ResourceLookup.Resolve("assistant.tool.failed"), Name);
+
+    public string ResultDetailText =>
+        $"{ResourceLookup.Resolve("assistant.tool.result")}：\n{FormatPayload(result ?? detail ?? string.Empty)}";
+
+    public string DetailsText => HasCompletion
+        ? $"{CallHeaderText}\n{CallDetailText}\n{CompletionHeaderText}\n{ResultDetailText}"
+        : $"{CallHeaderText}\n{CallDetailText}";
+
+    public bool IsCallExpanded
+    {
+        get => isCallExpanded;
+        set => SetProperty(ref isCallExpanded, value);
+    }
+
+    public bool IsResultExpanded
+    {
+        get => isResultExpanded;
+        set => SetProperty(ref isResultExpanded, value);
+    }
+
+    public void UpdateDefinition(ToolCall toolCall)
+    {
+        id = toolCall.Id;
+        name = toolCall.Name;
+        argumentsJson = toolCall.ArgumentsJson;
+        NotifyDetailsChanged();
+    }
+
+    public void SetResult(string? content)
+    {
+        result = content;
+        NotifyDetailsChanged();
+    }
+
+    public void Complete(bool succeeded, string? failureDetail)
+    {
+        success = succeeded;
+        detail = failureDetail;
+        NotifyDetailsChanged();
+    }
+
+    private void NotifyDetailsChanged()
+    {
+        OnPropertyChanged(nameof(Id));
+        OnPropertyChanged(nameof(Name));
+        OnPropertyChanged(nameof(ArgumentsText));
+        OnPropertyChanged(nameof(CallHeaderText));
+        OnPropertyChanged(nameof(CallDetailText));
+        OnPropertyChanged(nameof(HasCompletion));
+        OnPropertyChanged(nameof(CompletionHeaderText));
+        OnPropertyChanged(nameof(ResultDetailText));
+        OnPropertyChanged(nameof(DetailsText));
+        changed();
+    }
+
+    private static string FormatPayload(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        try
+        {
+            return JsonNode.Parse(value)?.ToJsonString(PrettyJsonOptions) ?? value;
+        }
+        catch (JsonException)
+        {
+            return value;
+        }
+    }
 }
 
 public enum ChatEntryKind { Message, Status, Process }

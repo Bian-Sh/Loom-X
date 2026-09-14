@@ -106,9 +106,10 @@
       <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}"/>
     </Style>
 
-    <!-- 过程块折叠头：无 header 背景，只靠 2px 淡竖线做分割 -->
+    <!-- 过程区只保留文字与淡竖线；所有交互状态均透明，箭头仅在划入时出现。 -->
     <Style Selector="Button.process">
       <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="MinHeight" Value="0"/>
       <Setter Property="Padding" Value="0,2"/>
@@ -116,10 +117,139 @@
       <Setter Property="HorizontalContentAlignment" Value="Left"/>
       <Setter Property="FontSize" Value="12"/>
       <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
-      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="FocusAdorner" Value="{x:Null}"/>
     </Style>
     <Style Selector="Button.process:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+    </Style>
+    <Style Selector="Button.process:pressed">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.process /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.process:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.process:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0,2"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+      <Setter Property="FocusAdorner" Value="{x:Null}"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pressed">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:checked">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process:checked:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.process Path.process-arrow">
+      <Setter Property="Opacity" Value="0"/>
+    </Style>
+    <Style Selector="Button.process:pointerover Path.process-arrow">
+      <Setter Property="Opacity" Value="1"/>
+    </Style>
+    <Style Selector="ToggleButton.process Path.process-arrow">
+      <Setter Property="Opacity" Value="0"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pointerover Path.process-arrow">
+      <Setter Property="Opacity" Value="1"/>
+    </Style>
+
+    <!-- 工具参数/结果是低存在感的探索入口：没有背景、选中态和箭头。 -->
+    <Style Selector="ToggleButton.process-detail">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0,1"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+      <Setter Property="FocusAdorner" Value="{x:Null}"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:checked">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:checked:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
     </Style>
 
     <!-- 消息悬浮操作区（时间 / 复制） -->
@@ -278,8 +408,8 @@
                                 AutomationProperties.Name="{Binding ProcessStatusText}">
                           <Grid ColumnDefinitions="Auto,14" ColumnSpacing="6">
                             <TextBlock Text="{Binding ProcessStatusText}" VerticalAlignment="Center"/>
-                            <Path Grid.Column="1" Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="12" Height="12"
-                                  Stroke="White"
+                            <Path Grid.Column="1" Classes="icon-glyph process-arrow" Data="M 11,7 L 19,16 L 11,25" Width="12" Height="12"
+                                  Stroke="#CCFFFFFF"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"
                                   RenderTransformOrigin="50%,50%">
                               <Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform>
@@ -297,8 +427,8 @@
                                   <Grid ColumnDefinitions="Auto,14" ColumnSpacing="6">
                                     <TextBlock Text="{Binding HeaderText}" TextTrimming="CharacterEllipsis"
                                                MaxWidth="520" VerticalAlignment="Center"/>
-                                    <Path Grid.Column="1" Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25"
-                                          Width="12" Height="12" Stroke="White"
+                                    <Path Grid.Column="1" Classes="icon-glyph process-arrow" Data="M 11,7 L 19,16 L 11,25"
+                                          Width="12" Height="12" Stroke="#CCFFFFFF"
                                           HorizontalAlignment="Center" VerticalAlignment="Center"
                                           RenderTransformOrigin="50%,50%">
                                       <Path.RenderTransform>
@@ -307,10 +437,39 @@
                                     </Path>
                                   </Grid>
                                 </ToggleButton>
-                                <TextBlock Text="{Binding Text}" IsVisible="{Binding IsExpanded}"
-                                           FontSize="12" LineHeight="19" Margin="0,3,0,0"
-                                           TextWrapping="Wrap" MaxWidth="560"
-                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <TextBlock Text="{Binding Text}" IsVisible="{Binding IsContentVisible}"
+                                            FontSize="12" LineHeight="19" Margin="0,3,0,0"
+                                            TextWrapping="Wrap" MaxWidth="560"
+                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                                <ItemsControl ItemsSource="{Binding ToolCalls}" IsVisible="{Binding IsExpanded}"
+                                              Margin="10,3,0,0">
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                      <StackPanel Margin="0,0,0,5">
+                                        <ToggleButton Classes="process-detail"
+                                                      IsChecked="{Binding IsCallExpanded, Mode=TwoWay}"
+                                                      AutomationProperties.Name="{Binding CallHeaderText}">
+                                          <TextBlock Text="{Binding CallHeaderText}" TextWrapping="NoWrap"
+                                                     TextTrimming="CharacterEllipsis" MaxWidth="520"/>
+                                        </ToggleButton>
+                                        <TextBlock Text="{Binding CallDetailText}" IsVisible="{Binding IsCallExpanded}"
+                                                   Margin="8,2,0,3" MaxWidth="540" FontSize="11" LineHeight="17"
+                                                   TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                                        <ToggleButton Classes="process-detail" IsVisible="{Binding HasCompletion}"
+                                                      IsChecked="{Binding IsResultExpanded, Mode=TwoWay}"
+                                                      AutomationProperties.Name="{Binding CompletionHeaderText}">
+                                          <TextBlock Text="{Binding CompletionHeaderText}" TextWrapping="NoWrap"
+                                                     TextTrimming="CharacterEllipsis" MaxWidth="520"/>
+                                        </ToggleButton>
+                                        <TextBlock Text="{Binding ResultDetailText}" IsVisible="{Binding IsResultExpanded}"
+                                                   Margin="8,2,0,0" MaxWidth="540" FontSize="11" LineHeight="17"
+                                                   TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                      </StackPanel>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                               </StackPanel>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>

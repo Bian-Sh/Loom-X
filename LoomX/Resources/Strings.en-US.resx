@@ -484,7 +484,11 @@
   <data name="assistant.process.summary"><value>Thinking summary</value></data>
   <data name="assistant.process.elapsed"><value>Working for {0}</value></data>
   <data name="assistant.process.completed"><value>Completed in {0}</value></data>
-  <data name="assistant.process.steps"><value>Processing steps</value></data>
+  <data name="assistant.process.steps"><value>Tool calls</value></data>
+  <data name="assistant.tool.function"><value>Function</value></data>
+  <data name="assistant.tool.arguments"><value>Arguments</value></data>
+  <data name="assistant.tool.result"><value>Result</value></data>
+  <data name="assistant.tool.failed"><value>{0} failed</value></data>
   <data name="assistant.step.call"><value>Calling tool {0}</value></data>
   <data name="assistant.step.approval"><value>Waiting for approval: {0}</value></data>
   <data name="assistant.step.completed"><value>{0} completed</value></data>

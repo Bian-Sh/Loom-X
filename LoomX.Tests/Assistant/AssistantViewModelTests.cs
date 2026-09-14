@@ -11,20 +11,36 @@ namespace LoomX.Tests.Assistant;
 public sealed class AssistantViewModelTests
 {
     [Fact]
-    public void Project_TextDelta_CreatesStreamingMessageAndAppends()
+    public void Project_TextDeltas_ReuseStreamingMessageUntilFinalMessageCompletes()
     {
         var viewModel = CreateViewModel();
         var baseline = viewModel.Messages.Count;
+        var chunks = new[]
+        {
+            "第一段正文正在流式输出，",
+            "第二段继续追加到同一个消息气泡，",
+            "最后一段到达后仍要等待完整消息事件。",
+        };
 
-        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "你好，" });
-        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "世界。" });
+        foreach (var chunk in chunks)
+        {
+            viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = chunk });
+        }
 
         Assert.Equal(baseline + 1, viewModel.Messages.Count);
         var message = viewModel.Messages[^1];
-        Assert.Equal("你好，世界。", message.Text);
+        Assert.Equal(string.Concat(chunks), message.Text);
         Assert.True(message.IsStreaming);
         Assert.True(message.IsAssistantMessage);
-        Assert.Equal("你好，世界。", message.Markdown.ToString());
+        Assert.Equal(string.Concat(chunks), message.Markdown.ToString());
+
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with
+        {
+            Message = ChatMessage.Assistant(string.Concat(chunks)),
+        });
+
+        Assert.Same(message, viewModel.Messages[^1]);
+        Assert.False(message.IsStreaming);
     }
 
     [Fact]
@@ -116,7 +132,7 @@ public sealed class AssistantViewModelTests
         var process = Assert.Single(viewModel.Messages, item => item.IsProcess);
         Assert.False(process.IsFinished);
         Assert.Contains("处理中", process.ProcessStatusText);
-        Assert.Equal(3, process.Items.Count);
+        Assert.Equal(2, process.Items.Count);
 
         viewModel.Project(Event(AgentEventKind.StepStarted));
         viewModel.Project(Event(AgentEventKind.ReasoningDelta) with { Text = "继续思考" });
@@ -124,6 +140,7 @@ public sealed class AssistantViewModelTests
 
         Assert.Same(process, Assert.Single(viewModel.Messages, item => item.IsProcess));
         Assert.False(process.IsFinished);
+        Assert.Equal(2, process.Items.Count);
 
         viewModel.Project(Event(AgentEventKind.MessageCompleted) with { Message = ChatMessage.Assistant("**完成**") });
         viewModel.Project(Event(AgentEventKind.TaskCompleted));
@@ -132,6 +149,41 @@ public sealed class AssistantViewModelTests
         Assert.Contains("已完成", process.ProcessStatusText);
         Assert.False(process.IsExpanded);
         Assert.Equal("**完成**", viewModel.Messages.Last(item => item.IsAssistantMessage).Markdown.ToString());
+    }
+
+    [Fact]
+    public void Project_ToolMessages_PreserveArgumentsAndResultsByCallId()
+    {
+        var viewModel = CreateViewModel();
+        var toolCall = new ToolCall("call-42", "loomx.inspect", """{"path":"D:/demo","depth":3}""");
+
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with
+        {
+            Message = ChatMessage.AssistantToolCalls([toolCall]),
+        });
+        viewModel.Project(Event(AgentEventKind.ToolCallStarted) with
+        {
+            ToolName = toolCall.Name,
+            ToolCallId = toolCall.Id,
+        });
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with
+        {
+            Message = ChatMessage.ToolResult(toolCall, """{"files":["a.cs","b.cs"],"count":2}"""),
+        });
+        viewModel.Project(Event(AgentEventKind.ToolCallCompleted) with
+        {
+            ToolName = toolCall.Name,
+            ToolCallId = toolCall.Id,
+            Success = true,
+        });
+
+        var process = Assert.Single(viewModel.Messages, item => item.IsProcess);
+        var toolItem = Assert.Single(process.Items, item => item.Label.Contains("工具"));
+        Assert.Contains("D:/demo", toolItem.DetailsText);
+        Assert.Contains("depth", toolItem.DetailsText);
+        Assert.Contains("a.cs", toolItem.DetailsText);
+        Assert.Contains("count", toolItem.DetailsText);
+        Assert.Contains("完成", toolItem.DetailsText);
     }
 
     [Fact]
@@ -151,6 +203,7 @@ public sealed class AssistantViewModelTests
         // 父组运行时默认展开；子 foldout 默认折叠并显示各自最新一行
         Assert.True(group.IsExpanded);
         Assert.All(group.Items, item => Assert.False(item.IsExpanded));
+        Assert.All(group.Items, item => Assert.False(item.IsContentVisible));
         Assert.Equal("先想清楚", group.Items[0].HeaderText);
         Assert.Contains("loomx.inspect", group.Items[1].HeaderText);
         Assert.DoesNotContain("工具调用", group.Items[1].HeaderText);
@@ -158,9 +211,14 @@ public sealed class AssistantViewModelTests
         group.Items[0].IsExpanded = true;
         Assert.Equal(group.Items[0].Label, group.Items[0].HeaderText);
         Assert.Equal(90, group.Items[0].ExpandIconAngle);
+        Assert.True(group.Items[0].IsContentVisible);
+
+        group.Items[0].IsExpanded = false;
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with { Message = ChatMessage.Assistant("最终答案") });
+        Assert.All(group.Items, item => Assert.Equal(item.Label, item.HeaderText));
 
         // “已完成 / 处理中”只挂在父级，子项没有计时文案
-        Assert.Contains("处理中", group.ProcessStatusText);
+        Assert.Contains("已完成", group.ProcessStatusText);
         Assert.All(group.Items, item => Assert.Equal($"{item.Label}: {item.Text}", item.ToString()));
     }
 

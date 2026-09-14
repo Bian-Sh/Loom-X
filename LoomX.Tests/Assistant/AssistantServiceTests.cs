@@ -120,6 +120,33 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.Contains(service.CurrentSession.Messages, message => message.Content == "查询 Provider");
     }
 
+    [Fact(Skip = "TODO：输出中切换会话会让后续持久化跟随可变 CurrentSession，需固定运行会话并隔离 UI 投影后启用。")]
+    public async Task SendAsync_SwitchSessionDuringStreaming_PersistsOriginalRunWithoutPollutingViewedSession()
+    {
+        var model = new SessionSwitchModelClient();
+        var service = CreateService(new StubModelClientFactory(model));
+        await foreach (var unused in service.SendAsync("历史问题")) { }
+        var viewedSessionId = service.CurrentSession.Id;
+
+        var runningSessionId = service.NewSession().Id;
+        var runTask = Task.Run(async () =>
+        {
+            await foreach (var unused in service.SendAsync("流式问题")) { }
+        });
+
+        await model.StreamingPaused.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(await service.LoadSessionAsync(viewedSessionId));
+        model.ContinueStreaming.TrySetResult(true);
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(viewedSessionId, service.CurrentSession.Id);
+        Assert.DoesNotContain(service.CurrentSession.Messages, message => message.Content?.Contains("流式") == true);
+
+        Assert.True(await service.LoadSessionAsync(runningSessionId));
+        Assert.Contains(service.CurrentSession.Messages,
+            message => message.Role == ChatRole.Assistant && message.Content == "第一段第二段");
+    }
+
     [Fact]
     public async Task NewSession_ClearsCurrentHistory()
     {
@@ -285,6 +312,36 @@ public sealed class AssistantServiceTests : IDisposable
             }
 
             return client;
+        }
+    }
+
+    /// <summary>第二轮在首个正文增量后暂停，供测试精确模拟输出中切换会话。</summary>
+    private sealed class SessionSwitchModelClient : IModelClient
+    {
+        private int turn;
+
+        public TaskCompletionSource<bool> StreamingPaused { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource<bool> ContinueStreaming { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public async IAsyncEnumerable<ModelStreamEvent> StreamAsync(
+            ModelRequest request,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref turn) == 1)
+            {
+                yield return new TextDeltaEvent("历史回答");
+                yield return new ModelCompletedEvent("stop");
+                yield break;
+            }
+
+            yield return new TextDeltaEvent("第一段");
+            StreamingPaused.TrySetResult(true);
+            await ContinueStreaming.Task.WaitAsync(cancellationToken);
+            yield return new TextDeltaEvent("第二段");
+            yield return new ModelCompletedEvent("stop");
         }
     }
 
