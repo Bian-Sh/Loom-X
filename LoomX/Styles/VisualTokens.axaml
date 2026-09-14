@@ -15,6 +15,8 @@
   <SolidColorBrush x:Key="BorderStrongBrush" Color="#A0A5B9BD" />
   <!-- 极淡描边：给组合输入区这类“只勾个轮廓、不抢内容”的容器用。 -->
   <SolidColorBrush x:Key="BorderSoftBrush" Color="#4D94A6AB" />
+  <!-- 聚焦态极淡描边：色相取自品牌色，透明度压到与 BorderSoftBrush 同量级，只作“被选中”的暗示。 -->
+  <SolidColorBrush x:Key="AccentBorderSoftBrush" Color="#66287C83" />
 
   <!-- 语义色：用于状态、选中态和日志级别，不参与大面积背景。 -->
   <SolidColorBrush x:Key="TextPrimaryBrush" Color="#172126" />
