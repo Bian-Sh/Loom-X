@@ -33,7 +33,7 @@ public sealed class AssistantViewStyleTests
         Assert.Equal(TextWrapping.Wrap, input.TextWrapping);
         Assert.Equal(ScrollBarVisibility.Auto, input.GetValue(ScrollViewer.VerticalScrollBarVisibilityProperty));
         Assert.Equal(ScrollBarVisibility.Disabled, input.GetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty));
-        Assert.Equal(296, popupSurface.Width);
+        Assert.Equal(256, popupSurface.Width);
         Assert.Equal(360, popupSurface.MaxHeight);
     }
 
