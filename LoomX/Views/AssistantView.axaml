@@ -6,89 +6,6 @@
              xmlns:views="using:LoomX.Views"
              xmlns:l="using:LoomX.Localization"
              x:Class="LoomX.Views.AssistantView">
-  <UserControl.Resources>
-    <!-- 输入区：上下两层共用一个外框，内部控件一律“裸奔”，不再各自变色/描边。
-
-         为什么不能用「在 TextBox 元素上设 Background=Transparent」：
-         Fluent 把控件自身属性经由 `TemplateBinding Background` 传进模板里的
-         `Border#PART_BorderElement`，而 `:pointerover` / `:focus` 的样式是
-         `^ /template/ Border#PART_BorderElement` —— 改的是**模板内那个 Border**。
-         模板子元素上没有本地属性，主题的 Style Setter 畅通无阻，于是 hover/focus
-         照样刷白底 + 画描边。元素上的 LocalValue 跟它根本不在同一个擂台上。
-
-         所以这里用整份 ControlTheme 接管（而不是写几条 Style 去抢优先级）：
-         控件不再引用主题的 TextBox ControlTheme，主题的伪类样式自然全部失效。 -->
-    <ControlTheme x:Key="PlainTextBox" TargetType="TextBox">
-      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-      <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderBrush" Value="Transparent"/>
-      <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
-      <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoftBrush}"/>
-      <Setter Property="SelectionForegroundBrush" Value="{DynamicResource TextPrimaryBrush}"/>
-      <Setter Property="MinHeight" Value="0"/>
-      <Setter Property="FocusAdorner" Value="{x:Null}"/>
-      <Setter Property="Template">
-        <ControlTemplate>
-          <DataValidationErrors>
-            <Panel>
-              <!-- 整个输入框的背景/描边都归外层 input-card 管，这里永远透明 -->
-              <Border Name="PART_BorderElement"
-                      Background="Transparent"
-                      BorderBrush="Transparent"
-                      BorderThickness="0"/>
-              <DockPanel Name="PART_InnerDockPanel" Margin="{TemplateBinding Padding}">
-                <TextBlock Name="PART_FloatingWatermark"
-                           Foreground="{DynamicResource TextSecondaryBrush}"
-                           IsVisible="False"
-                           Text="{TemplateBinding Watermark}"
-                           DockPanel.Dock="Top"/>
-                <ScrollViewer Name="PART_ScrollViewer"
-                              HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
-                              VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}"
-                              IsScrollChainingEnabled="{TemplateBinding (ScrollViewer.IsScrollChainingEnabled)}">
-                  <Panel>
-                    <TextBlock Name="PART_Watermark"
-                               Opacity="0.5"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               Text="{TemplateBinding Watermark}"
-                               TextAlignment="{TemplateBinding TextAlignment}"
-                               TextWrapping="{TemplateBinding TextWrapping}"
-                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
-                      <TextBlock.IsVisible>
-                        <MultiBinding Converter="{x:Static BoolConverters.And}">
-                          <Binding ElementName="PART_TextPresenter" Path="PreeditText" Converter="{x:Static StringConverters.IsNullOrEmpty}"/>
-                          <Binding RelativeSource="{RelativeSource TemplatedParent}" Path="Text" Converter="{x:Static StringConverters.IsNullOrEmpty}"/>
-                        </MultiBinding>
-                      </TextBlock.IsVisible>
-                    </TextBlock>
-                    <TextPresenter Name="PART_TextPresenter"
-                                   Text="{TemplateBinding Text, Mode=TwoWay}"
-                                   CaretBlinkInterval="{TemplateBinding CaretBlinkInterval}"
-                                   CaretIndex="{TemplateBinding CaretIndex}"
-                                   SelectionStart="{TemplateBinding SelectionStart}"
-                                   SelectionEnd="{TemplateBinding SelectionEnd}"
-                                   TextAlignment="{TemplateBinding TextAlignment}"
-                                   TextWrapping="{TemplateBinding TextWrapping}"
-                                   LineHeight="{TemplateBinding LineHeight}"
-                                   LetterSpacing="{TemplateBinding LetterSpacing}"
-                                   PasswordChar="{TemplateBinding PasswordChar}"
-                                   RevealPassword="{TemplateBinding RevealPassword}"
-                                   SelectionBrush="{TemplateBinding SelectionBrush}"
-                                   SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
-                                   CaretBrush="{TemplateBinding CaretBrush}"
-                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
-                  </Panel>
-                </ScrollViewer>
-              </DockPanel>
-            </Panel>
-          </DataValidationErrors>
-        </ControlTemplate>
-      </Setter>
-    </ControlTheme>
-  </UserControl.Resources>
   <UserControl.Styles>
     <!-- 图标按钮：30×30 圆形圆角，无边框，hover 才出底 -->
     <Style Selector="Button.icon">
@@ -277,21 +194,26 @@
     </Style>
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
 
-    <!-- 纵深防御：即使 PlainTextBox 主题因故没接管（控件被重新模板化、主题查找失败等），
-         也强制抹掉 Fluent 注入到模板内 Border 的 hover / focus 背景与描边。
-         `/template/` 选择器直达模板子元素，是主题样式同一个擂台（Style 层 > ControlTheme 层）；
-         三个伪类全写一遍，避免默认态那条被 `^:pointerover` 的嵌套样式抢回去。 -->
-    <Style Selector="TextBox.plain /template/ Border#PART_BorderElement">
+    <!-- 输入框背景复用全局 input-embedded；局部样式只保留复合容器需要的光标、选区和零内框。 -->
+    <Style Selector="TextBox.composer-input">
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
+      <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoftBrush}"/>
+      <Setter Property="SelectionForegroundBrush" Value="{DynamicResource TextPrimaryBrush}"/>
+      <Setter Property="FocusAdorner" Value="{x:Null}"/>
+    </Style>
+    <Style Selector="TextBox.composer-input /template/ Border#PART_BorderElement">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
     </Style>
-    <Style Selector="TextBox.plain:pointerover /template/ Border#PART_BorderElement">
+    <Style Selector="TextBox.composer-input:pointerover /template/ Border#PART_BorderElement">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
     </Style>
-    <Style Selector="TextBox.plain:focus /template/ Border#PART_BorderElement">
+    <Style Selector="TextBox.composer-input:focus /template/ Border#PART_BorderElement">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
@@ -648,10 +570,8 @@
             CornerRadius="14"
             ClipToBounds="True">
       <Grid RowDefinitions="Auto,Auto">
-        <!-- 主题引用上面自定义的 PlainTextBox：hover / focus 都不会再单独变色或描边，
-             整卡描边由外层 input-card 统一负责。 -->
-        <TextBox Grid.Row="0" x:Name="inputTextBox" Classes="plain"
-                 Theme="{StaticResource PlainTextBox}"
+        <!-- 背景复用全局嵌入式输入材质，内部描边由 composer-input 清除，整卡描边归 input-card。 -->
+        <TextBox Grid.Row="0" x:Name="inputTextBox" Classes="composer-input input-embedded"
                  Text="{Binding InputText}"
                  Watermark="{l:Locale assistant.input.watermark}"
                  AcceptsReturn="True"

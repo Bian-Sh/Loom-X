@@ -30,11 +30,68 @@ public sealed class AssistantViewStyleTests
         var transform = Assert.IsType<TranslateTransform>(newSessionButton.RenderTransform);
         Assert.Equal(3, transform.X);
         Assert.True(input.AcceptsReturn);
+        Assert.Contains("input-embedded", input.Classes);
+        Assert.Contains("composer-input", input.Classes);
+        Assert.Null(input.Theme);
         Assert.Equal(TextWrapping.Wrap, input.TextWrapping);
         Assert.Equal(ScrollBarVisibility.Auto, input.GetValue(ScrollViewer.VerticalScrollBarVisibilityProperty));
         Assert.Equal(ScrollBarVisibility.Disabled, input.GetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty));
         Assert.Equal(256, popupSurface.Width);
         Assert.Equal(360, popupSurface.MaxHeight);
+    }
+
+    [Fact]
+    public void ComposerUsesSharedMaterialAndPreservesCompositeEditingSurface()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var view = new AssistantView();
+        var host = new Window { Content = view };
+        var focusSink = new TextBox { Width = 1, Height = 1 };
+        Assert.IsType<Grid>(view.Content).Children.Add(focusSink);
+        host.Measure(new Size(1180, 760));
+        host.Arrange(new Rect(0, 0, 1180, 760));
+        host.Show();
+        try
+        {
+            var input = Assert.IsType<TextBox>(view.FindControl<TextBox>("inputTextBox"));
+            var inputCard = Assert.IsType<Border>(view.FindControl<Border>("inputCard"));
+
+            Assert.True(input.Focus());
+            input.ApplyTemplate();
+            host.UpdateLayout();
+
+            var border = Assert.Single(
+                input.GetVisualDescendants().OfType<Border>(),
+                item => item.Name == "PART_BorderElement");
+            var scrollViewer = Assert.Single(
+                input.GetVisualDescendants().OfType<ScrollViewer>(),
+                item => item.Name == "PART_ScrollViewer");
+
+            Assert.Contains("focused", inputCard.Classes);
+            Assert.Equal(Brushes.Transparent, input.Background);
+            Assert.Equal(Brushes.Transparent, border.Background);
+            Assert.Equal(Brushes.Transparent, border.BorderBrush);
+            Assert.Equal(default, border.BorderThickness);
+            Assert.Equal(ScrollBarVisibility.Auto, scrollViewer.VerticalScrollBarVisibility);
+            Assert.NotNull(input.CaretBrush);
+            Assert.NotNull(input.SelectionBrush);
+            Assert.NotNull(input.SelectionForegroundBrush);
+
+            input.Text = "第一行\n第二行";
+            input.SelectionStart = 1;
+            input.SelectionEnd = 4;
+            Assert.Equal("第一行\n第二行", input.Text);
+            Assert.Equal(1, input.SelectionStart);
+            Assert.Equal(4, input.SelectionEnd);
+
+            Assert.True(focusSink.Focus());
+            Assert.DoesNotContain("focused", inputCard.Classes);
+        }
+        finally
+        {
+            host.Close();
+        }
     }
 
     [Fact]
