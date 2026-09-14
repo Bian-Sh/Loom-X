@@ -1,0 +1,8 @@
+{
+  "openspec_proposal": "openspec/changes/unify-input-focus-material/proposal.md",
+  "openspec_design": "openspec/changes/unify-input-focus-material/design.md",
+  "openspec_tasks": "openspec/changes/unify-input-focus-material/tasks.md",
+  "openspec_delta_spec": "openspec/changes/unify-input-focus-material/specs/app-input-material/spec.md",
+  "handoff_context": "openspec/changes/unify-input-focus-material/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/unify-input-focus-material/.comet/handoff/design-context.md"
+}
