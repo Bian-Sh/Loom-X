@@ -8,7 +8,7 @@ subagent_dispatch: null
 tdd_mode: direct
 review_mode: off
 isolation: branch
-verify_mode: light
+verify_mode: full
 auto_transition: true
 base_ref: 5e988ef15baea11095246347d28279f917075d1c
 design_doc: null
