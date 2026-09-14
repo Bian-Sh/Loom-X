@@ -2,6 +2,7 @@ using System;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
 
@@ -31,12 +32,24 @@ public partial class AnchoredPopupWindow : Window
     private Window? ownerWindow;
     private Control? anchor;
 
+    /// <summary>
+    /// 最近一次"在浮窗内部按下指针"的时间。
+    /// 用来区分「主窗口失活」到底是"用户点了浮窗"还是"用户点到了外面"。
+    /// </summary>
+    private DateTimeOffset lastInsidePressAt = DateTimeOffset.MinValue;
+
+    /// <summary>浮窗内按下的宽限窗口：点击浮窗时 <c>IsActive</c> 的更新可能晚于主窗口失活。</summary>
+    private static readonly TimeSpan InsidePressGrace = TimeSpan.FromMilliseconds(500);
+
     public AnchoredPopupWindow()
     {
         InitializeComponent();
         Deactivated += (_, _) => Close();
         KeyDown += OnKeyDown;
         Closed += OnClosed;
+
+        // 隧道阶段先于按钮的 Click 记录，作为主窗口失活原因判定的兜底依据。
+        AddHandler(PointerPressedEvent, OnInsidePointerPressed, RoutingStrategies.Tunnel);
     }
 
     /// <summary>关闭时由调用方接回（用于把 ViewModel 的开关状态复位）。</summary>
@@ -141,7 +154,29 @@ public partial class AnchoredPopupWindow : Window
 
     private void OnOwnerGeometryChanged(object? sender, EventArgs args) => Close();
 
-    private void OnOwnerDeactivated(object? sender, EventArgs args) => Close();
+    /// <summary>
+    /// 主窗口失活：绝大多数情况下这就是"用户点了浮窗本身"——点击会先把浮窗激活，
+    /// 主窗口随之失活。此时<b>绝不能关</b>，否则浮窗里的按钮永远点不到：
+    /// <c>WM_ACTIVATE</c> 早于 <c>WM_LBUTTONDOWN</c>，浮窗在按钮的 Click 派发之前就没了宿主，
+    /// 表现就是"点了没反应，浮窗还消失"。
+    /// 真正要关的是"点到了浮窗外面"（另一个应用、桌面、主窗口），
+    /// 那种情况下浮窗自己会收到 Deactivated，这里的延迟判定只是兜底。
+    /// </summary>
+    private void OnOwnerDeactivated(object? sender, EventArgs args) =>
+        // 延后到本轮输入处理完成再看：IsActive 此时已经稳定。
+        Dispatcher.UIThread.Post(CloseUnlessEngaged, DispatcherPriority.Input);
+
+    private void CloseUnlessEngaged()
+    {
+        // 浮窗自己成了活动窗口 -> 用户点在浮窗里。
+        if (IsActive) return;
+        // 兜底：浮窗内刚有指针按下（IsActive 的更新可能慢半拍）-> 也算点在浮窗里。
+        if (DateTimeOffset.UtcNow - lastInsidePressAt < InsidePressGrace) return;
+        Close();
+    }
+
+    private void OnInsidePointerPressed(object? sender, PointerPressedEventArgs args) =>
+        lastInsidePressAt = DateTimeOffset.UtcNow;
 
     private void OnOwnerClosing(object? sender, EventArgs args) => Close();
 
