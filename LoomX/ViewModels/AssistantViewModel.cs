@@ -336,15 +336,8 @@ public sealed class AssistantViewModel : NotifyViewModel
         }
     }
 
-    /// <summary>把所有过程 foldout 标记为结束并默认折叠。</summary>
-    private void FinishAllProcesses(DateTimeOffset? timestamp = null)
-    {
-        foreach (var process in Messages.Where(item => item.IsProcess)) process.Finish(timestamp);
-        currentGroup = null;
-    }
-
-    /// <summary>结束当前过程 foldout 并断开引用（下一次过程事件会开新的 foldout）。</summary>
-    private void CloseCurrentGroup(DateTimeOffset? timestamp = null)
+    /// <summary>最终内容完整输出后结束当前过程 foldout，并断开本轮引用。</summary>
+    private void FinishCurrentGroup(DateTimeOffset? timestamp = null)
     {
         currentGroup?.Finish(timestamp);
         currentGroup = null;
@@ -373,15 +366,18 @@ public sealed class AssistantViewModel : NotifyViewModel
     {
         switch (agentEvent.Kind)
         {
+            case AgentEventKind.SessionStarted:
+                // 新用户轮次只切断上一轮引用；没有最终内容的旧过程不能冒充“已完成”。
+                streamingMessage = null;
+                currentGroup = null;
+                break;
+
             case AgentEventKind.StepStarted:
-                // 新一轮开始：上一轮的过程 foldout 到此结束，冻结耗时并折叠。
-                CloseCurrentGroup(agentEvent.Timestamp);
+                // step 只切换阶段性正文；整轮的思考与工具调用仍归入同一个父 foldout。
                 streamingMessage = null;
                 break;
 
             case AgentEventKind.TextDelta:
-                // 正文开始输出 = finish_content：过程 foldout 结束，转为可折叠的“已完成 xx”。
-                CloseCurrentGroup(agentEvent.Timestamp);
                 streamingMessage ??= AppendStreamingMessage(agentEvent.Timestamp);
                 streamingMessage.Append(agentEvent.Text ?? string.Empty);
                 break;
@@ -395,9 +391,16 @@ public sealed class AssistantViewModel : NotifyViewModel
             }
 
             case AgentEventKind.MessageCompleted:
-                if (agentEvent.Message?.Role == ChatRole.Assistant && streamingMessage is not null)
-                    streamingMessage.IsStreaming = false;
-                CloseCurrentGroup(agentEvent.Timestamp);
+                if (agentEvent.Message?.Role == ChatRole.Assistant)
+                {
+                    if (streamingMessage is not null) streamingMessage.IsStreaming = false;
+                    // 带工具调用的 assistant 消息仍是中间步骤；无工具调用才是完整 finish content。
+                    if (agentEvent.Message.ToolCalls.Count == 0)
+                    {
+                        FinishCurrentGroup(agentEvent.Timestamp);
+                        streamingMessage = null;
+                    }
+                }
                 break;
 
             case AgentEventKind.ToolCallStarted:
@@ -433,7 +436,7 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             case AgentEventKind.TaskFailed:
                 streamingMessage = null;
-                FinishAllProcesses(agentEvent.Timestamp);
+                currentGroup = null;
                 // Detail 为 ModelErrorFormatter 组装的多行详情（本地化描述 + 状态码/错误码/上游描述）
                 Messages.Add(ChatMessageViewModel.Status($"⚠ {ResourceLookup.Resolve("assistant.task.failed")}：\n{agentEvent.Detail}"));
                 break;
@@ -444,12 +447,12 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             case AgentEventKind.TaskCompleted:
                 streamingMessage = null;
-                FinishAllProcesses(agentEvent.Timestamp);
+                currentGroup = null;
                 break;
 
             case AgentEventKind.TaskCancelled:
                 streamingMessage = null;
-                FinishAllProcesses(agentEvent.Timestamp);
+                currentGroup = null;
                 Messages.Add(ChatMessageViewModel.Status(ResourceLookup.Resolve("assistant.task.cancelled")));
                 break;
 
@@ -709,6 +712,8 @@ public sealed class AssistantViewModel : NotifyViewModel
             if (message.Role == ChatRole.Tool) continue;
             if (message.Role == ChatRole.User)
             {
+                streamingMessage = null;
+                currentGroup = null;
                 Messages.Add(new ChatMessageViewModel(message.Role, message.Content ?? string.Empty, message.Timestamp));
                 continue;
             }
@@ -730,17 +735,13 @@ public sealed class AssistantViewModel : NotifyViewModel
             Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message });
             if (!hasToolActivities && message.ToolCalls.Count > 0)
             {
-                var group = ChatMessageViewModel.Process(message.Timestamp);
-                Messages.Add(group);
-                group.EnsureItem(ResourceLookup.Resolve("assistant.process.steps"))
+                EnsureGroupItem(EnsureGroup(message.Timestamp), StepLabel)
                     .Append(string.Join('\n', message.ToolCalls.Select(call =>
                         string.Format(ResourceLookup.Resolve("assistant.step.call"), call.Name))));
             }
         }
         streamingMessage = null;
         currentGroup = null;
-        // 历史会话里的过程块一律是已结束状态。
-        FinishAllProcesses();
     }
 
     /// <summary>
@@ -967,11 +968,11 @@ public sealed class ChatMessageViewModel : NotifyViewModel
 
     /// <summary>
     /// 过程块 = 思考与工具调用共同的<b>父级 foldout</b>，与助手正文（finish content）同属消息流的一级条目。
-    /// “已处理 / 已完成 xx” 只出现在这一层，子项只负责“思考”“处理步骤”这类标签。
+    /// “处理中 / 已完成 xx” 只出现在这一层，子项只负责“思考”“工具调用”这类标签。
     /// </summary>
     public bool IsProcess => kind == ChatEntryKind.Process;
 
-    /// <summary>foldout 内的子项：思考、摘要、处理步骤。展开时才显示标签。</summary>
+    /// <summary>foldout 内的子项：思考、摘要、工具调用。展开时才显示标签。</summary>
     public ObservableCollection<ProcessItemViewModel> Items { get; } = [];
 
     public bool HasItems => Items.Count > 0;
@@ -996,7 +997,7 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     /// <summary>过程块折叠箭头的旋转角度：折叠朝右，展开朝下。</summary>
     public double ExpandIconAngle => IsExpanded ? 90 : 0;
 
-    /// <summary>过程块是否已结束（finish_content 之后）。结束后才可折叠。</summary>
+    /// <summary>过程块是否已结束（finish_content 完整输出之后）。</summary>
     public bool IsFinished => finishedAt is not null;
 
     /// <summary>过程块耗时；结束后冻结。</summary>
@@ -1005,30 +1006,27 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     /// <summary>耗时文案：12s / 1m23s / 1h05m。</summary>
     public string DurationText => FormatDuration(Elapsed);
 
-    /// <summary>过程块标题：运行中“已处理 12s”，结束后“已完成 12s”。</summary>
+    /// <summary>过程块标题：运行中“处理中 12s”，结束后“已完成 12s”。</summary>
     public string ProcessStatusText => string.Format(
         ResourceLookup.Resolve(IsFinished ? "assistant.process.completed" : "assistant.process.elapsed"),
         DurationText);
 
-    /// <summary>只有结束后的过程块才允许展开。</summary>
-    public bool CanExpand => IsFinished;
+    /// <summary>过程块有内容即可展开；运行中默认展开，最终内容完成后默认折叠。</summary>
+    public bool CanExpand => HasItems;
 
     /// <summary>
-    /// 结束过程块：冻结耗时并默认折叠（对标大厂 Agent 客户端——
-    /// 流式期间只显示“已处理 xx”，正文开始输出后才变成可展开的“已完成 xx”）。
+    /// 结束过程块：最终内容完整输出后冻结耗时并默认折叠。
     /// </summary>
     public void Finish(DateTimeOffset? timestamp = null)
     {
         // 只在首次结束时冻结耗时；折叠则每次都强制（任务结束时要把展开中的过程块收起来）。
         finishedAt ??= timestamp ?? DateTimeOffset.UtcNow;
-        isExpanded = false;
+        IsExpanded = false;
         OnPropertyChanged(nameof(IsFinished));
         OnPropertyChanged(nameof(CanExpand));
         OnPropertyChanged(nameof(Elapsed));
         OnPropertyChanged(nameof(DurationText));
         OnPropertyChanged(nameof(ProcessStatusText));
-        OnPropertyChanged(nameof(ExpandIconAngle));
-        OnPropertyChanged(nameof(IsExpanded));
     }
 
     /// <summary>运行中由计时器驱动的耗时刷新。</summary>
@@ -1064,7 +1062,7 @@ public sealed class ChatMessageViewModel : NotifyViewModel
     }
 
     /// <summary>
-    /// 过程块折叠时展示的内部最新一行 —— 刻意不带“思考 / 处理步骤”标签，
+    /// 过程块折叠时展示的内部最新一行 —— 刻意不带“思考 / 工具调用”标签，
     /// 标签只在展开后随子项一起出现。
     /// </summary>
     public string ProcessPreview
@@ -1085,6 +1083,7 @@ public sealed class ChatMessageViewModel : NotifyViewModel
         OnPropertyChanged(nameof(ProcessPreview));
         OnPropertyChanged(nameof(ItemsText));
         OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(CanExpand));
     }
 
     /// <summary>取得指定标签的子项；与最后一项同标签则复用，否则另起一项。</summary>
@@ -1113,17 +1112,22 @@ public sealed class ChatMessageViewModel : NotifyViewModel
         new(ChatRole.Assistant, text, ChatEntryKind.Status, null);
 
     /// <summary>新建一个过程 foldout（父级），内容是空的，子项通过 <see cref="EnsureItem"/> 挂进去。</summary>
-    public static ChatMessageViewModel Process(DateTimeOffset? timestamp = null) =>
-        new(ChatRole.Assistant, string.Empty, ChatEntryKind.Process, timestamp);
+    public static ChatMessageViewModel Process(DateTimeOffset? timestamp = null)
+    {
+        var process = new ChatMessageViewModel(ChatRole.Assistant, string.Empty, ChatEntryKind.Process, timestamp);
+        process.IsExpanded = true;
+        return process;
+    }
 }
 
 /// <summary>
-/// 过程 foldout 里的一个子项（思考 / 摘要 / 处理步骤）。
+/// 过程 foldout 里的一个子项（思考 / 摘要 / 工具调用）。
 /// 它<b>不是</b>消息流的一级条目，标签只在父级展开后可见。
 /// </summary>
 public sealed class ProcessItemViewModel : NotifyViewModel
 {
     private string text = string.Empty;
+    private bool isExpanded;
 
     public ProcessItemViewModel(string label, ChatMessageViewModel owner)
     {
@@ -1135,12 +1139,40 @@ public sealed class ProcessItemViewModel : NotifyViewModel
 
     public ChatMessageViewModel Owner { get; }
 
+    public bool IsExpanded
+    {
+        get => isExpanded;
+        set
+        {
+            if (!SetProperty(ref isExpanded, value)) return;
+            OnPropertyChanged(nameof(HeaderText));
+            OnPropertyChanged(nameof(ExpandIconAngle));
+        }
+    }
+
+    public double ExpandIconAngle => IsExpanded ? 90 : 0;
+
+    /// <summary>折叠时显示最新一行，展开时显示固定标签。</summary>
+    public string HeaderText => IsExpanded || string.IsNullOrEmpty(Preview) ? Label : Preview;
+
+    private string Preview
+    {
+        get
+        {
+            if (text.Length == 0) return string.Empty;
+            var span = text.AsSpan().TrimEnd();
+            var index = span.LastIndexOfAny('\r', '\n');
+            return (index >= 0 ? span[(index + 1)..] : span).Trim().ToString();
+        }
+    }
+
     public string Text
     {
         get => text;
         private set
         {
             if (!SetProperty(ref text, value)) return;
+            OnPropertyChanged(nameof(HeaderText));
             Owner.RefreshPreview();
         }
     }

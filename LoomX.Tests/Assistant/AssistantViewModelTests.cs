@@ -36,7 +36,7 @@ public sealed class AssistantViewModelTests
         viewModel.Project(Event(AgentEventKind.ToolCallCompleted) with { ToolName = "loomx.list_providers", Success = true });
 
         var steps = Assert.Single(viewModel.Messages, message => message.IsProcess);
-        Assert.False(steps.IsExpanded);
+        Assert.True(steps.IsExpanded);
         Assert.Contains("调用工具 loomx.list_providers", steps.ItemsText);
         Assert.Contains("完成", steps.ItemsText);
     }
@@ -99,30 +99,38 @@ public sealed class AssistantViewModelTests
     }
 
     [Fact]
-    public void Project_ReasoningAndSteps_DefaultCollapsed_CompletionCollapsesExpandedProcess()
+    public void Project_MultipleStepsShareOneProcessUntilFinalContentCompletes()
     {
         var viewModel = CreateViewModel();
         viewModel.Project(Event(AgentEventKind.StepStarted));
         viewModel.Project(Event(AgentEventKind.ReasoningDelta) with { Text = "原始思考" });
         viewModel.Project(Event(AgentEventKind.ReasoningDelta) with { Text = "摘要", IsSummary = true });
         viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "先检查" });
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with
+        {
+            Message = ChatMessage.AssistantToolCalls([new ToolCall("call-1", "loomx.inspect", "{}")], "先检查"),
+        });
         viewModel.Project(Event(AgentEventKind.ToolCallStarted) with { ToolName = "loomx.inspect" });
+        viewModel.Project(Event(AgentEventKind.ToolCallCompleted) with { ToolName = "loomx.inspect", Success = true });
 
-        // 思考与工具调用归并进同一个父级 foldout，正文之前只有一个过程条目
-        var processes = viewModel.Messages.Where(item => item.IsProcess).ToArray();
-        Assert.Equal(2, processes.Length);
-        Assert.All(processes, item => Assert.False(item.IsExpanded));
-        Assert.Equal(2, processes[0].Items.Count);   // 思考 + 摘要
-        Assert.Contains("原始思考", processes[0].ItemsText);
-        Assert.Single(processes[1].Items);           // 处理步骤
+        var process = Assert.Single(viewModel.Messages, item => item.IsProcess);
+        Assert.False(process.IsFinished);
+        Assert.Contains("处理中", process.ProcessStatusText);
+        Assert.Equal(3, process.Items.Count);
 
-        processes[0].IsExpanded = true;
-        processes[1].IsExpanded = true;
         viewModel.Project(Event(AgentEventKind.StepStarted));
+        viewModel.Project(Event(AgentEventKind.ReasoningDelta) with { Text = "继续思考" });
         viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "**完成**" });
+
+        Assert.Same(process, Assert.Single(viewModel.Messages, item => item.IsProcess));
+        Assert.False(process.IsFinished);
+
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with { Message = ChatMessage.Assistant("**完成**") });
         viewModel.Project(Event(AgentEventKind.TaskCompleted));
 
-        Assert.All(processes, item => Assert.False(item.IsExpanded));
+        Assert.True(process.IsFinished);
+        Assert.Contains("已完成", process.ProcessStatusText);
+        Assert.False(process.IsExpanded);
         Assert.Equal("**完成**", viewModel.Messages.Last(item => item.IsAssistantMessage).Markdown.ToString());
     }
 
@@ -138,30 +146,45 @@ public sealed class AssistantViewModelTests
         var group = Assert.Single(viewModel.Messages, item => item.IsProcess);
         Assert.Equal(2, group.Items.Count);
         Assert.Contains("思考", group.Items[0].Label);
-        Assert.Contains("步骤", group.Items[1].Label);
+        Assert.Contains("工具调用", group.Items[1].Label);
 
-        // 折叠时不显示标签，只滚动显示内部最新一行
-        Assert.False(group.IsExpanded);
-        Assert.Contains("loomx.inspect", group.ProcessPreview);
-        Assert.DoesNotContain("步骤", group.ProcessPreview);
+        // 父组运行时默认展开；子 foldout 默认折叠并显示各自最新一行
+        Assert.True(group.IsExpanded);
+        Assert.All(group.Items, item => Assert.False(item.IsExpanded));
+        Assert.Equal("先想清楚", group.Items[0].HeaderText);
+        Assert.Contains("loomx.inspect", group.Items[1].HeaderText);
+        Assert.DoesNotContain("工具调用", group.Items[1].HeaderText);
 
-        // “已完成 / 已处理”只挂在父级，子项没有计时文案
-        Assert.Contains("已处理", group.ProcessStatusText);
+        group.Items[0].IsExpanded = true;
+        Assert.Equal(group.Items[0].Label, group.Items[0].HeaderText);
+        Assert.Equal(90, group.Items[0].ExpandIconAngle);
+
+        // “已完成 / 处理中”只挂在父级，子项没有计时文案
+        Assert.Contains("处理中", group.ProcessStatusText);
         Assert.All(group.Items, item => Assert.Equal($"{item.Label}: {item.Text}", item.ToString()));
     }
 
     [Fact]
-    public void ProcessGroup_FinishContentTurnsElapsedIntoCompletedAndCollapses()
+    public void ProcessGroup_OnlyFinalMessageCompletionTurnsProcessingIntoCompleted()
     {
         var viewModel = CreateViewModel();
         viewModel.Project(Event(AgentEventKind.ReasoningDelta) with { Text = "先想清楚\n再看工具" });
         var group = Assert.Single(viewModel.Messages, item => item.IsProcess);
-        Assert.Contains("已处理", group.ProcessStatusText);
+        Assert.Contains("处理中", group.ProcessStatusText);
         Assert.False(group.IsFinished);
 
-        // 正文开始输出 = finish content
+        // 文本仍在流式输出，尚未完成 finish content。
         viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "结论" });
+        Assert.False(group.IsFinished);
 
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with
+        {
+            Message = ChatMessage.AssistantToolCalls([new ToolCall("call-1", "loomx.inspect", "{}")], "结论"),
+        });
+        Assert.False(group.IsFinished);
+
+        // 无工具调用的完整 assistant 消息才是 finish content 完成边界。
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with { Message = ChatMessage.Assistant("最终结论") });
         Assert.True(group.IsFinished);
         Assert.Contains("已完成", group.ProcessStatusText);
         Assert.False(group.IsExpanded);

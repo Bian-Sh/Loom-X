@@ -1502,9 +1502,9 @@
   <data name="assistant.jump.tooltip"><value>跳至最新消息</value></data>
   <data name="assistant.process.thinking"><value>思考</value></data>
   <data name="assistant.process.summary"><value>思考摘要</value></data>
-  <data name="assistant.process.elapsed"><value>已处理 {0}</value></data>
+  <data name="assistant.process.elapsed"><value>处理中 {0}</value></data>
   <data name="assistant.process.completed"><value>已完成 {0}</value></data>
-  <data name="assistant.process.steps"><value>处理步骤</value></data>
+  <data name="assistant.process.steps"><value>工具调用</value></data>
   <data name="assistant.step.call"><value>调用工具 {0}</value></data>
   <data name="assistant.step.approval"><value>等待你批准修改：{0}</value></data>
   <data name="assistant.step.completed"><value>{0} 完成</value></data>

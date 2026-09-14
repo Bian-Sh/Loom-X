@@ -267,45 +267,48 @@
                                HorizontalAlignment="Center"
                                Margin="0,2"/>
 
-                    <!-- 过程块：思考与工具调用共同的父级 foldout，与助手正文同层级。
-                         “已处理 / 已完成 xx” 只在这一层，子项只管“思考”“处理步骤”这类标签 -->
+                    <!-- 过程块：整轮思考与工具调用的父级 foldout，与最终正文同层级。 -->
                     <Grid IsVisible="{Binding IsProcess}" ColumnDefinitions="Auto,Auto" ColumnSpacing="8"
                           HorizontalAlignment="Left" Margin="0,2">
                       <Border Grid.Column="0" Width="2" CornerRadius="1" Margin="0,3"
                               Background="{DynamicResource SurfaceMutedBrush}" VerticalAlignment="Stretch"/>
                       <StackPanel Grid.Column="1">
-                        <!-- 运行中：不可展开，只有一行计时 -->
-                        <TextBlock Text="{Binding ProcessStatusText}" IsVisible="{Binding !IsFinished}"
-                                   FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}"
-                                   VerticalAlignment="Center" Margin="0,2"/>
-                        <!-- 已结束：可折叠的“已完成 xx” -->
                         <Button Classes="process" Tag="{Binding}" Click="ToggleProcess_OnClick"
-                                IsVisible="{Binding IsFinished}"
+                                IsEnabled="{Binding CanExpand}"
                                 AutomationProperties.Name="{Binding ProcessStatusText}">
-                          <Grid ColumnDefinitions="14,*" ColumnSpacing="6">
-                            <Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="12" Height="12"
-                                  Stroke="{DynamicResource TextTertiaryBrush}"
+                          <Grid ColumnDefinitions="Auto,14" ColumnSpacing="6">
+                            <TextBlock Text="{Binding ProcessStatusText}" VerticalAlignment="Center"/>
+                            <Path Grid.Column="1" Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="12" Height="12"
+                                  Stroke="White"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"
                                   RenderTransformOrigin="50%,50%">
                               <Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform>
                             </Path>
-                            <TextBlock Grid.Column="1" Text="{Binding ProcessStatusText}" VerticalAlignment="Center"/>
                           </Grid>
                         </Button>
 
-                        <!-- 折叠：不出现“思考/处理步骤”标签，只滚动显示内部最新一行 -->
-                        <TextBlock Text="{Binding ProcessPreview}" IsVisible="{Binding !IsExpanded}"
-                                   FontSize="12" Foreground="{DynamicResource TextTertiaryBrush}"
-                                   TextTrimming="CharacterEllipsis" MaxWidth="560" Margin="20,1,4,2"/>
-
-                        <!-- 展开：带标签的完整子项 -->
-                        <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding IsExpanded}" Margin="20,4,4,2">
+                        <!-- 父级展开后显示子 foldout；子项折叠时标题跟随最新内容。 -->
+                        <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding IsExpanded}" Margin="0,4,4,2">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                              <StackPanel Margin="0,0,0,8">
-                                <TextBlock Text="{Binding Label}" FontSize="11" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextTertiaryBrush}" Margin="0,0,0,2"/>
-                                <TextBlock Text="{Binding Text}" FontSize="12" LineHeight="19"
+                              <StackPanel Margin="0,0,0,6">
+                                <ToggleButton Classes="process" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                              AutomationProperties.Name="{Binding HeaderText}">
+                                  <Grid ColumnDefinitions="Auto,14" ColumnSpacing="6">
+                                    <TextBlock Text="{Binding HeaderText}" TextTrimming="CharacterEllipsis"
+                                               MaxWidth="520" VerticalAlignment="Center"/>
+                                    <Path Grid.Column="1" Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25"
+                                          Width="12" Height="12" Stroke="White"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          RenderTransformOrigin="50%,50%">
+                                      <Path.RenderTransform>
+                                        <RotateTransform Angle="{Binding ExpandIconAngle}"/>
+                                      </Path.RenderTransform>
+                                    </Path>
+                                  </Grid>
+                                </ToggleButton>
+                                <TextBlock Text="{Binding Text}" IsVisible="{Binding IsExpanded}"
+                                           FontSize="12" LineHeight="19" Margin="0,3,0,0"
                                            TextWrapping="Wrap" MaxWidth="560"
                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                               </StackPanel>
