@@ -68,6 +68,7 @@ public sealed class AssistantViewStyleTests
 
         var modelSearch = new TextBox();
         modelSearch.Classes.Add("model-search");
+        modelSearch.Classes.Add("input-transparent");
         var view = new AssistantView();
         var root = Assert.IsType<Grid>(view.Content);
         root.Children.Add(modelSearch);
@@ -104,8 +105,9 @@ public sealed class AssistantViewStyleTests
             "..", "..", "..", "..", "LoomX", "Views", "AssistantView.axaml"));
         var source = File.ReadAllText(path);
 
-        Assert.Contains("<Style Selector=\"TextBox.model-search:pointerover\">", source, StringComparison.Ordinal);
-        Assert.Contains("<Style Selector=\"TextBox.model-search:focus\">", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"model-search input-transparent\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("TextBox.model-search:pointerover", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("TextBox.model-search:focus", source, StringComparison.Ordinal);
         Assert.Contains("<Grid ColumnDefinitions=\"*,Auto\" ColumnSpacing=\"10\">", source, StringComparison.Ordinal);
         Assert.Contains("TextTrimming=\"CharacterEllipsis\"", source, StringComparison.Ordinal);
         Assert.Contains("TextWrapping=\"NoWrap\"", source, StringComparison.Ordinal);

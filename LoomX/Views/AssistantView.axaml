@@ -354,22 +354,6 @@
       <Setter Property="MinHeight" Value="0"/>
       <Setter Property="Height" Value="32"/>
       <Setter Property="Padding" Value="8,5"/>
-      <Setter Property="Background" Value="Transparent"/>
-    </Style>
-    <Style Selector="TextBox.model-search:pointerover">
-      <Setter Property="Background" Value="Transparent"/>
-    </Style>
-    <Style Selector="TextBox.model-search:focus">
-      <Setter Property="Background" Value="Transparent"/>
-    </Style>
-    <Style Selector="TextBox.model-search /template/ Border#PART_BorderElement">
-      <Setter Property="Background" Value="Transparent"/>
-    </Style>
-    <Style Selector="TextBox.model-search:pointerover /template/ Border#PART_BorderElement">
-      <Setter Property="Background" Value="Transparent"/>
-    </Style>
-    <Style Selector="TextBox.model-search:focus /template/ Border#PART_BorderElement">
-      <Setter Property="Background" Value="Transparent"/>
     </Style>
     <Style Selector="Button.model-provider">
       <Setter Property="MinHeight" Value="0"/>
@@ -751,7 +735,7 @@
       <Border Width="256" MaxHeight="360" Background="{DynamicResource PopupBackgroundBrush}"
               BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="6" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*,Auto" RowSpacing="6">
-          <TextBox x:Name="modelSearch" Classes="model-search" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
+          <TextBox x:Name="modelSearch" Classes="model-search input-transparent" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="1">
               <ItemsControl ItemsSource="{Binding ModelGroups}">
