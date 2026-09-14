@@ -348,6 +348,46 @@
     <Style Selector="Button.bare:pointerover">
       <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}"/>
     </Style>
+
+    <!-- 模型弹层使用更紧凑的行高，增加单屏可见模型数量。 -->
+    <Style Selector="TextBox.model-search">
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="Padding" Value="8,5"/>
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.model-search:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.model-search:focus">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.model-search /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.model-search:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBox.model-search:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.model-provider">
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="Padding" Value="8,6"/>
+      <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+    <Style Selector="Button.model-option">
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="Padding" Value="10,5"/>
+      <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+
+    <!-- Fluent 默认以右边缘为缩放原点；消息区改为从左向右展开，避免侵入气泡。 -->
+    <Style Selector="ScrollViewer.chat-scroll /template/ ScrollBar#PART_VerticalScrollBar /template/ Thumb">
+      <Setter Property="RenderTransformOrigin" Value="0%,50%"/>
+    </Style>
   </UserControl.Styles>
 
   <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
@@ -371,9 +411,12 @@
                 Data="M 12,3 A 9,9 0 1 0 12,21 A 9,9 0 1 0 12,3 M 12,7.5 V 12.3 L 15.6,14.3"
                 Width="14" Height="14"/>
         </Button>
-        <Button Classes="icon" Width="22" Height="22" CornerRadius="7" Command="{Binding NewSessionCommand}"
+        <Button x:Name="newSessionButton" Classes="icon" Width="22" Height="22" CornerRadius="7" Command="{Binding NewSessionCommand}"
                 ToolTip.Tip="{l:Locale assistant.session.new}"
                 AutomationProperties.Name="{l:Locale assistant.session.new}">
+          <Button.RenderTransform>
+            <TranslateTransform X="3"/>
+          </Button.RenderTransform>
           <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="14" Height="14"/>
         </Button>
       </StackPanel>
@@ -381,7 +424,7 @@
 
     <!-- 消息流：不画外框，消息直接铺在页面上 -->
     <Grid Grid.Row="1">
-      <ScrollViewer x:Name="MessageScroll" Padding="0,2">
+      <ScrollViewer x:Name="MessageScroll" Classes="chat-scroll" Padding="0,2">
         <StackPanel>
 
             <ItemsControl ItemsSource="{Binding Messages}">
@@ -627,7 +670,10 @@
                  Theme="{StaticResource PlainTextBox}"
                  Text="{Binding InputText}"
                  Watermark="{l:Locale assistant.input.watermark}"
-                 AcceptsReturn="False"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                  MinHeight="40"
                  Padding="12,10"
                  KeyDown="OnInputKeyDown"
@@ -702,19 +748,19 @@
     <!-- 模型选择弹层：与网关 foldout 同款 -->
     <Popup x:Name="modelPopup" PlacementTarget="{Binding #modelPickerButton}" Placement="Top" IsLightDismissEnabled="True"
            IsOpen="{Binding IsModelPickerOpen, Mode=TwoWay}" HorizontalOffset="0" VerticalOffset="-5">
-      <Border Width="360" MaxHeight="420" Background="{DynamicResource PopupBackgroundBrush}"
-              BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="8" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
-          <TextBox x:Name="modelSearch" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
+      <Border Width="256" MaxHeight="360" Background="{DynamicResource PopupBackgroundBrush}"
+              BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="6" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="6">
+          <TextBox x:Name="modelSearch" Classes="model-search" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="2">
+            <StackPanel Spacing="1">
               <ItemsControl ItemsSource="{Binding ModelGroups}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate DataType="{x:Type vm:AssistantModelGroupViewModel}">
-                    <StackPanel Spacing="2" Margin="0,0,0,6">
-                      <Button Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
-                              Background="{DynamicResource SurfaceSubtleBrush}" BorderThickness="0" Padding="10,9" CornerRadius="9">
-                        <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="8">
+                    <StackPanel Spacing="1" Margin="0,0,0,4">
+                      <Button Classes="model-provider" Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
+                              Background="{DynamicResource SurfaceSubtleBrush}" BorderThickness="0">
+                        <Grid ColumnDefinitions="14,*,Auto" ColumnSpacing="6">
                           <Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="14" Height="14" Stroke="{DynamicResource TextSecondaryBrush}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%">
                             <Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform>
@@ -726,10 +772,10 @@
                       <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding IsExpanded}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate DataType="{x:Type vm:AssistantModelOptionViewModel}">
-                            <Button Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
-                                    Background="Transparent" BorderThickness="0" Margin="22,0,0,0" Padding="12,8" CornerRadius="9">
-                              <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
-                                <TextBlock Text="{Binding DisplayName}"/>
+                            <Button Classes="model-option" Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
+                                    Background="Transparent" BorderThickness="0" Margin="18,0,0,0" ToolTip.Tip="{Binding DisplayName}">
+                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                 <Path Grid.Column="1" Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15"
                                       Stroke="{DynamicResource SuccessBrush}" IsVisible="{Binding IsSelected}"/>
                               </Grid>
@@ -746,10 +792,10 @@
             </StackPanel>
           </ScrollViewer>
           <!-- 思考等级 -->
-          <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0">
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,6,0,0">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
               <TextBlock Text="{l:Locale assistant.reasoning.label}" Classes="muted" FontSize="12" VerticalAlignment="Center"/>
-              <ComboBox Grid.Column="1" Classes="toolbar" HorizontalAlignment="Right" MinWidth="120"
+              <ComboBox Grid.Column="1" Classes="toolbar" HorizontalAlignment="Right" MinWidth="110"
                         ItemsSource="{Binding ReasoningEffortOptions}"
                         SelectedItem="{Binding SelectedReasoningEffort, Mode=TwoWay}"/>
             </Grid>
