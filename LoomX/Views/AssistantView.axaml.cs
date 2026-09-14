@@ -12,6 +12,8 @@ namespace LoomX.Views;
 public partial class AssistantView : UserControl
 {
     private const double BottomThreshold = 4;
+    private const double HistoryArrowWidth = 14;
+    private const double HistoryArrowMinInset = 21;
     private AssistantViewModel? observedModel;
     private bool following = true;
     private bool scrollingToBottom;
@@ -24,9 +26,11 @@ public partial class AssistantView : UserControl
         DataContextChanged += (_, _) =>
         {
             modelPopup.DataContext = DataContext;
+            historyPopup.DataContext = DataContext;
             HookAutoScroll();
         };
         modelPopup.DataContext = DataContext;
+        historyPopup.DataContext = DataContext;
         HookAutoScroll();
     }
 
@@ -95,20 +99,29 @@ public partial class AssistantView : UserControl
         }
     }
 
-    /// <summary>标题区历史会话图标：打开锚定浮窗（独立顶层窗口，可浮出主窗口外）。</summary>
+    /// <summary>标题区历史会话图标：切换平台浮层，并在打开前刷新列表。</summary>
     private void HistoryButton_OnClick(object? sender, RoutedEventArgs args)
     {
         if (DataContext is not AssistantViewModel viewModel) return;
-        if (viewModel.IsHistoryOpen) return;
+        var next = !viewModel.IsHistoryOpen;
+        if (next) viewModel.RefreshSessions();
+        viewModel.IsHistoryOpen = next;
+    }
 
-        var owner = TopLevel.GetTopLevel(this) as Window ?? throw new InvalidOperationException("历史会话浮窗需要窗口宿主");
-        viewModel.RefreshSessions();
+    private void HistoryPopup_OnOpened(object? sender, EventArgs args) =>
+        Dispatcher.UIThread.Post(UpdateHistoryPopupArrow, DispatcherPriority.Loaded);
 
-        var panel = new AssistantHistoryPanel { DataContext = viewModel };
-        var popup = new AnchoredPopupWindow();
-        popup.PopupClosed += (_, _) => viewModel.IsHistoryOpen = false;
-        viewModel.IsHistoryOpen = true;
-        popup.ShowAnchored(owner, historyButton, panel, width: 320, maxHeight: 420);
+    private void UpdateHistoryPopupArrow()
+    {
+        var scaling = TopLevel.GetTopLevel(historyPopupRoot)?.RenderScaling ?? 1;
+        if (scaling <= 0) scaling = 1;
+
+        var anchorPoint = historyButton.PointToScreen(new Point(historyButton.Bounds.Width / 2, historyButton.Bounds.Height));
+        var popupLeft = historyPopupRoot.PointToScreen(default).X;
+        var arrowCenter = (anchorPoint.X - popupLeft) / scaling;
+        var maxInset = Math.Max(HistoryArrowMinInset, historyPopupRoot.Bounds.Width - HistoryArrowMinInset);
+        var clamped = Math.Clamp(arrowCenter, HistoryArrowMinInset, maxInset);
+        historyPopupArrow.Margin = new Thickness(clamped - HistoryArrowWidth / 2, 0, 0, -1);
     }
 
     /// <summary>过程块（思考 / 处理步骤）折叠与展开。</summary>

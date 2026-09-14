@@ -3,6 +3,7 @@
              xmlns:md="using:LiveMarkdown.Avalonia"
              xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:vm="using:LoomX.ViewModels"
+             xmlns:views="using:LoomX.Views"
              xmlns:l="using:LoomX.Localization"
              x:Class="LoomX.Views.AssistantView">
   <UserControl.Resources>
@@ -670,8 +671,33 @@
       </Grid>
     </Border>
 
-    <!-- 历史会话浮层已改为 AnchoredPopupWindow（独立顶层窗口，可浮出主窗口外、
-         尖角按锚点屏幕坐标动态对齐），内容见 AssistantHistoryPanel。构建逻辑在 code-behind。 -->
+    <!-- 历史会话使用平台 Popup：可浮出主窗口边界，同时不参与应用窗口激活切换。 -->
+    <Popup x:Name="historyPopup"
+           PlacementTarget="{Binding #historyButton}"
+           Placement="AnchorAndGravity"
+           PlacementAnchor="Bottom"
+           PlacementGravity="Bottom"
+           PlacementConstraintAdjustment="SlideX,FlipY"
+           VerticalOffset="6"
+           IsLightDismissEnabled="True"
+           ShouldUseOverlayLayer="False"
+           IsOpen="{Binding IsHistoryOpen, Mode=TwoWay}"
+           Opened="HistoryPopup_OnOpened">
+      <Grid x:Name="historyPopupRoot" Width="320" RowDefinitions="Auto,Auto">
+        <Border x:Name="historyPopupPanel" Grid.Row="1"
+                Background="{DynamicResource PopupBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1"
+                CornerRadius="14" ClipToBounds="True">
+          <views:AssistantHistoryPanel/>
+        </Border>
+        <Path x:Name="historyPopupArrow" Grid.Row="0"
+              Width="14" Height="9"
+              HorizontalAlignment="Left" VerticalAlignment="Top"
+              Fill="{DynamicResource PopupBackgroundBrush}"
+              Stroke="{DynamicResource BorderStrongBrush}" StrokeThickness="1" StrokeLineCap="Round"
+              Data="M 0.7,8.5 L 7,1 L 13.3,8.5"/>
+      </Grid>
+    </Popup>
 
     <!-- 模型选择弹层：与网关 foldout 同款 -->
     <Popup x:Name="modelPopup" PlacementTarget="{Binding #modelPickerButton}" Placement="Top" IsLightDismissEnabled="True"

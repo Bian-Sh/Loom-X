@@ -1,5 +1,7 @@
 # 验证报告：fix-assistant-history-popup-activation
 
+> 状态：已失效。2026-09-15 用户实机确认第一版 `close -> activate` 会先显示外部应用再唤回 LoomX，存在明显闪烁；change 已重新打开并改为根因修复。
+
 ## 摘要
 
 | 维度 | 状态 |

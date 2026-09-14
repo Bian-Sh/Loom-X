@@ -3,14 +3,12 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.VisualTree;
 using LoomX.ViewModels;
 
 namespace LoomX.Views;
 
 /// <summary>
-/// 历史会话面板：既用在 <see cref="AnchoredPopupWindow"/> 里（可浮出主窗口外），
-/// 也独立持有行内改名（铅笔 → 文本框 → 回车/Esc/失焦）的交互。
+/// 历史会话面板：承载会话选择以及行内改名（铅笔 → 文本框 → 回车/Esc/失焦）的交互。
 /// </summary>
 public partial class AssistantHistoryPanel : UserControl
 {
@@ -32,7 +30,7 @@ public partial class AssistantHistoryPanel : UserControl
     {
         if (sender is not Button { Tag: AssistantSessionItemViewModel item }) return;
         if (DataContext is not AssistantViewModel viewModel) return;
-        CloseHostAndActivateOwner();
+        viewModel.IsHistoryOpen = false;
         if (viewModel.LoadSessionCommand.CanExecute(item)) viewModel.LoadSessionCommand.Execute(item);
     }
 
@@ -89,7 +87,4 @@ public partial class AssistantHistoryPanel : UserControl
         if (DataContext is not AssistantViewModel viewModel) return;
         await viewModel.RenameSessionAsync(item, box.Text);
     }
-
-    private void CloseHostAndActivateOwner() =>
-        this.GetVisualAncestors().OfType<AnchoredPopupWindow>().FirstOrDefault()?.CloseAndActivateOwner();
 }
