@@ -631,16 +631,7 @@ public sealed class AssistantViewModel : NotifyViewModel
         var wasCurrent = service.CurrentSession.Id == item.SessionId;
         service.DeleteSession(item.SessionId);
 
-        suppressSelectionLoad = true;
-        try
-        {
-            RefreshSessions();
-            if (SelectedSession?.SessionId == item.SessionId) SelectedSession = null;
-        }
-        finally
-        {
-            suppressSelectionLoad = false;
-        }
+        RefreshSessions();
 
         if (wasCurrent)
         {
@@ -673,17 +664,9 @@ public sealed class AssistantViewModel : NotifyViewModel
             return;
         }
 
-        var wasCurrent = SelectedSession?.SessionId == item.SessionId;
-        suppressSelectionLoad = true;
-        try
-        {
-            RefreshSessions();
-            if (wasCurrent) SelectedSession = Sessions.FirstOrDefault(candidate => candidate.SessionId == item.SessionId);
-        }
-        finally
-        {
-            suppressSelectionLoad = false;
-        }
+        // RefreshSessions 会重建列表并把 SelectedSession 指向当前会话的新实例，
+        // 标题因此立刻跟着变（改名的就是这个会话）。
+        RefreshSessions();
 
         toastService?.Show(ResourceLookup.Resolve("assistant.history.renamed"), ToastLevel.Success);
     }
@@ -701,6 +684,10 @@ public sealed class AssistantViewModel : NotifyViewModel
             AddSystemMessage("会话载入失败（文件可能已损坏或删除）。");
             return;
         }
+
+        // 载入成功后同步标题区：CurrentSessionTitle 是 SelectedSession 的派生属性，
+        // 不写回就会一直显示上一个会话的标题，直到下次 RefreshSessions 才纠正。
+        SyncCurrentSessionSelection(item);
 
         Messages.Clear();
         streamingMessage = null;
@@ -757,6 +744,28 @@ public sealed class AssistantViewModel : NotifyViewModel
     }
 
     /// <summary>
+    /// 把 <see cref="SelectedSession"/> 指向当前服务会话对应的列表项（只刷标题，不触发载入）。
+    /// 列表里找不到时用 <paramref name="fallback"/> 兜底（例如列表还没刷新就载入了会话）。
+    /// </summary>
+    private void SyncCurrentSessionSelection(AssistantSessionItemViewModel? fallback = null)
+    {
+        var service = ResolveService();
+        if (service is null) return;
+
+        var currentId = service.CurrentSession.Id;
+        suppressSelectionLoad = true;
+        try
+        {
+            SelectedSession = Sessions.FirstOrDefault(candidate => candidate.SessionId == currentId)
+                              ?? (fallback?.SessionId == currentId ? fallback : null);
+        }
+        finally
+        {
+            suppressSelectionLoad = false;
+        }
+    }
+
+    /// <summary>
     /// 重新加载历史会话列表（打开历史浮层前调用，保证列表是最新的），
     /// 并把当前服务会话同步到 <see cref="SelectedSession"/>，让标题区跟着更新。
     /// </summary>
@@ -766,25 +775,13 @@ public sealed class AssistantViewModel : NotifyViewModel
         var service = ResolveService();
         if (service is null) return;
 
-        var currentId = service.CurrentSession.Id;
-        AssistantSessionItemViewModel? match = null;
         foreach (var summary in service.ListSessions())
         {
-            var item = new AssistantSessionItemViewModel(summary);
-            Sessions.Add(item);
-            if (summary.SessionId == currentId) match = item;
+            Sessions.Add(new AssistantSessionItemViewModel(summary));
         }
 
         // 只同步标题，不触发载入（载入会清空当前消息）。
-        suppressSelectionLoad = true;
-        try
-        {
-            SelectedSession = match;
-        }
-        finally
-        {
-            suppressSelectionLoad = false;
-        }
+        SyncCurrentSessionSelection();
     }
 
     private ChatMessageViewModel AppendStreamingMessage(DateTimeOffset? timestamp = null)

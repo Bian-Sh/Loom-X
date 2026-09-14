@@ -181,6 +181,15 @@ public sealed class AssistantViewModelTests
     }
 
     [Fact]
+    public void CurrentSessionTitle_FallsBackToNewSessionWhenNothingSelected()
+    {
+        var viewModel = CreateViewModel();
+
+        Assert.Null(viewModel.SelectedSession);
+        Assert.False(string.IsNullOrWhiteSpace(viewModel.CurrentSessionTitle));
+    }
+
+    [Fact]
     public void ModelOption_MatchesSearchByDisplayNameOrModelId()
     {
         var option = new AssistantModelOptionViewModel("p1", "gpt-4o-mini", "GPT 4o Mini");
