@@ -1,6 +1,6 @@
 workflow: hotfix
 language: zh-CN
-phase: build
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: 5e988ef15baea11095246347d28279f917075d1c
 design_doc: null
 plan: null
-verify_result: pending
-verification_report: null
-branch_status: pending
+verify_result: pass
+verification_report: docs/superpowers/reports/2026-09-14-fix-assistant-process-foldouts-verify.md
+branch_status: handled
 created_at: 2026-09-14
-verified_at: null
+verified_at: 2026-09-14
 archived: false
 direct_override: null
 handoff_context: null
