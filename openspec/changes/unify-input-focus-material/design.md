@@ -43,4 +43,4 @@
 
 ## Review Strategy
 
-本 change 使用主会话直接实现与验证，`review_mode` 设为 `off`；原因是改动集中在 Avalonia 样式和对应真实控件测试，用户未要求子代理审查，且助手复合输入框保留独立实机验收门槛。
+本 change 由主会话按已确认的 `tasks.md` 顺序执行，`build_mode` 记为 `executing-plans`，`review_mode` 设为 `off`；原因是改动集中在 Avalonia 样式和对应真实控件测试，用户未要求子代理审查，且助手复合输入框保留独立实机验收门槛。
