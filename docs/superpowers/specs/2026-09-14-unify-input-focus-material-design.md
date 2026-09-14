@@ -2,6 +2,8 @@
 comet_change: unify-input-focus-material
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-15-unify-input-focus-material
+status: final
 ---
 
 # 应用输入聚焦材质统一设计
