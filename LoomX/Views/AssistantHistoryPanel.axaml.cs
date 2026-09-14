@@ -32,7 +32,7 @@ public partial class AssistantHistoryPanel : UserControl
     {
         if (sender is not Button { Tag: AssistantSessionItemViewModel item }) return;
         if (DataContext is not AssistantViewModel viewModel) return;
-        CloseHost();
+        CloseHostAndActivateOwner();
         if (viewModel.LoadSessionCommand.CanExecute(item)) viewModel.LoadSessionCommand.Execute(item);
     }
 
@@ -90,5 +90,6 @@ public partial class AssistantHistoryPanel : UserControl
         await viewModel.RenameSessionAsync(item, box.Text);
     }
 
-    private void CloseHost() => this.GetVisualAncestors().OfType<AnchoredPopupWindow>().FirstOrDefault()?.Close();
+    private void CloseHostAndActivateOwner() =>
+        this.GetVisualAncestors().OfType<AnchoredPopupWindow>().FirstOrDefault()?.CloseAndActivateOwner();
 }

@@ -1,0 +1,10 @@
+## ADDED Requirements
+
+### Requirement: 历史会话切换保持应用前台
+
+桌面端 MUST 在用户从历史会话浮窗载入会话后保持 LoomX 为前台应用，不得恢复或置顶打开 LoomX 前处于活动状态的外部窗口。
+
+#### Scenario: 从独立浮窗载入历史会话
+
+- **WHEN** 用户从其他应用切换到 LoomX，打开历史会话浮窗并点击一个会话 cell
+- **THEN** 浮窗关闭、目标会话载入且 LoomX 主窗口仍位于外部应用之上

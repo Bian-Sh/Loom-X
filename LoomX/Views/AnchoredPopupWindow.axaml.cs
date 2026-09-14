@@ -55,6 +55,25 @@ public partial class AnchoredPopupWindow : Window
     /// <summary>关闭时由调用方接回（用于把 ViewModel 的开关状态复位）。</summary>
     public event EventHandler? PopupClosed;
 
+    /// <summary>浮窗内部命令完成后，关闭浮窗并把激活权交还给主窗口。</summary>
+    internal void CloseAndActivateOwner()
+    {
+        var owner = ownerWindow;
+        if (owner is null)
+        {
+            Close();
+            return;
+        }
+
+        CompleteInteraction(owner.Activate, Close);
+    }
+
+    internal static void CompleteInteraction(Action activateOwner, Action closePopup)
+    {
+        closePopup();
+        activateOwner();
+    }
+
     /// <summary>
     /// 在 <paramref name="anchor"/> 正下方显示浮层。
     /// </summary>

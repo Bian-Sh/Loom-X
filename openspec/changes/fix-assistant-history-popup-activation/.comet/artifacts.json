@@ -1,0 +1,6 @@
+{
+  "openspec_proposal": "openspec/changes/fix-assistant-history-popup-activation/proposal.md",
+  "openspec_design": "openspec/changes/fix-assistant-history-popup-activation/design.md",
+  "openspec_tasks": "openspec/changes/fix-assistant-history-popup-activation/tasks.md",
+  "openspec_delta_spec": "openspec/changes/fix-assistant-history-popup-activation/specs/assistant-session-lifecycle/spec.md"
+}
