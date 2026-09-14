@@ -1,6 +1,7 @@
 using System.Collections.Specialized;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -18,14 +19,24 @@ public partial class AssistantView : UserControl
     private AssistantViewModel? observedModel;
     private bool following = true;
     private bool scrollingToBottom;
+    private bool syncingMessageScrollBar;
     private double lastOffsetY;
 
     public AssistantView()
     {
         InitializeComponent();
         MessageScroll.ScrollChanged += MessageScroll_OnScrollChanged;
-        SizeChanged += (_, _) => UpdateInputMaxHeight();
-        AttachedToVisualTree += (_, _) => UpdateInputMaxHeight();
+        MessageScrollBar.ValueChanged += MessageScrollBar_OnValueChanged;
+        SizeChanged += (_, _) =>
+        {
+            UpdateInputMaxHeight();
+            UpdateMessageScrollBar();
+        };
+        AttachedToVisualTree += (_, _) =>
+        {
+            UpdateInputMaxHeight();
+            Dispatcher.UIThread.Post(UpdateMessageScrollBar, DispatcherPriority.Loaded);
+        };
         DataContextChanged += (_, _) =>
         {
             modelPopup.DataContext = DataContext;
@@ -54,6 +65,7 @@ public partial class AssistantView : UserControl
 
     private void MessageScroll_OnScrollChanged(object? sender, ScrollChangedEventArgs args)
     {
+        UpdateMessageScrollBar();
         if (scrollingToBottom) return;
         var max = Math.Max(0, MessageScroll.Extent.Height - MessageScroll.Viewport.Height);
         var offset = MessageScroll.Offset.Y;
@@ -72,10 +84,41 @@ public partial class AssistantView : UserControl
             scrollingToBottom = true;
             var max = Math.Max(0, MessageScroll.Extent.Height - MessageScroll.Viewport.Height);
             MessageScroll.Offset = new Vector(MessageScroll.Offset.X, max);
+            UpdateMessageScrollBar();
             lastOffsetY = MessageScroll.Offset.Y;
             JumpButton.IsVisible = false;
             scrollingToBottom = false;
         }, DispatcherPriority.Render);
+    }
+
+    private void MessageScrollBar_OnValueChanged(object? sender, RangeBaseValueChangedEventArgs args)
+    {
+        if (syncingMessageScrollBar) return;
+
+        var maximum = Math.Max(0, MessageScroll.Extent.Height - MessageScroll.Viewport.Height);
+        var offset = Math.Clamp(args.NewValue, 0, maximum);
+        MessageScroll.Offset = new Vector(MessageScroll.Offset.X, offset);
+    }
+
+    private void UpdateMessageScrollBar()
+    {
+        var viewport = Math.Max(0, MessageScroll.Viewport.Height);
+        var maximum = Math.Max(0, MessageScroll.Extent.Height - viewport);
+
+        syncingMessageScrollBar = true;
+        try
+        {
+            MessageScrollBar.Maximum = maximum;
+            MessageScrollBar.ViewportSize = viewport;
+            MessageScrollBar.LargeChange = viewport;
+            MessageScrollBar.SmallChange = 48;
+            MessageScrollBar.Value = Math.Clamp(MessageScroll.Offset.Y, 0, maximum);
+            MessageScrollBar.IsVisible = maximum > BottomThreshold;
+        }
+        finally
+        {
+            syncingMessageScrollBar = false;
+        }
     }
 
     private void JumpButton_OnClick(object? sender, RoutedEventArgs args)
@@ -114,7 +157,9 @@ public partial class AssistantView : UserControl
         applicationHeight * InputMaxHeightRatio;
 
     internal static bool ShouldSendMessage(Key key, KeyModifiers modifiers) =>
-        key == Key.Enter && !modifiers.HasFlag(KeyModifiers.Shift);
+        key == Key.Enter &&
+        !modifiers.HasFlag(KeyModifiers.Shift) &&
+        !modifiers.HasFlag(KeyModifiers.Control);
 
     /// <summary>标题区历史会话图标：切换平台浮层，并在打开前刷新列表。</summary>
     private void HistoryButton_OnClick(object? sender, RoutedEventArgs args)

@@ -4,15 +4,15 @@
 
 | 维度 | 状态 |
 | --- | --- |
-| 完整性 | PASS：7/7 个任务完成，4/4 个 requirements 已实现 |
-| 正确性 | PASS：8/8 个场景有实现和自动化或实机证据 |
-| 一致性 | PASS：实现符合 `design.md` 的 6 项决策，未发现规格漂移 |
+| 完整性 | PASS：9/9 个任务完成，5/5 个 requirements 已实现 |
+| 正确性 | PASS：10/10 个场景有实现和自动化或实机证据 |
+| 一致性 | PASS：实现符合 `design.md` 的 7 项决策，未发现规格漂移 |
 
 未发现 CRITICAL、WARNING 或 SUGGESTION 级问题，可以进入归档前确认。
 
 ## 自动化证据
 
-- `dotnet test LoomX.slnx --no-restore --nologo`：611/611 通过，0 失败，0 跳过。
+- `dotnet test LoomX.slnx -c Release --no-restore --nologo`：623/623 通过，0 失败，0 跳过。
 - `dotnet build LoomX.slnx --configuration Release --no-restore --nologo`：0 错误，6 个既有警告。
 - 弹层宽度契约 RED：`Expected: 256 / Actual: 296`，1 条失败、9 条通过；实现后 GREEN：10/10 通过。
 - 搜索框透明背景与长模型名展示契约 RED：2 条失败、10 条通过；实现后 GREEN：12/12 通过。
@@ -29,13 +29,17 @@
    - 测试：`LoomX.Tests/Views/AssistantViewStyleTests.cs:20`。
    - 实机：新会话按钮中心 `x=1218`；消息区右边缘 `x=1226`，16px 滚动条中心同为 `x=1218`。
 2. 消息滚动条避让对话内容
-   - 实现：`LoomX/Views/AssistantView.axaml:379` 将局部 Thumb 的 `RenderTransformOrigin` 设为 `0%,50%`，悬停从左侧基准向右展开。
-   - 测试：`LoomX.Tests/Views/AssistantViewStyleTests.cs:65` 读取真实模板 Thumb 并验证缩放原点。
+   - 实现：`MessageScroll` 隐藏内置纵向滚动条，`MessageScrollBar` 位于 `ChatRegion` 的独立右侧列；代码后置同步 `Extent`、`Viewport`、`Offset` 和拖动值。
+   - 测试：验证内外控件位于同一 Grid 的不同列、关闭自动隐藏，并在 40 条状态消息下验证可见性、范围和双向偏移同步。
+   - 实机：CUA/UIA 识别独立 `MessageScrollBar`，截图中轨道与 Thumb 位于消息内容右侧，不再覆盖正文。
 3. 输入框按内容自动增高
-   - 实现：`LoomX/Views/AssistantView.axaml:660` 启用多行、换行和内部纵向滚动；`LoomX/Views/AssistantView.axaml.cs:107` 按顶层客户区高度的 32% 更新 `MaxHeight`；`LoomX/Views/AssistantView.axaml.cs:116` 区分 Enter 与 Shift+Enter。
-   - 测试：`LoomX.Tests/Views/AssistantViewStyleTests.cs:88` 和 `:102`。
-   - 实机：760px 客户区下理论上限 243.2px，UIA 取整为 244px；超过上限后出现 `16 x 224px` 内部滚动条。
-4. 模型选择弹层保持紧凑比例
+   - 实现：输入框继续启用多行、换行和内部纵向滚动；`ShouldSendMessage` 仅让无 Shift/Ctrl 修饰的 Enter 发送。
+   - 测试：覆盖 760px/600px 高度上限，以及 Enter、Shift+Enter、Ctrl+Enter、Shift+Ctrl+Enter。
+   - 实机：760px 客户区下理论上限 243.2px，UIA 取整为 244px；超过上限后出现内部滚动条。
+4. 状态消息与输入区保持稳定布局
+   - 实现：状态行从居中改为左对齐，消息列表横向拉伸；根 Grid 取消统一 `RowSpacing`，聊天区显式使用 2px 底部间距。
+   - 测试：不同长度状态消息的可视左边沿一致；`inputCard.Bounds.Top - ChatRegion.Bounds.Bottom == 2`。
+5. 模型选择弹层保持紧凑比例
    - 实现：`LoomX/Views/AssistantView.axaml:751` 使用 256px 外宽、360px 最大高度和 6px 间距；Provider/模型行分别为 32px/30px。
    - 透明主题：`LoomX/Views/AssistantView.axaml:353` 至 `:372` 同时覆盖控件属性和 Fluent 模板的 `PART_BorderElement`，让搜索框在普通、悬停和聚焦状态均保持透明；`LoomX.Tests/Views/AssistantViewStyleTests.cs:65` 聚焦真实 Avalonia 控件并验证模板不存在可见背景。
    - 长名称：`LoomX/Views/AssistantView.axaml:776` 至 `:778` 使用剩余宽度列、`CharacterEllipsis` 和标准 ToolTip；`LoomX.Tests/Views/AssistantViewStyleTests.cs:100` 锁定布局与提示契约。
@@ -45,7 +49,7 @@
 
 ## 桌面验证产物
 
-- 最新发布目录：`outputs/LoomX-win-x64-2026-09-15-024348-model-search-focus-fix/`
+- 最新发布目录：`outputs/LoomX-win-x64-2026-09-14-assistant-chat-layout-feedback/`
 - 输入框截图：`outputs/LoomX-win-x64-2026-09-14-compact-popup-verify/assistant-composer-max-height.png`
 - 弹层 UIA 几何与完整模型名：`outputs/LoomX-win-x64-2026-09-14-model-popup-theme-tooltip-verify/assistant-model-popup-uia.json`
 - 输入框 UIA 几何：`outputs/LoomX-win-x64-2026-09-14-compact-popup-verify/assistant-composer-uia.json`
@@ -53,6 +57,15 @@
 当前启用透明主题时，Avalonia `Popup` 使用独立合成层，CUA 的主窗口位图不会包含弹层本体；UIA 树仍完整暴露弹层控件、边界和滚动条。本报告以 UIA 几何、真实控件测试和 XAML 契约三者交叉验证弹层尺寸，不把主窗口截图缺少 Popup 合成层视为功能失败。
 
 用户已在新发布包中实机确认模型搜索框聚焦态透明效果符合预期。
+
+## 实机反馈复验
+
+- 根因确认：失败信息属于 `ChatEntryKind.Status`，原 `HorizontalAlignment="Center"` 会按每条文本的自身宽度居中，因此长短不同的多行错误从不同横坐标开始，形成截图中的左右漂移；现已统一左对齐并让消息列表横向拉伸。
+- 滚动条：消息 `ScrollViewer` 内置滚动条改为 `Hidden`，右侧独立 `ScrollBar` 关闭自动隐藏并同步 `Extent`、`Viewport`、`Offset`；CUA/UIA 已识别独立 `MessageScrollBar`，截图可见其位于消息内容外侧。
+- 键盘：定向测试覆盖 Enter 发送、Shift+Enter、Ctrl+Enter、Shift+Ctrl+Enter 不发送；助手视图定向测试 18/18 通过。
+- 间距：根 Grid 取消统一 `RowSpacing`，聊天区显式设置底部 2px；几何测试直接断言 `inputCard.Bounds.Top - ChatRegion.Bounds.Bottom == 2`。
+- 桌面截图：`outputs/LoomX-win-x64-2026-09-14-assistant-chat-layout-feedback/assistant-chat-loaded-session.png`。
+- 新发布目录：`outputs/LoomX-win-x64-2026-09-14-assistant-chat-layout-feedback/`，共 406 个文件，主程序为 `LoomX.exe`。
 
 ## 分支处理
 

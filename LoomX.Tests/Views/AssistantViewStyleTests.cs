@@ -6,7 +6,9 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using LoomX.ViewModels;
 using LoomX.Views;
+using System.Collections.ObjectModel;
 using System.Reflection;
 using Xunit;
 using AvaloniaPath = Avalonia.Controls.Shapes.Path;
@@ -24,6 +26,8 @@ public sealed class AssistantViewStyleTests
         var view = new AssistantView();
         var newSessionButton = Assert.IsType<Button>(view.FindControl<Button>("newSessionButton"));
         var input = Assert.IsType<TextBox>(view.FindControl<TextBox>("inputTextBox"));
+        var messageScroll = Assert.IsType<ScrollViewer>(view.FindControl<ScrollViewer>("MessageScroll"));
+        var messageScrollBar = Assert.IsType<ScrollBar>(view.FindControl<ScrollBar>("MessageScrollBar"));
         var popup = Assert.IsType<Popup>(view.FindControl<Popup>("modelPopup"));
         var popupSurface = Assert.IsType<Border>(popup.Child);
 
@@ -36,6 +40,14 @@ public sealed class AssistantViewStyleTests
         Assert.Equal(TextWrapping.Wrap, input.TextWrapping);
         Assert.Equal(ScrollBarVisibility.Auto, input.GetValue(ScrollViewer.VerticalScrollBarVisibilityProperty));
         Assert.Equal(ScrollBarVisibility.Disabled, input.GetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty));
+        var chatRegion = Assert.IsType<Grid>(messageScroll.Parent);
+        Assert.Same(chatRegion, messageScrollBar.Parent);
+        Assert.Equal(0, Grid.GetColumn(messageScroll));
+        Assert.Equal(1, Grid.GetColumn(messageScrollBar));
+        Assert.Equal(ScrollBarVisibility.Hidden, messageScroll.VerticalScrollBarVisibility);
+        Assert.False(messageScrollBar.AllowAutoHide);
+        Assert.Equal(12, messageScrollBar.Width);
+        Assert.Equal(new Thickness(4, 0, 0, 0), messageScrollBar.Margin);
         Assert.Equal(256, popupSurface.Width);
         Assert.Equal(360, popupSurface.MaxHeight);
     }
@@ -172,7 +184,7 @@ public sealed class AssistantViewStyleTests
     }
 
     [Fact]
-    public void MessageScrollBarExpandsTowardWindowRight()
+    public void ExternalMessageScrollBarLivesOutsideMessageContent()
     {
         AvaloniaTestBootstrap.Ensure();
 
@@ -182,14 +194,105 @@ public sealed class AssistantViewStyleTests
         host.Arrange(new Rect(0, 0, 1180, 760));
 
         var scrollViewer = Assert.IsType<ScrollViewer>(view.FindControl<ScrollViewer>("MessageScroll"));
-        scrollViewer.ApplyTemplate();
-        var scrollBar = Assert.Single(
-            scrollViewer.GetVisualDescendants().OfType<ScrollBar>(),
-            item => item.Orientation == Orientation.Vertical);
-        scrollBar.ApplyTemplate();
-        var thumb = Assert.Single(scrollBar.GetVisualDescendants().OfType<Thumb>());
+        var scrollBar = Assert.IsType<ScrollBar>(view.FindControl<ScrollBar>("MessageScrollBar"));
 
-        Assert.Equal(new RelativePoint(0, 0.5, RelativeUnit.Relative), thumb.RenderTransformOrigin);
+        Assert.Same(scrollViewer.Parent, scrollBar.Parent);
+        Assert.Equal(0, Grid.GetColumn(scrollViewer));
+        Assert.Equal(1, Grid.GetColumn(scrollBar));
+        Assert.False(scrollBar.AllowAutoHide);
+    }
+
+    [Fact]
+    public void ExternalMessageScrollBarSynchronizesWithMessageViewport()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var context = new MessageListContext();
+        for (var index = 0; index < 40; index++)
+        {
+            context.Messages.Add(ChatMessageViewModel.Status($"状态 {index}: 这是一条用于撑高消息区的测试内容。"));
+        }
+
+        var view = new AssistantView { DataContext = context };
+        var host = new Window
+        {
+            Content = view,
+            Width = 520,
+            Height = 320,
+            SizeToContent = SizeToContent.Manual
+        };
+        host.Show();
+        try
+        {
+            host.UpdateLayout();
+            var scrollViewer = Assert.IsType<ScrollViewer>(view.FindControl<ScrollViewer>("MessageScroll"));
+            var scrollBar = Assert.IsType<ScrollBar>(view.FindControl<ScrollBar>("MessageScrollBar"));
+            var updateScrollBar = typeof(AssistantView).GetMethod(
+                "UpdateMessageScrollBar",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(updateScrollBar);
+            updateScrollBar.Invoke(view, null);
+
+            Assert.True(scrollBar.IsVisible, $"Extent={scrollViewer.Extent.Height}, Viewport={scrollViewer.Viewport.Height}, Maximum={scrollBar.Maximum}");
+            Assert.True(scrollBar.Maximum > 0);
+            Assert.Equal(scrollViewer.Viewport.Height, scrollBar.ViewportSize, 6);
+
+            scrollBar.Value = scrollBar.Maximum / 2;
+
+            Assert.Equal(scrollBar.Value, scrollViewer.Offset.Y, 6);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
+    [Fact]
+    public void ChatRegionKeepsTwoPixelGapAboveComposer()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var context = new MessageListContext();
+        context.Messages.Add(ChatMessageViewModel.Status("状态"));
+        var view = new AssistantView { DataContext = context };
+        var host = new Window { Content = view };
+        host.Measure(new Size(1180, 760));
+        host.Arrange(new Rect(0, 0, 1180, 760));
+
+        var chatRegion = Assert.IsType<Grid>(view.FindControl<Grid>("ChatRegion"));
+        var inputCard = Assert.IsType<Border>(view.FindControl<Border>("inputCard"));
+
+        Assert.Equal(2, inputCard.Bounds.Top - chatRegion.Bounds.Bottom, 6);
+    }
+
+    [Fact]
+    public void StatusMessagesStayLeftAlignedRegardlessOfTextWidth()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var context = new MessageListContext();
+        context.Messages.Add(ChatMessageViewModel.Status("短状态"));
+        context.Messages.Add(ChatMessageViewModel.Status("⚠ 任务失败：\n这是一条更长的错误详情，用来验证不同宽度不会把状态行横向居中。"));
+
+        var view = new AssistantView { DataContext = context };
+        var host = new Window { Content = view };
+        host.Measure(new Size(1180, 760));
+        host.Arrange(new Rect(0, 0, 1180, 760));
+        host.UpdateLayout();
+
+        var statusBlocks = view.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .Where(item => item.IsEffectivelyVisible &&
+                item.DataContext is ChatMessageViewModel { IsStatus: true } status &&
+                item.Text == status.Text)
+            .ToArray();
+
+        Assert.Equal(2, statusBlocks.Length);
+        Assert.All(statusBlocks, item => Assert.Equal(HorizontalAlignment.Left, item.HorizontalAlignment));
+        var leftEdges = statusBlocks
+            .Select(item => item.TranslatePoint(default, view)?.X)
+            .Select(value => value ?? double.NaN)
+            .ToArray();
+        Assert.Equal(leftEdges[0], leftEdges[1], 6);
     }
 
     [Theory]
@@ -208,6 +311,8 @@ public sealed class AssistantViewStyleTests
     [Theory]
     [InlineData(Key.Enter, KeyModifiers.None, true)]
     [InlineData(Key.Enter, KeyModifiers.Shift, false)]
+    [InlineData(Key.Enter, KeyModifiers.Control, false)]
+    [InlineData(Key.Enter, KeyModifiers.Shift | KeyModifiers.Control, false)]
     [InlineData(Key.A, KeyModifiers.None, false)]
     public void EnterKeyDecisionPreservesShiftEnterLineBreak(Key key, KeyModifiers modifiers, bool expected)
     {
@@ -270,5 +375,14 @@ public sealed class AssistantViewStyleTests
         Assert.Equal(Brushes.Transparent, presenter.Background);
         Assert.Equal(Brushes.Transparent, presenter.BorderBrush);
         Assert.Empty(visibleBackgrounds);
+    }
+
+    private sealed class MessageListContext
+    {
+        public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
+        public bool IsRunning => false;
+        public bool HasError => false;
+        public object? PendingApproval => null;
+        public bool HasNoMessages => Messages.Count == 0;
     }
 }

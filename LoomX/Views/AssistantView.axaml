@@ -290,13 +290,9 @@
       <Setter Property="CornerRadius" Value="8"/>
     </Style>
 
-    <!-- Fluent 默认以右边缘为缩放原点；消息区改为从左向右展开，避免侵入气泡。 -->
-    <Style Selector="ScrollViewer.chat-scroll /template/ ScrollBar#PART_VerticalScrollBar /template/ Thumb">
-      <Setter Property="RenderTransformOrigin" Value="0%,50%"/>
-    </Style>
   </UserControl.Styles>
 
-  <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
+  <Grid RowDefinitions="Auto,*,Auto,Auto">
 
     <!-- 标题区：会话名居中（右侧图标不参与居中计算），右侧只放图标 -->
     <Grid Grid.Row="0" Height="22">
@@ -329,11 +325,12 @@
     </Grid>
 
     <!-- 消息流：不画外框，消息直接铺在页面上 -->
-    <Grid Grid.Row="1">
-      <ScrollViewer x:Name="MessageScroll" Classes="chat-scroll" Padding="0,2">
+    <Grid Grid.Row="1" x:Name="ChatRegion" ColumnDefinitions="*,Auto" Margin="0,10,0,2">
+      <ScrollViewer Grid.Column="0" x:Name="MessageScroll" Classes="chat-scroll" Padding="0,2"
+                    VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
         <StackPanel>
 
-            <ItemsControl ItemsSource="{Binding Messages}">
+            <ItemsControl ItemsSource="{Binding Messages}" HorizontalAlignment="Stretch">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
                   <Grid>
@@ -344,7 +341,7 @@
                                FontSize="11"
                                Foreground="{DynamicResource TextTertiaryBrush}"
                                TextWrapping="Wrap"
-                               HorizontalAlignment="Center"
+                               HorizontalAlignment="Left"
                                Margin="0,2"/>
 
                     <!-- 过程块：整轮思考与工具调用的父级 foldout，与最终正文同层级。 -->
@@ -504,8 +501,12 @@
         </StackPanel>
       </ScrollViewer>
 
+      <!-- 独立滚动条占用专属列，不再覆盖或挤进消息内容。 -->
+      <ScrollBar Grid.Column="1" x:Name="MessageScrollBar" Orientation="Vertical"
+                 Width="12" Margin="4,0,0,0" AllowAutoHide="False" IsVisible="False"/>
+
       <!-- 空态：铺在 chat 区域上层而不是滚动内容里，才能在整个聊天区真正垂直 + 水平居中 -->
-      <StackPanel IsVisible="{Binding HasNoMessages}" Spacing="10"
+      <StackPanel Grid.Column="0" IsVisible="{Binding HasNoMessages}" Spacing="10"
                   HorizontalAlignment="Center" VerticalAlignment="Center">
         <Path Classes="icon-glyph"
               Data="M 6,9 C 6,7.3 8.2,6 11,6 H 21 C 23.8,6 26,7.3 26,9 V 17 C 26,18.7 23.8,20 21,20 H 15 L 10.5,24 V 20 C 7.9,19.7 6,18.5 6,17 Z M 12,11 H 20 M 12,14.5 H 17"
@@ -517,7 +518,7 @@
                    TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300" HorizontalAlignment="Center"/>
       </StackPanel>
 
-      <Button x:Name="JumpButton" Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+      <Button Grid.Column="0" x:Name="JumpButton" Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Margin="0,0,8,4" IsVisible="False" Click="JumpButton_OnClick"
                 ToolTip.Tip="{l:Locale assistant.jump.tooltip}"
                 AutomationProperties.Name="{l:Locale assistant.jump.tooltip}">
