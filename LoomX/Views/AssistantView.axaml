@@ -6,54 +6,6 @@
              xmlns:views="using:LoomX.Views"
              xmlns:l="using:LoomX.Localization"
              x:Class="LoomX.Views.AssistantView">
-  <UserControl.Resources>
-    <!-- 聊天滚动条保留原生 Track 交互，仅替换局部视觉。 -->
-    <ControlTheme x:Key="ChatScrollButtonTheme" TargetType="RepeatButton">
-      <Setter Property="Focusable" Value="False"/>
-      <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="Padding" Value="0"/>
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Border Background="Transparent">
-            <ContentPresenter HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
-          </Border>
-        </ControlTemplate>
-      </Setter>
-    </ControlTheme>
-    <ControlTheme x:Key="ChatScrollThumbTheme" TargetType="Thumb">
-      <Setter Property="MinHeight" Value="28"/>
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Border Background="Transparent">
-            <Border x:Name="Capsule" Width="6" CornerRadius="3"
-                    HorizontalAlignment="Center" Background="{DynamicResource TextTertiaryBrush}" Opacity="0.45"/>
-          </Border>
-        </ControlTemplate>
-      </Setter>
-      <Style Selector="^:pointerover /template/ Border#Capsule">
-        <Setter Property="Opacity" Value="0.75"/>
-      </Style>
-      <Style Selector="^:pressed /template/ Border#Capsule">
-        <Setter Property="Opacity" Value="1"/>
-      </Style>
-    </ControlTheme>
-    <ControlTheme x:Key="ChatScrollBarTheme" TargetType="ScrollBar">
-      <Setter Property="Template">
-        <ControlTemplate>
-          <Border Background="Transparent">
-            <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True"
-                   Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
-                   Value="{TemplateBinding Value, Mode=TwoWay}" ViewportSize="{TemplateBinding ViewportSize}">
-              <Track.DecreaseButton><RepeatButton x:Name="PART_PageUpButton" Theme="{StaticResource ChatScrollButtonTheme}"/></Track.DecreaseButton>
-              <Track.Thumb><Thumb Theme="{StaticResource ChatScrollThumbTheme}"/></Track.Thumb>
-              <Track.IncreaseButton><RepeatButton x:Name="PART_PageDownButton" Theme="{StaticResource ChatScrollButtonTheme}"/></Track.IncreaseButton>
-            </Track>
-          </Border>
-        </ControlTemplate>
-      </Setter>
-    </ControlTheme>
-  </UserControl.Resources>
   <UserControl.Styles>
     <Style Selector="ScrollViewer#MessageScroll">
       <Setter Property="Margin" Value="0,0,0,-7"/>

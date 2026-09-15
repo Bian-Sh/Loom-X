@@ -657,6 +657,51 @@ public sealed class AssistantViewStyleTests
         finally { host.Close(); }
     }
 
+    [Fact]
+    public void GlobalScrollBarsUseTransparentTrackAndCapsuleThumb()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var content = new StackPanel();
+        for (var index = 0; index < 20; index++)
+        {
+            content.Children.Add(new Border { Height = 40 });
+        }
+
+        var viewer = new ScrollViewer
+        {
+            Content = content,
+            Width = 200,
+            Height = 120,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        var host = new Window { Content = viewer, ShowActivated = false };
+        host.Show();
+        try
+        {
+            host.UpdateLayout();
+            var bar = Assert.Single(viewer.GetVisualDescendants().OfType<ScrollBar>(),
+                item => item.Orientation == Orientation.Vertical);
+            bar.ApplyTemplate();
+
+            var track = Assert.Single(bar.GetVisualDescendants().OfType<Track>(),
+                item => item.Name == "PART_Track");
+            var thumb = Assert.IsType<Thumb>(track.Thumb);
+            var capsule = Assert.Single(thumb.GetVisualDescendants().OfType<Border>(),
+                item => item.Name == "Capsule");
+
+            Assert.Equal(6, capsule.Bounds.Width);
+            Assert.Equal(new CornerRadius(3), capsule.CornerRadius);
+            Assert.Equal(.45, capsule.Opacity);
+            Assert.DoesNotContain(bar.GetVisualDescendants().OfType<Border>(),
+                item => item.Name != "Capsule" && item.Background is ISolidColorBrush brush && brush.Color.A > 0);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
     private sealed class MessageListContext
     {
         public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
