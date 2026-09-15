@@ -10,8 +10,15 @@
     <!-- 聊天滚动条保留原生 Track 交互，仅替换局部视觉。 -->
     <ControlTheme x:Key="ChatScrollButtonTheme" TargetType="RepeatButton">
       <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
       <Setter Property="Template">
-        <ControlTemplate><Border Background="Transparent"/></ControlTemplate>
+        <ControlTemplate>
+          <Border Background="Transparent">
+            <ContentPresenter HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+          </Border>
+        </ControlTemplate>
       </Setter>
     </ControlTheme>
     <ControlTheme x:Key="ChatScrollThumbTheme" TargetType="Thumb">
@@ -49,10 +56,19 @@
   </UserControl.Resources>
   <UserControl.Styles>
     <Style Selector="ScrollViewer#MessageScroll">
-      <Setter Property="Margin" Value="0,0,0,-7"/>
+      <Setter Property="Margin" Value="0,0,12,-7"/>
+    </Style>
+    <Style Selector="RepeatButton.chat-scroll-line Path">
+      <Setter Property="Opacity" Value="0.45"/>
+    </Style>
+    <Style Selector="RepeatButton.chat-scroll-line:pointerover Path">
+      <Setter Property="Opacity" Value="0.8"/>
+    </Style>
+    <Style Selector="RepeatButton.chat-scroll-line:pressed Path">
+      <Setter Property="Opacity" Value="1"/>
     </Style>
     <Style Selector="Grid.approval-visible > ScrollViewer#MessageScroll">
-      <Setter Property="Margin" Value="0"/>
+      <Setter Property="Margin" Value="0,0,12,0"/>
     </Style>
     <!-- 图标按钮：30×30 圆形圆角，无边框，hover 才出底 -->
     <Style Selector="Button.icon">
@@ -363,6 +379,7 @@
         <Button x:Name="newSessionButton" Classes="icon" Width="22" Height="22" CornerRadius="7" Command="{Binding NewSessionCommand}"
                 ToolTip.Tip="{l:Locale assistant.session.new}"
                 AutomationProperties.Name="{l:Locale assistant.session.new}">
+          <Button.RenderTransform><TranslateTransform X="10"/></Button.RenderTransform>
           <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="14" Height="14"/>
         </Button>
       </StackPanel>
@@ -473,7 +490,7 @@
                     <!-- 终态异常消息：淡红阅读表面，普通正文，不提供手动重试或忽略。 -->
                     <Border IsVisible="{Binding IsError}" HorizontalAlignment="Left" MaxWidth="640" Margin="0,6"
                             Padding="12,10" CornerRadius="18,18,18,6"
-                            Background="{DynamicResource DangerMessageSurfaceBrush}"
+                            Background="{DynamicResource DangerSoftBrush}"
                             BorderBrush="{DynamicResource DangerMessageBorderBrush}" BorderThickness="1">
                       <TextBlock Text="{Binding Text}" FontSize="14" FontWeight="Normal" LineHeight="22"
                                  Foreground="{DynamicResource DangerMessageTextBrush}" TextWrapping="Wrap"/>
@@ -531,11 +548,6 @@
         </StackPanel>
       </ScrollViewer>
 
-      <!-- 独立滚动条占用专属列，不再覆盖或挤进消息内容。 -->
-      <ScrollBar Grid.Column="1" x:Name="MessageScrollBar" Orientation="Vertical"
-                 Width="12" Margin="4,0,-6,0" Theme="{StaticResource ChatScrollBarTheme}"
-                 AllowAutoHide="False" IsVisible="False"/>
-
       <!-- 空态：铺在 chat 区域上层而不是滚动内容里，才能在整个聊天区真正垂直 + 水平居中 -->
       <StackPanel Grid.Column="0" IsVisible="{Binding HasNoMessages}" Spacing="10"
                   HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -559,6 +571,24 @@
             <TextBlock Text="{l:Locale assistant.jump.tooltip}" VerticalAlignment="Center"/>
           </StackPanel>
         </Button>
+    </Grid>
+
+    <!-- 贴边滚动轨：上端贴标题下沿，下端抵达应用右下角，中段保留原生滚动交互。 -->
+    <Grid Grid.Row="0" Grid.RowSpan="4" x:Name="MessageScrollRail" RowDefinitions="12,*,12"
+          Width="12" Margin="0,22,-32,-20" HorizontalAlignment="Right" ZIndex="4" IsVisible="False">
+      <RepeatButton Grid.Row="0" x:Name="MessageScrollLineUpButton" Classes="chat-scroll-line"
+                    Theme="{StaticResource ChatScrollButtonTheme}" Click="MessageScrollLineUp_OnClick">
+        <Path x:Name="MessageScrollUpGlyph" Data="M 2,8 L 6,4 L 10,8 Z" Width="12" Height="12"
+              Fill="{DynamicResource TextTertiaryBrush}"/>
+      </RepeatButton>
+      <ScrollBar Grid.Row="1" x:Name="MessageScrollBar" Orientation="Vertical"
+                 Width="12" Theme="{StaticResource ChatScrollBarTheme}"
+                 AllowAutoHide="False"/>
+      <RepeatButton Grid.Row="2" x:Name="MessageScrollLineDownButton" Classes="chat-scroll-line"
+                    Theme="{StaticResource ChatScrollButtonTheme}" Click="MessageScrollLineDown_OnClick">
+        <Path x:Name="MessageScrollDownGlyph" Data="M 2,4 L 6,8 L 10,4 Z" Width="12" Height="12"
+              Fill="{DynamicResource TextTertiaryBrush}"/>
+      </RepeatButton>
     </Grid>
 
     <!-- 逐条批准：待批准的修改操作卡片 -->

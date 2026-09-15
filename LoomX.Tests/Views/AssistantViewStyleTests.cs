@@ -11,6 +11,7 @@ using LoomX.ViewModels;
 using LoomX.Views;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using System.Xml.Linq;
 using Xunit;
 using AvaloniaPath = Avalonia.Controls.Shapes.Path;
 
@@ -25,6 +26,7 @@ public sealed class AssistantViewStyleTests
         AvaloniaTestBootstrap.Ensure();
 
         var view = new AssistantView();
+        var historyButton = Assert.IsType<Button>(view.FindControl<Button>("historyButton"));
         var newSessionButton = Assert.IsType<Button>(view.FindControl<Button>("newSessionButton"));
         var input = Assert.IsType<TextBox>(view.FindControl<TextBox>("inputTextBox"));
         var messageScroll = Assert.IsType<ScrollViewer>(view.FindControl<ScrollViewer>("MessageScroll"));
@@ -32,7 +34,9 @@ public sealed class AssistantViewStyleTests
         var popup = Assert.IsType<Popup>(view.FindControl<Popup>("modelPopup"));
         var popupSurface = Assert.IsType<Border>(popup.Child);
 
-        Assert.Null(newSessionButton.RenderTransform);
+        Assert.True(historyButton.RenderTransform is null || historyButton.RenderTransform.Value.IsIdentity);
+        var newSessionTransform = Assert.IsType<TranslateTransform>(newSessionButton.RenderTransform);
+        Assert.Equal(10, newSessionTransform.X);
         Assert.True(input.AcceptsReturn);
         Assert.Contains("input-embedded", input.Classes);
         Assert.Contains("composer-input", input.Classes);
@@ -41,15 +45,33 @@ public sealed class AssistantViewStyleTests
         Assert.Equal(ScrollBarVisibility.Auto, input.GetValue(ScrollViewer.VerticalScrollBarVisibilityProperty));
         Assert.Equal(ScrollBarVisibility.Disabled, input.GetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty));
         var chatRegion = Assert.IsType<Grid>(messageScroll.Parent);
-        Assert.Same(chatRegion, messageScrollBar.Parent);
+        var scrollRail = Assert.IsType<Grid>(view.FindControl<Grid>("MessageScrollRail"));
+        Assert.Same(scrollRail, messageScrollBar.Parent);
         Assert.Equal(0, Grid.GetColumn(messageScroll));
-        Assert.Equal(1, Grid.GetColumn(messageScrollBar));
+        Assert.Equal(1, Grid.GetRow(messageScrollBar));
+        Assert.Equal(0, Grid.GetRow(scrollRail));
+        Assert.Equal(4, Grid.GetRowSpan(scrollRail));
+        Assert.Equal(new Thickness(0, 22, -32, -20), scrollRail.Margin);
         Assert.Equal(ScrollBarVisibility.Hidden, messageScroll.VerticalScrollBarVisibility);
         Assert.False(messageScrollBar.AllowAutoHide);
         Assert.Equal(12, messageScrollBar.Width);
-        Assert.Equal(new Thickness(4, 0, -6, 0), messageScrollBar.Margin);
         Assert.Equal(256, popupSurface.Width);
         Assert.Equal(360, popupSurface.MaxHeight);
+    }
+
+
+    [Fact]
+    public void Markdown彩色图标固定兼容的SkiaSharp运行时()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "LoomX.slnx"))) directory = directory.Parent;
+        Assert.NotNull(directory);
+        var document = XDocument.Load(Path.Combine(directory.FullName, "LoomX", "LoomX.csproj"));
+        var references = document.Descendants("PackageReference")
+            .ToDictionary(item => (string)item.Attribute("Include")!, item => (string)item.Attribute("Version")!);
+
+        Assert.Equal("3.119.0", references["SkiaSharp"]);
+        Assert.Equal("3.119.0", references["SkiaSharp.NativeAssets.Win32"]);
     }
 
     [Fact]
@@ -196,9 +218,11 @@ public sealed class AssistantViewStyleTests
         var scrollViewer = Assert.IsType<ScrollViewer>(view.FindControl<ScrollViewer>("MessageScroll"));
         var scrollBar = Assert.IsType<ScrollBar>(view.FindControl<ScrollBar>("MessageScrollBar"));
 
-        Assert.Same(scrollViewer.Parent, scrollBar.Parent);
+        var rail = Assert.IsType<Grid>(view.FindControl<Grid>("MessageScrollRail"));
+        Assert.NotSame(scrollViewer.Parent, scrollBar.Parent);
+        Assert.Same(rail, scrollBar.Parent);
         Assert.Equal(0, Grid.GetColumn(scrollViewer));
-        Assert.Equal(1, Grid.GetColumn(scrollBar));
+        Assert.Equal(1, Grid.GetRow(scrollBar));
         Assert.False(scrollBar.AllowAutoHide);
     }
 
@@ -233,7 +257,8 @@ public sealed class AssistantViewStyleTests
             Assert.NotNull(updateScrollBar);
             updateScrollBar.Invoke(view, null);
 
-            Assert.True(scrollBar.IsVisible, $"Extent={scrollViewer.Extent.Height}, Viewport={scrollViewer.Viewport.Height}, Maximum={scrollBar.Maximum}");
+            var rail = Assert.IsType<Grid>(view.FindControl<Grid>("MessageScrollRail"));
+            Assert.True(rail.IsVisible, $"Extent={scrollViewer.Extent.Height}, Viewport={scrollViewer.Viewport.Height}, Maximum={scrollBar.Maximum}");
             Assert.True(scrollBar.Maximum > 0);
             Assert.Equal(scrollViewer.Viewport.Height, scrollBar.ViewportSize, 6);
 
@@ -497,22 +522,26 @@ public sealed class AssistantViewStyleTests
         {
             if (multiline) view.FindControl<TextBox>("inputTextBox")!.Text = "第一行\n第二行\n第三行";
             host.UpdateLayout();
+            var historyButton = view.FindControl<Button>("historyButton")!;
             var button = view.FindControl<Button>("newSessionButton")!;
-            var position = button.TranslatePoint(default, view)!.Value;
-            Assert.True(position.X >= 0 && position.X + button.Bounds.Width <= view.Bounds.Width);
+            Assert.True(historyButton.RenderTransform is null || historyButton.RenderTransform.Value.IsIdentity);
+            Assert.Equal(10, Assert.IsType<TranslateTransform>(button.RenderTransform).X);
             var region = view.FindControl<Grid>("ChatRegion")!;
             var scroll = view.FindControl<ScrollViewer>("MessageScroll")!;
             var card = view.FindControl<Border>("inputCard")!;
             var bar = view.FindControl<ScrollBar>("MessageScrollBar")!;
             Assert.Equal(new Thickness(0, 10, 0, 0), region.Margin);
-            Assert.Equal(approval ? default : new Thickness(0, 0, 0, -7), scroll.Margin);
+            Assert.Equal(new Thickness(0, 0, 12, approval ? 0 : -7), scroll.Margin);
             Assert.True(card.ZIndex > region.ZIndex);
             if (!approval)
             {
                 var scrollBottom = scroll.TranslatePoint(new Point(0, scroll.Bounds.Height), view)!.Value.Y;
                 var cardTop = card.TranslatePoint(default, view)!.Value.Y;
                 Assert.Equal(card.CornerRadius.TopLeft / 2, scrollBottom - cardTop, 5);
-                Assert.True(bar.TranslatePoint(new Point(0, bar.Bounds.Height), view)!.Value.Y <= cardTop);
+                var rail = view.FindControl<Grid>("MessageScrollRail")!;
+                var railBottom = rail.TranslatePoint(new Point(0, rail.Bounds.Height), view)!.Value.Y;
+                var cardBottom = card.TranslatePoint(new Point(0, card.Bounds.Height), view)!.Value.Y;
+                Assert.True(railBottom >= cardBottom);
                 var content = Assert.IsType<StackPanel>(scroll.Content);
                 Assert.Equal(14, Assert.IsType<Border>(content.Children.Last()).Height);
                 scroll.Offset = new Vector(0, scroll.Extent.Height);
@@ -535,8 +564,9 @@ public sealed class AssistantViewStyleTests
         var context = new MessageListContext();
         for (var index = 0; index < 80; index++) context.Messages.Add(ChatMessageViewModel.Status($"消息 {index}"));
         var view = new AssistantView { DataContext = context };
+        var rail = view.FindControl<Grid>("MessageScrollRail")!;
         var bar = view.FindControl<ScrollBar>("MessageScrollBar")!;
-        bar.IsVisible = true;
+        rail.IsVisible = true;
         bar.Maximum = 1000;
         bar.ViewportSize = 200;
         var host = new Window { Content = view, Width = 600, Height = 600, ShowActivated = false };
@@ -546,9 +576,24 @@ public sealed class AssistantViewStyleTests
             host.UpdateLayout();
             bar.ApplyTemplate();
             var track = Assert.Single(bar.GetVisualDescendants().OfType<Track>(), item => item.Name == "PART_Track");
+            var lineUp = view.FindControl<RepeatButton>("MessageScrollLineUpButton")!;
+            var lineDown = view.FindControl<RepeatButton>("MessageScrollLineDownButton")!;
+            var upGlyph = view.FindControl<AvaloniaPath>("MessageScrollUpGlyph")!;
+            var downGlyph = view.FindControl<AvaloniaPath>("MessageScrollDownGlyph")!;
+            Assert.Same(rail, lineUp.Parent);
+            Assert.Same(rail, lineDown.Parent);
+            Assert.Equal(0, Grid.GetRow(lineUp));
+            Assert.Equal(2, Grid.GetRow(lineDown));
+            Assert.NotNull(upGlyph.Fill);
+            Assert.NotNull(downGlyph.Fill);
             Assert.Equal(Orientation.Vertical, track.Orientation);
             Assert.True(track.IsDirectionReversed);
             bar.Value = 500;
+            bar.SmallChange = 48;
+            lineUp.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(452, bar.Value);
+            lineDown.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(500, bar.Value);
             bar.LargeChange = 100;
             track.IncreaseButton!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(600, bar.Value);

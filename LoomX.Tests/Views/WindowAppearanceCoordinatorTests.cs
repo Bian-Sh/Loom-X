@@ -135,18 +135,20 @@ public sealed class WindowAppearanceCoordinatorTests
     }
 
     [Fact]
-    public void 异常气泡最低透明度仍有稳定阅读背景()
+    public void 异常气泡与普通消息复用同一透明度链路()
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
         window.ApplyAppearance(true, 0, 0, "acrylic");
-        Assert.True(dictionary.ContainsKey("DangerMessageSurfaceBrush"));
-        var brush = Assert.IsType<SolidColorBrush>(dictionary["DangerMessageSurfaceBrush"]);
-        Assert.InRange(brush.Color.A, (byte)217, (byte)254);
+        var surface = Assert.IsType<SolidColorBrush>(dictionary["SurfaceBrush"]);
+        var danger = Assert.IsType<SolidColorBrush>(dictionary["DangerSoftBrush"]);
+        Assert.True(surface.Color.A < 199);
+        Assert.True(danger.Color.A < 214);
+        Assert.InRange(Math.Abs(surface.Color.A - danger.Color.A), 0, 1);
         window.ApplyAppearance(false, 0, 0, "acrylic");
-        Assert.Equal(255, brush.Color.A);
+        Assert.Equal(255, danger.Color.A);
     }
 
     private static ResourceDictionary LoadVisualTokens() => Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(

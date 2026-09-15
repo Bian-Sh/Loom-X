@@ -114,12 +114,24 @@ public partial class AssistantView : UserControl
             MessageScrollBar.LargeChange = viewport;
             MessageScrollBar.SmallChange = 48;
             MessageScrollBar.Value = Math.Clamp(MessageScroll.Offset.Y, 0, maximum);
-            MessageScrollBar.IsVisible = maximum > BottomThreshold;
+            MessageScrollRail.IsVisible = maximum > BottomThreshold;
         }
         finally
         {
             syncingMessageScrollBar = false;
         }
+    }
+
+    private void MessageScrollLineUp_OnClick(object? sender, RoutedEventArgs args) =>
+        ScrollMessageBy(-MessageScrollBar.SmallChange);
+
+    private void MessageScrollLineDown_OnClick(object? sender, RoutedEventArgs args) =>
+        ScrollMessageBy(MessageScrollBar.SmallChange);
+
+    private void ScrollMessageBy(double delta)
+    {
+        var next = Math.Clamp(MessageScrollBar.Value + delta, MessageScrollBar.Minimum, MessageScrollBar.Maximum);
+        MessageScrollBar.Value = next;
     }
 
     private void JumpButton_OnClick(object? sender, RoutedEventArgs args)

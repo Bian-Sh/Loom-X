@@ -13,7 +13,7 @@ public sealed class AssistantErrorBubbleTests
         Assert.NotNull(directory);
         var document = XDocument.Load(Path.Combine(directory.FullName, "LoomX", "Views", "AssistantView.axaml"));
         var bubble = Assert.Single(document.Descendants(), item => item.Name.LocalName == "Border" && (string?)item.Attribute("IsVisible") == "{Binding IsError}");
-        Assert.Equal("{DynamicResource DangerMessageSurfaceBrush}", (string?)bubble.Attribute("Background"));
+        Assert.Equal("{DynamicResource DangerSoftBrush}", (string?)bubble.Attribute("Background"));
         Assert.Equal("18,18,18,6", (string?)bubble.Attribute("CornerRadius"));
         Assert.DoesNotContain(bubble.Descendants(), item => item.Name.LocalName == "Button");
         var text = Assert.Single(bubble.Descendants(), item => (string?)item.Attribute("Text") == "{Binding Text}");
