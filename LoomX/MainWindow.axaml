@@ -181,8 +181,8 @@
             <TextBlock Text="{Binding PageDescription}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
           </StackPanel>
         </Border>
-        <Border Grid.Row="1" Padding="32,20" Background="Transparent">
-          <ContentControl Content="{Binding CurrentView}" />
+        <Border Grid.Row="1" Padding="32,20" Background="Transparent" ClipToBounds="False">
+          <ContentControl Content="{Binding CurrentView}" ClipToBounds="False" />
         </Border>
       </Grid>
       <!-- 标题栏覆盖两列，品牌区与内容区都可拖动；按钮位于同一层避免命中区被遮挡。 -->

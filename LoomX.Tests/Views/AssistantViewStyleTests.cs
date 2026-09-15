@@ -252,6 +252,11 @@ public sealed class AssistantViewStyleTests
         var document = XDocument.Load(Path.Combine(directory.FullName, "LoomX", "App.axaml"));
         var assistantView = Assert.Single(document.Descendants(), item => item.Name.LocalName == "AssistantView");
         Assert.Equal("0,0,-32,-20", (string?)assistantView.Attribute("Margin"));
+        var mainWindow = XDocument.Load(Path.Combine(directory.FullName, "LoomX", "MainWindow.axaml"));
+        var contentHost = Assert.Single(mainWindow.Descendants(), item => item.Name.LocalName == "Border" && (string?)item.Attribute("Grid.Row") == "1" && (string?)item.Attribute("Padding") == "32,20");
+        Assert.Equal("False", (string?)contentHost.Attribute("ClipToBounds"));
+        var contentControl = Assert.Single(contentHost.Descendants(), item => item.Name.LocalName == "ContentControl");
+        Assert.Equal("False", (string?)contentControl.Attribute("ClipToBounds"));
 
         AvaloniaTestBootstrap.Ensure();
         var view = new AssistantView();

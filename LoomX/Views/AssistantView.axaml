@@ -368,7 +368,7 @@
                  TextTrimming="CharacterEllipsis"
                  TextWrapping="NoWrap"/>
       <!-- 保持时钟按钮原位，使用助手视图预留的右侧空间让新会话按钮在上一轮反馈基线上继续右移 8px。 -->
-      <Grid x:Name="HeaderActions" ColumnDefinitions="22,18,22" Width="62" Margin="0,0,-16,0"
+      <Grid x:Name="HeaderActions" ColumnDefinitions="22,18,22" Width="62" Margin="0,0,-16,0" Panel.ZIndex="5"
             HorizontalAlignment="Right" VerticalAlignment="Center">
         <Button Grid.Column="0" x:Name="historyButton" Classes="icon" Width="22" Height="22" CornerRadius="7"
                 Click="HistoryButton_OnClick"
