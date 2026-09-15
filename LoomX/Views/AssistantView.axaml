@@ -6,7 +6,54 @@
              xmlns:views="using:LoomX.Views"
              xmlns:l="using:LoomX.Localization"
              x:Class="LoomX.Views.AssistantView">
+  <UserControl.Resources>
+    <!-- 聊天滚动条保留原生 Track 交互，仅替换局部视觉。 -->
+    <ControlTheme x:Key="ChatScrollButtonTheme" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template">
+        <ControlTemplate><Border Background="Transparent"/></ControlTemplate>
+      </Setter>
+    </ControlTheme>
+    <ControlTheme x:Key="ChatScrollThumbTheme" TargetType="Thumb">
+      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="Transparent">
+            <Border x:Name="Capsule" Width="4" CornerRadius="2"
+                    HorizontalAlignment="Center" Background="{DynamicResource TextTertiaryBrush}" Opacity="0.45"/>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:pointerover /template/ Border#Capsule">
+        <Setter Property="Opacity" Value="0.75"/>
+      </Style>
+      <Style Selector="^:pressed /template/ Border#Capsule">
+        <Setter Property="Opacity" Value="1"/>
+      </Style>
+    </ControlTheme>
+    <ControlTheme x:Key="ChatScrollBarTheme" TargetType="ScrollBar">
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="Transparent">
+            <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True"
+                   Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                   Value="{TemplateBinding Value, Mode=TwoWay}" ViewportSize="{TemplateBinding ViewportSize}">
+              <Track.DecreaseButton><RepeatButton x:Name="PART_PageUpButton" Theme="{StaticResource ChatScrollButtonTheme}"/></Track.DecreaseButton>
+              <Track.Thumb><Thumb Theme="{StaticResource ChatScrollThumbTheme}"/></Track.Thumb>
+              <Track.IncreaseButton><RepeatButton x:Name="PART_PageDownButton" Theme="{StaticResource ChatScrollButtonTheme}"/></Track.IncreaseButton>
+            </Track>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+  </UserControl.Resources>
   <UserControl.Styles>
+    <Style Selector="ScrollViewer#MessageScroll">
+      <Setter Property="Margin" Value="0,0,0,-7"/>
+    </Style>
+    <Style Selector="Grid.approval-visible > ScrollViewer#MessageScroll">
+      <Setter Property="Margin" Value="0"/>
+    </Style>
     <!-- 图标按钮：30×30 圆形圆角，无边框，hover 才出底 -->
     <Style Selector="Button.icon">
       <Setter Property="Width" Value="30"/>
@@ -316,18 +363,17 @@
         <Button x:Name="newSessionButton" Classes="icon" Width="22" Height="22" CornerRadius="7" Command="{Binding NewSessionCommand}"
                 ToolTip.Tip="{l:Locale assistant.session.new}"
                 AutomationProperties.Name="{l:Locale assistant.session.new}">
-          <Button.RenderTransform>
-            <TranslateTransform X="3"/>
-          </Button.RenderTransform>
           <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="14" Height="14"/>
         </Button>
       </StackPanel>
     </Grid>
 
     <!-- 消息流：不画外框，消息直接铺在页面上 -->
-    <Grid Grid.Row="1" x:Name="ChatRegion" ColumnDefinitions="*,Auto" Margin="0,10,0,2">
+    <Grid Grid.Row="1" x:Name="ChatRegion" ColumnDefinitions="*,Auto" Margin="0,10,0,0"
+          Classes.approval-visible="{Binding PendingApproval, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
       <ScrollViewer Grid.Column="0" x:Name="MessageScroll" Classes="chat-scroll" Padding="0,2"
                     VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+        <!-- 末尾保留重叠量与少量呼吸空间，避免像素取整后正文贴进输入卡。 -->
         <StackPanel>
 
             <ItemsControl ItemsSource="{Binding Messages}" HorizontalAlignment="Stretch">
@@ -481,14 +527,14 @@
                          IsVisible="{Binding StatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
 
-
-
+          <Border Height="14" IsHitTestVisible="False"/>
         </StackPanel>
       </ScrollViewer>
 
       <!-- 独立滚动条占用专属列，不再覆盖或挤进消息内容。 -->
       <ScrollBar Grid.Column="1" x:Name="MessageScrollBar" Orientation="Vertical"
-                 Width="12" Margin="4,0,0,0" AllowAutoHide="False" IsVisible="False"/>
+                 Width="12" Margin="4,0,-6,0" Theme="{StaticResource ChatScrollBarTheme}"
+                 AllowAutoHide="False" IsVisible="False"/>
 
       <!-- 空态：铺在 chat 区域上层而不是滚动内容里，才能在整个聊天区真正垂直 + 水平居中 -->
       <StackPanel Grid.Column="0" IsVisible="{Binding HasNoMessages}" Spacing="10"
@@ -504,7 +550,7 @@
       </StackPanel>
 
       <Button Grid.Column="0" x:Name="JumpButton" Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                Margin="0,0,8,4" IsVisible="False" Click="JumpButton_OnClick"
+                Margin="0,0,8,11" IsVisible="False" Click="JumpButton_OnClick"
                 ToolTip.Tip="{l:Locale assistant.jump.tooltip}"
                 AutomationProperties.Name="{l:Locale assistant.jump.tooltip}">
           <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -516,7 +562,7 @@
     </Grid>
 
     <!-- 逐条批准：待批准的修改操作卡片 -->
-    <Border Grid.Row="2"
+    <Border Grid.Row="2" ZIndex="1"
             IsVisible="{Binding PendingApproval, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
             Background="{DynamicResource WarningSoftBrush}"
             BorderBrush="{DynamicResource WarningBorderBrush}"
@@ -551,7 +597,7 @@
     </Border>
 
     <!-- 输入区：上输入框 + 下功能区（权限 / 模型 / 发送）。整张卡一个外框，内部控件不再各自描边 -->
-    <Border Grid.Row="3" x:Name="inputCard" Classes="input-card"
+    <Border Grid.Row="3" ZIndex="1" x:Name="inputCard" Classes="input-card"
             Background="{DynamicResource SurfaceBrush}"
             CornerRadius="14"
             ClipToBounds="True">

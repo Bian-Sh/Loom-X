@@ -32,8 +32,7 @@ public sealed class AssistantViewStyleTests
         var popup = Assert.IsType<Popup>(view.FindControl<Popup>("modelPopup"));
         var popupSurface = Assert.IsType<Border>(popup.Child);
 
-        var transform = Assert.IsType<TranslateTransform>(newSessionButton.RenderTransform);
-        Assert.Equal(3, transform.X);
+        Assert.Null(newSessionButton.RenderTransform);
         Assert.True(input.AcceptsReturn);
         Assert.Contains("input-embedded", input.Classes);
         Assert.Contains("composer-input", input.Classes);
@@ -48,7 +47,7 @@ public sealed class AssistantViewStyleTests
         Assert.Equal(ScrollBarVisibility.Hidden, messageScroll.VerticalScrollBarVisibility);
         Assert.False(messageScrollBar.AllowAutoHide);
         Assert.Equal(12, messageScrollBar.Width);
-        Assert.Equal(new Thickness(4, 0, 0, 0), messageScrollBar.Margin);
+        Assert.Equal(new Thickness(4, 0, -6, 0), messageScrollBar.Margin);
         Assert.Equal(256, popupSurface.Width);
         Assert.Equal(360, popupSurface.MaxHeight);
     }
@@ -248,7 +247,7 @@ public sealed class AssistantViewStyleTests
         }
     }
     [Fact]
-    public void ChatRegionKeepsTwoPixelGapAboveComposer()
+    public void 聊天区与输入卡边界相接而视口向下延伸()
     {
         AvaloniaTestBootstrap.Ensure();
 
@@ -262,7 +261,7 @@ public sealed class AssistantViewStyleTests
         var chatRegion = Assert.IsType<Grid>(view.FindControl<Grid>("ChatRegion"));
         var inputCard = Assert.IsType<Border>(view.FindControl<Border>("inputCard"));
 
-        Assert.Equal(2, inputCard.Bounds.Top - chatRegion.Bounds.Bottom, 6);
+        Assert.Equal(0, inputCard.Bounds.Top - chatRegion.Bounds.Bottom, 6);
     }
 
     [Fact]
@@ -481,12 +480,102 @@ public sealed class AssistantViewStyleTests
         finally { host.Close(); }
     }
 
+    [Theory]
+    [InlineData(420, false, false)]
+    [InlineData(960, false, true)]
+    [InlineData(420, true, true)]
+    public void 助手按钮完整且视口仅在无批准卡时重叠半个圆角(int width, bool approval, bool multiline)
+    {
+        AvaloniaTestBootstrap.Ensure();
+        var context = new MessageListContext { PendingApproval = approval ? new object() : null };
+        for (var index = 0; index < 40; index++)
+            context.Messages.Add(ChatMessageViewModel.Status($"消息 {index}"));
+        var view = new AssistantView { DataContext = context };
+        var host = new Window { Content = view, Width = width, Height = 600, ShowActivated = false };
+        host.Show();
+        try
+        {
+            if (multiline) view.FindControl<TextBox>("inputTextBox")!.Text = "第一行\n第二行\n第三行";
+            host.UpdateLayout();
+            var button = view.FindControl<Button>("newSessionButton")!;
+            var position = button.TranslatePoint(default, view)!.Value;
+            Assert.True(position.X >= 0 && position.X + button.Bounds.Width <= view.Bounds.Width);
+            var region = view.FindControl<Grid>("ChatRegion")!;
+            var scroll = view.FindControl<ScrollViewer>("MessageScroll")!;
+            var card = view.FindControl<Border>("inputCard")!;
+            var bar = view.FindControl<ScrollBar>("MessageScrollBar")!;
+            Assert.Equal(new Thickness(0, 10, 0, 0), region.Margin);
+            Assert.Equal(approval ? default : new Thickness(0, 0, 0, -7), scroll.Margin);
+            Assert.True(card.ZIndex > region.ZIndex);
+            if (!approval)
+            {
+                var scrollBottom = scroll.TranslatePoint(new Point(0, scroll.Bounds.Height), view)!.Value.Y;
+                var cardTop = card.TranslatePoint(default, view)!.Value.Y;
+                Assert.Equal(card.CornerRadius.TopLeft / 2, scrollBottom - cardTop, 5);
+                Assert.True(bar.TranslatePoint(new Point(0, bar.Bounds.Height), view)!.Value.Y <= cardTop);
+                var content = Assert.IsType<StackPanel>(scroll.Content);
+                Assert.Equal(14, Assert.IsType<Border>(content.Children.Last()).Height);
+                scroll.Offset = new Vector(0, scroll.Extent.Height);
+                host.UpdateLayout();
+                Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+                host.UpdateLayout();
+                var lastText = Assert.Single(view.GetVisualDescendants().OfType<TextBlock>(),
+                    item => item.Text == "消息 39" && item.Bounds.Width > 0);
+                var lastBottom = lastText.TranslatePoint(new Point(0, lastText.Bounds.Height), view)!.Value.Y;
+                Assert.True(lastBottom <= cardTop, $"末条正文底部={lastBottom}，输入卡顶部={cardTop}，Offset={scroll.Offset}，Extent={scroll.Extent}，Viewport={scroll.Viewport}");
+            }
+        }
+        finally { host.Close(); }
+    }
+
+    [Fact]
+    public void 消息滚动条实际模板采用透明轨道与主题胶囊滑块()
+    {
+        AvaloniaTestBootstrap.Ensure();
+        var context = new MessageListContext();
+        for (var index = 0; index < 80; index++) context.Messages.Add(ChatMessageViewModel.Status($"消息 {index}"));
+        var view = new AssistantView { DataContext = context };
+        var bar = view.FindControl<ScrollBar>("MessageScrollBar")!;
+        bar.IsVisible = true;
+        bar.Maximum = 1000;
+        bar.ViewportSize = 200;
+        var host = new Window { Content = view, Width = 600, Height = 600, ShowActivated = false };
+        host.Show();
+        try
+        {
+            host.UpdateLayout();
+            bar.ApplyTemplate();
+            var track = Assert.Single(bar.GetVisualDescendants().OfType<Track>(), item => item.Name == "PART_Track");
+            Assert.Equal(Orientation.Vertical, track.Orientation);
+            Assert.True(track.IsDirectionReversed);
+            bar.Value = 500;
+            bar.LargeChange = 100;
+            track.IncreaseButton!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(600, bar.Value);
+            track.DecreaseButton!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(500, bar.Value);
+            var thumb = Assert.IsType<Thumb>(track.Thumb);
+            Assert.True(thumb.Bounds.Height >= 28);
+            var capsule = Assert.Single(thumb.GetVisualDescendants().OfType<Border>(), item => item.Name == "Capsule");
+            Assert.Equal(4, capsule.Width);
+            Assert.Equal(4, capsule.Bounds.Width);
+            Assert.True(capsule.Bounds.Height >= 28);
+            Assert.Equal(12, thumb.Bounds.Width);
+            Assert.Equal(new CornerRadius(2), capsule.CornerRadius);
+            Assert.NotNull(capsule.Background);
+            Assert.Equal(.45, capsule.Opacity);
+            Assert.DoesNotContain(bar.GetVisualDescendants().OfType<Border>(),
+                item => item.Name != "Capsule" && item.Background is ISolidColorBrush brush && brush.Color.A > 0);
+        }
+        finally { host.Close(); }
+    }
+
     private sealed class MessageListContext
     {
         public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
         public bool IsRunning => false;
         public bool HasError => false;
-        public object? PendingApproval => null;
+        public object? PendingApproval { get; set; }
         public bool HasNoMessages => Messages.Count == 0;
     }
 }
