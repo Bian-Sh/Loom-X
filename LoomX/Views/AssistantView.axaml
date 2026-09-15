@@ -56,7 +56,7 @@
   </UserControl.Resources>
   <UserControl.Styles>
     <Style Selector="ScrollViewer#MessageScroll">
-      <Setter Property="Margin" Value="0,0,12,-7"/>
+      <Setter Property="Margin" Value="0,0,0,-7"/>
     </Style>
     <Style Selector="RepeatButton.chat-scroll-line Path">
       <Setter Property="Opacity" Value="0.45"/>
@@ -68,7 +68,7 @@
       <Setter Property="Opacity" Value="1"/>
     </Style>
     <Style Selector="Grid.approval-visible > ScrollViewer#MessageScroll">
-      <Setter Property="Margin" Value="0,0,12,0"/>
+      <Setter Property="Margin" Value="0"/>
     </Style>
     <!-- 图标按钮：30×30 圆形圆角，无边框，hover 才出底 -->
     <Style Selector="Button.icon">
@@ -358,7 +358,7 @@
   <Grid RowDefinitions="Auto,*,Auto,Auto">
 
     <!-- 标题区：会话名居中（右侧图标不参与居中计算），右侧只放图标 -->
-    <Grid Grid.Row="0" Height="22">
+    <Grid Grid.Row="0" x:Name="AssistantHeader" Height="22" Margin="0,0,32,0" ClipToBounds="False">
       <TextBlock Text="{Binding CurrentSessionTitle}"
                  HorizontalAlignment="Center"
                  VerticalAlignment="Center"
@@ -367,8 +367,10 @@
                  FontWeight="SemiBold"
                  TextTrimming="CharacterEllipsis"
                  TextWrapping="NoWrap"/>
-      <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
-        <Button x:Name="historyButton" Classes="icon" Width="22" Height="22" CornerRadius="7"
+      <!-- 保持时钟按钮原位，使用助手视图预留的右侧空间让新会话按钮在上一轮反馈基线上继续右移 8px。 -->
+      <Grid x:Name="HeaderActions" ColumnDefinitions="22,18,22" Width="62" Margin="0,0,-16,0"
+            HorizontalAlignment="Right" VerticalAlignment="Center">
+        <Button Grid.Column="0" x:Name="historyButton" Classes="icon" Width="22" Height="22" CornerRadius="7"
                 Click="HistoryButton_OnClick"
                 ToolTip.Tip="{l:Locale assistant.history.list.tooltip}"
                 AutomationProperties.Name="{l:Locale assistant.history.list.tooltip}">
@@ -376,17 +378,16 @@
                 Data="M 12,3 A 9,9 0 1 0 12,21 A 9,9 0 1 0 12,3 M 12,7.5 V 12.3 L 15.6,14.3"
                 Width="14" Height="14"/>
         </Button>
-        <Button x:Name="newSessionButton" Classes="icon" Width="22" Height="22" CornerRadius="7" Command="{Binding NewSessionCommand}"
+        <Button Grid.Column="2" x:Name="newSessionButton" Classes="icon" Width="22" Height="22" CornerRadius="7" Command="{Binding NewSessionCommand}"
                 ToolTip.Tip="{l:Locale assistant.session.new}"
                 AutomationProperties.Name="{l:Locale assistant.session.new}">
-          <Button.RenderTransform><TranslateTransform X="10"/></Button.RenderTransform>
           <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="14" Height="14"/>
         </Button>
-      </StackPanel>
+      </Grid>
     </Grid>
 
     <!-- 消息流：不画外框，消息直接铺在页面上 -->
-    <Grid Grid.Row="1" x:Name="ChatRegion" ColumnDefinitions="*,Auto" Margin="0,10,0,0"
+    <Grid Grid.Row="1" x:Name="ChatRegion" ColumnDefinitions="*,Auto" Margin="0,10,32,0"
           Classes.approval-visible="{Binding PendingApproval, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
       <ScrollViewer Grid.Column="0" x:Name="MessageScroll" Classes="chat-scroll" Padding="0,2"
                     VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
@@ -575,7 +576,7 @@
 
     <!-- 贴边滚动轨：上端贴标题下沿，下端抵达应用右下角，中段保留原生滚动交互。 -->
     <Grid Grid.Row="0" Grid.RowSpan="4" x:Name="MessageScrollRail" RowDefinitions="12,*,12"
-          Width="12" Margin="0,22,-32,-20" HorizontalAlignment="Right" ZIndex="4" IsVisible="False">
+          Width="12" Margin="0,22,2,0" HorizontalAlignment="Right" ZIndex="4" IsVisible="False">
       <RepeatButton Grid.Row="0" x:Name="MessageScrollLineUpButton" Classes="chat-scroll-line"
                     Theme="{StaticResource ChatScrollButtonTheme}" Click="MessageScrollLineUp_OnClick">
         <Path x:Name="MessageScrollUpGlyph" Data="M 2,8 L 6,4 L 10,8 Z" Width="12" Height="12"
@@ -592,7 +593,7 @@
     </Grid>
 
     <!-- 逐条批准：待批准的修改操作卡片 -->
-    <Border Grid.Row="2" ZIndex="1"
+    <Border Grid.Row="2" ZIndex="1" Margin="0,0,32,0"
             IsVisible="{Binding PendingApproval, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
             Background="{DynamicResource WarningSoftBrush}"
             BorderBrush="{DynamicResource WarningBorderBrush}"
@@ -627,7 +628,7 @@
     </Border>
 
     <!-- 输入区：上输入框 + 下功能区（权限 / 模型 / 发送）。整张卡一个外框，内部控件不再各自描边 -->
-    <Border Grid.Row="3" ZIndex="1" x:Name="inputCard" Classes="input-card"
+    <Border Grid.Row="3" ZIndex="1" x:Name="inputCard" Classes="input-card" Margin="0,0,32,20"
             Background="{DynamicResource SurfaceBrush}"
             CornerRadius="14"
             ClipToBounds="True">

@@ -6,7 +6,7 @@
     <DataTemplate DataType="{x:Type vm:ActivityViewModel}"><views:ActivityView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:GatewayViewModel}"><views:GatewayView /></DataTemplate>
-    <DataTemplate DataType="{x:Type vm:AssistantViewModel}"><views:AssistantView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:AssistantViewModel}"><views:AssistantView Margin="0,0,-32,-20" /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:PlaceholderViewModel}"><views:PlaceholderView /></DataTemplate>
   </Application.DataTemplates>
   <Application.Resources>

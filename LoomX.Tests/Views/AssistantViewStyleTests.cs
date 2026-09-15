@@ -35,8 +35,25 @@ public sealed class AssistantViewStyleTests
         var popupSurface = Assert.IsType<Border>(popup.Child);
 
         Assert.True(historyButton.RenderTransform is null || historyButton.RenderTransform.Value.IsIdentity);
-        var newSessionTransform = Assert.IsType<TranslateTransform>(newSessionButton.RenderTransform);
-        Assert.Equal(10, newSessionTransform.X);
+        Assert.True(newSessionButton.RenderTransform is null || newSessionButton.RenderTransform.Value.IsIdentity);
+        var headerActions = Assert.IsType<Grid>(view.FindControl<Grid>("HeaderActions"));
+        Assert.Equal(62, headerActions.Width);
+        Assert.Equal(new Thickness(0, 0, -16, 0), headerActions.Margin);
+        Assert.False(view.FindControl<Grid>("AssistantHeader")!.ClipToBounds);
+        Assert.Equal(0, Grid.GetColumn(historyButton));
+        Assert.Equal(2, Grid.GetColumn(newSessionButton));
+        var host = new Window { Content = view, Width = 1180, Height = 760, ShowActivated = false };
+        host.Show();
+        try
+        {
+            host.UpdateLayout();
+            var historyLeft = historyButton.TranslatePoint(default, view)!.Value.X;
+            var newSessionLeft = newSessionButton.TranslatePoint(default, view)!.Value.X;
+            Assert.Equal(40, newSessionLeft - historyLeft, 1);
+            var newSessionRight = newSessionButton.TranslatePoint(new Point(newSessionButton.Bounds.Width, 0), view)!.Value.X;
+            Assert.True(newSessionRight <= view.Bounds.Width, $"新会话按钮右边缘 {newSessionRight} 超出助手视图 {view.Bounds.Width}");
+        }
+        finally { host.Close(); }
         Assert.True(input.AcceptsReturn);
         Assert.Contains("input-embedded", input.Classes);
         Assert.Contains("composer-input", input.Classes);
@@ -51,7 +68,7 @@ public sealed class AssistantViewStyleTests
         Assert.Equal(1, Grid.GetRow(messageScrollBar));
         Assert.Equal(0, Grid.GetRow(scrollRail));
         Assert.Equal(4, Grid.GetRowSpan(scrollRail));
-        Assert.Equal(new Thickness(0, 22, -32, -20), scrollRail.Margin);
+        Assert.Equal(new Thickness(0, 22, 2, 0), scrollRail.Margin);
         Assert.Equal(ScrollBarVisibility.Hidden, messageScroll.VerticalScrollBarVisibility);
         Assert.False(messageScrollBar.AllowAutoHide);
         Assert.Equal(12, messageScrollBar.Width);
@@ -224,6 +241,24 @@ public sealed class AssistantViewStyleTests
         Assert.Equal(0, Grid.GetColumn(scrollViewer));
         Assert.Equal(1, Grid.GetRow(scrollBar));
         Assert.False(scrollBar.AllowAutoHide);
+    }
+
+    [Fact]
+    public void 助手视图扩展到主窗口边缘并在内部保留内容Padding()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "LoomX.slnx"))) directory = directory.Parent;
+        Assert.NotNull(directory);
+        var document = XDocument.Load(Path.Combine(directory.FullName, "LoomX", "App.axaml"));
+        var assistantView = Assert.Single(document.Descendants(), item => item.Name.LocalName == "AssistantView");
+        Assert.Equal("0,0,-32,-20", (string?)assistantView.Attribute("Margin"));
+
+        AvaloniaTestBootstrap.Ensure();
+        var view = new AssistantView();
+        Assert.Equal(new Thickness(0, 0, 32, 0), view.FindControl<Grid>("AssistantHeader")!.Margin);
+        Assert.Equal(new Thickness(0, 10, 32, 0), view.FindControl<Grid>("ChatRegion")!.Margin);
+        Assert.Equal(new Thickness(0, 0, 32, 20), view.FindControl<Border>("inputCard")!.Margin);
+        Assert.Equal(new Thickness(0, 22, 2, 0), view.FindControl<Grid>("MessageScrollRail")!.Margin);
     }
 
     [Fact]
@@ -525,13 +560,15 @@ public sealed class AssistantViewStyleTests
             var historyButton = view.FindControl<Button>("historyButton")!;
             var button = view.FindControl<Button>("newSessionButton")!;
             Assert.True(historyButton.RenderTransform is null || historyButton.RenderTransform.Value.IsIdentity);
-            Assert.Equal(10, Assert.IsType<TranslateTransform>(button.RenderTransform).X);
+            Assert.True(button.RenderTransform is null || button.RenderTransform.Value.IsIdentity);
+            var headerActions = view.FindControl<Grid>("HeaderActions")!;
+            Assert.Equal(new Thickness(0, 0, -16, 0), headerActions.Margin);
             var region = view.FindControl<Grid>("ChatRegion")!;
             var scroll = view.FindControl<ScrollViewer>("MessageScroll")!;
             var card = view.FindControl<Border>("inputCard")!;
             var bar = view.FindControl<ScrollBar>("MessageScrollBar")!;
-            Assert.Equal(new Thickness(0, 10, 0, 0), region.Margin);
-            Assert.Equal(new Thickness(0, 0, 12, approval ? 0 : -7), scroll.Margin);
+            Assert.Equal(new Thickness(0, 10, 32, 0), region.Margin);
+            Assert.Equal(new Thickness(0, 0, 0, approval ? 0 : -7), scroll.Margin);
             Assert.True(card.ZIndex > region.ZIndex);
             if (!approval)
             {
