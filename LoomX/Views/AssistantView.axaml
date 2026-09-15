@@ -19,7 +19,7 @@
       <Setter Property="Template">
         <ControlTemplate>
           <Border Background="Transparent">
-            <Border x:Name="Capsule" Width="4" CornerRadius="2"
+            <Border x:Name="Capsule" Width="6" CornerRadius="3"
                     HorizontalAlignment="Center" Background="{DynamicResource TextTertiaryBrush}" Opacity="0.45"/>
           </Border>
         </ControlTemplate>

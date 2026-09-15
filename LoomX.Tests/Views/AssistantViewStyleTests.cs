@@ -557,11 +557,11 @@ public sealed class AssistantViewStyleTests
             var thumb = Assert.IsType<Thumb>(track.Thumb);
             Assert.True(thumb.Bounds.Height >= 28);
             var capsule = Assert.Single(thumb.GetVisualDescendants().OfType<Border>(), item => item.Name == "Capsule");
-            Assert.Equal(4, capsule.Width);
-            Assert.Equal(4, capsule.Bounds.Width);
+            Assert.Equal(6, capsule.Width);
+            Assert.Equal(6, capsule.Bounds.Width);
             Assert.True(capsule.Bounds.Height >= 28);
             Assert.Equal(12, thumb.Bounds.Width);
-            Assert.Equal(new CornerRadius(2), capsule.CornerRadius);
+            Assert.Equal(new CornerRadius(3), capsule.CornerRadius);
             Assert.NotNull(capsule.Background);
             Assert.Equal(.45, capsule.Opacity);
             Assert.DoesNotContain(bar.GetVisualDescendants().OfType<Border>(),
