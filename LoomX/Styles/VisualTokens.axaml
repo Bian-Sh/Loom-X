@@ -33,6 +33,10 @@
   <SolidColorBrush x:Key="DangerBrush" Color="#A94E59" />
   <SolidColorBrush x:Key="DangerSoftBrush" Color="#FBE8EC" />
   <SolidColorBrush x:Key="DangerBorderBrush" Color="#E2B5BE" />
+  <!-- 异常消息使用独立阅读表面；中性正文颜色暂供预览，后续只需调整 token。 -->
+  <SolidColorBrush x:Key="DangerMessageSurfaceBrush" Color="#D9F8E8EB" />
+  <SolidColorBrush x:Key="DangerMessageBorderBrush" Color="#80C9949E" />
+  <SolidColorBrush x:Key="DangerMessageTextBrush" Color="#303639" />
   <!-- Windows 标题栏关闭按钮使用系统语义红，避免悬停态与普通危险操作混淆。 -->
   <SolidColorBrush x:Key="WindowCloseHoverBrush" Color="#E81123" />
   <SolidColorBrush x:Key="WindowClosePressedBrush" Color="#C50F1F" />

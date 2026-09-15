@@ -134,6 +134,21 @@ public sealed class WindowAppearanceCoordinatorTests
         Assert.Equal(changed, window.AppearanceCoordinator.Current);
     }
 
+    [Fact]
+    public void 异常气泡最低透明度仍有稳定阅读背景()
+    {
+        EnsureAvaloniaSetup();
+        var window = new MainWindow();
+        var dictionary = LoadVisualTokens();
+        window.Resources.MergedDictionaries.Add(dictionary);
+        window.ApplyAppearance(true, 0, 0, "acrylic");
+        Assert.True(dictionary.ContainsKey("DangerMessageSurfaceBrush"));
+        var brush = Assert.IsType<SolidColorBrush>(dictionary["DangerMessageSurfaceBrush"]);
+        Assert.InRange(brush.Color.A, (byte)217, (byte)254);
+        window.ApplyAppearance(false, 0, 0, "acrylic");
+        Assert.Equal(255, brush.Color.A);
+    }
+
     private static ResourceDictionary LoadVisualTokens() => Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
         new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
 

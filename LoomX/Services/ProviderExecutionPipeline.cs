@@ -39,6 +39,8 @@ public sealed class ProviderStreamingResult(HttpResponseMessage response, Stream
     public string? ContentType => response.Content.Headers.ContentType?.MediaType;
     public Stream Body => body;
     public bool IsSuccess => response.IsSuccessStatusCode;
+    public TimeSpan? RetryAfter => response.Headers.RetryAfter?.Delta
+        ?? (response.Headers.RetryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : null);
 
     public async ValueTask DisposeAsync()
     {

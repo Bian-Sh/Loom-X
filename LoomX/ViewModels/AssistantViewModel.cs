@@ -26,8 +26,6 @@ public sealed class AssistantViewModel : NotifyViewModel
     private string statusText = string.Empty;
     private bool isRunning;
     private bool hasPersistenceWarning;
-    private string? lastUserText;
-    private string errorMessage = string.Empty;
     private DispatcherTimer? elapsedTimer;
     private AssistantSessionItemViewModel? selectedSession;
     private ChatMessageViewModel? streamingMessage;
@@ -50,12 +48,10 @@ public sealed class AssistantViewModel : NotifyViewModel
         logger = this.loggerFactory.CreateLogger<AssistantViewModel>();
         this.toastService = toastService;
 
-        SendCommand = new AsyncCommand(() => SendAsync(false), () => !IsRunning && !string.IsNullOrWhiteSpace(InputText));
+        SendCommand = new AsyncCommand(SendAsync, () => !IsRunning && !string.IsNullOrWhiteSpace(InputText));
         CancelCommand = new DelegateCommand(Cancel);
         NewSessionCommand = new DelegateCommand(NewSession);
         LoadSessionCommand = new AsyncCommand(parameter => LoadSessionAsync(parameter as AssistantSessionItemViewModel));
-        RetryCommand = new AsyncCommand(() => SendAsync(true), () => !IsRunning && !string.IsNullOrWhiteSpace(lastUserText));
-        DismissErrorCommand = new DelegateCommand(ClearError);
 
         PermissionModeOptions =
         [
@@ -119,11 +115,6 @@ public sealed class AssistantViewModel : NotifyViewModel
     public ICommand NewSessionCommand { get; }
     public ICommand LoadSessionCommand { get; }
 
-    /// <summary>请求失败卡片上的「重试」：重发最后一条用户输入，不重复追加用户气泡。</summary>
-    public ICommand RetryCommand { get; }
-
-    /// <summary>请求失败卡片上的「关闭」。</summary>
-    public ICommand DismissErrorCommand { get; }
 
     public IReadOnlyList<AssistantPermissionOption> PermissionModeOptions { get; }
 
@@ -152,24 +143,9 @@ public sealed class AssistantViewModel : NotifyViewModel
             if (SetProperty(ref isRunning, value))
             {
                 (SendCommand as AsyncCommand)?.RaiseCanExecuteChanged();
-                (RetryCommand as AsyncCommand)?.RaiseCanExecuteChanged();
             }
         }
     }
-
-    /// <summary>请求失败态：在消息流底部展示失败卡片（不是输入框上方的固定文本）。</summary>
-    public string ErrorMessage
-    {
-        get => errorMessage;
-        private set
-        {
-            if (SetProperty(ref errorMessage, value)) OnPropertyChanged(nameof(HasError));
-        }
-    }
-
-    public bool HasError => errorMessage.Length > 0;
-
-    private void ClearError() => ErrorMessage = string.Empty;
 
     /// <summary>历史会话选择；选中即载入。</summary>
     public AssistantSessionItemViewModel? SelectedSession
@@ -260,17 +236,14 @@ public sealed class AssistantViewModel : NotifyViewModel
         return ResolveService();
     }
 
-    /// <param name="isRetry">重试时不重复追加用户气泡，直接复用上一次的用户输入。</param>
-    private async Task SendAsync(bool isRetry)
+    private async Task SendAsync()
     {
-        var text = isRetry ? lastUserText ?? string.Empty : InputText.Trim();
+        var text = InputText.Trim();
         if (text.Length == 0) return;
 
-        if (!isRetry) InputText = string.Empty;
-        lastUserText = text;
+        InputText = string.Empty;
         hasPersistenceWarning = false;
-        ErrorMessage = string.Empty;
-        if (!isRetry) Messages.Add(new ChatMessageViewModel(ChatRole.User, text));
+        Messages.Add(new ChatMessageViewModel(ChatRole.User, text));
         IsRunning = true;
         StatusText = ResourceLookup.Resolve("assistant.status.working");
         AssistantService? service = null;
@@ -280,7 +253,7 @@ public sealed class AssistantViewModel : NotifyViewModel
             service = await EnsureServiceAsync();
             if (service is null)
             {
-                ErrorMessage = ResourceLookup.Resolve("assistant.error.service_unavailable");
+                Messages.Add(ChatMessageViewModel.Error(ResourceLookup.Resolve("assistant.error.service_unavailable")));
                 return;
             }
 
@@ -293,12 +266,12 @@ public sealed class AssistantViewModel : NotifyViewModel
         catch (InvalidOperationException exception)
         {
             logger.LogWarning(exception, "AI 助手请求被拒绝");
-            Dispatcher.UIThread.Post(() => ErrorMessage = exception.Message);
+            Dispatcher.UIThread.Post(() => Messages.Add(ChatMessageViewModel.Error(exception.Message)));
         }
         catch (Exception exception)
         {
             logger.LogError(exception, "AI 助手运行失败");
-            Dispatcher.UIThread.Post(() => ErrorMessage = ResourceLookup.Resolve("assistant.error.unexpected"));
+            Dispatcher.UIThread.Post(() => Messages.Add(ChatMessageViewModel.Error(ResourceLookup.Resolve("assistant.error.unexpected"))));
         }
         finally
         {
@@ -449,10 +422,12 @@ public sealed class AssistantViewModel : NotifyViewModel
                 break;
 
             case AgentEventKind.TaskFailed:
+                if (streamingMessage is not null) streamingMessage.IsStreaming = false;
+                if (currentGroup is not null) currentGroup.IsExpanded = false;
                 streamingMessage = null;
                 currentGroup = null;
                 // Detail 为 ModelErrorFormatter 组装的多行详情（本地化描述 + 状态码/错误码/上游描述）
-                Messages.Add(ChatMessageViewModel.Status($"⚠ {ResourceLookup.Resolve("assistant.task.failed")}：\n{agentEvent.Detail}"));
+                Messages.Add(ChatMessageViewModel.Error(agentEvent.Detail ?? ResourceLookup.Resolve("assistant.task.failed"), agentEvent.Timestamp));
                 break;
 
             case AgentEventKind.WaitingForUser:
@@ -621,8 +596,6 @@ public sealed class AssistantViewModel : NotifyViewModel
         ResolveService()?.NewSession();
         hasPersistenceWarning = false;
         StatusText = string.Empty;
-        ErrorMessage = string.Empty;
-        lastUserText = null;
         Messages.Clear();
         streamingMessage = null;
         currentGroup = null;
@@ -691,8 +664,6 @@ public sealed class AssistantViewModel : NotifyViewModel
     private async Task LoadSessionAsync(AssistantSessionItemViewModel? item)
     {
         if (item is null) return;
-        ErrorMessage = string.Empty;
-        lastUserText = null;
         var service = await EnsureServiceAsync();
         if (service is null) return;
 
@@ -989,6 +960,8 @@ public sealed class ChatMessageViewModel : NotifyViewModel
 
     public bool IsStatus => kind == ChatEntryKind.Status;
 
+    public bool IsError => kind == ChatEntryKind.Error;
+
     /// <summary>
     /// 过程块 = 思考与工具调用共同的<b>父级 foldout</b>，与助手正文（finish content）同属消息流的一级条目。
     /// “处理中 / 已完成 xx” 只出现在这一层，子项只负责“思考”“工具调用”这类标签。
@@ -1132,6 +1105,9 @@ public sealed class ChatMessageViewModel : NotifyViewModel
         Text += delta;
         if (IsAssistantMessage) Markdown.Append(delta);
     }
+
+    public static ChatMessageViewModel Error(string text, DateTimeOffset? timestamp = null) =>
+        new(ChatRole.Assistant, text, ChatEntryKind.Error, timestamp);
 
     public static ChatMessageViewModel Status(string text) =>
         new(ChatRole.Assistant, text, ChatEntryKind.Status, null);
@@ -1391,4 +1367,4 @@ public sealed class ProcessToolCallViewModel : NotifyViewModel
     }
 }
 
-public enum ChatEntryKind { Message, Status, Process }
+public enum ChatEntryKind { Message, Status, Process, Error }

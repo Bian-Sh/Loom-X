@@ -132,7 +132,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 kind,
                 statusCode,
                 errorCode,
-                upstreamMessage);
+                upstreamMessage) { RetryAfter = result.RetryAfter };
         }
 
         using var reader = new StreamReader(result.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, leaveOpen: true);

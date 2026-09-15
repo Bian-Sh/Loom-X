@@ -57,6 +57,9 @@ public sealed class ModelClientException : Exception
         UpstreamMessage = upstreamMessage;
     }
 
+    /// <summary>服务端建议的重试等待时间，仅用于后台调度，不含响应正文。</summary>
+    public TimeSpan? RetryAfter { get; init; }
+
     /// <summary>错误类别，用于映射多语言文案（assistant.error.kind.*）。</summary>
     public ModelErrorKind Kind { get; init; } = ModelErrorKind.Unknown;
 

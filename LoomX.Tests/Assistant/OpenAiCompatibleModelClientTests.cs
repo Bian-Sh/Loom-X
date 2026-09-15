@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.IO.Compression;
 using System.IO.Pipelines;
 using System.Text;
@@ -27,6 +27,8 @@ public sealed class OpenAiCompatibleModelClientTests
             this.body = body;
         }
 
+        public string? RetryAfter { get; init; }
+
         public HttpRequestMessage? LastRequest { get; private set; }
         public string? LastRequestBody { get; private set; }
 
@@ -34,11 +36,25 @@ public sealed class OpenAiCompatibleModelClientTests
         {
             LastRequest = request;
             LastRequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
-            return new HttpResponseMessage(statusCode)
+            var response = new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(body, Encoding.UTF8, "text/event-stream"),
             };
+            if (RetryAfter is not null) response.Headers.TryAddWithoutValidation("Retry-After", RetryAfter);
+            return response;
         }
+    }
+
+    [Theory]
+    [InlineData("12", 12)]
+    [InlineData("无效", null)]
+    public async Task 错误响应保留合法重试等待提示(string header, int? expectedSeconds)
+    {
+        using var http = new HttpClient(new FakeHttpHandler(HttpStatusCode.TooManyRequests, "") { RetryAfter = header });
+        var client = new OpenAiCompatibleModelClient(http, "https://example.invalid/v1", "测试模型");
+        var exception = await Assert.ThrowsAsync<ModelClientException>(() => CollectAsync(
+            client.StreamAsync(new ModelRequest([ChatMessage.User("测试")], []), CancellationToken.None)));
+        Assert.Equal(expectedSeconds, exception.RetryAfter?.TotalSeconds);
     }
 
     private static ToolDefinition CreateTool() => new()

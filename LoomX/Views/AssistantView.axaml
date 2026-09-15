@@ -424,6 +424,15 @@
                       </StackPanel>
                     </Grid>
 
+                    <!-- 终态异常消息：淡红阅读表面，普通正文，不提供手动重试或忽略。 -->
+                    <Border IsVisible="{Binding IsError}" HorizontalAlignment="Left" MaxWidth="640" Margin="0,6"
+                            Padding="12,10" CornerRadius="18,18,18,6"
+                            Background="{DynamicResource DangerMessageSurfaceBrush}"
+                            BorderBrush="{DynamicResource DangerMessageBorderBrush}" BorderThickness="1">
+                      <TextBlock Text="{Binding Text}" FontSize="14" FontWeight="Normal" LineHeight="22"
+                                 Foreground="{DynamicResource DangerMessageTextBrush}" TextWrapping="Wrap"/>
+                    </Border>
+
                     <!-- 用户消息：右对齐气泡 -->
                     <StackPanel Classes="msg-body" IsVisible="{Binding IsUser}" HorizontalAlignment="Right"
                                 MaxWidth="560" Margin="0,6">
@@ -472,31 +481,7 @@
                          IsVisible="{Binding StatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}"/>
             </StackPanel>
 
-            <!-- 失败态：请求失败卡片，带重试 -->
-            <Border IsVisible="{Binding HasError}" HorizontalAlignment="Left" MaxWidth="560" Margin="0,12,0,2"
-                    Padding="12,10" CornerRadius="12"
-                    Background="{DynamicResource DangerSoftBrush}"
-                    BorderBrush="{DynamicResource DangerBorderBrush}" BorderThickness="1">
-              <StackPanel Spacing="8">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <Path Classes="icon-glyph" Data="M 16,5 L 28,26 H 4 Z M 16,11 V 18 M 16,21.5 V 23"
-                        Width="15" Height="15" Stroke="{DynamicResource DangerBrush}"/>
-                  <TextBlock Text="{l:Locale assistant.status.failed}" FontWeight="SemiBold" FontSize="13"
-                             VerticalAlignment="Center"/>
-                </StackPanel>
-                <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Classes="muted" TextWrapping="Wrap"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Command="{Binding RetryCommand}" Height="28" MinHeight="0" Padding="14,0"
-                          CornerRadius="9" Background="{DynamicResource AccentBrush}" Foreground="White"
-                          BorderThickness="0" FontSize="12">
-                    <TextBlock Text="{l:Locale assistant.error.retry}"/>
-                  </Button>
-                  <Button Command="{Binding DismissErrorCommand}" Classes="bare">
-                    <TextBlock Text="{l:Locale assistant.error.dismiss}"/>
-                  </Button>
-                </StackPanel>
-              </StackPanel>
-            </Border>
+
 
         </StackPanel>
       </ScrollViewer>

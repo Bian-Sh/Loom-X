@@ -22,6 +22,7 @@ public sealed class AgentLoop
     private readonly ToolApprovalGate? approvalGate;
     private readonly Func<Exception, string> failureFormatter;
     private readonly Func<int, string> maxStepsFormatter;
+    private readonly Func<TimeSpan, CancellationToken, Task> retryDelay;
 
     public AgentLoop(
         IModelClient modelClient,
@@ -29,7 +30,8 @@ public sealed class AgentLoop
         ILogger<AgentLoop> logger,
         ToolApprovalGate? approvalGate = null,
         Func<Exception, string>? failureFormatter = null,
-        Func<int, string>? maxStepsFormatter = null)
+        Func<int, string>? maxStepsFormatter = null,
+        Func<TimeSpan, CancellationToken, Task>? retryDelay = null)
     {
         this.modelClient = modelClient;
         this.toolRegistry = toolRegistry;
@@ -37,6 +39,7 @@ public sealed class AgentLoop
         this.approvalGate = approvalGate;
         this.failureFormatter = failureFormatter ?? (exception => exception.Message);
         this.maxStepsFormatter = maxStepsFormatter ?? (steps => $"超过最大步骤数：{steps}");
+        this.retryDelay = retryDelay ?? ((delay, token) => Task.Delay(delay, token));
     }
 
     public async IAsyncEnumerable<AgentEvent> RunAsync(
@@ -62,8 +65,6 @@ public sealed class AgentLoop
         for (var step = 0; step < session.Options.MaxSteps && !completed && !cancelled && failedDetail is null; step++)
         {
             yield return AgentEvent.Create(session.Id, AgentEventKind.StepStarted) with { Step = step + 1 };
-            using var stepTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            stepTimeout.CancelAfter(session.Options.ModelTimeout);
 
             var textBuilder = new StringBuilder();
             var blocks = new List<ChatContentBlock>();
@@ -72,9 +73,9 @@ public sealed class AgentLoop
             var completionReceived = false;
 
             // 逐条拉取模型流。yield 不允许出现在带 catch 的 try 内，因此仅在 try 中移动枚举器，事件在 try 外处理。
-            await using var enumerator = modelClient
-                .StreamAsync(new ModelRequest(session.Messages, toolRegistry.All), stepTimeout.Token)
-                .GetAsyncEnumerator(stepTimeout.Token);
+            await using var enumerator = StreamWithRetryAsync(
+                new ModelRequest(session.Messages, toolRegistry.All), session.Options.ModelTimeout,
+                session.Id, step + 1, cancellationToken).GetAsyncEnumerator(cancellationToken);
 
             while (failedDetail is null && !cancelled)
             {
@@ -254,6 +255,83 @@ public sealed class AgentLoop
         {
             Detail = failedDetail ?? maxStepsFormatter(session.Options.MaxSteps),
         };
+    }
+
+    /// <summary>仅在尚未产生流式事件时重试模型步骤；首次请求计入五次总尝试。</summary>
+    private async IAsyncEnumerable<ModelStreamEvent> StreamWithRetryAsync(
+        ModelRequest request, TimeSpan timeout, string sessionId, int step,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            logger.LogInformation("Agent 模型尝试开始 {SessionId} {Step} {Attempt}", sessionId, step, attempt);
+            Exception? failure = null;
+            var receivedEvent = false;
+            using (var attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+            {
+                attemptTimeout.CancelAfter(timeout);
+                IAsyncEnumerator<ModelStreamEvent>? enumerator = null;
+                try
+                {
+                    enumerator = modelClient.StreamAsync(request, attemptTimeout.Token).GetAsyncEnumerator(attemptTimeout.Token);
+                }
+                catch (Exception exception)
+                {
+                    failure = exception;
+                }
+
+                if (enumerator is not null)
+                {
+                    await using (enumerator)
+                    {
+                        while (failure is null)
+                        {
+                            var moved = false;
+                            try { moved = await enumerator.MoveNextAsync(); }
+                            catch (Exception exception) { failure = exception; }
+                            if (!moved) break;
+                            receivedEvent = true;
+                            yield return enumerator.Current;
+                        }
+                    }
+                }
+            }
+
+            if (failure is null)
+            {
+                logger.LogInformation("Agent 模型尝试完成 {SessionId} {Step} {Attempt}", sessionId, step, attempt);
+                yield break;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (failure is OperationCanceledException)
+                failure = new ModelClientException("模型请求超时。", ModelErrorKind.Timeout);
+            else if (failure is IOException or HttpRequestException)
+                failure = new ModelClientException("模型连接中断。", ModelErrorKind.ConnectionFailed);
+
+            var error = failure as ModelClientException;
+            var kind = error?.Kind ?? ModelErrorKind.Unknown;
+            if (kind == ModelErrorKind.Unknown && error is not null)
+                kind = ModelErrorClassifier.Classify(error.StatusCode, error.ErrorCode);
+            var retryable = kind is ModelErrorKind.ConnectionFailed or ModelErrorKind.Timeout or
+                ModelErrorKind.RateLimited or ModelErrorKind.ServerOverloaded or ModelErrorKind.ServerError;
+            if (!retryable || receivedEvent || attempt == 5)
+            {
+                logger.LogWarning("Agent 模型尝试终止 {SessionId} {Step} {Attempt} {Retryable} {ReceivedEvent}",
+                    sessionId, step, attempt, retryable, receivedEvent);
+                throw failure;
+            }
+
+            var serverDelay = (failure as ModelClientException)?.RetryAfter;
+            var delay = serverDelay is { } hint
+                ? TimeSpan.FromSeconds(Math.Clamp(hint.TotalSeconds, 0, 60))
+                : TimeSpan.FromSeconds(Math.Pow(2, attempt - 1));
+            logger.LogWarning(failure, "Agent 模型准备重试 {SessionId} {Step} {Attempt} {DelayMs} {StatusCode} {Kind}",
+                sessionId, step, attempt + 1, delay.TotalMilliseconds,
+                (failure as ModelClientException)?.StatusCode, (failure as ModelClientException)?.Kind);
+            await retryDelay(delay, cancellationToken);
+        }
     }
 
     private static void AppendBlock(List<ChatContentBlock> blocks, ChatContentKind kind, string delta, bool summary = false)

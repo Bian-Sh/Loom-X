@@ -453,6 +453,34 @@ public sealed class AssistantViewStyleTests
         Assert.Empty(visibleBackgrounds);
     }
 
+    [Fact]
+    public void 异常气泡实际控件使用普通字重并可换行()
+    {
+        AvaloniaTestBootstrap.Ensure();
+        var context = new MessageListContext();
+        var error = ChatMessageViewModel.Error("错误详情\nHTTP 状态码：402");
+        context.Messages.Add(error);
+        var view = new AssistantView { DataContext = context };
+        var host = new Window { Content = view, Width = 800, Height = 600, ShowActivated = false };
+        host.Show();
+        try
+        {
+            host.UpdateLayout();
+            var text = Assert.Single(view.GetVisualDescendants().OfType<TextBlock>(), item => item.Text == error.Text && item.Bounds.Width > 0);
+            Assert.True(text.IsVisible);
+            Assert.Equal(14, text.FontSize);
+            Assert.Equal(FontWeight.Normal, text.FontWeight);
+            Assert.Equal(22, text.LineHeight);
+            Assert.Equal(TextWrapping.Wrap, text.TextWrapping);
+            Assert.Equal(Color.Parse("#303639"), Assert.IsAssignableFrom<ISolidColorBrush>(text.Foreground).Color);
+            var bubble = Assert.IsType<Border>(text.Parent);
+            Assert.True(bubble.IsVisible);
+            Assert.Equal(new CornerRadius(18, 18, 18, 6), bubble.CornerRadius);
+            Assert.DoesNotContain(bubble.GetVisualDescendants(), child => child is Button);
+        }
+        finally { host.Close(); }
+    }
+
     private sealed class MessageListContext
     {
         public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];

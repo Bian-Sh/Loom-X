@@ -104,13 +104,31 @@ public sealed class AssistantViewModelTests
     }
 
     [Fact]
-    public void Project_TaskFailed_AddsWarningStatus()
+    public void Project_TaskFailed_AddsErrorBubble()
     {
         var viewModel = CreateViewModel();
 
         viewModel.Project(Event(AgentEventKind.TaskFailed) with { Detail = "超过最大步骤数 16。" });
 
-        Assert.Contains(viewModel.Messages, message => message.IsStatus && message.Text.Contains("任务失败"));
+        var error = Assert.Single(viewModel.Messages);
+        Assert.True(error.IsError);
+        Assert.False(error.IsStatus);
+        Assert.False(error.IsAssistantMessage);
+        Assert.Contains("超过最大步骤数 16。", error.Text);
+    }
+
+    [Fact]
+    public void Project_历史失败事件保留时间和正文且新轮次不删除错误()
+    {
+        var viewModel = CreateViewModel();
+        var timestamp = DateTimeOffset.Parse("2026-09-15T08:00:00+08:00");
+        viewModel.Project(Event(AgentEventKind.TaskFailed) with { Timestamp = timestamp, Detail = "历史错误" });
+        viewModel.Project(Event(AgentEventKind.SessionStarted));
+        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "下一轮正文" });
+        var error = Assert.Single(viewModel.Messages, message => message.IsError);
+        Assert.Equal(timestamp, error.Timestamp);
+        Assert.Equal("历史错误", error.Text);
+        Assert.Empty(error.Markdown.ToString());
     }
 
     [Fact]
