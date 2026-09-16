@@ -1,0 +1,772 @@
+﻿using System.Collections.ObjectModel;
+using LoomX.Assistant.Configuration;
+
+namespace LoomX.Assistant.UserDecisions;
+
+public enum UserDecisionFieldType
+{
+    SingleSelect,
+    MultiSelect,
+    Number,
+    Text,
+}
+
+public sealed record UserDecisionOption
+{
+    public UserDecisionOption(string id, string label, string? description = null)
+    {
+        Id = id;
+        Label = label;
+        Description = description;
+    }
+
+    public string Id { get; }
+
+    public string Label { get; }
+
+    public string? Description { get; }
+}
+
+public sealed record UserDecisionField
+{
+    public UserDecisionField(
+        string id,
+        string label,
+        UserDecisionFieldType type,
+        bool isRequired = false,
+        IReadOnlyList<UserDecisionOption>? options = null,
+        string? defaultOptionId = null,
+        IReadOnlyList<string>? defaultOptionIds = null,
+        int? minSelections = null,
+        int? maxSelections = null,
+        decimal? defaultNumber = null,
+        decimal? minNumber = null,
+        decimal? maxNumber = null,
+        decimal? step = null,
+        string? defaultText = null,
+        bool isMultiline = false,
+        int? maxLength = null)
+    {
+        Id = id;
+        Label = label;
+        Type = type;
+        IsRequired = isRequired;
+        Options = CopyItems(options ?? [], nameof(options));
+        DefaultOptionId = defaultOptionId;
+        DefaultOptionIds = CopyStrings(defaultOptionIds ?? [], nameof(defaultOptionIds));
+        MinSelections = minSelections;
+        MaxSelections = maxSelections;
+        DefaultNumber = defaultNumber;
+        MinNumber = minNumber;
+        MaxNumber = maxNumber;
+        Step = step;
+        DefaultText = defaultText;
+        IsMultiline = isMultiline;
+        MaxLength = maxLength;
+    }
+
+    public string Id { get; }
+
+    public string Label { get; }
+
+    public UserDecisionFieldType Type { get; }
+
+    public bool IsRequired { get; }
+
+    public IReadOnlyList<UserDecisionOption> Options { get; }
+
+    public string? DefaultOptionId { get; }
+
+    public IReadOnlyList<string> DefaultOptionIds { get; }
+
+    public int? MinSelections { get; }
+
+    public int? MaxSelections { get; }
+
+    public decimal? DefaultNumber { get; }
+
+    public decimal? MinNumber { get; }
+
+    public decimal? MaxNumber { get; }
+
+    public decimal? Step { get; }
+
+    public string? DefaultText { get; }
+
+    public bool IsMultiline { get; }
+
+    public int? MaxLength { get; }
+
+    private static ReadOnlyCollection<UserDecisionOption> CopyItems(
+        IReadOnlyList<UserDecisionOption> items,
+        string parameterName)
+    {
+        var copy = new UserDecisionOption[items.Count];
+        for (var index = 0; index < items.Count; index++)
+        {
+            copy[index] = items[index]
+                ?? throw new ArgumentException("用户决策选项不能为 null。", parameterName);
+        }
+
+        return Array.AsReadOnly(copy);
+    }
+
+    private static ReadOnlyCollection<string> CopyStrings(
+        IReadOnlyList<string> items,
+        string parameterName)
+    {
+        var copy = new string[items.Count];
+        for (var index = 0; index < items.Count; index++)
+        {
+            copy[index] = items[index]
+                ?? throw new ArgumentException("用户决策默认选项不能为 null。", parameterName);
+        }
+
+        return Array.AsReadOnly(copy);
+    }
+}
+
+public sealed record UserDecisionRequest
+{
+    public UserDecisionRequest(
+        string title,
+        string question,
+        IReadOnlyList<UserDecisionField> fields,
+        string? description = null,
+        string? impactSummary = null,
+        bool allowCancel = true)
+    {
+        ArgumentNullException.ThrowIfNull(fields);
+        var copy = new UserDecisionField[fields.Count];
+        for (var index = 0; index < fields.Count; index++)
+        {
+            copy[index] = fields[index]
+                ?? throw new ArgumentException("用户决策字段不能为 null。", nameof(fields));
+        }
+
+        Title = title;
+        Question = question;
+        Description = description;
+        ImpactSummary = impactSummary;
+        AllowCancel = allowCancel;
+        Fields = Array.AsReadOnly(copy);
+    }
+
+    public string Title { get; }
+
+    public string Question { get; }
+
+    public string? Description { get; }
+
+    public string? ImpactSummary { get; }
+
+    public bool AllowCancel { get; }
+
+    public IReadOnlyList<UserDecisionField> Fields { get; }
+}
+
+public sealed record UserDecisionValidationError(string FieldId, string Message)
+{
+    public const string RequestFieldId = "$request";
+}
+
+public sealed class UserDecisionValidationException : ArgumentException
+{
+    public UserDecisionValidationException(IReadOnlyList<UserDecisionValidationError> errors)
+        : base("用户决策请求无效。")
+    {
+        ArgumentNullException.ThrowIfNull(errors);
+        Errors = Array.AsReadOnly(errors.ToArray());
+    }
+
+    public IReadOnlyList<UserDecisionValidationError> Errors { get; }
+}
+
+public static class UserDecisionValidator
+{
+    private const int MaxTitleLength = 120;
+    private const int MaxQuestionLength = 2000;
+    private const int MaxDescriptionLength = 2000;
+    private const int MaxImpactSummaryLength = 1000;
+    private const int MaxFieldIdLength = 64;
+    private const int MaxFieldLabelLength = 200;
+    private const int MaxOptionIdLength = 64;
+    private const int MaxOptionLabelLength = 200;
+    private const int MaxOptionDescriptionLength = 500;
+    private const int DefaultTextMaxLength = 1000;
+    private const int MaxTextLength = 4000;
+
+    public static IReadOnlyList<UserDecisionValidationError> ValidateRequest(UserDecisionRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var errors = new List<UserDecisionValidationError>();
+
+        ValidateDisplayText(errors, UserDecisionValidationError.RequestFieldId, "标题", request.Title, true, MaxTitleLength);
+        ValidateDisplayText(errors, UserDecisionValidationError.RequestFieldId, "问题", request.Question, true, MaxQuestionLength);
+        ValidateDisplayText(errors, UserDecisionValidationError.RequestFieldId, "说明", request.Description, false, MaxDescriptionLength);
+        ValidateDisplayText(
+            errors,
+            UserDecisionValidationError.RequestFieldId,
+            "影响摘要",
+            request.ImpactSummary,
+            false,
+            MaxImpactSummaryLength);
+
+        if (request.Fields.Count == 0)
+        {
+            errors.Add(new UserDecisionValidationError(
+                UserDecisionValidationError.RequestFieldId,
+                "用户决策至少需要一个字段。"));
+            return errors.AsReadOnly();
+        }
+
+        var fieldIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var field in request.Fields)
+        {
+            var fieldId = GetErrorFieldId(field.Id);
+            if (!fieldIds.Add(field.Id ?? string.Empty))
+            {
+                errors.Add(new UserDecisionValidationError(fieldId, "字段 id 不能重复。"));
+            }
+
+            ValidateField(errors, field, fieldId);
+        }
+
+        return errors.AsReadOnly();
+    }
+
+    public static IReadOnlyList<UserDecisionValidationError> ValidateSubmission(
+        UserDecisionRequest request,
+        IReadOnlyDictionary<string, object?> values)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(values);
+        var errors = new List<UserDecisionValidationError>();
+        var fields = request.Fields.ToDictionary(field => field.Id, StringComparer.Ordinal);
+
+        foreach (var key in values.Keys)
+        {
+            if (!fields.ContainsKey(key))
+            {
+                errors.Add(new UserDecisionValidationError(
+                    UserDecisionValidationError.RequestFieldId,
+                    "提交结果包含未知字段。"));
+            }
+        }
+
+        foreach (var field in request.Fields)
+        {
+            values.TryGetValue(field.Id, out var value);
+            ValidateSubmittedValue(errors, field, value);
+        }
+
+        return errors.AsReadOnly();
+    }
+
+    private static void ValidateField(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        ValidateIdentifier(errors, fieldId, "字段 id", field.Id, MaxFieldIdLength);
+        ValidateDisplayText(errors, fieldId, "字段标题", field.Label, true, MaxFieldLabelLength);
+
+        switch (field.Type)
+        {
+            case UserDecisionFieldType.SingleSelect:
+                ValidateSingleSelectField(errors, field, fieldId);
+                break;
+            case UserDecisionFieldType.MultiSelect:
+                ValidateMultiSelectField(errors, field, fieldId);
+                break;
+            case UserDecisionFieldType.Number:
+                ValidateNumberField(errors, field, fieldId);
+                break;
+            case UserDecisionFieldType.Text:
+                ValidateTextField(errors, field, fieldId);
+                break;
+            default:
+                errors.Add(new UserDecisionValidationError(fieldId, "字段类型无效。"));
+                break;
+        }
+    }
+
+    private static void ValidateSingleSelectField(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        var optionIds = ValidateOptions(errors, field, fieldId);
+        if (field.DefaultOptionId is not null && !optionIds.Contains(field.DefaultOptionId))
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "单选字段的默认选项不存在。"));
+        }
+    }
+
+    private static void ValidateMultiSelectField(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        var optionIds = ValidateOptions(errors, field, fieldId);
+        var minimum = field.MinSelections ?? 0;
+        var maximum = field.MaxSelections ?? field.Options.Count;
+
+        if (minimum < 0)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "最少选择数不能小于零。"));
+        }
+        else if (maximum < minimum)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "最少选择数不能大于最多选择数。"));
+        }
+        else if (maximum > field.Options.Count)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "最多选择数不能超过选项数量。"));
+        }
+
+        var defaultIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var defaultId in field.DefaultOptionIds)
+        {
+            if (!defaultIds.Add(defaultId))
+            {
+                errors.Add(new UserDecisionValidationError(fieldId, "多选字段的默认选项不能重复。"));
+                continue;
+            }
+
+            if (!optionIds.Contains(defaultId))
+            {
+                errors.Add(new UserDecisionValidationError(fieldId, "多选字段的默认选项不存在。"));
+            }
+        }
+
+        if (field.DefaultOptionIds.Count > 0
+            && (field.DefaultOptionIds.Count < minimum || field.DefaultOptionIds.Count > maximum))
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "多选字段的默认值不符合选择数量限制。"));
+        }
+    }
+
+    private static HashSet<string> ValidateOptions(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        var optionIds = new HashSet<string>(StringComparer.Ordinal);
+        if (field.Options.Count == 0)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "选择字段至少需要一个选项。"));
+            return optionIds;
+        }
+
+        foreach (var option in field.Options)
+        {
+            ValidateIdentifier(errors, fieldId, "选项 id", option.Id, MaxOptionIdLength);
+            ValidateDisplayText(errors, fieldId, "选项标签", option.Label, true, MaxOptionLabelLength);
+            ValidateDisplayText(
+                errors,
+                fieldId,
+                "选项说明",
+                option.Description,
+                false,
+                MaxOptionDescriptionLength);
+
+            if (!optionIds.Add(option.Id ?? string.Empty))
+            {
+                errors.Add(new UserDecisionValidationError(fieldId, "选项 id 不能重复。"));
+            }
+        }
+
+        return optionIds;
+    }
+
+    private static void ValidateNumberField(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        if (field.MinNumber is not null
+            && field.MaxNumber is not null
+            && field.MinNumber > field.MaxNumber)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "数值字段的最小值不能大于最大值。"));
+            return;
+        }
+
+        if (field.Step is not null && field.Step <= 0)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "数值字段的步长必须大于零。"));
+            return;
+        }
+
+        if (field.DefaultNumber is not null)
+        {
+            ValidateNumber(errors, field, field.DefaultNumber.Value, "默认值");
+        }
+    }
+
+    private static void ValidateTextField(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        var maxLength = field.MaxLength ?? DefaultTextMaxLength;
+        if (maxLength <= 0 || maxLength > MaxTextLength)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "文本最大长度必须处于允许范围内。"));
+            return;
+        }
+
+        if (field.DefaultText is null)
+        {
+            return;
+        }
+
+        if (field.IsRequired && string.IsNullOrWhiteSpace(field.DefaultText))
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "必填文本的默认值不能为空。"));
+        }
+        else if (field.DefaultText.Length > maxLength)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "文本默认值超过最大长度。"));
+        }
+        else if (ContainsSensitivePattern(field.DefaultText))
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "文本默认值包含敏感字段模式。"));
+        }
+    }
+
+    private static void ValidateSubmittedValue(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        object? value)
+    {
+        if (value is null)
+        {
+            if (field.IsRequired)
+            {
+                errors.Add(new UserDecisionValidationError(field.Id, "必填字段不能为空。"));
+            }
+
+            return;
+        }
+
+        switch (field.Type)
+        {
+            case UserDecisionFieldType.SingleSelect:
+                ValidateSubmittedSingle(errors, field, value);
+                break;
+            case UserDecisionFieldType.MultiSelect:
+                ValidateSubmittedMulti(errors, field, value);
+                break;
+            case UserDecisionFieldType.Number:
+                ValidateSubmittedNumber(errors, field, value);
+                break;
+            case UserDecisionFieldType.Text:
+                ValidateSubmittedText(errors, field, value);
+                break;
+            default:
+                errors.Add(new UserDecisionValidationError(field.Id, "字段类型无效。"));
+                break;
+        }
+    }
+
+    private static void ValidateSubmittedSingle(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        object value)
+    {
+        if (value is not string selectedId)
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "单选字段值类型无效。"));
+            return;
+        }
+
+        if (!field.Options.Any(option => string.Equals(option.Id, selectedId, StringComparison.Ordinal)))
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "单选字段选择了未知选项。"));
+        }
+    }
+
+    private static void ValidateSubmittedMulti(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        object value)
+    {
+        if (value is not IEnumerable<string> selectedValues || value is string)
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "多选字段值类型无效。"));
+            return;
+        }
+
+        var selected = selectedValues.ToArray();
+        if (selected.Any(item => item is null))
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "多选字段不能包含空选项。"));
+            return;
+        }
+
+        if (selected.Distinct(StringComparer.Ordinal).Count() != selected.Length)
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "多选字段不能重复选择同一选项。"));
+            return;
+        }
+
+        var optionIds = field.Options.Select(option => option.Id).ToHashSet(StringComparer.Ordinal);
+        if (selected.Any(item => !optionIds.Contains(item)))
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "多选字段选择了未知选项。"));
+            return;
+        }
+
+        var minimum = field.MinSelections ?? (field.IsRequired ? 1 : 0);
+        var maximum = field.MaxSelections ?? field.Options.Count;
+        if (selected.Length < minimum || selected.Length > maximum)
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "多选字段的选择数量无效。"));
+        }
+    }
+
+    private static void ValidateSubmittedNumber(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        object value)
+    {
+        if (!TryConvertNumber(value, out var number))
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "数值字段值类型无效。"));
+            return;
+        }
+
+        ValidateNumber(errors, field, number, "提交值");
+    }
+
+    private static void ValidateSubmittedText(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        object value)
+    {
+        if (value is not string text)
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "文本字段值类型无效。"));
+            return;
+        }
+
+        if (field.IsRequired && string.IsNullOrWhiteSpace(text))
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "必填文本不能为空。"));
+            return;
+        }
+
+        var maxLength = field.MaxLength ?? DefaultTextMaxLength;
+        if (text.Length > maxLength)
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "文本长度超过最大限制。"));
+        }
+    }
+
+    private static void ValidateNumber(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        decimal value,
+        string valueName)
+    {
+        if (field.MinNumber is not null && value < field.MinNumber)
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, $"数值{valueName}小于最小值。"));
+            return;
+        }
+
+        if (field.MaxNumber is not null && value > field.MaxNumber)
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, $"数值{valueName}大于最大值。"));
+            return;
+        }
+
+        if (field.Step is not null)
+        {
+            var origin = field.MinNumber ?? 0;
+            if ((value - origin) % field.Step.Value != 0)
+            {
+                errors.Add(new UserDecisionValidationError(field.Id, $"数值{valueName}不符合步长限制。"));
+            }
+        }
+    }
+
+    private static void ValidateIdentifier(
+        ICollection<UserDecisionValidationError> errors,
+        string fieldId,
+        string name,
+        string? value,
+        int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, $"{name}不能为空。"));
+        }
+        else if (value.Length > maxLength)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, $"{name}长度超过限制。"));
+        }
+        else if (SensitiveKeyPolicy.IsSensitivePath([value]))
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, $"{name}包含敏感字段模式。"));
+        }
+    }
+
+    private static void ValidateDisplayText(
+        ICollection<UserDecisionValidationError> errors,
+        string fieldId,
+        string name,
+        string? value,
+        bool required,
+        int maxLength)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            if (required)
+            {
+                errors.Add(new UserDecisionValidationError(fieldId, $"{name}不能为空。"));
+            }
+
+            return;
+        }
+
+        if (value.Length > maxLength)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, $"{name}长度超过限制。"));
+        }
+        else if (ContainsSensitivePattern(value))
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, $"{name}包含敏感字段模式。"));
+        }
+    }
+
+    private static bool ContainsSensitivePattern(string value)
+    {
+        var start = -1;
+        for (var index = 0; index <= value.Length; index++)
+        {
+            var isTokenCharacter = index < value.Length && IsSensitiveTokenCharacter(value[index]);
+            if (isTokenCharacter && start < 0)
+            {
+                start = index;
+            }
+            else if (!isTokenCharacter && start >= 0)
+            {
+                var token = value[start..index];
+                if (SensitiveKeyPolicy.IsSensitivePath([token]))
+                {
+                    return true;
+                }
+
+                start = -1;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSensitiveTokenCharacter(char character) =>
+        character is >= 'a' and <= 'z'
+        or >= 'A' and <= 'Z'
+        or >= '0' and <= '9'
+        or '_'
+        or '-';
+
+    private static bool TryConvertNumber(object value, out decimal number)
+    {
+        try
+        {
+            switch (value)
+            {
+                case decimal decimalValue:
+                    number = decimalValue;
+                    return true;
+                case byte or sbyte or short or ushort or int or uint or long or ulong:
+                    number = Convert.ToDecimal(value);
+                    return true;
+                case float floatValue when float.IsFinite(floatValue):
+                    number = Convert.ToDecimal(floatValue);
+                    return true;
+                case double doubleValue when double.IsFinite(doubleValue):
+                    number = Convert.ToDecimal(doubleValue);
+                    return true;
+                default:
+                    number = default;
+                    return false;
+            }
+        }
+        catch (OverflowException)
+        {
+            number = default;
+            return false;
+        }
+    }
+
+    private static string GetErrorFieldId(string? fieldId) =>
+        string.IsNullOrWhiteSpace(fieldId) ? "$field" : fieldId;
+}
+
+public sealed record UserDecisionResult
+{
+    private readonly ReadOnlyDictionary<string, object?> values;
+
+    private UserDecisionResult(
+        bool cancelled,
+        string? cancellationReason,
+        IReadOnlyDictionary<string, object?> values)
+    {
+        Cancelled = cancelled;
+        CancellationReason = cancellationReason;
+        this.values = CopyValues(values);
+    }
+
+    public bool Cancelled { get; }
+
+    public string? CancellationReason { get; }
+
+    public IReadOnlyDictionary<string, object?> Values => values;
+
+    public static UserDecisionResult Submit(IReadOnlyDictionary<string, object?> values)
+    {
+        ArgumentNullException.ThrowIfNull(values);
+        return new UserDecisionResult(false, null, values);
+    }
+
+    public static UserDecisionResult Cancel(string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ArgumentException("取消原因不能为空。", nameof(reason));
+        }
+
+        return new UserDecisionResult(true, reason, new Dictionary<string, object?>());
+    }
+
+    private static ReadOnlyDictionary<string, object?> CopyValues(
+        IReadOnlyDictionary<string, object?> values)
+    {
+        var copy = new Dictionary<string, object?>(values.Count, StringComparer.Ordinal);
+        foreach (var pair in values)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key))
+            {
+                throw new ArgumentException("用户决策结果字段 id 不能为空。", nameof(values));
+            }
+
+            copy.Add(pair.Key, CopyValue(pair.Value));
+        }
+
+        return new ReadOnlyDictionary<string, object?>(copy);
+    }
+
+    private static object? CopyValue(object? value) => value switch
+    {
+        IReadOnlyList<string> items => Array.AsReadOnly(items.ToArray()),
+        IEnumerable<string> items when value is not string => Array.AsReadOnly(items.ToArray()),
+        _ => value,
+    };
+}
+
+public sealed record PendingUserDecision(string RequestId, string OwnerId, UserDecisionRequest Request);
