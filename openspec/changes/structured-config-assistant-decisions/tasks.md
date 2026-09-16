@@ -7,10 +7,10 @@
 ## 2. TOML 文档读取与结构化编辑
 
 - [x] 2.1 实现通用 TOML 文档服务的读取、路径查询和语法校验，统一使用 Tomlyn syntax parser/document model，并以测试覆盖嵌套表、数组表、dotted key、包含点号的键名和非法 TOML
-- [ ] 2.2 实现 `set`、`delete`、`patch` 的内存候选文档编辑，将 JSON 输入转换为受控 TOML 值，并以测试确认注释、无关 section、未知字段和原有语义得到保留
-- [ ] 2.3 实现 Read → Compare → Backup → Temp Write → Parse Temp → Atomic Replace → Parse Target 的事务式写入流程，临时文件与备份文件放在目标目录，并以测试确认 no-op 不创建备份
-- [ ] 2.4 为 Windows 路径、空格、非 ASCII 字符、文件占用和替换失败增加安全处理与有限重试，并以失败回滚测试确认原文件内容保持不变且错误结果包含可恢复信息
-- [ ] 2.5 为 TOML 服务补齐 `ILogger<T>` 结构化日志，记录操作类型、路径安全摘要、结果、错误类型和耗时，测试确认不记录完整文档、Secret、请求正文或响应正文
+- [x] 2.2 实现 `set`、`delete`、`patch` 的内存候选文档编辑，将 JSON 输入转换为受控 TOML 值，并以测试确认注释、无关 section、未知字段和原有语义得到保留
+- [x] 2.3 实现 Read → Compare → Backup → Temp Write → Parse Temp → Atomic Replace → Parse Target 的事务式写入流程，临时文件与备份文件放在目标目录，并以测试确认 no-op 不创建备份
+- [x] 2.4 为 Windows 路径、空格、非 ASCII 字符、文件占用和替换失败增加安全处理与有限重试，并以失败回滚测试确认原文件内容保持不变且错误结果包含可恢复信息
+- [x] 2.5 为 TOML 服务补齐 `ILogger<T>` 结构化日志，记录操作类型、路径安全摘要、结果、错误类型和耗时，测试确认不记录完整文档、Secret、请求正文或响应正文
 
 ## 3. TOML Assistant 工具
 

@@ -238,7 +238,7 @@ git commit -m "实现 TOML 读取查询与语法校验"
 - Consumes: `ITomlDocumentService.PatchAsync`。
 - Produces: internal `ITomlFileOperations`，只抽象测试必须控制的 copy/write/replace/move/delete/delay 行为；默认实现直接调用 `File` API。
 
-- [ ] **Step 1: 编写 Patch 原子性和格式保留失败测试**
+- [x] **Step 1: 编写 Patch 原子性和格式保留失败测试**
 
 覆盖 set、delete、父表创建、标量穿越拒绝、批量中途失败不落盘、注释/未知 section 保留、空父表保留、同值 no-op。示例：
 
@@ -261,20 +261,20 @@ public async Task PatchAsync_WhenSecondOperationIsInvalid_LeavesOriginalUntouche
 }
 ```
 
-- [ ] **Step 2: 运行 Patch 测试确认红灯**
+- [x] **Step 2: 运行 Patch 测试确认红灯**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~TomlDocumentServiceTests&Name~Patch"`
 Expected: FAIL，Patch 尚未实现。
 
-- [ ] **Step 3: 实现语法树候选编辑与重新解析**
+- [x] **Step 3: 实现语法树候选编辑与重新解析**
 
 全部操作先应用于内存候选；delete 只移除目标节点，不清理父表；set 创建缺失普通 table，但拒绝跨越标量或数组表。候选文本必须重新解析成功才进入文件事务。
 
-- [ ] **Step 4: 编写文件事务失败测试**
+- [x] **Step 4: 编写文件事务失败测试**
 
 通过 fake `ITomlFileOperations` 注入以下故障：临时文件写入失败、临时解析失败、Replace 抛 `IOException` 两次后成功、Replace 最终失败、写后目标解析失败且备份恢复成功、恢复失败。每条测试断言原文件或备份可恢复，并断言日志不含 TOML/Secret。
 
-- [ ] **Step 5: 实现事务式写入和有限重试**
+- [x] **Step 5: 实现事务式写入和有限重试**
 
 默认实现使用同目录路径：
 
@@ -285,12 +285,12 @@ var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
 
 目标存在时先 Copy 到备份；写临时文件并解析；Windows 目标存在时 `File.Replace(tempPath, path, null)`，不存在时 `File.Move(tempPath, path)`。仅对 `IOException`/`UnauthorizedAccessException` 做固定次数短延迟重试，并响应 CancellationToken。
 
-- [ ] **Step 6: 运行 TOML 服务全部测试**
+- [x] **Step 6: 运行 TOML 服务全部测试**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~TomlDocumentServiceTests`
 Expected: PASS，包含中文路径、空格路径、no-op、占用重试和恢复测试。
 
-- [ ] **Step 7: 勾选 OpenSpec 2.2–2.5 并提交**
+- [x] **Step 7: 勾选 OpenSpec 2.2–2.5 并提交**
 
 ```powershell
 git add LoomX/Assistant/Configuration/TomlDocumentService.cs LoomX/Assistant/Configuration/TomlFileOperations.cs LoomX.Tests/Assistant/TomlDocumentServiceTests.cs openspec/changes/structured-config-assistant-decisions/tasks.md

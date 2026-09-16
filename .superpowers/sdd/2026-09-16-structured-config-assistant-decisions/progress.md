@@ -12,3 +12,5 @@ Task 2: complete（commits bf1163a..a6f136f，thorough review clean）。
 Ruling: Task 2 Step 2 重命名为“运行 TOML 读取测试确认红灯” — Comet task-checkoff 要求任务文本全计划唯一，原通用文本出现三次 — 若判断错误仅影响计划标签，不改变已执行的 TDD 行为。
 Task 3: review failed（3 IMPORTANT 代码/测试缺口；OpenSpec 勾选由协调者在 review clean 后执行）；进入 fix round 1/2。
 Ruling: Task 3 OpenSpec 2.2–2.5 勾选不交给 fix agent — Comet 明确要求 review clean 后由协调者统一勾选并 task-checkoff — 若判断错误只影响流程提交拆分，不影响实现行为。
+Task 3: fix round 1/2（3 项代码/测试问题全部 addressed；85 tests passed）。
+Task 3: complete（commits 016f104..bbf4565，thorough review clean）。
