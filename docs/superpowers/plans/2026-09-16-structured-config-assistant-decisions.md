@@ -40,7 +40,7 @@ base-ref: a9e755d2ff2e924c6b23a589a027d8f8bca64a2d
 - Create: `LoomX/Assistant/AssistantTools.cs` — `assistant.ask_user` ToolDefinition。
 - Create: `LoomX/ViewModels/AskUserDialogViewModel.cs` — 字段投影、输入状态和提交校验。
 - Create: `LoomX/Views/AskUserDialog.axaml`、`LoomX/Views/AskUserDialog.axaml.cs` — 动态 AskUser 表单。
-- Modify: `LoomX/LoomX.csproj` — 引入 Tomlyn 2.10.1。
+- Modify: `LoomX/LoomX.csproj`、`LoomX.Tests/LoomX.Tests.csproj` — 引入 Tomlyn 2.10.1。
 - Modify: `LoomX/LoomXHost.cs:48-111` — 注册 TOML 服务、Broker 与工具。
 - Modify: `LoomX/Assistant/AssistantService.cs:25-47, 95-205` — 暴露运行取消边界并取消 pending AskUser。
 - Modify: `LoomX/ViewModels/AssistantViewModel.cs:18-70, 250-285, 560-600` — 订阅 Broker、显示 Dialog、页面卸载取消。
@@ -62,6 +62,7 @@ base-ref: a9e755d2ff2e924c6b23a589a027d8f8bca64a2d
 
 **Files:**
 - Modify: `LoomX/LoomX.csproj`
+- Modify: `LoomX.Tests/LoomX.Tests.csproj`
 - Create: `LoomX/Assistant/Configuration/TomlModels.cs`
 - Create: `LoomX/Assistant/Configuration/SensitiveKeyPolicy.cs`
 - Create: `LoomX.Tests/Assistant/TomlModelsTests.cs`
@@ -74,7 +75,7 @@ base-ref: a9e755d2ff2e924c6b23a589a027d8f8bca64a2d
 
 - [ ] **Step 1: 添加 Tomlyn 2.10.1 包引用并恢复依赖**
 
-在 `LoomX/LoomX.csproj` 的 PackageReference ItemGroup 加入：
+在 `LoomX/LoomX.csproj` 与 `LoomX.Tests/LoomX.Tests.csproj` 的 PackageReference ItemGroup 分别加入：
 
 ```xml
 <PackageReference Include="Tomlyn" Version="2.10.1" />
@@ -145,7 +146,7 @@ Expected: PASS；若仅新增文件格式不符，先运行 `dotnet format LoomX
 - [ ] **Step 6: 勾选 OpenSpec 1.1–1.3 并提交**
 
 ```powershell
-git add LoomX/LoomX.csproj LoomX/Assistant/Configuration LoomX.Tests/Assistant/TomlModelsTests.cs LoomX.Tests/Assistant/SensitiveKeyPolicyTests.cs openspec/changes/structured-config-assistant-decisions/tasks.md
+git add LoomX/LoomX.csproj LoomX.Tests/LoomX.Tests.csproj LoomX/Assistant/Configuration LoomX.Tests/Assistant/TomlModelsTests.cs LoomX.Tests/Assistant/SensitiveKeyPolicyTests.cs openspec/changes/structured-config-assistant-decisions/tasks.md
 git commit -m "新增 TOML 领域契约与敏感键策略"
 ```
 
@@ -629,3 +630,4 @@ git commit -m "完成结构化配置与助手决策能力"
 - Type consistency：`ITomlDocumentService`、`IUserDecisionBroker`、`PendingUserDecision`、`TomlPatchOperation` 在首次出现处定义，后续任务使用同一命名。
 - Scope：不包含 Codex Catalog/Profile/configure、环境变量或重启逻辑；后续 Change 通过这里的公共接口接入。
 - No placeholders：计划不含未决实现项；Skill 文件选择存在条件分支，但明确规定优先修改现有最接近 Skill，仅在不存在时创建固定路径。
+
