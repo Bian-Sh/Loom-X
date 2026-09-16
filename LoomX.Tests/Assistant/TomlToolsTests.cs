@@ -10,11 +10,15 @@ namespace LoomX.Tests.Assistant;
 public sealed class TomlToolsTests
 {
     [Fact]
-    public async Task Read_返回安全摘要并传递取消令牌()
+    public async Task Read_隐藏敏感顶层键并传递取消令牌()
     {
         var service = new RecordingTomlDocumentService
         {
-            ReadHandler = (_, _) => Task.FromResult(new TomlReadResult(true, true, ["model", "api_key"], [])),
+            ReadHandler = (_, _) => Task.FromResult(new TomlReadResult(
+                true,
+                true,
+                ["model", "api_key", "token", "plain-secret"],
+                [])),
         };
         var tool = GetTool("toml.read", service);
         using var cancellation = new CancellationTokenSource();
@@ -26,7 +30,10 @@ public sealed class TomlToolsTests
         Assert.Equal(fullPath, service.LastPath);
         Assert.Equal(cancellation.Token, service.LastCancellationToken);
         Assert.Contains("top_level_keys", result.Content);
-        Assert.Contains("api_key", result.Content);
+        Assert.Contains("model", result.Content);
+        Assert.DoesNotContain("api_key", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("token", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("plain-secret", result.Content, StringComparison.Ordinal);
         Assert.DoesNotContain(fullPath, result.Content, StringComparison.Ordinal);
     }
 
@@ -53,6 +60,44 @@ public sealed class TomlToolsTests
         Assert.Contains("***", result.Content);
         Assert.Contains("string", result.Content);
         Assert.DoesNotContain("plain-secret", result.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Get_读取父对象时隐藏敏感属性名和值()
+    {
+        const string secret = "parent-object-secret-sentinel";
+        var service = new RecordingTomlDocumentService
+        {
+            GetHandler = (_, _, _) => Task.FromResult(new TomlValueResult(
+                true,
+                TomlValueKind.Object,
+                TomlValue.FromObject(new Dictionary<string, object?>
+                {
+                    ["model"] = "loomx",
+                    ["api_key"] = secret,
+                    ["nested"] = new Dictionary<string, object?>
+                    {
+                        ["token"] = secret,
+                        ["enabled"] = true,
+                    },
+                }),
+                [])),
+        };
+        var tool = GetTool("toml.get", service);
+
+        var result = await tool.Handler(new JsonObject
+        {
+            ["path"] = "config.toml",
+            ["key_path"] = new JsonArray("provider"),
+        }, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Contains("model", result.Content);
+        Assert.Contains("nested", result.Content);
+        Assert.Contains("enabled", result.Content);
+        Assert.DoesNotContain("api_key", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("token", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, result.Content, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -325,6 +370,47 @@ public sealed class TomlToolsTests
         Assert.DoesNotContain(secret, string.Join("\n", logger.Messages), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Patch_AgentLoop结果和日志不包含敏感输入服务错误或异常文本()
+    {
+        const string patchSecret = "patch-json-secret-sentinel";
+        const string userSecret = "user-text-secret-sentinel";
+        const string serviceErrorSecret = "service-error-secret-sentinel";
+        const string exceptionSecret = "exception-text-secret-sentinel";
+        var logger = new RecordingLogger<AgentLoop>();
+
+        var failedService = new RecordingTomlDocumentService
+        {
+            PatchHandler = (_, _, _) => Task.FromResult(new TomlWriteResult(
+                false,
+                false,
+                null,
+                false,
+                [serviceErrorSecret])),
+        };
+        var failedSession = await RunPatchThroughAgentLoopAsync(failedService, logger, patchSecret, userSecret);
+
+        var throwingService = new RecordingTomlDocumentService
+        {
+            PatchHandler = (_, _, _) => throw new InvalidOperationException(exceptionSecret),
+        };
+        var throwingSession = await RunPatchThroughAgentLoopAsync(throwingService, logger, patchSecret, userSecret);
+
+        var toolResults = failedSession.Messages
+            .Concat(throwingSession.Messages)
+            .Where(message => message.Role == ChatRole.Tool)
+            .Select(message => message.Content ?? string.Empty)
+            .ToArray();
+        Assert.Equal(2, toolResults.Length);
+
+        var logged = string.Join("\n", logger.Messages);
+        foreach (var sentinel in new[] { patchSecret, userSecret, serviceErrorSecret, exceptionSecret })
+        {
+            Assert.All(toolResults, content => Assert.DoesNotContain(sentinel, content, StringComparison.Ordinal));
+            Assert.DoesNotContain(sentinel, logged, StringComparison.Ordinal);
+        }
+    }
+
     private static ToolDefinition GetTool(string name, ITomlDocumentService service)
     {
         var registry = TomlToolsTestSupport.CreateRegistry(service);
@@ -341,6 +427,40 @@ public sealed class TomlToolsTests
         }
 
         return events;
+    }
+
+    private static async Task<AgentSession> RunPatchThroughAgentLoopAsync(
+        ITomlDocumentService service,
+        RecordingLogger<AgentLoop> logger,
+        string patchSecret,
+        string userSecret)
+    {
+        var arguments = new JsonObject
+        {
+            ["path"] = "config.toml",
+            ["operations"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["op"] = "set",
+                    ["key_path"] = new JsonArray("provider", "headers"),
+                    ["value"] = new JsonObject { ["Authorization"] = patchSecret },
+                },
+            },
+        }.ToJsonString();
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("call_1", "toml.patch", arguments)), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已完成。"), new ModelCompletedEvent("stop")]);
+        var loop = new AgentLoop(
+            model,
+            TomlToolsTestSupport.CreateRegistry(service),
+            logger,
+            approvalGate: (_, _, _) => Task.FromResult(true));
+        var session = new AgentSession();
+
+        await CollectAsync(loop.RunAsync(session, userSecret));
+
+        return session;
     }
 }
 

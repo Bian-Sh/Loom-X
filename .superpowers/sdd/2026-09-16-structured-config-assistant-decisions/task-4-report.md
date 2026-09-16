@@ -75,3 +75,11 @@ git diff --check
 ## 仓库同步说明
 
 开始时工作区干净且位于 `codex/structured-config-assistant-decisions`。`git pull --ff-only` 因该分支没有 upstream 而无法执行；同时 fetch 的 geometric repack 报告缺少对象 `e42a7d13307188ed6a5459b2a5c6ce4d1d47930d`。该问题未阻塞本任务编译、测试与提交，也未对仓库执行 reset、clean、stash 或其他清理操作。
+
+## Fix round 1
+
+- 技术核验确认敏感键名泄漏和递归 value Schema 缺口成立；真实 `AgentLoop` 项为测试覆盖缺口，现有安全行为无需修改。
+- RED：首轮定向测试 `45` 项中 `4` 项按预期失败，分别覆盖 `toml.read`、读取父对象的 `toml.get`、`toml.set`/`toml.patch` 递归 Schema；AgentLoop 新测试在修复前通过。
+- 修复：read 使用固定 `[sensitive]` 键名占位；get 在 `TomlTools` 序列化边界过滤敏感对象属性；set/patch 使用 `$defs/$ref` 递归 Schema，覆盖数组 items、对象 additionalProperties 与 propertyNames 长度。
+- GREEN：Task 4/AgentLoop 定向测试 `45/45` 通过；`SensitiveKeyPolicyTests|TomlDocumentServiceTests` 回归 `59/59` 通过；定向 `dotnet format --verify-no-changes` 与 `git diff --check` 通过。
+- 详细证据见 `task-4-fix-1-report.md`。

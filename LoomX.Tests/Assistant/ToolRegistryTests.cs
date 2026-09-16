@@ -118,6 +118,38 @@ public sealed class ToolRegistryTests
         AssertBoundedStringArray(operation["properties"]!["key_path"]!);
     }
 
+    [Theory]
+    [InlineData("toml.set")]
+    [InlineData("toml.patch")]
+    public void TomlTools_ValueSchema递归限制嵌套字符串和对象属性名(string toolName)
+    {
+        var registry = TomlToolsTestSupport.CreateRegistry(new RecordingTomlDocumentService());
+        var schema = GetSchema(registry, toolName);
+        var valueSchema = toolName == "toml.set"
+            ? schema["properties"]!["value"]!.AsObject()
+            : schema["properties"]!["operations"]!["items"]!["properties"]!["value"]!.AsObject();
+
+        var valueReference = valueSchema["$ref"];
+        Assert.NotNull(valueReference);
+        Assert.Equal("#/$defs/tomlValue", valueReference.GetValue<string>());
+        var definitions = Assert.IsType<JsonObject>(schema["$defs"]);
+        var definition = Assert.IsType<JsonObject>(definitions["tomlValue"]);
+        var variants = definition["anyOf"]!.AsArray()
+            .Select(item => item!.AsObject())
+            .ToArray();
+        var stringSchema = Assert.Single(variants, item => item["type"]!.GetValue<string>() == "string");
+        var arraySchema = Assert.Single(variants, item => item["type"]!.GetValue<string>() == "array");
+        var objectSchema = Assert.Single(variants, item => item["type"]!.GetValue<string>() == "object");
+
+        Assert.True(stringSchema["maxLength"]!.GetValue<int>() > 0);
+        Assert.Equal("#/$defs/tomlValue", arraySchema["items"]!["$ref"]!.GetValue<string>());
+        Assert.Equal("string", objectSchema["propertyNames"]!["type"]!.GetValue<string>());
+        Assert.True(objectSchema["propertyNames"]!["maxLength"]!.GetValue<int>() > 0);
+        Assert.Equal("#/$defs/tomlValue", objectSchema["additionalProperties"]!["$ref"]!.GetValue<string>());
+
+        Assert.NotNull(JsonNode.Parse(schema.ToJsonString()));
+    }
+
     private static JsonObject GetSchema(ToolRegistry registry, string name)
     {
         Assert.True(registry.TryGet(name, out var tool));

@@ -15,6 +15,7 @@ public static class TomlTools
     private const int MaxPathLength = 4096;
     private const int MaxStringLength = 16384;
     private const int MaxKeySegmentLength = 256;
+    private const string SensitiveKeyPlaceholder = "[sensitive]";
 
     private static readonly JsonSerializerOptions OutputJsonOptions = new()
     {
@@ -45,7 +46,10 @@ public static class TomlTools
                 {
                     ["exists"] = result.Exists,
                     ["is_valid"] = result.IsValid,
-                    ["top_level_keys"] = new JsonArray(result.TopLevelKeys.Select(key => (JsonNode?)JsonValue.Create(key)).ToArray()),
+                    ["top_level_keys"] = new JsonArray(result.TopLevelKeys
+                        .Select(key => SensitiveKeyPolicy.IsSensitivePath([key]) ? SensitiveKeyPlaceholder : key)
+                        .Select(key => (JsonNode?)JsonValue.Create(key))
+                        .ToArray()),
                 });
             }),
         });
@@ -81,7 +85,7 @@ public static class TomlTools
                 {
                     ["found"] = true,
                     ["value_type"] = ValueTypeName(value.Kind),
-                    ["value"] = ToJsonNode(value),
+                    ["value"] = ToSafeJsonNode(value, keyPath.Segments),
                 });
             }),
         });
@@ -188,14 +192,17 @@ public static class TomlTools
 
         if (includeValue)
         {
-            schema["properties"]!["value"] = ValueSchema();
+            schema["properties"]!["value"] = ValueSchemaReference();
+            schema["$defs"] = ValueDefinitions();
             schema["required"]!.AsArray().Add("value");
         }
 
         return schema;
     }
 
-    private static JsonNode PatchSchema() => Schema($$"""
+    private static JsonNode PatchSchema()
+    {
+        var schema = Schema($$"""
         {
           "type": "object",
           "additionalProperties": false,
@@ -216,7 +223,7 @@ public static class TomlTools
                     "maxItems": {{MaxKeyPathSegments}},
                     "items": { "type": "string", "minLength": 1, "maxLength": {{MaxKeySegmentLength}} }
                   },
-                  "value": {{ValueSchema().ToJsonString()}}
+                  "value": { "$ref": "#/$defs/tomlValue" }
                 },
                 "required": ["op", "key_path"],
                 "allOf": [
@@ -234,20 +241,38 @@ public static class TomlTools
           },
           "required": ["path", "operations"]
         }
-        """);
+        """).AsObject();
+        schema["$defs"] = ValueDefinitions();
+        return schema;
+    }
 
-    private static JsonNode ValueSchema() => Schema($$"""
-        {
-          "anyOf": [
-            { "type": "string", "maxLength": {{MaxStringLength}} },
-            { "type": "integer" },
-            { "type": "number" },
-            { "type": "boolean" },
-            { "type": "array" },
-            { "type": "object" }
-          ]
-        }
-        """);
+    private static JsonObject ValueSchemaReference() => new()
+    {
+        ["$ref"] = "#/$defs/tomlValue",
+    };
+
+    private static JsonObject ValueDefinitions() => new()
+    {
+        ["tomlValue"] = Schema($$"""
+            {
+              "anyOf": [
+                { "type": "string", "maxLength": {{MaxStringLength}} },
+                { "type": "integer" },
+                { "type": "number" },
+                { "type": "boolean" },
+                {
+                  "type": "array",
+                  "items": { "$ref": "#/$defs/tomlValue" }
+                },
+                {
+                  "type": "object",
+                  "propertyNames": { "type": "string", "maxLength": {{MaxStringLength}} },
+                  "additionalProperties": { "$ref": "#/$defs/tomlValue" }
+                }
+              ]
+            }
+            """),
+    };
 
     private static JsonNode Schema(string json) => JsonNode.Parse(json)!;
 
@@ -453,17 +478,32 @@ public static class TomlTools
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "未知 TOML 值类型。"),
     };
 
-    private static JsonNode ToJsonNode(TomlValue value) => value.Kind switch
+    private static JsonNode ToSafeJsonNode(TomlValue value, IReadOnlyList<string> path) => value.Kind switch
     {
         TomlValueKind.String => JsonValue.Create((string)value.Value),
         TomlValueKind.Integer => JsonValue.Create((long)value.Value),
         TomlValueKind.Float => JsonValue.Create((double)value.Value),
         TomlValueKind.Boolean => JsonValue.Create((bool)value.Value),
         TomlValueKind.Array => new JsonArray(
-            ((IReadOnlyList<TomlValue>)value.Value).Select(ToJsonNode).ToArray()),
-        TomlValueKind.Object => new JsonObject(
-            ((IReadOnlyDictionary<string, TomlValue>)value.Value)
-                .Select(property => KeyValuePair.Create<string, JsonNode?>(property.Key, ToJsonNode(property.Value)))),
+            ((IReadOnlyList<TomlValue>)value.Value)
+                .Select(item => ToSafeJsonNode(item, path))
+                .ToArray()),
+        TomlValueKind.Object => ToSafeJsonObject(value, path),
         _ => throw new ArgumentOutOfRangeException(nameof(value), value.Kind, "未知 TOML 值类型。"),
     };
+
+    private static JsonObject ToSafeJsonObject(TomlValue value, IReadOnlyList<string> path)
+    {
+        var json = new JsonObject();
+        foreach (var property in (IReadOnlyDictionary<string, TomlValue>)value.Value)
+        {
+            var childPath = path.Concat([property.Key]).ToArray();
+            if (!SensitiveKeyPolicy.IsSensitivePath(childPath))
+            {
+                json[property.Key] = ToSafeJsonNode(property.Value, childPath);
+            }
+        }
+
+        return json;
+    }
 }
