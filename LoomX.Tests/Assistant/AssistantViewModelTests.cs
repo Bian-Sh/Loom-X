@@ -11,6 +11,24 @@ namespace LoomX.Tests.Assistant;
 public sealed class AssistantViewModelTests
 {
     [Fact]
+    public void 历史文本块合并连续文本避免Emoji代理项被分割()
+    {
+        var blocks = new[]
+        {
+            new ChatContentBlock(ChatContentKind.Thinking, "思考"),
+            new ChatContentBlock(ChatContentKind.Text, "\uD83D"),
+            new ChatContentBlock(ChatContentKind.Text, "\uDD34"),
+            new ChatContentBlock(ChatContentKind.Text, " 正文"),
+        };
+
+        var replay = AssistantViewModel.CoalesceHistoricalTextBlocks(blocks).ToArray();
+
+        Assert.Equal(2, replay.Length);
+        Assert.Equal(ChatContentKind.Thinking, replay[0].Kind);
+        Assert.Equal("🔴 正文", replay[1].Text);
+    }
+
+    [Fact]
     public void Project_TextDeltas_ReuseStreamingMessageUntilFinalMessageCompletes()
     {
         var viewModel = CreateViewModel();

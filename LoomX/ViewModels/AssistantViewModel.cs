@@ -720,7 +720,7 @@ public sealed class AssistantViewModel : NotifyViewModel
 
             if (message.Blocks.Count > 0)
             {
-                foreach (var block in message.Blocks)
+                foreach (var block in CoalesceHistoricalTextBlocks(message.Blocks))
                 {
                     if (block.Kind == ChatContentKind.Thinking)
                         Project(new AgentEvent(session.Id, AgentEventKind.ReasoningDelta, message.Timestamp)
@@ -736,6 +736,36 @@ public sealed class AssistantViewModel : NotifyViewModel
         }
         streamingMessage = null;
         currentGroup = null;
+    }
+
+    /// <summary>
+    /// 历史消息回放时合并相邻文本块，避免 Emoji 的 UTF-16 代理项在多次 Markdown 增量解析中被拆开。
+    /// 思考块等非文本块保持原顺序，不改变过程消息的投影语义。
+    /// </summary>
+    internal static IEnumerable<ChatContentBlock> CoalesceHistoricalTextBlocks(IReadOnlyList<ChatContentBlock> blocks)
+    {
+        System.Text.StringBuilder? pendingText = null;
+
+        foreach (var block in blocks)
+        {
+            if (block.Kind == ChatContentKind.Text)
+            {
+                pendingText ??= new System.Text.StringBuilder();
+                pendingText.Append(block.Text);
+                continue;
+            }
+
+            if (pendingText is not null)
+            {
+                yield return new ChatContentBlock(ChatContentKind.Text, pendingText.ToString());
+                pendingText = null;
+            }
+
+            yield return block;
+        }
+
+        if (pendingText is not null)
+            yield return new ChatContentBlock(ChatContentKind.Text, pendingText.ToString());
     }
 
     /// <summary>
