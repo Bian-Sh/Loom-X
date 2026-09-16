@@ -260,6 +260,160 @@ public sealed class TomlDocumentServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadGetValidate_接受严格Utf8无Bom与Utf8Bom()
+    {
+        var files = new[]
+        {
+            WriteBytes("utf8-no-bom.toml", new UTF8Encoding(false, true).GetBytes("name = \"loomx\"\n")),
+            WriteBytes(
+                "utf8-bom.toml",
+                new UTF8Encoding(true, true).GetPreamble()
+                    .Concat(new UTF8Encoding(false, true).GetBytes("name = \"loomx\"\n"))
+                    .ToArray()),
+        };
+        var service = CreateService();
+
+        foreach (var file in files)
+        {
+            var read = await service.ReadAsync(file);
+            var get = await service.GetAsync(file, new TomlPath(["name"]));
+            var validate = await service.ValidateAsync(file);
+
+            Assert.True(read.IsValid);
+            Assert.Equal("loomx", get.Value?.Value);
+            Assert.True(validate.IsValid);
+        }
+    }
+
+    [Fact]
+    public async Task ReadGetValidate_一致拒绝Utf16Utf32与非法Utf8()
+    {
+        const string content = "name = \"loomx\"\n";
+        var encodings = new (string FileName, byte[] Bytes)[]
+        {
+            ("utf16-le.toml", Encoding.Unicode.GetPreamble().Concat(Encoding.Unicode.GetBytes(content)).ToArray()),
+            ("utf16-be.toml", Encoding.BigEndianUnicode.GetPreamble().Concat(Encoding.BigEndianUnicode.GetBytes(content)).ToArray()),
+            (
+                "utf32-le.toml",
+                new UTF32Encoding(false, true, true).GetPreamble()
+                    .Concat(new UTF32Encoding(false, false, true).GetBytes(content))
+                    .ToArray()),
+            (
+                "utf32-be.toml",
+                new UTF32Encoding(true, true, true).GetPreamble()
+                    .Concat(new UTF32Encoding(true, false, true).GetBytes(content))
+                    .ToArray()),
+            ("invalid-utf8.toml", [.. Encoding.ASCII.GetBytes("name = \""), 0xC3, 0x28, (byte)'\"', (byte)'\n']),
+        };
+        var service = CreateService();
+
+        foreach (var encoding in encodings)
+        {
+            var file = WriteBytes(encoding.FileName, encoding.Bytes);
+
+            var read = await service.ReadAsync(file);
+            var get = await service.GetAsync(file, new TomlPath(["name"]));
+            var validate = await service.ValidateAsync(file);
+
+            Assert.False(read.IsValid);
+            Assert.False(get.Found);
+            Assert.False(validate.IsValid);
+            Assert.Equal(read.Errors, get.Errors);
+            Assert.Equal(read.Errors, validate.Errors);
+            Assert.Contains(read.Errors, error => error.Contains("UTF-8", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public async Task GetAsync_读取有限浮点数()
+    {
+        var file = WriteToml("float.toml", "temperature = 0.75\n");
+        var service = CreateService();
+
+        var result = await service.GetAsync(file, new TomlPath(["temperature"]));
+
+        Assert.True(result.Found);
+        Assert.Equal(TomlValueKind.Float, result.ValueType);
+        Assert.Equal(0.75d, result.Value?.Value);
+    }
+
+    [Fact]
+    public async Task GetAsync_查询父表时递归脱敏嵌套对象与数组表()
+    {
+        var file = WriteToml(
+            "parent-redaction.toml",
+            """
+            [provider]
+            name = "loomx"
+            credentials = { api_key = "inline-secret", enabled = true }
+            [[provider.accounts]]
+            name = "first"
+            token = "array-secret"
+            [[provider.accounts]]
+            name = "second"
+            password = "password-secret"
+            """);
+        var service = CreateService();
+
+        var result = await service.GetAsync(file, new TomlPath(["provider"]));
+
+        var provider = Assert.IsAssignableFrom<IReadOnlyDictionary<string, TomlValue>>(result.Value?.Value);
+        var credentials = Assert.IsAssignableFrom<IReadOnlyDictionary<string, TomlValue>>(provider["credentials"].Value);
+        Assert.Equal("***", credentials["api_key"].Value);
+        Assert.Equal(true, credentials["enabled"].Value);
+        var accounts = Assert.IsAssignableFrom<IReadOnlyList<TomlValue>>(provider["accounts"].Value);
+        var first = Assert.IsAssignableFrom<IReadOnlyDictionary<string, TomlValue>>(accounts[0].Value);
+        var second = Assert.IsAssignableFrom<IReadOnlyDictionary<string, TomlValue>>(accounts[1].Value);
+        Assert.Equal("***", first["token"].Value);
+        Assert.Equal("***", second["password"].Value);
+    }
+
+    [Fact]
+    public async Task 所有操作_预取消时抛出取消异常()
+    {
+        var file = WriteToml("pre-cancel.toml", "name = \"loomx\"\n");
+        var service = CreateService();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ReadAsync(file, cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.GetAsync(file, new TomlPath(["name"]), cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ValidateAsync(file, cancellation.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.PatchAsync(file, [], cancellation.Token));
+    }
+
+    [Fact]
+    public async Task GetAsync_大数组处理期间响应取消()
+    {
+        var file = WriteToml(
+            "large-array-cancel.toml",
+            $"values = [{string.Join(',', Enumerable.Repeat("0", 180_000))}]\n");
+        var service = CreateService();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(25));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.GetAsync(file, new TomlPath(["values"]), cancellation.Token));
+    }
+
+    [Fact]
+    public async Task ReadAsync_大量节点处理期间响应取消()
+    {
+        var content = new StringBuilder();
+        for (var index = 0; index < 60_000; index++)
+        {
+            content.Append("key").Append(index.ToString("D5")).Append(" = 0\n");
+        }
+
+        var file = WriteToml("many-nodes-cancel.toml", content.ToString());
+        var service = CreateService();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(25));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ReadAsync(file, cancellation.Token));
+    }
+
+    [Fact]
     public async Task 成功日志包含结构化操作文件摘要与耗时且不含完整路径()
     {
         var file = WriteToml("logging.toml", """
@@ -292,9 +446,61 @@ public sealed class TomlDocumentServiceTests : IDisposable
         var entry = Assert.Single(logger.Entries, item => item.Level == LogLevel.Warning);
         Assert.Equal("Validate", entry.Properties["Operation"]);
         Assert.Equal("TomlSyntaxError", entry.Properties["ErrorType"]);
+        Assert.Equal("ParseDocument", entry.Properties["Stage"]);
         Assert.Equal(Path.GetFileName(file), entry.Properties["FileSummary"]);
         Assert.DoesNotContain(secret, entry.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(Path.GetDirectoryName(file)!, entry.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task 文件读取失败日志阶段为ReadFile()
+    {
+        var file = Path.Combine(tempDirectory, "logging-missing.toml");
+        var logger = new RecordingLogger<TomlDocumentService>();
+        var service = CreateService(logger);
+
+        await service.ReadAsync(file);
+
+        var entry = Assert.Single(logger.Entries, item => item.Level == LogLevel.Warning);
+        Assert.Equal("ReadFile", entry.Properties["Stage"]);
+        Assert.Equal("FileNotFound", entry.Properties["ErrorType"]);
+    }
+
+    [Fact]
+    public async Task 不支持值类型日志阶段为ConvertValue且不泄漏原值()
+    {
+        const string originalValue = "1979-05-27T07:32:00Z";
+        var file = WriteToml("unsupported-value.toml", $"released_at = {originalValue}\n");
+        var logger = new RecordingLogger<TomlDocumentService>();
+        var service = CreateService(logger);
+
+        var result = await service.GetAsync(file, new TomlPath(["released_at"]));
+
+        Assert.True(result.Found);
+        Assert.Null(result.Value);
+        var entry = Assert.Single(logger.Entries, item => item.Level == LogLevel.Warning);
+        Assert.Equal("ConvertValue", entry.Properties["Stage"]);
+        Assert.Equal("UnsupportedTomlType", entry.Properties["ErrorType"]);
+        Assert.DoesNotContain(originalValue, entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            logger.Entries.SelectMany(item => item.Properties.Values).OfType<string>(),
+            value => value.Contains(originalValue, StringComparison.Ordinal));
+        Assert.All(result.Errors, error => Assert.DoesNotContain(originalValue, error, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PatchAsync_不存在文件时不创建目标备份或临时文件()
+    {
+        var file = Path.Combine(tempDirectory, "missing-patch.toml");
+        var service = CreateService();
+        var filesBefore = Directory.GetFiles(tempDirectory, "*", SearchOption.AllDirectories);
+
+        var result = await service.PatchAsync(file, []);
+
+        Assert.False(result.Success);
+        Assert.False(File.Exists(file));
+        Assert.Null(result.BackupPath);
+        Assert.Equal(filesBefore, Directory.GetFiles(tempDirectory, "*", SearchOption.AllDirectories));
     }
 
     [Fact]
@@ -339,6 +545,13 @@ public sealed class TomlDocumentServiceTests : IDisposable
     {
         var path = Path.Combine(tempDirectory, fileName);
         File.WriteAllText(path, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        return path;
+    }
+
+    private string WriteBytes(string fileName, byte[] content)
+    {
+        var path = Path.Combine(tempDirectory, fileName);
+        File.WriteAllBytes(path, content);
         return path;
     }
 
