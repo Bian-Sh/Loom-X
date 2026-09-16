@@ -975,7 +975,7 @@ public sealed class TomlDocumentService : ITomlDocumentService
                 }
 
                 logger.LogWarning(
-                    exception,
+                    CreateSafeLogException(exception),
                     "TOML 文件操作重试 {Operation} {FileSummary} {Stage} {ErrorType} {Attempt} {MaxAttempts}",
                     targetExists ? "Replace" : "Move",
                     GetFileSummary(path),
@@ -1088,7 +1088,7 @@ public sealed class TomlDocumentService : ITomlDocumentService
         catch (IOException exception)
         {
             logger.LogWarning(
-                exception,
+                CreateSafeLogException(exception),
                 "TOML 临时文件清理失败 {Operation} {FileSummary} {Stage} {ErrorType}",
                 "Delete",
                 GetFileSummary(targetPath),
@@ -1098,7 +1098,7 @@ public sealed class TomlDocumentService : ITomlDocumentService
         catch (UnauthorizedAccessException exception)
         {
             logger.LogWarning(
-                exception,
+                CreateSafeLogException(exception),
                 "TOML 临时文件清理失败 {Operation} {FileSummary} {Stage} {ErrorType}",
                 "Delete",
                 GetFileSummary(targetPath),
@@ -1610,6 +1610,13 @@ public sealed class TomlDocumentService : ITomlDocumentService
         }
     }
 
+    private static Exception CreateSafeLogException(Exception exception) => exception switch
+    {
+        IOException => new IOException(nameof(IOException)),
+        UnauthorizedAccessException => new UnauthorizedAccessException(nameof(UnauthorizedAccessException)),
+        _ => new Exception(exception.GetType().Name),
+    };
+
     private void LogSuccess(string operation, string path, long elapsedMilliseconds)
     {
         logger.LogInformation(
@@ -1630,7 +1637,7 @@ public sealed class TomlDocumentService : ITomlDocumentService
         if (exception is not null)
         {
             logger.LogError(
-                exception,
+                CreateSafeLogException(exception),
                 "TOML 操作失败 {Operation} {FileSummary} {Stage} {ErrorType} {ElapsedMs}ms",
                 operation,
                 GetFileSummary(path),

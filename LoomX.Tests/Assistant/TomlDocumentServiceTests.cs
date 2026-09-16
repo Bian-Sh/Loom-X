@@ -658,6 +658,28 @@ public sealed class TomlDocumentServiceTests : IDisposable
         Assert.Empty(Directory.GetFiles(tempDirectory, "*.bak"));
     }
 
+    [Theory]
+    [InlineData(TomlPatchKind.Set)]
+    [InlineData(TomlPatchKind.Delete)]
+    public async Task PatchAsync_拒绝穿越普通数组且不落盘(TomlPatchKind patchKind)
+    {
+        const string original = "values = [1, 2]\n";
+        var file = WriteToml($"patch-array-{patchKind}.toml", original);
+        var service = CreateService();
+        var operation = patchKind == TomlPatchKind.Set
+            ? Set(["values", "child"], "invalid")
+            : Delete(["values", "child"]);
+
+        var result = await service.PatchAsync(file, [operation]);
+
+        Assert.False(result.Success);
+        Assert.False(result.Changed);
+        Assert.Contains(result.Errors, error => error.Contains("数组", StringComparison.Ordinal));
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.bak", SearchOption.AllDirectories));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+    }
+
     [Fact]
     public async Task PatchAsync_批量第二项非法时整批不落盘()
     {
@@ -737,15 +759,22 @@ public sealed class TomlDocumentServiceTests : IDisposable
     [Fact]
     public async Task PatchAsync_临时写入失败时保留原文件与备份并清理临时文件()
     {
-        const string original = "name = \"old\"\n";
+        const string secret = "secret-temp-write-123";
+        const string original = "api_key = \"old\"\n";
         var file = WriteToml("patch-temp-write-failure.toml", original);
+        var sensitiveExceptionText = CreateSensitiveExceptionText(file, secret, original);
+        var logger = new RecordingLogger<TomlDocumentService>();
         var fileOperations = new FakeTomlFileOperations
         {
-            WriteAction = (_, _, _, _) => throw new IOException("临时写入失败"),
+            WriteAction = async (path, _, encoding, cancellationToken) =>
+            {
+                await File.WriteAllTextAsync(path, "partial", encoding, cancellationToken);
+                throw new IOException(sensitiveExceptionText);
+            },
         };
-        var service = CreateService(fileOperations: fileOperations);
+        var service = CreateService(logger, fileOperations);
 
-        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+        var result = await service.PatchAsync(file, [Set(["api_key"], secret)]);
 
         Assert.False(result.Success);
         Assert.False(result.Changed);
@@ -754,22 +783,32 @@ public sealed class TomlDocumentServiceTests : IDisposable
         Assert.Equal(original, await File.ReadAllTextAsync(result.BackupPath));
         Assert.Equal(1, fileOperations.WriteCalls);
         Assert.Equal(0, fileOperations.ReplaceCalls);
+        Assert.Equal(1, fileOperations.DeleteCalls);
         Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+        AssertLogsDoNotLeak(logger, file, secret, original, sensitiveExceptionText);
     }
 
     [Fact]
     public async Task PatchAsync_临时验证失败时不替换目标并清理临时文件()
     {
-        const string original = "name = \"old\"\n";
+        const string secret = "secret-temp-validation-123";
+        const string original = "api_key = \"old\"\n";
+        const string sensitiveValidationText = "raw-temp-validation-sensitive-text";
+        var invalidToml = $"# {sensitiveValidationText}\napi_key = \"{secret}\"\nbroken = \"";
         var file = WriteToml("patch-temp-validation-failure.toml", original);
+        var logger = new RecordingLogger<TomlDocumentService>();
         var fileOperations = new FakeTomlFileOperations
         {
             WriteAction = (path, _, encoding, cancellationToken) =>
-                File.WriteAllTextAsync(path, "broken = \"", encoding, cancellationToken),
+                File.WriteAllTextAsync(
+                    path,
+                    invalidToml,
+                    encoding,
+                    cancellationToken),
         };
-        var service = CreateService(fileOperations: fileOperations);
+        var service = CreateService(logger, fileOperations);
 
-        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+        var result = await service.PatchAsync(file, [Set(["api_key"], secret)]);
 
         Assert.False(result.Success);
         Assert.NotNull(result.BackupPath);
@@ -777,34 +816,40 @@ public sealed class TomlDocumentServiceTests : IDisposable
         Assert.Equal(0, fileOperations.ReplaceCalls);
         Assert.Contains(result.Errors, error => error.Contains("临时", StringComparison.Ordinal));
         Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+        AssertLogsDoNotLeak(logger, file, secret, original, invalidToml, sensitiveValidationText);
     }
 
     [Fact]
     public async Task PatchAsync_Replace两次IOException后重试成功()
     {
-        var file = WriteToml("patch-replace-retry.toml", "name = \"old\"\n");
+        const string secret = "secret-retry-success-123";
+        const string original = "api_key = \"old\"\n";
+        var file = WriteToml("patch-replace-retry.toml", original);
+        var sensitiveExceptionText = CreateSensitiveExceptionText(file, secret, original);
+        var logger = new RecordingLogger<TomlDocumentService>();
         var fileOperations = new FakeTomlFileOperations
         {
             ReplaceAction = (source, destination) =>
             {
                 if (fileOperationsPlaceholder.ReplaceCalls < 3)
                 {
-                    throw new IOException("文件暂时被占用");
+                    throw new IOException(sensitiveExceptionText);
                 }
 
                 File.Replace(source, destination, destinationBackupFileName: null);
             },
         };
         fileOperationsPlaceholder = fileOperations;
-        var service = CreateService(fileOperations: fileOperations);
+        var service = CreateService(logger, fileOperations);
 
-        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+        var result = await service.PatchAsync(file, [Set(["api_key"], secret)]);
 
         Assert.True(result.Success);
         Assert.Equal(3, fileOperations.ReplaceCalls);
         Assert.Equal(2, fileOperations.DelayCalls);
-        Assert.Equal("new", (await service.GetAsync(file, new TomlPath(["name"]))).Value?.Value);
+        Assert.Equal("***", (await service.GetAsync(file, new TomlPath(["api_key"]))).Value?.Value);
         Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+        AssertLogsDoNotLeak(logger, file, secret, original, sensitiveExceptionText);
     }
 
     [Fact]
@@ -839,15 +884,18 @@ public sealed class TomlDocumentServiceTests : IDisposable
     [Fact]
     public async Task PatchAsync_Replace最终失败时保留原文件与可恢复备份()
     {
-        const string original = "name = \"old\"\n";
+        const string secret = "secret-replace-failure-123";
+        const string original = "api_key = \"old\"\n";
         var file = WriteToml("patch-replace-final-failure.toml", original);
+        var sensitiveExceptionText = CreateSensitiveExceptionText(file, secret, original);
+        var logger = new RecordingLogger<TomlDocumentService>();
         var fileOperations = new FakeTomlFileOperations
         {
-            ReplaceAction = (_, _) => throw new IOException("持续占用"),
+            ReplaceAction = (_, _) => throw new IOException(sensitiveExceptionText),
         };
-        var service = CreateService(fileOperations: fileOperations);
+        var service = CreateService(logger, fileOperations);
 
-        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+        var result = await service.PatchAsync(file, [Set(["api_key"], secret)]);
 
         Assert.False(result.Success);
         Assert.NotNull(result.BackupPath);
@@ -856,24 +904,32 @@ public sealed class TomlDocumentServiceTests : IDisposable
         Assert.Equal(original, await File.ReadAllTextAsync(file));
         Assert.Equal(original, await File.ReadAllTextAsync(result.BackupPath));
         Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+        AssertLogsDoNotLeak(logger, file, secret, original, sensitiveExceptionText);
     }
 
     [Fact]
     public async Task PatchAsync_写后目标验证失败时从备份恢复原文件()
     {
-        const string original = "name = \"old\"\n";
+        const string secret = "secret-restore-success-123";
+        const string original = "api_key = \"old\"\n";
+        const string sensitiveValidationText = "raw-target-validation-sensitive-text";
+        var invalidToml = $"# {sensitiveValidationText}\napi_key = \"{secret}\"\nbroken = \"";
         var file = WriteToml("patch-target-validation-restore.toml", original);
+        var logger = new RecordingLogger<TomlDocumentService>();
         var fileOperations = new FakeTomlFileOperations
         {
             ReplaceAction = (source, destination) =>
             {
                 File.Replace(source, destination, destinationBackupFileName: null);
-                File.WriteAllText(destination, "broken = \"", new UTF8Encoding(false));
+                File.WriteAllText(
+                    destination,
+                    invalidToml,
+                    new UTF8Encoding(false));
             },
         };
-        var service = CreateService(fileOperations: fileOperations);
+        var service = CreateService(logger, fileOperations);
 
-        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+        var result = await service.PatchAsync(file, [Set(["api_key"], secret)]);
 
         Assert.False(result.Success);
         Assert.NotNull(result.BackupPath);
@@ -881,6 +937,7 @@ public sealed class TomlDocumentServiceTests : IDisposable
         Assert.Equal(original, await File.ReadAllTextAsync(file));
         Assert.Equal(original, await File.ReadAllTextAsync(result.BackupPath));
         Assert.Contains(result.Errors, error => error.Contains("恢复", StringComparison.Ordinal));
+        AssertLogsDoNotLeak(logger, file, secret, original, invalidToml, sensitiveValidationText);
     }
 
     [Fact]
@@ -889,6 +946,7 @@ public sealed class TomlDocumentServiceTests : IDisposable
         const string secret = "secret-patch-value-123";
         const string original = "api_key = \"old\"\n";
         var file = WriteToml("patch-restore-failure.toml", original);
+        var sensitiveExceptionText = CreateSensitiveExceptionText(file, secret, original);
         var logger = new RecordingLogger<TomlDocumentService>();
         var fileOperations = new FakeTomlFileOperations
         {
@@ -896,7 +954,7 @@ public sealed class TomlDocumentServiceTests : IDisposable
             {
                 if (fileOperationsPlaceholder.CopyCalls > 1)
                 {
-                    throw new UnauthorizedAccessException("恢复失败");
+                    throw new UnauthorizedAccessException(sensitiveExceptionText);
                 }
 
                 File.Copy(source, destination, overwrite);
@@ -917,25 +975,13 @@ public sealed class TomlDocumentServiceTests : IDisposable
         Assert.True(File.Exists(result.BackupPath));
         Assert.NotEqual(original, await File.ReadAllTextAsync(file));
         Assert.Contains(result.Errors, error => error.Contains("恢复失败", StringComparison.Ordinal));
-        var entry = Assert.Single(logger.Entries, item => item.Properties.GetValueOrDefault("Stage") as string == "Restore");
-        Assert.IsType<UnauthorizedAccessException>(entry.Exception);
-        Assert.DoesNotContain(secret, string.Join('|', result.Errors), StringComparison.Ordinal);
-        Assert.All(
+        var entry = Assert.Single(
             logger.Entries,
-            logEntry =>
-            {
-                Assert.DoesNotContain(secret, logEntry.Message, StringComparison.Ordinal);
-                Assert.DoesNotContain(original, logEntry.Message, StringComparison.Ordinal);
-                Assert.DoesNotContain(
-                    Path.GetDirectoryName(file)!,
-                    logEntry.Message,
-                    StringComparison.OrdinalIgnoreCase);
-                Assert.DoesNotContain(
-                    logEntry.Properties.Values.OfType<string>(),
-                    value => value.Contains(secret, StringComparison.Ordinal)
-                        || value.Contains(original, StringComparison.Ordinal)
-                        || value.Contains(Path.GetDirectoryName(file)!, StringComparison.OrdinalIgnoreCase));
-            });
+            item => item.Properties.GetValueOrDefault("Stage") as string == "Restore");
+        Assert.NotNull(entry.Exception);
+        Assert.Null(entry.Exception.InnerException);
+        Assert.DoesNotContain(secret, string.Join('|', result.Errors), StringComparison.Ordinal);
+        AssertLogsDoNotLeak(logger, file, secret, original, sensitiveExceptionText);
     }
 
     [Fact]
@@ -990,6 +1036,53 @@ public sealed class TomlDocumentServiceTests : IDisposable
         {
             Directory.Delete(tempDirectory, recursive: true);
         }
+    }
+
+    private static string CreateSensitiveExceptionText(string file, string secret, string original) =>
+        $"文件系统异常：{Path.GetDirectoryName(file)} | {secret} | {original}";
+
+    private static void AssertLogsDoNotLeak(
+        RecordingLogger<TomlDocumentService> logger,
+        string file,
+        params string[] sensitiveTexts)
+    {
+        var fullDirectory = Path.GetDirectoryName(file)!;
+        Assert.NotEmpty(logger.Entries);
+        Assert.All(
+            logger.Entries,
+            entry =>
+            {
+                Assert.DoesNotContain(fullDirectory, entry.Message, StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(
+                    entry.Properties.Values.OfType<string>(),
+                    value => value.Contains(fullDirectory, StringComparison.OrdinalIgnoreCase));
+
+                foreach (var sensitiveText in sensitiveTexts)
+                {
+                    Assert.DoesNotContain(sensitiveText, entry.Message, StringComparison.Ordinal);
+                    Assert.DoesNotContain(
+                        entry.Properties.Values.OfType<string>(),
+                        value => value.Contains(sensitiveText, StringComparison.Ordinal));
+                    if (entry.Exception is not null)
+                    {
+                        Assert.DoesNotContain(sensitiveText, entry.Exception.Message, StringComparison.Ordinal);
+                        Assert.DoesNotContain(sensitiveText, entry.Exception.ToString(), StringComparison.Ordinal);
+                    }
+                }
+
+                if (entry.Exception is not null)
+                {
+                    Assert.DoesNotContain(
+                        fullDirectory,
+                        entry.Exception.Message,
+                        StringComparison.OrdinalIgnoreCase);
+                    Assert.DoesNotContain(
+                        fullDirectory,
+                        entry.Exception.ToString(),
+                        StringComparison.OrdinalIgnoreCase);
+                    Assert.Null(entry.Exception.InnerException);
+                }
+            });
     }
 
     private static TomlPatchOperation Set(IReadOnlyList<string> path, object value) =>
