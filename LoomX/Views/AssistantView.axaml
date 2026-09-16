@@ -7,6 +7,11 @@
              xmlns:l="using:LoomX.Localization"
              x:Class="LoomX.Views.AssistantView">
   <UserControl.Styles>
+    <!-- LiveMarkdown 默认以 Arial 为首选字体；显式优先使用 Windows 彩色 Emoji 字体，
+         避免页面切换后 Skia 字体回退缓存选择为单色字形。普通文字仍由后续字体回退处理。 -->
+    <Style Selector="md|MarkdownTextBlock">
+      <Setter Property="FontFamily" Value="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, 'Segoe UI', sans-serif"/>
+    </Style>
     <Style Selector="ScrollViewer#MessageScroll">
       <Setter Property="Margin" Value="0,0,0,-7"/>
     </Style>

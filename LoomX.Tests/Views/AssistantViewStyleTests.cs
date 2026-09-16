@@ -92,6 +92,18 @@ public sealed class AssistantViewStyleTests
     }
 
     [Fact]
+    public void Markdown正文优先使用系统彩色Emoji字体避免导航后退化为单色()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "LoomX.slnx"))) directory = directory.Parent;
+        Assert.NotNull(directory);
+        var source = File.ReadAllText(Path.Combine(directory.FullName, "LoomX", "Views", "AssistantView.axaml"));
+
+        Assert.Contains("<Style Selector=\"md|MarkdownTextBlock\">", source, StringComparison.Ordinal);
+        Assert.Contains("Segoe UI Emoji", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ComposerUsesSharedMaterialAndPreservesCompositeEditingSurface()
     {
         AvaloniaTestBootstrap.Ensure();
