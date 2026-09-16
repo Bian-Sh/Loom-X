@@ -5,12 +5,13 @@
              xmlns:vm="using:LoomX.ViewModels"
              xmlns:views="using:LoomX.Views"
              xmlns:l="using:LoomX.Localization"
-             x:Class="LoomX.Views.AssistantView">
+             x:Class="LoomX.Views.AssistantView"
+             FontFamily="Segoe UI, Microsoft YaHei UI, Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, sans-serif">
   <UserControl.Styles>
-    <!-- LiveMarkdown 默认以 Arial 为首选字体；显式优先使用 Windows 彩色 Emoji 字体，
-         避免页面切换后 Skia 字体回退缓存选择为单色字形。普通文字仍由后续字体回退处理。 -->
+    <!-- 普通文本字体优先，统一英文、数字与中文的基线；彩色 Emoji 作为明确回退，
+         避免页面切换后 Skia 字体缓存把 Emoji 退化为单色字形。 -->
     <Style Selector="md|MarkdownTextBlock">
-      <Setter Property="FontFamily" Value="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, 'Segoe UI', sans-serif"/>
+      <Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI, Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, sans-serif"/>
     </Style>
     <Style Selector="ScrollViewer#MessageScroll">
       <Setter Property="Margin" Value="0,0,0,-7"/>
@@ -258,7 +259,7 @@
       <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
     </Style>
 
-    <!-- 权限 / 模型：沉浸进输入卡的功能区，没有自己的背景与边框 -->
+    <!-- 权限沉浸进输入卡；模型选择器保留低对比度常态表面，避免仅在划入时才产生“落回工具栏”的错觉。 -->
     <Style Selector="ComboBox.bare">
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
@@ -278,7 +279,7 @@
       <Setter Property="BorderThickness" Value="0"/>
     </Style>
     <Style Selector="Button.bare">
-      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="MinHeight" Value="0"/>
@@ -286,6 +287,8 @@
       <Setter Property="FontSize" Value="12"/>
       <Setter Property="Height" Value="24"/>
       <Setter Property="CornerRadius" Value="7"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
     <Style Selector="Button.bare:pointerover">
       <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}"/>
@@ -450,7 +453,7 @@
                             Padding="12,10" CornerRadius="18,18,18,6"
                             Background="{DynamicResource DangerSoftBrush}"
                             BorderBrush="{DynamicResource DangerMessageBorderBrush}" BorderThickness="1">
-                      <TextBlock Text="{Binding Text}" FontSize="14" FontWeight="Normal" LineHeight="22"
+                      <SelectableTextBlock Text="{Binding Text}" FontSize="14" FontWeight="Normal" LineHeight="22"
                                  Foreground="{DynamicResource DangerMessageTextBrush}" TextWrapping="Wrap"/>
                     </Border>
 
@@ -458,7 +461,7 @@
                     <StackPanel Classes="msg-body" IsVisible="{Binding IsUser}" HorizontalAlignment="Right"
                                 MaxWidth="560" Margin="0,6">
                       <Border Padding="12,10" CornerRadius="18,18,6,18" Background="{DynamicResource AccentSoftBrush}">
-                        <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="14" LineHeight="22"/>
+                        <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="14" LineHeight="22"/>
                       </Border>
                       <StackPanel Classes="msg-actions" Orientation="Horizontal" HorizontalAlignment="Right"
                                   Spacing="4" Height="24" Margin="0,2,4,0">
@@ -519,6 +522,26 @@
                    TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300" HorizontalAlignment="Center"/>
       </StackPanel>
 
+      <!-- 网页式中键自动滚动锚点：固定在启动位置，箭头强调当前滚动方向。 -->
+      <Canvas Grid.Column="0" x:Name="MessageAutoScrollOverlay" IsHitTestVisible="False" ZIndex="8">
+        <Border x:Name="MessageAutoScrollAnchor" Width="32" Height="32" IsVisible="False"
+                CornerRadius="16" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                BoxShadow="0 3 10 0 #40000000">
+          <Grid>
+            <Path x:Name="MessageAutoScrollUpGlyph" Data="M 4,6 L 8,2 L 12,6 Z"
+                  Width="16" Height="8" Margin="0,4,0,0"
+                  HorizontalAlignment="Center" VerticalAlignment="Top"
+                  Fill="{DynamicResource TextSecondaryBrush}"/>
+            <Ellipse Width="4" Height="4" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Fill="{DynamicResource TextTertiaryBrush}"/>
+            <Path x:Name="MessageAutoScrollDownGlyph" Data="M 4,2 L 8,6 L 12,2 Z"
+                  Width="16" Height="8" Margin="0,0,0,4"
+                  HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                  Fill="{DynamicResource TextSecondaryBrush}"/>
+          </Grid>
+        </Border>
+      </Canvas>
       <Button Grid.Column="0" x:Name="JumpButton" Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                 Margin="0,0,8,11" IsVisible="False" Click="JumpButton_OnClick"
                 ToolTip.Tip="{l:Locale assistant.jump.tooltip}"

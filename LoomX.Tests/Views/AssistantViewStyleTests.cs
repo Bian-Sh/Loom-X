@@ -21,6 +21,174 @@ namespace LoomX.Tests.Views;
 public sealed class AssistantViewStyleTests
 {
     [Fact]
+    public void 用户消息与异常消息正文使用可选择文本控件()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "LoomX.slnx"))) directory = directory.Parent;
+        Assert.NotNull(directory);
+
+        var document = XDocument.Load(Path.Combine(directory.FullName, "LoomX", "Views", "AssistantView.axaml"));
+        var selectableMessages = document.Descendants()
+            .Where(item => item.Name.LocalName == "SelectableTextBlock" && (string?)item.Attribute("Text") == "{Binding Text}")
+            .ToArray();
+
+        Assert.Equal(2, selectableMessages.Length);
+        Assert.Contains(selectableMessages, item => item.Ancestors().Any(parent => (string?)parent.Attribute("IsVisible") == "{Binding IsUser}"));
+        Assert.Contains(selectableMessages, item => item.Ancestors().Any(parent => (string?)parent.Attribute("IsVisible") == "{Binding IsError}"));
+    }
+    [Fact]
+    public void 中键自动滚动速度包含死区方向与最大速度()
+    {
+        var method = typeof(AssistantView).GetMethod(
+            "CalculateAutoScrollVelocity",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(method);
+
+        double Calculate(double displacement) => (double)method.Invoke(null, [displacement])!;
+
+        Assert.Equal(0, Calculate(0));
+        Assert.Equal(0, Calculate(10));
+        Assert.True(Calculate(-40) < 0);
+        Assert.True(Calculate(40) > 0);
+        Assert.True(Math.Abs(Calculate(120)) > Math.Abs(Calculate(40)));
+        Assert.Equal(1800, Calculate(1000));
+        Assert.Equal(-1800, Calculate(-1000));
+    }
+
+    [Fact]
+    public void 中键自动滚动位移不会超过视口边界()
+    {
+        var method = typeof(AssistantView).GetMethod(
+            "CalculateAutoScrollOffset",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(method);
+
+        double Calculate(double current, double velocity, double elapsed, double maximum) =>
+            (double)method.Invoke(null, [current, velocity, elapsed, maximum])!;
+
+        Assert.Equal(65, Calculate(50, 100, 0.15, 200), 6);
+        Assert.Equal(0, Calculate(5, -100, 1, 200));
+        Assert.Equal(200, Calculate(190, 100, 1, 200));
+        Assert.Equal(0, Calculate(50, 100, -1, -20));
+    }
+    [Fact]
+    public void 中键自动滚动显示锚点方向并在退出时恢复状态()
+    {
+        AvaloniaTestBootstrap.Ensure();
+        var context = new MessageListContext();
+        for (var index = 0; index < 80; index++) context.Messages.Add(ChatMessageViewModel.Status($"消息 {index}"));
+
+        var view = new AssistantView { DataContext = context };
+        var host = new Window { Content = view, Width = 600, Height = 360, ShowActivated = false };
+        host.Show();
+        try
+        {
+            host.UpdateLayout();
+            var scroll = Assert.IsType<ScrollViewer>(view.FindControl<ScrollViewer>("MessageScroll"));
+            var anchor = Assert.IsType<Border>(view.FindControl<Border>("MessageAutoScrollAnchor"));
+            var up = Assert.IsType<AvaloniaPath>(view.FindControl<AvaloniaPath>("MessageAutoScrollUpGlyph"));
+            var down = Assert.IsType<AvaloniaPath>(view.FindControl<AvaloniaPath>("MessageAutoScrollDownGlyph"));
+            var start = typeof(AssistantView).GetMethod("StartAutoScroll", BindingFlags.Instance | BindingFlags.NonPublic);
+            var update = typeof(AssistantView).GetMethod("UpdateAutoScrollFeedback", BindingFlags.Instance | BindingFlags.NonPublic);
+            var stop = typeof(AssistantView).GetMethod("StopAutoScroll", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(start);
+            Assert.NotNull(update);
+            Assert.NotNull(stop);
+            Assert.True(scroll.Extent.Height > scroll.Viewport.Height);
+
+            var originalCursor = scroll.Cursor;
+            start.Invoke(view, [new Point(120, 100), null]);
+            Assert.True(anchor.IsVisible);
+            Assert.NotSame(originalCursor, scroll.Cursor);
+            Assert.Equal(104, Canvas.GetLeft(anchor));
+            Assert.Equal(84, Canvas.GetTop(anchor));
+
+            update.Invoke(view, [80d]);
+            Assert.Equal(0.25, up.Opacity);
+            Assert.Equal(1, down.Opacity);
+            update.Invoke(view, [-80d]);
+            Assert.Equal(1, up.Opacity);
+            Assert.Equal(0.25, down.Opacity);
+
+            stop.Invoke(view, null);
+            Assert.False(anchor.IsVisible);
+            Assert.Same(originalCursor, scroll.Cursor);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
+    [Fact]
+    public void 中键指针事件会启动更新并再次按下退出自动滚动()
+    {
+        AvaloniaTestBootstrap.Ensure();
+        var context = new MessageListContext();
+        for (var index = 0; index < 80; index++) context.Messages.Add(ChatMessageViewModel.Status($"消息 {index}"));
+
+        var view = new AssistantView { DataContext = context };
+        var host = new Window { Content = view, Width = 600, Height = 360, ShowActivated = false };
+        host.Show();
+        try
+        {
+            host.UpdateLayout();
+            var scroll = Assert.IsType<ScrollViewer>(view.FindControl<ScrollViewer>("MessageScroll"));
+            var anchor = Assert.IsType<Border>(view.FindControl<Border>("MessageAutoScrollAnchor"));
+            var down = Assert.IsType<AvaloniaPath>(view.FindControl<AvaloniaPath>("MessageAutoScrollDownGlyph"));
+            var pointer = CreateTestPointer();
+            var middleProperties = new PointerPointProperties(
+                RawInputModifiers.MiddleMouseButton,
+                PointerUpdateKind.MiddleButtonPressed);
+
+            Assert.True(scroll.Extent.Height > scroll.Viewport.Height, $"Extent={scroll.Extent.Height}, Viewport={scroll.Viewport.Height}");
+            var pressed = new PointerPressedEventArgs(
+                scroll,
+                pointer,
+                scroll,
+                new Point(120, 100),
+                1,
+                middleProperties,
+                KeyModifiers.None,
+                1);
+            Assert.Equal(InputElement.PointerPressedEvent, pressed.RoutedEvent);
+            var currentPoint = pressed.GetCurrentPoint(scroll);
+            Assert.Equal(PointerUpdateKind.MiddleButtonPressed, currentPoint.Properties.PointerUpdateKind);
+            Assert.True(currentPoint.Properties.IsMiddleButtonPressed);
+            scroll.RaiseEvent(pressed);
+
+            Assert.True(anchor.IsVisible);
+            Assert.Same(scroll, pointer.Captured);
+
+            scroll.RaiseEvent(new PointerEventArgs(
+                InputElement.PointerMovedEvent,
+                scroll,
+                pointer,
+                scroll,
+                new Point(120, 180),
+                2,
+                new PointerPointProperties(RawInputModifiers.None, PointerUpdateKind.Other),
+                KeyModifiers.None));
+            Assert.Equal(1, down.Opacity);
+
+            scroll.RaiseEvent(new PointerPressedEventArgs(
+                scroll,
+                pointer,
+                scroll,
+                new Point(120, 180),
+                3,
+                middleProperties,
+                KeyModifiers.None,
+                1));
+
+            Assert.False(anchor.IsVisible);
+            Assert.Null(pointer.Captured);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
+    [Fact]
     public void ChatLayoutUsesAlignedHeaderMultilineComposerAndCompactModelPopup()
     {
         AvaloniaTestBootstrap.Ensure();
@@ -92,15 +260,27 @@ public sealed class AssistantViewStyleTests
     }
 
     [Fact]
-    public void Markdown正文优先使用系统彩色Emoji字体避免导航后退化为单色()
+    public void 助手正文优先使用对齐文本字体并保留彩色Emoji回退()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "LoomX.slnx"))) directory = directory.Parent;
         Assert.NotNull(directory);
-        var source = File.ReadAllText(Path.Combine(directory.FullName, "LoomX", "Views", "AssistantView.axaml"));
+        var document = XDocument.Load(Path.Combine(directory.FullName, "LoomX", "Views", "AssistantView.axaml"));
+        var markdownStyle = document.Descendants()
+            .Single(item => item.Name.LocalName == "Style" && (string?)item.Attribute("Selector") == "md|MarkdownTextBlock");
+        var fontFamily = (string?)markdownStyle.Elements()
+            .Single(item => item.Name.LocalName == "Setter" && (string?)item.Attribute("Property") == "FontFamily")
+            .Attribute("Value");
+        Assert.NotNull(fontFamily);
+        var families = fontFamily.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => item.Trim('\''))
+            .ToArray();
 
-        Assert.Contains("<Style Selector=\"md|MarkdownTextBlock\">", source, StringComparison.Ordinal);
-        Assert.Contains("Segoe UI Emoji", source, StringComparison.Ordinal);
+        Assert.Equal("Segoe UI", families[0]);
+        Assert.Contains("Microsoft YaHei UI", families);
+        Assert.Contains("Segoe UI Emoji", families);
+        Assert.True(Array.IndexOf(families, "Segoe UI Emoji") > Array.IndexOf(families, "Microsoft YaHei UI"));
+        Assert.Equal(fontFamily, (string?)document.Root!.Attribute("FontFamily"));
     }
 
     [Fact]
@@ -157,6 +337,27 @@ public sealed class AssistantViewStyleTests
         }
     }
 
+    [Fact]
+    public void 底部模型选择器常态具有稳定表面并垂直居中()
+    {
+        AvaloniaTestBootstrap.Ensure();
+        var view = new AssistantView();
+        var button = Assert.IsType<Button>(view.FindControl<Button>("modelPickerButton"));
+        var host = new Window { Content = view, Width = 1180, Height = 760, ShowActivated = false };
+        host.Show();
+        try
+        {
+            host.UpdateLayout();
+            Assert.Equal(VerticalAlignment.Center, button.VerticalAlignment);
+            Assert.Equal(VerticalAlignment.Center, button.VerticalContentAlignment);
+            Assert.NotNull(button.Background);
+            Assert.NotEqual(Brushes.Transparent, button.Background);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
     [Fact]
     public void ModelPopupUsesDenseProviderAndModelRows()
     {
@@ -713,6 +914,16 @@ public sealed class AssistantViewStyleTests
         {
             host.Close();
         }
+    }
+    private static IPointer CreateTestPointer()
+    {
+        var constructor = typeof(Avalonia.Input.Pointer).GetConstructor(
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            [typeof(int), typeof(PointerType), typeof(bool)],
+            modifiers: null);
+        Assert.NotNull(constructor);
+        return (IPointer)constructor.Invoke([1, PointerType.Mouse, true]);
     }
     private sealed class MessageListContext
     {
