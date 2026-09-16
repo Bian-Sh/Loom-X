@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Localization;
 using LoomX;
+using LoomX.Assistant;
 using LoomX.Localization;
 using LoomX.Logging;
 using LoomX.Services;
@@ -33,7 +34,11 @@ public partial class App : Application
     private bool ownsShellBootstrapMutex;
     private bool allowMultipleInstances;
     public ILoggerFactory? LoggerFactory => loggerFactory;
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AssistantMarkdownTypography.Configure();
+        AvaloniaXamlLoader.Load(this);
+    }
     public override void OnFrameworkInitializationCompleted()
     {
         DeleteBootstrapShortcutFromArguments();

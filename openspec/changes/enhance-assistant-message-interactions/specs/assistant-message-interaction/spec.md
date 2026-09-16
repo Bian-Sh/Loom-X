@@ -51,4 +51,8 @@
 
 #### Scenario: 正文包含 Emoji
 - **WHEN** 助手 Markdown 正文包含彩色 Emoji
-- **THEN** Emoji 保持彩色渲染且普通英文、数字不由 Emoji 字体接管
+- **THEN** Emoji 使用独立的彩色 Emoji 字体运行段，普通英文和数字使用普通文本字体运行段
+
+#### Scenario: 页面往返后历史 Emoji 保持彩色
+- **WHEN** 用户加载包含 Emoji 的助手历史会话，切换到网关页面后再返回 AI 助手
+- **THEN** 历史消息中的 Emoji 仍以彩色字形渲染，英文、数字与中文基线也保持不变

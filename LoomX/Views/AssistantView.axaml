@@ -8,10 +8,10 @@
              x:Class="LoomX.Views.AssistantView"
              FontFamily="Segoe UI, Microsoft YaHei UI, Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, sans-serif">
   <UserControl.Styles>
-    <!-- 普通文本字体优先，统一英文、数字与中文的基线；彩色 Emoji 作为明确回退，
-         避免页面切换后 Skia 字体缓存把 Emoji 退化为单色字形。 -->
+    <!-- Markdown 容器只承载普通文字字体；Emoji 由 AssistantMarkdownTypography 拆成独立 Run，
+         避免页面切换后 Skia 回退缓存把彩色字形退化为单色。 -->
     <Style Selector="md|MarkdownTextBlock">
-      <Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI, Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, sans-serif"/>
+      <Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI, Arial, sans-serif"/>
     </Style>
     <Style Selector="ScrollViewer#MessageScroll">
       <Setter Property="Margin" Value="0,0,0,-7"/>

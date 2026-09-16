@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.VisualTree;
+using LoomX.Assistant;
 using LoomX.Services;
 using LoomX.ViewModels;
 using LoomX.Views;
@@ -278,9 +279,27 @@ public sealed class AssistantViewStyleTests
 
         Assert.Equal("Segoe UI", families[0]);
         Assert.Contains("Microsoft YaHei UI", families);
-        Assert.Contains("Segoe UI Emoji", families);
-        Assert.True(Array.IndexOf(families, "Segoe UI Emoji") > Array.IndexOf(families, "Microsoft YaHei UI"));
-        Assert.Equal(fontFamily, (string?)document.Root!.Attribute("FontFamily"));
+        Assert.DoesNotContain("Segoe UI Emoji", families);
+
+        var rootFamilies = ((string?)document.Root!.Attribute("FontFamily"))!
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => item.Trim('\''))
+            .ToArray();
+        Assert.Equal("Segoe UI", rootFamilies[0]);
+        Assert.Contains("Microsoft YaHei UI", rootFamilies);
+        Assert.Contains("Segoe UI Emoji", rootFamilies);
+    }
+
+    [Fact]
+    public void 助手Markdown将普通文字与Emoji分配到独立字体运行段()
+    {
+        var runs = AssistantMarkdownTypography.CreateRuns("中文 LoomX 123 👋");
+        var textRun = Assert.Single(runs, run => run.Text?.Contains("LoomX 123", StringComparison.Ordinal) == true);
+        var emojiRun = Assert.Single(runs, run => run.Text?.Contains("👋", StringComparison.Ordinal) == true);
+
+        Assert.Equal("Segoe UI", textRun.FontFamily.Name);
+        Assert.Equal("Segoe UI Emoji", emojiRun.FontFamily.Name);
+        Assert.NotSame(textRun, emojiRun);
     }
 
     [Fact]
@@ -925,6 +944,7 @@ public sealed class AssistantViewStyleTests
         Assert.NotNull(constructor);
         return (IPointer)constructor.Invoke([1, PointerType.Mouse, true]);
     }
+
     private sealed class MessageListContext
     {
         public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
