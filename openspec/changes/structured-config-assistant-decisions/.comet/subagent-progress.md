@@ -4,7 +4,7 @@
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
 - Current task: Task 2
-- Stage: dispatch-implementer
+- Stage: task-review
 - Fix round: 0
 
 ## Rulings
@@ -15,4 +15,5 @@
 
 
 - Task 2 允许补充不可变 `TomlReadResult`，字段固定为 `Exists`、`IsValid`、`TopLevelKeys`、`Errors`；示例使用既有 `TomlValue.Value`。
+
 
