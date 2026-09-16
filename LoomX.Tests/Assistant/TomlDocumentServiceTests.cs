@@ -489,45 +489,499 @@ public sealed class TomlDocumentServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task PatchAsync_不存在文件时不创建目标备份或临时文件()
+    public async Task PatchAsync_新文件在中文空格目录写入且不创建备份或残留临时文件()
     {
-        var file = Path.Combine(tempDirectory, "missing-patch.toml");
+        var directory = Path.Combine(tempDirectory, "新 配置");
+        Directory.CreateDirectory(directory);
+        var file = Path.Combine(directory, "新 文件.toml");
         var service = CreateService();
-        var filesBefore = Directory.GetFiles(tempDirectory, "*", SearchOption.AllDirectories);
 
-        var result = await service.PatchAsync(file, []);
+        var result = await service.PatchAsync(
+            file,
+            [Set(["provider", "name"], "新模型")]);
 
-        Assert.False(result.Success);
-        Assert.False(File.Exists(file));
+        Assert.True(result.Success);
+        Assert.True(result.Changed);
         Assert.Null(result.BackupPath);
-        Assert.Equal(filesBefore, Directory.GetFiles(tempDirectory, "*", SearchOption.AllDirectories));
+        Assert.True(File.Exists(file));
+        var value = await service.GetAsync(file, new TomlPath(["provider", "name"]));
+        Assert.Equal("新模型", value.Value?.Value);
+        Assert.Empty(Directory.GetFiles(directory, "*.bak"));
+        Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
     }
 
     [Fact]
-    public async Task PatchAsync_当前返回稳定未实现失败且不修改文件()
+    public async Task PatchAsync_Set更新目标并保留注释未知节与无关字段()
     {
         const string original = """
-            model = "old"
-            """;
-        var file = WriteToml("patch.toml", original);
-        var service = CreateService();
-        var operations = new[]
-        {
-            new TomlPatchOperation(
-                TomlPatchKind.Set,
-                new TomlPath(["model"]),
-                TomlValue.FromObject("new")),
-        };
+            # keep comment
+            [provider]
+            name  = 'demo' # keep tail
+            enabled = true
 
-        var result = await service.PatchAsync(file, operations);
+            [unknown]
+            untouched = "保留"
+            """;
+        var file = WriteToml("patch-set.toml", original);
+        var service = CreateService();
+
+        var result = await service.PatchAsync(
+            file,
+            [Set(["provider", "name"], "changed")]);
+
+        Assert.True(result.Success);
+        Assert.True(result.Changed);
+        Assert.Empty(result.Errors);
+        Assert.NotNull(result.BackupPath);
+        Assert.Equal(Path.GetDirectoryName(file), Path.GetDirectoryName(result.BackupPath));
+        Assert.Equal(original, await File.ReadAllTextAsync(result.BackupPath));
+        var updated = await File.ReadAllTextAsync(file);
+        Assert.Contains("# keep comment", updated, StringComparison.Ordinal);
+        Assert.Contains("# keep tail", updated, StringComparison.Ordinal);
+        Assert.Contains("enabled = true", updated, StringComparison.Ordinal);
+        Assert.Contains("[unknown]", updated, StringComparison.Ordinal);
+        Assert.Contains("untouched = \"保留\"", updated, StringComparison.Ordinal);
+        var value = await service.GetAsync(file, new TomlPath(["provider", "name"]));
+        Assert.Equal("changed", value.Value?.Value);
+    }
+
+    [Fact]
+    public async Task PatchAsync_Delete只删除目标并保留空父表()
+    {
+        const string original = """
+            [provider]
+            name = "demo"
+
+            [provider.empty]
+            remove_me = true
+
+            [other]
+            value = 1
+            """;
+        var file = WriteToml("patch-delete.toml", original);
+        var service = CreateService();
+
+        var result = await service.PatchAsync(
+            file,
+            [Delete(["provider", "empty", "remove_me"])]);
+
+        Assert.True(result.Success);
+        Assert.True(result.Changed);
+        var updated = await File.ReadAllTextAsync(file);
+        Assert.Contains("[provider.empty]", updated, StringComparison.Ordinal);
+        Assert.DoesNotContain("remove_me", updated, StringComparison.Ordinal);
+        Assert.Contains("[other]", updated, StringComparison.Ordinal);
+        Assert.Contains("value = 1", updated, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PatchAsync_Set为缺失路径创建普通父表()
+    {
+        var file = WriteToml("patch-create-parent.toml", "title = \"demo\"\n");
+        var service = CreateService();
+
+        var result = await service.PatchAsync(
+            file,
+            [Set(["provider", "options", "timeout"], 30L)]);
+
+        Assert.True(result.Success);
+        Assert.True(result.Changed);
+        var updated = await File.ReadAllTextAsync(file);
+        Assert.Contains(
+            updated.Split('\n', StringSplitOptions.RemoveEmptyEntries),
+            line => line.StartsWith('[')
+                && line.Contains("provider", StringComparison.Ordinal)
+                && line.Contains("options", StringComparison.Ordinal));
+        var value = await service.GetAsync(file, new TomlPath(["provider", "options", "timeout"]));
+        Assert.Equal(30L, value.Value?.Value);
+    }
+
+    [Fact]
+    public async Task PatchAsync_Set与Delete可穿越内联表并保留同级字段()
+    {
+        const string original = "owner = { name = \"old\", enabled = true } # keep\n";
+        var file = WriteToml("patch-inline-table.toml", original);
+        var service = CreateService();
+
+        var result = await service.PatchAsync(
+            file,
+            [
+                Set(["owner", "name"], "new"),
+                Set(["owner", "region"], "cn"),
+                Delete(["owner", "enabled"]),
+            ]);
+
+        Assert.True(result.Success);
+        var ownerResult = await service.GetAsync(file, new TomlPath(["owner"]));
+        var owner = Assert.IsAssignableFrom<IReadOnlyDictionary<string, TomlValue>>(ownerResult.Value?.Value);
+        Assert.Equal("new", owner["name"].Value);
+        Assert.Equal("cn", owner["region"].Value);
+        Assert.DoesNotContain("enabled", owner.Keys);
+        Assert.Contains("# keep", await File.ReadAllTextAsync(file), StringComparison.Ordinal);
+    }
+    [Fact]
+    public async Task PatchAsync_Set拒绝穿越标量且不落盘()
+    {
+        const string original = "provider = \"scalar\"\n";
+        var file = WriteToml("patch-scalar.toml", original);
+        var service = CreateService();
+
+        var result = await service.PatchAsync(
+            file,
+            [Set(["provider", "name"], "invalid")]);
 
         Assert.False(result.Success);
         Assert.False(result.Changed);
+        Assert.Contains(result.Errors, error => error.Contains("标量", StringComparison.Ordinal));
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.bak"));
+    }
+
+    [Fact]
+    public async Task PatchAsync_Set拒绝穿越数组表且不落盘()
+    {
+        const string original = """
+            [[servers]]
+            name = "one"
+            """;
+        var file = WriteToml("patch-array-table.toml", original);
+        var service = CreateService();
+
+        var result = await service.PatchAsync(
+            file,
+            [Set(["servers", "name"], "invalid")]);
+
+        Assert.False(result.Success);
+        Assert.False(result.Changed);
+        Assert.Contains(result.Errors, error => error.Contains("数组表", StringComparison.Ordinal));
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.bak"));
+    }
+
+    [Fact]
+    public async Task PatchAsync_批量第二项非法时整批不落盘()
+    {
+        const string original = """
+            # keep
+            [provider]
+            name = "demo"
+            """;
+        var file = WriteToml("patch-batch.toml", original);
+        var service = CreateService();
+
+        var result = await service.PatchAsync(
+            file,
+            [
+                Set(["provider", "name"], "changed"),
+                Set(["provider", "name", "child"], "invalid"),
+            ]);
+
+        Assert.False(result.Success);
+        Assert.False(result.Changed);
+        Assert.Contains(result.Errors, error => error.Contains("第 2 项", StringComparison.Ordinal));
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.bak"));
+    }
+
+    [Fact]
+    public async Task PatchAsync_Set同值时NoOp且不创建备份()
+    {
+        const string original = "name  = 'demo' # keep formatting\n";
+        var file = WriteToml("patch-no-op.toml", original);
+        var service = CreateService();
+
+        var result = await service.PatchAsync(file, [Set(["name"], "demo")]);
+
+        Assert.True(result.Success);
+        Assert.False(result.Changed);
         Assert.Null(result.BackupPath);
         Assert.False(result.FormattingChanged);
-        Assert.Single(result.Errors);
-        Assert.Contains("未实现", result.Errors[0], StringComparison.Ordinal);
+        Assert.Empty(result.Errors);
         Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.bak"));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task PatchAsync_Delete缺失目标时NoOp且不创建备份()
+    {
+        const string original = "[provider]\nname = \"demo\"\n";
+        var file = WriteToml("patch-delete-missing.toml", original);
+        var service = CreateService();
+
+        var result = await service.PatchAsync(file, [Delete(["provider", "missing"])]);
+
+        Assert.True(result.Success);
+        Assert.False(result.Changed);
+        Assert.Null(result.BackupPath);
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.bak"));
+    }
+
+    [Fact]
+    public async Task PatchAsync_NoOp不调用任何文件事务操作()
+    {
+        const string original = "name = \"demo\"\n";
+        var file = WriteToml("patch-no-op-operations.toml", original);
+        var fileOperations = new FakeTomlFileOperations();
+        var service = CreateService(fileOperations: fileOperations);
+
+        var result = await service.PatchAsync(file, [Set(["name"], "demo")]);
+
+        Assert.True(result.Success);
+        Assert.False(result.Changed);
+        Assert.Equal(0, fileOperations.TotalCalls);
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+    }
+
+    [Fact]
+    public async Task PatchAsync_临时写入失败时保留原文件与备份并清理临时文件()
+    {
+        const string original = "name = \"old\"\n";
+        var file = WriteToml("patch-temp-write-failure.toml", original);
+        var fileOperations = new FakeTomlFileOperations
+        {
+            WriteAction = (_, _, _, _) => throw new IOException("临时写入失败"),
+        };
+        var service = CreateService(fileOperations: fileOperations);
+
+        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+
+        Assert.False(result.Success);
+        Assert.False(result.Changed);
+        Assert.NotNull(result.BackupPath);
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Equal(original, await File.ReadAllTextAsync(result.BackupPath));
+        Assert.Equal(1, fileOperations.WriteCalls);
+        Assert.Equal(0, fileOperations.ReplaceCalls);
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task PatchAsync_临时验证失败时不替换目标并清理临时文件()
+    {
+        const string original = "name = \"old\"\n";
+        var file = WriteToml("patch-temp-validation-failure.toml", original);
+        var fileOperations = new FakeTomlFileOperations
+        {
+            WriteAction = (path, _, encoding, cancellationToken) =>
+                File.WriteAllTextAsync(path, "broken = \"", encoding, cancellationToken),
+        };
+        var service = CreateService(fileOperations: fileOperations);
+
+        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.BackupPath);
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Equal(0, fileOperations.ReplaceCalls);
+        Assert.Contains(result.Errors, error => error.Contains("临时", StringComparison.Ordinal));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task PatchAsync_Replace两次IOException后重试成功()
+    {
+        var file = WriteToml("patch-replace-retry.toml", "name = \"old\"\n");
+        var fileOperations = new FakeTomlFileOperations
+        {
+            ReplaceAction = (source, destination) =>
+            {
+                if (fileOperationsPlaceholder.ReplaceCalls < 3)
+                {
+                    throw new IOException("文件暂时被占用");
+                }
+
+                File.Replace(source, destination, destinationBackupFileName: null);
+            },
+        };
+        fileOperationsPlaceholder = fileOperations;
+        var service = CreateService(fileOperations: fileOperations);
+
+        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+
+        Assert.True(result.Success);
+        Assert.Equal(3, fileOperations.ReplaceCalls);
+        Assert.Equal(2, fileOperations.DelayCalls);
+        Assert.Equal("new", (await service.GetAsync(file, new TomlPath(["name"]))).Value?.Value);
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task PatchAsync_Move一次UnauthorizedAccess后重试成功()
+    {
+        var file = Path.Combine(tempDirectory, "patch-move-retry.toml");
+        var fileOperations = new FakeTomlFileOperations
+        {
+            MoveAction = (source, destination) =>
+            {
+                if (fileOperationsPlaceholder.MoveCalls < 2)
+                {
+                    throw new UnauthorizedAccessException("文件暂时不可移动");
+                }
+
+                File.Move(source, destination);
+            },
+        };
+        fileOperationsPlaceholder = fileOperations;
+        var service = CreateService(fileOperations: fileOperations);
+
+        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+
+        Assert.True(result.Success);
+        Assert.Null(result.BackupPath);
+        Assert.Equal(2, fileOperations.MoveCalls);
+        Assert.Equal(1, fileOperations.DelayCalls);
+        Assert.True(File.Exists(file));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task PatchAsync_Replace最终失败时保留原文件与可恢复备份()
+    {
+        const string original = "name = \"old\"\n";
+        var file = WriteToml("patch-replace-final-failure.toml", original);
+        var fileOperations = new FakeTomlFileOperations
+        {
+            ReplaceAction = (_, _) => throw new IOException("持续占用"),
+        };
+        var service = CreateService(fileOperations: fileOperations);
+
+        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.BackupPath);
+        Assert.Equal(3, fileOperations.ReplaceCalls);
+        Assert.Equal(2, fileOperations.DelayCalls);
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Equal(original, await File.ReadAllTextAsync(result.BackupPath));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task PatchAsync_写后目标验证失败时从备份恢复原文件()
+    {
+        const string original = "name = \"old\"\n";
+        var file = WriteToml("patch-target-validation-restore.toml", original);
+        var fileOperations = new FakeTomlFileOperations
+        {
+            ReplaceAction = (source, destination) =>
+            {
+                File.Replace(source, destination, destinationBackupFileName: null);
+                File.WriteAllText(destination, "broken = \"", new UTF8Encoding(false));
+            },
+        };
+        var service = CreateService(fileOperations: fileOperations);
+
+        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.BackupPath);
+        Assert.Equal(2, fileOperations.CopyCalls);
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Equal(original, await File.ReadAllTextAsync(result.BackupPath));
+        Assert.Contains(result.Errors, error => error.Contains("恢复", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PatchAsync_写后验证失败且恢复失败时保留备份并记录安全错误()
+    {
+        const string secret = "secret-patch-value-123";
+        const string original = "api_key = \"old\"\n";
+        var file = WriteToml("patch-restore-failure.toml", original);
+        var logger = new RecordingLogger<TomlDocumentService>();
+        var fileOperations = new FakeTomlFileOperations
+        {
+            CopyAction = (source, destination, overwrite) =>
+            {
+                if (fileOperationsPlaceholder.CopyCalls > 1)
+                {
+                    throw new UnauthorizedAccessException("恢复失败");
+                }
+
+                File.Copy(source, destination, overwrite);
+            },
+            ReplaceAction = (source, destination) =>
+            {
+                File.Replace(source, destination, destinationBackupFileName: null);
+                File.WriteAllText(destination, "broken = \"", new UTF8Encoding(false));
+            },
+        };
+        fileOperationsPlaceholder = fileOperations;
+        var service = CreateService(logger, fileOperations);
+
+        var result = await service.PatchAsync(file, [Set(["api_key"], secret)]);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.BackupPath);
+        Assert.True(File.Exists(result.BackupPath));
+        Assert.NotEqual(original, await File.ReadAllTextAsync(file));
+        Assert.Contains(result.Errors, error => error.Contains("恢复失败", StringComparison.Ordinal));
+        var entry = Assert.Single(logger.Entries, item => item.Properties.GetValueOrDefault("Stage") as string == "Restore");
+        Assert.IsType<UnauthorizedAccessException>(entry.Exception);
+        Assert.DoesNotContain(secret, string.Join('|', result.Errors), StringComparison.Ordinal);
+        Assert.All(
+            logger.Entries,
+            logEntry =>
+            {
+                Assert.DoesNotContain(secret, logEntry.Message, StringComparison.Ordinal);
+                Assert.DoesNotContain(original, logEntry.Message, StringComparison.Ordinal);
+                Assert.DoesNotContain(
+                    Path.GetDirectoryName(file)!,
+                    logEntry.Message,
+                    StringComparison.OrdinalIgnoreCase);
+                Assert.DoesNotContain(
+                    logEntry.Properties.Values.OfType<string>(),
+                    value => value.Contains(secret, StringComparison.Ordinal)
+                        || value.Contains(original, StringComparison.Ordinal)
+                        || value.Contains(Path.GetDirectoryName(file)!, StringComparison.OrdinalIgnoreCase));
+            });
+    }
+
+    [Fact]
+    public async Task PatchAsync_重试延迟期间取消时传播取消异常()
+    {
+        const string original = "name = \"old\"\n";
+        var file = WriteToml("patch-retry-cancel.toml", original);
+        using var cancellation = new CancellationTokenSource();
+        var fileOperations = new FakeTomlFileOperations
+        {
+            ReplaceAction = (_, _) => throw new IOException("暂时占用"),
+            DelayAction = (_, cancellationToken) =>
+            {
+                cancellation.Cancel();
+                return Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            },
+        };
+        var service = CreateService(fileOperations: fileOperations);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.PatchAsync(file, [Set(["name"], "new")], cancellation.Token));
+
+        Assert.Equal(1, fileOperations.ReplaceCalls);
+        Assert.Equal(1, fileOperations.DelayCalls);
+        Assert.Equal(original, await File.ReadAllTextAsync(file));
+        Assert.Empty(Directory.GetFiles(tempDirectory, "*.tmp", SearchOption.AllDirectories));
+    }
+
+    [Fact]
+    public async Task PatchAsync_备份和临时文件始终位于目标同目录且成功后仅保留备份()
+    {
+        var directory = Path.Combine(tempDirectory, "事务 路径");
+        Directory.CreateDirectory(directory);
+        var file = Path.Combine(directory, "配置.toml");
+        File.WriteAllText(file, "name = \"old\"\n", new UTF8Encoding(false));
+        var fileOperations = new FakeTomlFileOperations();
+        var service = CreateService(fileOperations: fileOperations);
+
+        var result = await service.PatchAsync(file, [Set(["name"], "new")]);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.BackupPath);
+        Assert.Equal(directory, Path.GetDirectoryName(result.BackupPath));
+        Assert.All(fileOperations.WrittenPaths, path => Assert.Equal(directory, Path.GetDirectoryName(path)));
+        Assert.True(File.Exists(result.BackupPath));
+        Assert.Empty(Directory.GetFiles(directory, "*.tmp"));
     }
 
     public void Dispose()
@@ -538,8 +992,18 @@ public sealed class TomlDocumentServiceTests : IDisposable
         }
     }
 
-    private TomlDocumentService CreateService(ILogger<TomlDocumentService>? logger = null) =>
-        new(logger ?? new RecordingLogger<TomlDocumentService>());
+    private static TomlPatchOperation Set(IReadOnlyList<string> path, object value) =>
+        new(TomlPatchKind.Set, new TomlPath(path), TomlValue.FromObject(value));
+
+    private static TomlPatchOperation Delete(IReadOnlyList<string> path) =>
+        new(TomlPatchKind.Delete, new TomlPath(path));
+
+    private TomlDocumentService CreateService(
+        ILogger<TomlDocumentService>? logger = null,
+        ITomlFileOperations? fileOperations = null) =>
+        fileOperations is null
+            ? new TomlDocumentService(logger ?? new RecordingLogger<TomlDocumentService>())
+            : new TomlDocumentService(logger ?? new RecordingLogger<TomlDocumentService>(), fileOperations);
 
     private string WriteToml(string fileName, string content)
     {
@@ -553,6 +1017,108 @@ public sealed class TomlDocumentServiceTests : IDisposable
         var path = Path.Combine(tempDirectory, fileName);
         File.WriteAllBytes(path, content);
         return path;
+    }
+
+    private FakeTomlFileOperations fileOperationsPlaceholder = null!;
+
+    private sealed class FakeTomlFileOperations : ITomlFileOperations
+    {
+        public Action<string, string, bool>? CopyAction { get; init; }
+
+        public Func<string, string, Encoding, CancellationToken, Task>? WriteAction { get; init; }
+
+        public Action<string, string>? ReplaceAction { get; init; }
+
+        public Action<string, string>? MoveAction { get; init; }
+
+        public Action<string>? DeleteAction { get; init; }
+
+        public Func<TimeSpan, CancellationToken, Task>? DelayAction { get; init; }
+
+        public int CopyCalls { get; private set; }
+
+        public int WriteCalls { get; private set; }
+
+        public int ReplaceCalls { get; private set; }
+
+        public int MoveCalls { get; private set; }
+
+        public int DeleteCalls { get; private set; }
+
+        public int DelayCalls { get; private set; }
+
+        public int TotalCalls => CopyCalls + WriteCalls + ReplaceCalls + MoveCalls + DeleteCalls + DelayCalls;
+
+        public List<string> WrittenPaths { get; } = [];
+
+        public void Copy(string sourcePath, string destinationPath, bool overwrite)
+        {
+            CopyCalls++;
+            if (CopyAction is not null)
+            {
+                CopyAction(sourcePath, destinationPath, overwrite);
+                return;
+            }
+
+            File.Copy(sourcePath, destinationPath, overwrite);
+        }
+
+        public Task WriteAllTextAsync(
+            string path,
+            string content,
+            Encoding encoding,
+            CancellationToken cancellationToken)
+        {
+            WriteCalls++;
+            WrittenPaths.Add(path);
+            return WriteAction is null
+                ? File.WriteAllTextAsync(path, content, encoding, cancellationToken)
+                : WriteAction(path, content, encoding, cancellationToken);
+        }
+
+        public void Replace(string sourcePath, string destinationPath)
+        {
+            ReplaceCalls++;
+            if (ReplaceAction is not null)
+            {
+                ReplaceAction(sourcePath, destinationPath);
+                return;
+            }
+
+            File.Replace(sourcePath, destinationPath, destinationBackupFileName: null);
+        }
+
+        public void Move(string sourcePath, string destinationPath)
+        {
+            MoveCalls++;
+            if (MoveAction is not null)
+            {
+                MoveAction(sourcePath, destinationPath);
+                return;
+            }
+
+            File.Move(sourcePath, destinationPath);
+        }
+
+        public void Delete(string path)
+        {
+            DeleteCalls++;
+            if (DeleteAction is not null)
+            {
+                DeleteAction(path);
+                return;
+            }
+
+            File.Delete(path);
+        }
+
+        public Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken)
+        {
+            DelayCalls++;
+            return DelayAction is null
+                ? Task.CompletedTask
+                : DelayAction(delay, cancellationToken);
+        }
     }
 
     private sealed class RecordingLogger<T> : ILogger<T>
