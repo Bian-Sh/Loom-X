@@ -1,6 +1,7 @@
+using System.Collections.Concurrent;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
-using System.Data.Common;
 
 namespace LoomX.Configuration;
 
@@ -246,6 +247,14 @@ public sealed class GatewayRouteEntity
 
 public static class ConfigurationDatabase
 {
+    private static readonly ConcurrentDictionary<string, byte> CompletedInitializations = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 供测试使用：清空"本进程已完整初始化"缓存，使后续调用重新执行完整初始化流程。
+    /// 运行时不应调用，否则会退回每次均做全量 schema 校验与 GUID 归一化的慢路径。
+    /// </summary>
+    public static void ResetInitializationCache() => CompletedInitializations.Clear();
+
     public static IDisposable AcquireInitializationLock()
     {
         AppDataPaths.EnsureCreated();
@@ -268,9 +277,49 @@ public static class ConfigurationDatabase
         }
     }
 
+    /// <summary>
+    /// 与 <see cref="AcquireInitializationLock"/> 语义相同，但等待期间异步退避，
+    /// 不会像 Thread.Sleep 那样长期占用线程池线程。随机抖动用于缓解多进程惊群。
+    /// </summary>
+    public static async Task<IDisposable> AcquireInitializationLockAsync(CancellationToken cancellationToken = default)
+    {
+        AppDataPaths.EnsureCreated();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(AppDataPaths.ConfigurationInitializationLockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline) { }
+            catch (UnauthorizedAccessException) when (DateTime.UtcNow < deadline) { }
+            if (DateTime.UtcNow >= deadline) throw new TimeoutException("配置库初始化锁等待超时。");
+            await Task.Delay(Random.Shared.Next(15, 45), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// 连接字符串级别的初始化键。不同 SQLite 文件各自独立，测试使用临时路径互不影响。
+    /// </summary>
+    internal static string ResolveInitializationKey(ConfigurationDbContext dbContext) =>
+        dbContext.Database.GetDbConnection().ConnectionString;
+
     public static async Task InitializeAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken = default)
     {
-        using var initializationLock = AcquireInitializationLock();
+        var initializationKey = ResolveInitializationKey(dbContext);
+        if (CompletedInitializations.ContainsKey(initializationKey)) return;
+
+        using var initializationLock = await AcquireInitializationLockAsync(cancellationToken);
+        // 双检：等待锁期间可能已有其它线程完成了同一个库的初始化。
+        if (CompletedInitializations.ContainsKey(initializationKey)) return;
+
+        await InitializeCoreAsync(dbContext, cancellationToken);
+        CompletedInitializations[initializationKey] = 0;
+    }
+
+    private static async Task InitializeCoreAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
+    {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         if (!await IsSchemaReadyAsync(dbContext, cancellationToken))
         {

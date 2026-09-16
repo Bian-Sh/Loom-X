@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using System.Windows.Input;
@@ -20,11 +21,20 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
         @"^(?<date>\d{4}-\d{2}-\d{2})\s+(?<clock>\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\s+[^\t]*\t\[(?<level>[^\]]+)\]\t(?<module>[^\t]*)\t(?<message>.*)$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex SecretPattern = new("(?i)(authorization\\s*:\\s*(?:bearer\\s+)?|api[-_ ]?key\\s*[:=]\\s*)[^\\s,;]+", RegexOptions.Compiled);
+    /// <summary>
+    /// 日志合并窗口：窗口期内到达的日志由一次 UI 回调批量消费。
+    /// 每条日志单独 Dispatcher.Post 会在日志洪水时淹没 UI 队列并让界面失去响应。
+    /// </summary>
+    private static readonly TimeSpan LogFlushInterval = TimeSpan.FromMilliseconds(200);
+    private readonly ConcurrentQueue<RuntimeLogEntry> pendingEntries = new();
     private readonly List<ConsoleLogEntry> allLogs = [];
     private readonly RuntimeLogBuffer buffer;
     private readonly ToastService toastService;
     private readonly EventHandler<RuntimeLogEntry> entryHandler;
     private readonly IStringLocalizer<ConsoleViewModel> _loc;
+    private readonly ILogger<ConsoleViewModel>? logger;
+    private volatile bool disposed;
+    private int flushScheduled;
     private string searchText = "";
     private bool showInfo = true;
     private bool showWarning = true;
@@ -51,12 +61,13 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
     public ICommand ClearCommand { get; }
     public ICommand ClearSearchCommand { get; }
 
-    public ConsoleViewModel(RuntimeLogBuffer? buffer = null, ToastService? toastService = null, IStringLocalizer<ConsoleViewModel>? localizer = null)
+    public ConsoleViewModel(RuntimeLogBuffer? buffer = null, ToastService? toastService = null, IStringLocalizer<ConsoleViewModel>? localizer = null, ILogger<ConsoleViewModel>? logger = null)
     {
         this.buffer = buffer ?? RuntimeLogBuffer.Default;
         this.toastService = toastService ?? new ToastService();
+        this.logger = logger;
         _loc = localizer ?? LocalizerFactory.Create<ConsoleViewModel>();
-        entryHandler = (_, entry) => Dispatcher.UIThread.Post(() => AddEntry(entry));
+        entryHandler = (_, entry) => EnqueueRuntimeEntry(entry);
         this.buffer.EntryAdded += entryHandler;
         ClearCommand = new DelegateCommand(Clear);
         ClearSearchCommand = new DelegateCommand(() => SearchText = "");
@@ -108,6 +119,49 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
         var module = match.Groups["module"].Value.Trim();
         entry = new ConsoleLogEntry(match.Groups["clock"].Value, NormalizeLevel(match.Groups["level"].Value), string.IsNullOrWhiteSpace(module) ? "Runtime" : module, Sanitize(match.Groups["message"].Value));
         return true;
+    }
+
+    /// <summary>
+    /// 日志到达时只做无锁入队，不直接向 UI 线程投递。
+    /// 合并窗口结束由一次 UI 回调批量消费，避免高频日志把消息泵挤爆。
+    /// </summary>
+    private void EnqueueRuntimeEntry(RuntimeLogEntry entry)
+    {
+        if (disposed) return;
+        pendingEntries.Enqueue(entry);
+        if (Interlocked.CompareExchange(ref flushScheduled, 1, 0) != 0) return;
+        _ = FlushAfterDelayAsync();
+    }
+
+    private async Task FlushAfterDelayAsync()
+    {
+        try
+        {
+            await Task.Delay(LogFlushInterval).ConfigureAwait(false);
+            if (disposed) return;
+            await Dispatcher.UIThread.InvokeAsync(FlushPendingEntries);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            Interlocked.Exchange(ref flushScheduled, 0);
+            logger?.LogWarning(exception, "控制台日志批量刷新失败，丢弃本轮待处理条目");
+        }
+    }
+
+    /// <summary>
+    /// 在 UI 线程一次性消化窗口期内累积的日志。
+    /// 先复位标志再消费，确保消费过程中新入队的条目能排到下一轮。
+    /// </summary>
+    private void FlushPendingEntries()
+    {
+        Interlocked.Exchange(ref flushScheduled, 0);
+        var added = 0;
+        while (pendingEntries.TryDequeue(out var entry))
+        {
+            AddEntry(entry);
+            added++;
+        }
+        if (added > 0) logger?.LogDebug("控制台日志批量刷新完成 {EntryCount}", added);
     }
 
     internal void AddEntry(RuntimeLogEntry runtimeEntry)
@@ -203,6 +257,7 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
 
     public void Dispose()
     {
+        disposed = true;
         buffer.EntryAdded -= entryHandler;
         LocaleService.CultureChanged -= OnCultureChanged;
     }

@@ -71,7 +71,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
         this.dataStore = dataStore ?? new AppDataStore(ownedConfigService, gatewayService, this.loggerFactory.CreateLogger<AppDataStore>());
         this.applyAppearance = applyAppearance;
         _loc = localizer ?? LocalizerFactory.Create<MainWindowViewModel>();
-        consoleViewModel = new ConsoleViewModel(toastService: this.toastService);
+        consoleViewModel = new ConsoleViewModel(toastService: this.toastService, logger: this.loggerFactory.CreateLogger<ConsoleViewModel>());
         overviewViewModel = new OverviewViewModel(gatewayService, this.dataStore, this.loggerFactory.CreateLogger<MainWindowViewModel>());
         providersViewModel = new ProvidersViewModel(this.dataStore, this.toastService, this.loggerFactory.CreateLogger<ProvidersViewModel>());
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
@@ -2402,18 +2402,31 @@ public sealed class AsyncCommand : ICommand
 {
     private readonly Func<object?, Task> action;
     private readonly Func<object?, bool> canExecute;
+    private readonly ILogger? logger;
     public event EventHandler? CanExecuteChanged;
-    public AsyncCommand(Func<Task> action, Func<bool>? canExecute = null)
+    public AsyncCommand(Func<Task> action, Func<bool>? canExecute = null, ILogger? logger = null)
     {
         this.action = _ => action();
         this.canExecute = _ => canExecute?.Invoke() ?? true;
+        this.logger = logger;
     }
-    public AsyncCommand(Func<object?, Task> action, Func<object?, bool>? canExecute = null)
+    public AsyncCommand(Func<object?, Task> action, Func<object?, bool>? canExecute = null, ILogger? logger = null)
     {
         this.action = action;
         this.canExecute = parameter => canExecute?.Invoke(parameter) ?? true;
+        this.logger = logger;
     }
     public bool CanExecute(object? parameter) => canExecute(parameter);
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
-    public async void Execute(object? parameter) => await action(parameter);
+
+    /// <summary>
+    /// ICommand.Execute 签名不允许返回 Task，因此必须在此捕获异常。
+    /// async void 中未捕获的异常会直接抛到 SynchronizationContext，
+    /// 绕过所有调用方 try/catch 并导致进程崩溃。
+    /// </summary>
+    public async void Execute(object? parameter)
+    {
+        try { await action(parameter); }
+        catch (Exception exception) { logger?.LogError(exception, "异步命令执行失败"); }
+    }
 }

@@ -182,7 +182,13 @@ public sealed class GatewayProcessService : IDisposable
         {
             if (activityStore is not null) activityStore.ActivityEnqueued -= OnActivityEnqueued;
             if (telemetryHub is not null) telemetryHub.Published -= OnTelemetryPublished;
-            app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            // IDisposable 无法 await。正常退出路径会先走 StopAsync（释放后置空 app），
+            // 这里只兜异常路径，因此加超时保护，避免网关停摆时把进程退出永久卡住。
+            if (!app.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5)))
+            {
+                State = GatewayState.Failed;
+                Error = "网关容器释放超时，已放弃等待。";
+            }
             activityStore = null;
             telemetryHub = null;
             app = null;

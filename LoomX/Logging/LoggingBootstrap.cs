@@ -29,7 +29,9 @@ public static class LoggingBootstrap
                     fileSizeLimitBytes: 10 * 1024 * 1024,
                     rollOnFileSizeLimit: true,
                     retainedFileCountLimit: 30,
-                    shared: true)
+                    // buffered：批量落盘，避免每条日志在调用线程上做一次同步文件写入。
+                    shared: true,
+                    buffered: true)
                 .CreateLogger();
             configured = true;
         }

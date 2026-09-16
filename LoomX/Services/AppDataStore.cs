@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
@@ -711,29 +712,86 @@ public sealed class AppDataStore : IDisposable
         return fields;
     }
 
-    private void OnActivityEnqueued(object? sender, ActivityEventInput input) => _ = HandleActivityEnqueuedAsync(input);
+    /// <summary>
+    /// 活动事件合并窗口。代理请求高峰期每个请求都会入队一条活动事件，
+    /// 逐条抢 stateLock 并通知 UI 会导致配置读写排队、列表被反复全量重建。
+    /// </summary>
+    private static readonly TimeSpan ActivityFlushInterval = TimeSpan.FromMilliseconds(300);
+    private readonly ConcurrentQueue<ActivityEventInput> pendingActivityInputs = new();
+    private int activityFlushScheduled;
+
+    /// <summary>
+    /// 事件桥接：只做无锁入队，由后台泵在同一时间窗内批量折进状态。
+    /// </summary>
+    private void OnActivityEnqueued(object? sender, ActivityEventInput input)
+    {
+        if (disposed) return;
+        pendingActivityInputs.Enqueue(input);
+        if (Interlocked.CompareExchange(ref activityFlushScheduled, 1, 0) != 0) return;
+        _ = FlushActivityInputsAsync();
+    }
+
+    private async Task FlushActivityInputsAsync()
+    {
+        try
+        {
+            await Task.Delay(ActivityFlushInterval).ConfigureAwait(false);
+            await FlushPendingActivityInputsAsync().ConfigureAwait(false);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            logger.LogWarning(exception, "活动事件批量合并失败，等待下一轮重建");
+        }
+    }
+
+    /// <summary>
+    /// 一次抢锁消化窗口期内累积的全部活动事件，最多触发一次窗口变更通知。
+    /// </summary>
+    internal async Task FlushPendingActivityInputsAsync()
+    {
+        Interlocked.Exchange(ref activityFlushScheduled, 0);
+        await stateLock.WaitAsync();
+        try
+        {
+            var changed = false;
+            while (pendingActivityInputs.TryDequeue(out var input))
+            {
+                if (ApplyActivityInput(input)) changed = true;
+            }
+            if (changed) ActivityWindowChanged?.Invoke(this, EventArgs.Empty);
+        }
+        finally { stateLock.Release(); }
+    }
 
     internal async Task HandleActivityEnqueuedAsync(ActivityEventInput input)
     {
         await stateLock.WaitAsync();
         try
         {
-            var record = new ActivityEventRecord(0, input.CreatedAt, input.RequestId, input.Method, input.IncomingPath, input.Protocol, input.Route, input.ProviderId, input.ModelId, input.StatusCode, input.ElapsedMs, input.ResponseBytes, input.IsStreaming, input.ErrorType);
-            if (activityHistoryMode)
-            {
-                if (!ContainsActivity(record, pendingActivities)) pendingActivities.Add(record);
-                pendingActivityCount = pendingActivities.Count;
-            }
-            else
-            {
-                if (activityQuery is null || !MatchesActivityQuery(record, activityQuery)) return;
-                if (ContainsActivity(record, activityWindow)) return;
-                activityWindow.Insert(0, record);
-                while (activityWindow.Count > ActivityWindowLimit) activityWindow.RemoveAt(activityWindow.Count - 1);
-            }
-            ActivityWindowChanged?.Invoke(this, EventArgs.Empty);
+            if (ApplyActivityInput(input)) ActivityWindowChanged?.Invoke(this, EventArgs.Empty);
         }
         finally { stateLock.Release(); }
+    }
+
+    /// <summary>
+    /// 把单条活动事件折进当前窗口，返回是否需要通知 UI。调用方必须持有 stateLock。
+    /// </summary>
+    private bool ApplyActivityInput(ActivityEventInput input)
+    {
+        var record = new ActivityEventRecord(0, input.CreatedAt, input.RequestId, input.Method, input.IncomingPath, input.Protocol, input.Route, input.ProviderId, input.ModelId, input.StatusCode, input.ElapsedMs, input.ResponseBytes, input.IsStreaming, input.ErrorType);
+        if (activityHistoryMode)
+        {
+            if (ContainsActivity(record, pendingActivities)) return false;
+            pendingActivities.Add(record);
+            pendingActivityCount = pendingActivities.Count;
+            return true;
+        }
+
+        if (activityQuery is null || !MatchesActivityQuery(record, activityQuery)) return false;
+        if (ContainsActivity(record, activityWindow)) return false;
+        activityWindow.Insert(0, record);
+        while (activityWindow.Count > ActivityWindowLimit) activityWindow.RemoveAt(activityWindow.Count - 1);
+        return true;
     }
 
     private void ReplaceActivityWindow(ActivityPage page)

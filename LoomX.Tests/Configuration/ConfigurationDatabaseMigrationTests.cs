@@ -138,6 +138,9 @@ public sealed class ConfigurationDatabaseMigrationTests
                 context.ChangeTracker.Clear();
             }
 
+            // 手工改 schema 后必须让初始化缓存失效，否则下面的 InitializeAsync 会被短路。
+            ConfigurationDatabase.ResetInitializationCache();
+
             await using (var migratedContext = new ConfigurationDbContext(options))
             {
                 await ConfigurationDatabase.InitializeAsync(migratedContext);
