@@ -1,46 +1,83 @@
-# suppress-meaningless-console-logs 验证报告
+# 验证报告：suppress-meaningless-console-logs
 
-## 结论
+验证日期：2026-09-16
+验证阶段：Comet verify
 
-本次 change 验证通过，可以进入归档确认。目标日志已降为 `Debug`，在 `LoggingBootstrap` 默认最低级别 `Information` 下不会进入运行时控制台或日志文件；Shell 回退与透明外观行为保持不变。
+## 总结
 
-## 验证总览
-
-| 维度 | 状态 | 证据 |
-|---|---|---|
-| 完整性 | PASS | `tasks.md` 2/2 完成；`skip_specs: true`，无 delta spec |
-| 正确性 | PASS | RED 阶段 2 个回归测试按预期失败；GREEN 阶段目标测试 2/2、相关测试 12/12、完整测试 672/672 通过 |
-| 一致性 | PASS | 实现与 `design.md` 一致，仅调整 3 条目标日志级别并新增回归测试 |
-| 构建发布 | PASS | Release 构建 0 错误；self-contained `win-x64` 发布成功，目录仅包含 `LoomX.exe` 一个可执行文件 |
-| 分支处理 | PASS | 按项目共享 `master` 约定提交并推送到 `origin/master`，实现提交 `bccb98a` |
+| 维度 | 结果 |
+| --- | --- |
+| 完整性 | 4/4 个任务完成 |
+| 正确性 | 日志降级、旧数据库迁移移除及保留的 JSON 迁移均有测试或静态证据 |
+| 一致性 | 与 proposal、design、delta spec 和当前运行时路径约束一致 |
 
 ## 验证证据
 
-1. TDD RED：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ConsoleNoiseLoggingTests --no-restore`，修复前 2 个测试失败，分别捕获 `Warning` 与 `Information` 级别。
-2. TDD GREEN：同一命令修复后 2/2 通过。
-3. 相关测试：`ConsoleNoiseLoggingTests`、`AppStartupAndProviderRefreshContractTests`、`WindowAppearanceCoordinatorTests` 共 12/12 通过。
-4. 完整测试：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore`，672/672 通过，0 失败、0 跳过。
-5. Release 构建：`dotnet build LoomX.slnx -c Release --no-restore`，0 错误。
-6. OpenSpec：`openspec validate suppress-meaningless-console-logs --strict` 通过。
-7. 根因消除：源码中不再存在目标消息的 `LogWarning` / `LogInformation` 调用；当前实现位置为 `LoomX/App.axaml.cs:88`、`LoomX/MainWindow.axaml.cs:295-302`。
-8. 发布包：`outputs/LoomX-win-x64-2026-09-16-console-log-cleanup/`，390 个文件，唯一可执行文件为 `LoomX.exe`。
+### 1. 目标回归测试
 
-## 设计一致性
+- 旧迁移入口负向契约、路径契约、品牌契约和控制台日志契约均已纳入 `LoomX.Tests`。
+- 相关目标测试此前验证结果为 15 passed、0 failed。
+- `openspec validate suppress-meaningless-console-logs --strict` 通过。
 
-- Shell 子进程启动失败仍继续当前进程，仅将诊断从 `Warning` 降为 `Debug`。
-- 透明外观仍执行原有归一化、材质应用和透明级别赋值，仅将开始/完成日志从 `Information` 降为 `Debug`。
-- 未修改日志基础设施、API、数据库、配置结构或依赖。
+### 2. 完整测试
 
-## 问题分级
+执行：
 
-### CRITICAL
+```powershell
+dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore --no-build
+```
 
-无。
+结果：666 passed、0 failed、0 skipped。
 
-### WARNING
+为排除 Avalonia 测试线程调度影响，另执行：
 
-- 构建仍报告既有 `SQLitePCLRaw.lib.e_sqlite3 2.1.11` 高严重性漏洞警告，以及既有 nullable / CA2024 警告；本次 change 未修改依赖或相关代码。
+```powershell
+dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore -- RunConfiguration.MaxCpuCount=1
+```
 
-### SUGGESTION
+结果：666 passed、0 failed、0 skipped。
 
-无。
+此前一次并行执行曾出现 4 个 `RuntimeGraphControlTests` 的 `Call from invalid thread`，但串行复现通过；随后以当前构建产物重新执行默认并行测试也完整通过。该现象未归因于本次变更，因此没有修改无关节点图测试或生产代码。
+
+### 3. Release 构建
+
+执行：
+
+```powershell
+dotnet build LoomX.slnx -c Release --no-restore
+```
+
+结果：构建成功。现有警告包括 `SQLitePCLRaw.lib.e_sqlite3` 的 `NU1903` 漏洞提示；本次未改变依赖版本。
+
+### 4. win-x64 发布
+
+执行：
+
+```powershell
+.\scripts\publish-desktop.ps1 -Configuration Release -OutputDirectory outputs\LoomX-win-x64-2026-09-16-no-legacy-migration
+```
+
+发布目录：
+
+```text
+outputs/LoomX-win-x64-2026-09-16-no-legacy-migration
+```
+
+发布目录中确认只有 1 个 `LoomX.exe`。
+
+### 5. 旧迁移能力移除检查
+
+- `ApplicationDataMigration`、`EnsureMigratedAsync`、旧数据库路径属性和迁移锁已从生产代码移除。
+- 生产代码不再引用 `OllamaHub.db` 或旧活动库迁移路径。
+- `AssistantPreferencesStore.MigrateLegacyIfNeeded` 与 `CliVersionCache` 等其他 JSON 迁移逻辑仍保留。
+- CodeGraph 已同步，结果为 `Already up to date`；旧迁移符号无生产代码结果。
+- 桌面端 Shell 启动回退和透明外观开始/完成事件均已降为 `Debug`，不会再以用户可见的 `Warning` 或 `Information` 级别制造无意义控制台输出。
+
+## 非阻塞警告
+
+- Release 构建继续报告既有 `NU1903` 依赖漏洞提示，以及现有代码分析警告；与本次需求无关，未在本 change 中扩大范围处理。
+- 工作区仍保留其他 session 的未提交修改：`LoomX.Tests/Views/WindowAppearanceCoordinatorTests.cs`、`openspec/changes/incremental-config-edit/.comet/trajectory.jsonl` 和 `.zcode/`，本次未修改或清理。
+
+## 最终结论
+
+所有本次 change 任务均已完成，目标测试、完整测试、Release 构建、win-x64 发布和规格校验均通过。当前实现可进入分支收尾和归档前确认。
