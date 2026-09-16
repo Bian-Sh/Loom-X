@@ -247,6 +247,25 @@ public sealed class GatewayViewContractTests
     }
 
     [Fact]
+    public void MissingCombosAreHiddenOnlyFromTheRightEditorPanel()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+        var comboId = Guid.NewGuid();
+        var missingCombo = GatewayComboEditorViewModel.FromResponse(new GatewayComboResponse(comboId, "历史组合", true, 0, [], [], true));
+        var endpoint = GatewayEndpointEditorViewModel.FromResponse(
+            new GatewayEndpointResponse("openai", "OpenAI", "/openai", true, [new GatewayEndpointComboResponse(comboId, "历史组合", true, true, 0, true)]),
+            "http://127.0.0.1:11434",
+            [missingCombo]);
+
+        Assert.Contains("ClipToBounds=\"True\" IsVisible=\"{Binding !IsDeleted}\"", source, StringComparison.Ordinal);
+        Assert.Contains("<CheckBox Tag=\"{Binding}\" IsChecked=\"{Binding IsSelected, Mode=OneWay}\" Click=\"EndpointComboOption_OnClick\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<CheckBox Tag=\"{Binding}\" IsVisible=\"{Binding !IsDeleted}\"", source, StringComparison.Ordinal);
+        var leftOption = Assert.Single(endpoint.ComboOptions);
+        Assert.True(leftOption.IsDeleted);
+        Assert.True(leftOption.IsSelected);
+    }
+
+    [Fact]
     public void ComboPickerStatusLabelsAreLocalizedAndDeletedItemsRemainInteractive()
     {
         Assert.Equal("停用", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("zh-CN")));
