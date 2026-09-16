@@ -4,7 +4,7 @@
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
 - Current task: Task 3
-- Stage: fix-round-1
+- Stage: re-review-round-1
 - Fix round: 1
 
 ## Rulings
