@@ -41,15 +41,14 @@ public sealed class LoomXBrandingContractTests
     }
 
     [Fact]
-    public void 桌面配置服务创建前先执行数据迁移()
+    public void 桌面启动不再检查旧数据库迁移()
     {
         var app = ReadSource("App.axaml.cs");
 
-        var migrationIndex = app.IndexOf("new ApplicationDataMigration", StringComparison.Ordinal);
-        var configServiceIndex = app.IndexOf("new ConfigSnapshotService", StringComparison.Ordinal);
-
-        Assert.True(migrationIndex >= 0);
-        Assert.True(configServiceIndex > migrationIndex);
+        Assert.DoesNotContain("ApplicationDataMigration", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureMigratedAsync", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("OllamaHub.db", app, StringComparison.Ordinal);
+        Assert.DoesNotContain("Activity.db", app, StringComparison.Ordinal);
     }
 
     [Fact]

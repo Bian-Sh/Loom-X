@@ -10,18 +10,17 @@ namespace LoomX.Tests.Hosting;
 public sealed class LoomXHostTests
 {
     [Fact]
-    public void CreateAsync_迁移发生在首次配置数据库连接之前()
+    public void CreateAsync_直接初始化当前配置数据库而不依赖旧库迁移()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "LoomXHost.cs");
         var source = File.ReadAllText(Path.GetFullPath(path));
 
-        var migrationIndex = source.IndexOf("EnsureMigratedAsync", StringComparison.Ordinal);
-        var configurationContextIndex = source.IndexOf("new ConfigurationDbContext", StringComparison.Ordinal);
-        var factoryRegistrationIndex = source.IndexOf("AddDbContextFactory<ConfigurationDbContext>", StringComparison.Ordinal);
-
-        Assert.True(migrationIndex >= 0);
-        Assert.True(configurationContextIndex > migrationIndex);
-        Assert.True(factoryRegistrationIndex > migrationIndex);
+        Assert.Contains("AppDataPaths.EnsureCreated()", source, StringComparison.Ordinal);
+        Assert.Contains("var databasePath = AppDataPaths.DatabasePath", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ApplicationDataMigration", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnsureMigratedAsync", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("OllamaHub.db", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Activity.db", source, StringComparison.Ordinal);
     }
 
     [Fact]
