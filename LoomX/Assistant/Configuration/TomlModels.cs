@@ -208,6 +208,40 @@ public sealed record TomlPatchOperation
     public TomlValue? Value { get; }
 }
 
+public sealed record TomlReadResult
+{
+    private readonly ReadOnlyCollection<string> topLevelKeys;
+    private readonly ReadOnlyCollection<string> errors;
+
+    public TomlReadResult(
+        bool exists,
+        bool isValid,
+        IReadOnlyList<string> topLevelKeys,
+        IReadOnlyList<string> errors)
+    {
+        ArgumentNullException.ThrowIfNull(topLevelKeys);
+        var keyCopy = new string[topLevelKeys.Count];
+        for (var index = 0; index < topLevelKeys.Count; index++)
+        {
+            keyCopy[index] = topLevelKeys[index]
+                ?? throw new ArgumentException("TOML 顶层键不能为 null。", nameof(topLevelKeys));
+        }
+
+        Exists = exists;
+        IsValid = isValid;
+        this.topLevelKeys = Array.AsReadOnly(keyCopy);
+        this.errors = TomlResultErrors.Copy(errors);
+    }
+
+    public bool Exists { get; }
+
+    public bool IsValid { get; }
+
+    public IReadOnlyList<string> TopLevelKeys => topLevelKeys;
+
+    public IReadOnlyList<string> Errors => errors;
+}
+
 public sealed record TomlValidationResult
 {
     private readonly ReadOnlyCollection<string> errors;
