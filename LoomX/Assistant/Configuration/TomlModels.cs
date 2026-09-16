@@ -29,6 +29,32 @@ public readonly record struct TomlPath
     }
 
     public IReadOnlyList<string> Segments { get; }
+
+    public bool Equals(TomlPath other)
+    {
+        if (Segments is null || other.Segments is null)
+        {
+            return Segments is null && other.Segments is null;
+        }
+
+        return Segments.SequenceEqual(other.Segments, StringComparer.Ordinal);
+    }
+
+    public override int GetHashCode()
+    {
+        if (Segments is null)
+        {
+            return 0;
+        }
+
+        var hash = new HashCode();
+        foreach (var segment in Segments)
+        {
+            hash.Add(segment, StringComparer.Ordinal);
+        }
+
+        return hash.ToHashCode();
+    }
 }
 
 public enum TomlValueKind
@@ -90,7 +116,13 @@ public sealed record TomlValue
     internal static TomlValue FromArray(IEnumerable<TomlValue> items)
     {
         ArgumentNullException.ThrowIfNull(items);
-        return new TomlValue(TomlValueKind.Array, Array.AsReadOnly(items.ToArray()));
+        var copy = new List<TomlValue>();
+        foreach (var item in items)
+        {
+            copy.Add(item ?? throw new ArgumentException("TOML 数组元素不能为 null。", nameof(items)));
+        }
+
+        return new TomlValue(TomlValueKind.Array, Array.AsReadOnly(copy.ToArray()));
     }
 
     internal static TomlValue FromObjectProperties(IEnumerable<KeyValuePair<string, TomlValue>> properties)
@@ -144,6 +176,16 @@ public sealed record TomlPatchOperation
 {
     public TomlPatchOperation(TomlPatchKind kind, TomlPath path, TomlValue? value = null)
     {
+        if (!Enum.IsDefined(kind))
+        {
+            throw new ArgumentOutOfRangeException(nameof(kind), kind, "未定义的 TOML Patch 操作类型。");
+        }
+
+        if (path.Segments is null || path.Segments.Count == 0)
+        {
+            throw new ArgumentException("TOML Patch 路径不能为空。", nameof(path));
+        }
+
         if (kind == TomlPatchKind.Set && value is null)
         {
             throw new ArgumentException("set 操作必须提供值。", nameof(value));
@@ -166,21 +208,89 @@ public sealed record TomlPatchOperation
     public TomlValue? Value { get; }
 }
 
-public sealed record TomlValidationResult(
-    bool IsValid,
-    int? Line,
-    int? Column,
-    IReadOnlyList<string> Errors);
+public sealed record TomlValidationResult
+{
+    private readonly ReadOnlyCollection<string> errors;
 
-public sealed record TomlValueResult(
-    bool Found,
-    TomlValueKind? ValueType,
-    TomlValue? Value,
-    IReadOnlyList<string> Errors);
+    public TomlValidationResult(bool isValid, int? line, int? column, IReadOnlyList<string> errors)
+    {
+        IsValid = isValid;
+        Line = line;
+        Column = column;
+        this.errors = TomlResultErrors.Copy(errors);
+    }
 
-public sealed record TomlWriteResult(
-    bool Success,
-    bool Changed,
-    string? BackupPath,
-    bool FormattingChanged,
-    IReadOnlyList<string> Errors);
+    public bool IsValid { get; }
+
+    public int? Line { get; }
+
+    public int? Column { get; }
+
+    public IReadOnlyList<string> Errors => errors;
+}
+
+public sealed record TomlValueResult
+{
+    private readonly ReadOnlyCollection<string> errors;
+
+    public TomlValueResult(bool found, TomlValueKind? valueType, TomlValue? value, IReadOnlyList<string> errors)
+    {
+        Found = found;
+        ValueType = valueType;
+        Value = value;
+        this.errors = TomlResultErrors.Copy(errors);
+    }
+
+    public bool Found { get; }
+
+    public TomlValueKind? ValueType { get; }
+
+    public TomlValue? Value { get; }
+
+    public IReadOnlyList<string> Errors => errors;
+}
+
+public sealed record TomlWriteResult
+{
+    private readonly ReadOnlyCollection<string> errors;
+
+    public TomlWriteResult(
+        bool success,
+        bool changed,
+        string? backupPath,
+        bool formattingChanged,
+        IReadOnlyList<string> errors)
+    {
+        Success = success;
+        Changed = changed;
+        BackupPath = backupPath;
+        FormattingChanged = formattingChanged;
+        this.errors = TomlResultErrors.Copy(errors);
+    }
+
+    public bool Success { get; }
+
+    public bool Changed { get; }
+
+    public string? BackupPath { get; }
+
+    public bool FormattingChanged { get; }
+
+    public IReadOnlyList<string> Errors => errors;
+}
+
+file static class TomlResultErrors
+{
+    public static ReadOnlyCollection<string> Copy(IReadOnlyList<string> errors)
+    {
+        ArgumentNullException.ThrowIfNull(errors);
+        var copy = new string[errors.Count];
+        for (var index = 0; index < errors.Count; index++)
+        {
+            copy[index] = errors[index]
+                ?? throw new ArgumentException("TOML 结果错误项不能为 null。", nameof(errors));
+        }
+
+        return Array.AsReadOnly(copy);
+    }
+}
