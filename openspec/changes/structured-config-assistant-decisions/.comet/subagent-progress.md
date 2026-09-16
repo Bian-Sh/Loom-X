@@ -4,8 +4,8 @@
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
 - Current task: Task 6
-- Stage: review
-- Fix round: 1
+- Stage: implementer
+- Fix round: 2
 
 ## Rulings
 - Task 1 同时向 `LoomX` 与 `LoomX.Tests` 添加 Tomlyn 2.10.1，以满足 OpenSpec 1.1。
@@ -27,3 +27,4 @@
 - Task 5 计划中的通用 Step 6 文本与其他任务重复；为满足 task-checkoff 唯一性，最小改名为“运行 AskUser 模型与 Broker 定向测试并提交”，不改变任务语义。
 - Task 6 首轮审查接受 2 个 Critical 与 2 个 Important：Text 原文不得进入 ToolResult/Session；AskUser 必须拒绝完整 TOML、请求/响应正文、Header 形态并封闭运行时属性；owner 传播不得依赖跨 yield 的 AsyncLocal；人工决策不得继承默认 30 秒工具超时，进入修复轮 1。
 - Task 6 的 OpenSpec 4.3–4.4 与计划 Step 勾选继续由协调者在复审 clean 后统一完成，避免在阻断缺陷未修复时虚假标记完成。代价是状态文件会晚于首轮实现提交更新。
+- Task 6 修复轮 1 复审：Text 安全结果、运行 owner 与无限人工等待已 addressed；Header 边界仍漏掉 `Server`、`Date`、`Location`、`Tenant` 等无连字符名称，接受该剩余 Critical，进入修复轮 2。修复应封闭单 token ASCII Header 名，同时保留带空格的普通短句。
