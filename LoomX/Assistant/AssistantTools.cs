@@ -14,6 +14,26 @@ public static class AssistantTools
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
+    private static readonly HashSet<string> RequestProperties = new(StringComparer.Ordinal)
+    {
+        "title", "question", "reason", "impact_summary", "allow_cancel", "fields",
+    };
+    private static readonly HashSet<string> FieldProperties = new(StringComparer.Ordinal)
+    {
+        "id", "label", "type", "is_required", "options", "default_option_id", "default_option_ids",
+        "min_selections", "max_selections", "default_number", "min_number", "max_number", "step",
+        "default_text", "is_multiline", "max_length",
+    };
+    private static readonly HashSet<string> OptionProperties = new(StringComparer.Ordinal)
+    {
+        "id", "label", "description",
+    };
+    private static readonly HashSet<string> KnownHttpHeaders = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "accept", "authorization", "cache-control", "connection", "content-length", "content-type",
+        "cookie", "host", "origin", "referer", "user-agent",
+    };
+
     public static void RegisterAll(ToolRegistry registry, IUserDecisionBroker broker)
     {
         ArgumentNullException.ThrowIfNull(registry);
@@ -25,6 +45,7 @@ public static class AssistantTools
             Description = "暂停当前步骤并向用户收集一组结构化业务决策；不得用于索取密钥或认证信息。",
             ParametersSchema = CreateAskUserSchema(),
             RiskLevel = ToolRiskLevel.Read,
+            Timeout = System.Threading.Timeout.InfiniteTimeSpan,
             Handler = async (arguments, cancellationToken) =>
             {
                 try
@@ -32,7 +53,7 @@ public static class AssistantTools
                     var request = ParseRequest(arguments);
                     var ownerId = CurrentOwnerId.Value ?? Guid.NewGuid().ToString("N");
                     var result = await broker.RequestAsync(ownerId, request, cancellationToken).ConfigureAwait(false);
-                    return ToolResult.Ok(SerializeResult(result));
+                    return ToolResult.Ok(SerializeResult(request, result));
                 }
                 catch (OperationCanceledException)
                 {
@@ -63,18 +84,21 @@ public static class AssistantTools
         var root = arguments as JsonObject
             ?? throw new UserDecisionValidationException(
                 [new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, "工具参数必须是对象。")]);
+        ValidateProperties(root, RequestProperties);
         var fieldsNode = root["fields"] as JsonArray
             ?? throw new UserDecisionValidationException(
                 [new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, "用户决策字段无效。")]);
 
         var fields = fieldsNode.Select(ParseField).ToArray();
-        return new UserDecisionRequest(
+        var request = new UserDecisionRequest(
             RequireString(root, "title"),
             RequireString(root, "question"),
             fields,
             OptionalString(root, "reason"),
             OptionalString(root, "impact_summary"),
             OptionalValue(root, "allow_cancel", true));
+        ValidateContentBoundary(request);
+        return request;
     }
 
     private static UserDecisionField ParseField(JsonNode? node)
@@ -82,6 +106,7 @@ public static class AssistantTools
         var field = node as JsonObject
             ?? throw new UserDecisionValidationException(
                 [new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, "用户决策字段无效。")]);
+        ValidateProperties(field, FieldProperties);
         var type = ParseFieldType(RequireString(field, "type"));
         var options = (field["options"] as JsonArray)?.Select(ParseOption).ToArray()
             ?? Array.Empty<UserDecisionOption>();
@@ -110,6 +135,7 @@ public static class AssistantTools
         var option = node as JsonObject
             ?? throw new UserDecisionValidationException(
                 [new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, "用户决策选项无效。")]);
+        ValidateProperties(option, OptionProperties);
         return new UserDecisionOption(
             RequireString(option, "id"),
             RequireString(option, "label"),
@@ -125,6 +151,131 @@ public static class AssistantTools
         _ => throw new UserDecisionValidationException(
             [new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, "用户决策字段类型无效。")]),
     };
+
+    private static void ValidateProperties(JsonObject source, IReadOnlySet<string> allowedProperties)
+    {
+        if (source.Any(property => !allowedProperties.Contains(property.Key)))
+        {
+            throw InvalidRequest("用户决策请求包含未知属性。");
+        }
+    }
+
+    private static void ValidateContentBoundary(UserDecisionRequest request)
+    {
+        if (EnumerateDisplayContent(request).Any(IsProhibitedContent))
+        {
+            throw InvalidRequest("用户决策请求包含禁止的正文或配置内容。");
+        }
+    }
+
+    private static IEnumerable<string?> EnumerateDisplayContent(UserDecisionRequest request)
+    {
+        yield return request.Title;
+        yield return request.Question;
+        yield return request.Description;
+        yield return request.ImpactSummary;
+
+        foreach (var field in request.Fields)
+        {
+            yield return field.Label;
+            yield return field.DefaultText;
+            foreach (var option in field.Options)
+            {
+                yield return option.Label;
+                yield return option.Description;
+            }
+        }
+    }
+
+    private static bool IsProhibitedContent(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return false;
+        }
+
+        var trimmed = content.Trim();
+        if (LooksLikeJsonDocument(trimmed))
+        {
+            return true;
+        }
+
+        var lines = content
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var assignmentCount = lines.Count(LooksLikeTomlAssignment);
+        if (assignmentCount >= 2 || (assignmentCount >= 1 && lines.Any(LooksLikeTomlTableHeader)))
+        {
+            return true;
+        }
+
+        return lines.Any(LooksLikeHttpHeader);
+    }
+
+    private static bool LooksLikeJsonDocument(string content)
+    {
+        if (content.Length < 2
+            || (content[0] != '{' || content[^1] != '}')
+            && (content[0] != '[' || content[^1] != ']'))
+        {
+            return false;
+        }
+
+        try
+        {
+            return JsonNode.Parse(content) is JsonObject or JsonArray;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool LooksLikeTomlTableHeader(string line)
+    {
+        var trimmed = line.Trim();
+        return trimmed.Length >= 3 && trimmed.StartsWith('[') && trimmed.EndsWith(']');
+    }
+
+    private static bool LooksLikeTomlAssignment(string line)
+    {
+        var trimmed = line.Trim();
+        var equalsIndex = trimmed.IndexOf('=');
+        if (equalsIndex <= 0 || equalsIndex == trimmed.Length - 1)
+        {
+            return false;
+        }
+
+        var key = trimmed[..equalsIndex].Trim();
+        if (key.Length >= 2
+            && (key[0] == '"' && key[^1] == '"' || key[0] == '\'' && key[^1] == '\''))
+        {
+            return true;
+        }
+
+        return key.All(character => char.IsLetterOrDigit(character)
+            || character is '_' or '-' or '.' or ' ');
+    }
+
+    private static bool LooksLikeHttpHeader(string line)
+    {
+        var trimmed = line.Trim();
+        var colonIndex = trimmed.IndexOf(':');
+        if (colonIndex <= 0 || colonIndex == trimmed.Length - 1)
+        {
+            return false;
+        }
+
+        var name = trimmed[..colonIndex];
+        if (name.Any(character => !char.IsLetterOrDigit(character) && character != '-'))
+        {
+            return false;
+        }
+
+        return name.Contains('-', StringComparison.Ordinal) || KnownHttpHeaders.Contains(name);
+    }
+
+    private static UserDecisionValidationException InvalidRequest(string message) =>
+        new([new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, message)]);
 
     private static string RequireString(JsonObject source, string propertyName) =>
         source[propertyName]?.GetValue<string>()
@@ -155,12 +306,15 @@ public static class AssistantTools
             ["message"] = message,
         }.ToJsonString(OutputJsonOptions));
 
-    private static string SerializeResult(UserDecisionResult result)
+    private static string SerializeResult(UserDecisionRequest request, UserDecisionResult result)
     {
+        var fields = request.Fields.ToDictionary(field => field.Id, StringComparer.Ordinal);
         var values = new JsonObject();
         foreach (var pair in result.Values)
         {
-            values[pair.Key] = JsonSerializer.SerializeToNode(pair.Value, OutputJsonOptions);
+            values[pair.Key] = fields[pair.Key].Type == UserDecisionFieldType.Text
+                ? new JsonObject { ["provided"] = pair.Value is not null }
+                : JsonSerializer.SerializeToNode(pair.Value, OutputJsonOptions);
         }
 
         return new JsonObject

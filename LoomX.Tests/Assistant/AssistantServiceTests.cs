@@ -225,8 +225,9 @@ public sealed class AssistantServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SendAsync_AskUser提交后保留工具结果并继续最终回答()
+    public async Task SendAsync_AskUser提交后安全保留结构化结果并继续最终回答()
     {
+        const string originalText = "自由文本原文-绝不可进入模型上下文-981273";
         using var broker = CreateDecisionBroker();
         var pending = CaptureNext(broker);
         var registry = CreateAskUserRegistry(broker);
@@ -247,18 +248,30 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.True(broker.Submit(request.RequestId, new Dictionary<string, object?>
         {
             ["mode"] = "safe",
+            ["count"] = 3m,
+            ["note"] = originalText,
         }));
         await runTask.WaitAsync(TimeSpan.FromSeconds(2));
 
         var messages = service.CurrentSession.Messages;
         var toolMessage = Assert.Single(messages, message => message.Role == ChatRole.Tool);
         Assert.Equal("assistant.ask_user", toolMessage.ToolName);
-        Assert.Equal("safe", System.Text.Json.Nodes.JsonNode.Parse(toolMessage.Content!)!["values"]!["mode"]!.GetValue<string>());
+        var toolResult = System.Text.Json.Nodes.JsonNode.Parse(toolMessage.Content!)!;
+        Assert.Equal("safe", toolResult["values"]!["mode"]!.GetValue<string>());
+        Assert.Equal(3m, toolResult["values"]!["count"]!.GetValue<decimal>());
+        Assert.True(toolResult["values"]!["note"]!["provided"]!.GetValue<bool>());
+        Assert.DoesNotContain(originalText, toolMessage.Content!, StringComparison.Ordinal);
+        Assert.DoesNotContain(messages, message => message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(events, item =>
+            item.Kind == AgentEventKind.MessageCompleted
+            && item.Message?.Content?.Contains(originalText, StringComparison.Ordinal) == true);
         Assert.Contains(messages, message => message.Role == ChatRole.Assistant && message.Content == "已按安全模式继续。");
         Assert.Contains(events, item => item.Kind == AgentEventKind.TaskCompleted);
         Assert.Equal(2, model.Requests.Count);
         Assert.Contains(model.Requests[1].Messages,
             message => message.Role == ChatRole.Tool && message.ToolName == "assistant.ask_user");
+        Assert.DoesNotContain(model.Requests[1].Messages,
+            message => message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
     }
 
     [Fact]
@@ -322,6 +335,27 @@ public sealed class AssistantServiceTests : IDisposable
 
         Assert.Equal(AgentSessionState.Cancelled, runningSession.State);
         Assert.False(broker.Submit(request.RequestId, new Dictionary<string, object?> { ["mode"] = "safe" }));
+    }
+
+    [Fact]
+    public async Task SendAsync_同一运行的Request与Finally取消使用相同Owner()
+    {
+        using var broker = new RecordingUserDecisionBroker();
+        var pending = CaptureNext(broker);
+        var service = CreateService(
+            new StubModelClientFactory(CreateAskUserModel()),
+            CreateAskUserRegistry(broker),
+            userDecisionBroker: broker);
+        using var cancellation = new CancellationTokenSource();
+        var runTask = RunToCompletionAsync(service, "等待选择", cancellation.Token);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.False(runTask.IsCompleted);
+        cancellation.Cancel();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal([request.OwnerId], broker.RequestOwnerIds);
+        Assert.Equal(request.OwnerId, Assert.Single(broker.CancelOwnerIds));
     }
 
     [Theory]
@@ -393,6 +427,16 @@ public sealed class AssistantServiceTests : IDisposable
                 { "id": "safe", "label": "安全模式" },
                 { "id": "fast", "label": "快速模式" }
               ]
+            },
+            {
+              "id": "count",
+              "label": "数量",
+              "type": "number"
+            },
+            {
+              "id": "note",
+              "label": "补充说明",
+              "type": "text"
             }
           ]
         }
@@ -427,6 +471,44 @@ public sealed class AssistantServiceTests : IDisposable
         await foreach (var unused in service.SendAsync(message, cancellationToken)) { }
     }
 
+    private sealed class RecordingUserDecisionBroker : IUserDecisionBroker
+    {
+        private readonly UserDecisionBroker inner = CreateDecisionBroker();
+        private readonly System.Collections.Concurrent.ConcurrentQueue<string> requestOwnerIds = new();
+        private readonly System.Collections.Concurrent.ConcurrentQueue<string> cancelOwnerIds = new();
+
+        public event EventHandler<PendingUserDecision>? PendingRequested
+        {
+            add => inner.PendingRequested += value;
+            remove => inner.PendingRequested -= value;
+        }
+
+        public IReadOnlyList<string> RequestOwnerIds => requestOwnerIds.ToArray();
+
+        public IReadOnlyList<string> CancelOwnerIds => cancelOwnerIds.ToArray();
+
+        public Task<UserDecisionResult> RequestAsync(
+            string ownerId,
+            UserDecisionRequest request,
+            CancellationToken cancellationToken)
+        {
+            requestOwnerIds.Enqueue(ownerId);
+            return inner.RequestAsync(ownerId, request, cancellationToken);
+        }
+
+        public bool Submit(string requestId, IReadOnlyDictionary<string, object?> values) =>
+            inner.Submit(requestId, values);
+
+        public bool Cancel(string requestId, string reason) => inner.Cancel(requestId, reason);
+
+        public int CancelOwner(string ownerId, string reason)
+        {
+            cancelOwnerIds.Enqueue(ownerId);
+            return inner.CancelOwner(ownerId, reason);
+        }
+
+        public void Dispose() => inner.Dispose();
+    }
     /// <summary>剧本式模型工厂：TryCreateAsync 返回预置客户端（或 null 模拟未配置）。</summary>
     private sealed class StubModelClientFactory(IModelClient? client)
         : AssistantModelClientFactory(

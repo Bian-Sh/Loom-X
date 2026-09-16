@@ -241,7 +241,6 @@ public sealed class AssistantService
             var runSession = CurrentSession;
             var ownerId = Guid.NewGuid().ToString("N");
             using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            using var ownerScope = AssistantTools.BeginRun(ownerId);
             currentRun = runCancellation;
             currentRunOwnerId = ownerId;
             var persistenceBlocked = false;
@@ -259,8 +258,22 @@ public sealed class AssistantService
                     : null;
                 var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate,
                     ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded);
-                await foreach (var agentEvent in loop.RunAsync(runSession, userMessage, runCancellation.Token))
+                await using var enumerator = loop
+                    .RunAsync(runSession, userMessage, runCancellation.Token)
+                    .GetAsyncEnumerator(runCancellation.Token);
+                while (true)
                 {
+                    AgentEvent agentEvent;
+                    using (AssistantTools.BeginRun(ownerId))
+                    {
+                        if (!await enumerator.MoveNextAsync())
+                        {
+                            break;
+                        }
+
+                        agentEvent = enumerator.Current;
+                    }
+
                     if (agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta or AgentEventKind.MessageCompleted))
                         runSession.RecordActivity(agentEvent);
                     if (!persistenceBlocked && agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta))

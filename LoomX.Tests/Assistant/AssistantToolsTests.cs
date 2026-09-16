@@ -19,6 +19,8 @@ public sealed class AssistantToolsTests
         Assert.True(registry.TryGet("assistant.ask_user", out var tool));
         Assert.NotNull(tool);
         Assert.Equal(ToolRiskLevel.Read, tool!.RiskLevel);
+        Assert.Equal(Timeout.InfiniteTimeSpan, tool.Timeout);
+        Assert.NotEqual(TimeSpan.FromSeconds(30), tool.Timeout);
         var properties = tool.ParametersSchema["properties"]!.AsObject();
         Assert.Contains("title", properties);
         Assert.Contains("question", properties);
@@ -151,11 +153,87 @@ public sealed class AssistantToolsTests
             ["count"] = 5m,
             ["note"] = "完成",
         }));
-        var result = JsonNode.Parse((await execution.WaitAsync(TimeSpan.FromSeconds(2))).Content)!;
+        var toolResult = await execution.WaitAsync(TimeSpan.FromSeconds(2));
+        var result = JsonNode.Parse(toolResult.Content)!;
         Assert.Equal("one", result["values"]!["single"]!.GetValue<string>());
         Assert.Equal(["one", "two"], result["values"]!["multi"]!.AsArray().Select(item => item!.GetValue<string>()));
         Assert.Equal(5m, result["values"]!["count"]!.GetValue<decimal>());
-        Assert.Equal("完成", result["values"]!["note"]!.GetValue<string>());
+        Assert.True(result["values"]!["note"]!["provided"]!.GetValue<bool>());
+        Assert.DoesNotContain("完成", toolResult.Content, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("[server]\nhost = \"localhost\"\nport = 8080")]
+    [InlineData("{\"model\":\"demo\",\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}")]
+    [InlineData("{\"status\":\"ok\",\"items\":[1,2]}")]
+    [InlineData("X-Tenant: acme")]
+    public async Task AskUser_禁止完整正文配置块与Header进入Pending(string prohibitedContent)
+    {
+        using var broker = CreateBroker();
+        PendingUserDecision? observed = null;
+        broker.PendingRequested += (_, request) => observed = request;
+        var tool = GetTool(broker);
+        var arguments = CreateValidArguments();
+        arguments["question"] = prohibitedContent;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+
+        var result = await tool.Handler(arguments, cancellation.Token);
+
+        Assert.False(result.Success);
+        Assert.Null(observed);
+        Assert.Equal("invalid_request", JsonNode.Parse(result.Content)!["error"]!.GetValue<string>());
+        Assert.DoesNotContain(prohibitedContent, result.Content, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("top")]
+    [InlineData("field")]
+    [InlineData("option")]
+    public async Task AskUser_拒绝各层未知属性且不回显属性值(string level)
+    {
+        const string unknownValue = "Authorization: Bearer unknown-property-secret";
+        using var broker = CreateBroker();
+        PendingUserDecision? observed = null;
+        broker.PendingRequested += (_, request) => observed = request;
+        var tool = GetTool(broker);
+        var arguments = CreateValidArguments();
+        var field = arguments["fields"]![0]!.AsObject();
+        var option = field["options"]![0]!.AsObject();
+        var target = level switch
+        {
+            "top" => arguments,
+            "field" => field,
+            "option" => option,
+            _ => throw new InvalidOperationException(),
+        };
+        target["unexpected"] = unknownValue;
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+
+        var result = await tool.Handler(arguments, cancellation.Token);
+
+        Assert.False(result.Success);
+        Assert.Null(observed);
+        Assert.Equal("invalid_request", JsonNode.Parse(result.Content)!["error"]!.GetValue<string>());
+        Assert.DoesNotContain(unknownValue, result.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AskUser_普通短句单个选项与JsonSchema字段可以进入Pending()
+    {
+        using var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var tool = GetTool(broker);
+        var arguments = CreateValidArguments();
+        arguments["question"] = "请确认 JSON Schema 的 type 字段。";
+        arguments["fields"]![0]!["options"] = new JsonArray(
+            new JsonObject { ["id"] = "string", ["label"] = "string" });
+        arguments["fields"]![0]!["default_option_id"] = "string";
+
+        var execution = tool.Handler(arguments, CancellationToken.None);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(broker.Cancel(request.RequestId, "测试结束"));
+        Assert.True((await execution.WaitAsync(TimeSpan.FromSeconds(2))).Success);
     }
 
     [Fact]
