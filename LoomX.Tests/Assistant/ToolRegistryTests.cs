@@ -1,3 +1,4 @@
+﻿using System.Text.Json.Nodes;
 using LoomX.Assistant;
 using Xunit;
 
@@ -59,5 +60,80 @@ public sealed class ToolRegistryTests
 
         Assert.False(registry.TryGet("loomx.list_providers", out var tool));
         Assert.Null(tool);
+    }
+
+    [Fact]
+    public void TomlTools_RegisterAll_注册六个工具及风险等级()
+    {
+        var registry = TomlToolsTestSupport.CreateRegistry(new RecordingTomlDocumentService());
+        var expected = new Dictionary<string, ToolRiskLevel>
+        {
+            ["toml.read"] = ToolRiskLevel.Read,
+            ["toml.get"] = ToolRiskLevel.Read,
+            ["toml.validate"] = ToolRiskLevel.Read,
+            ["toml.set"] = ToolRiskLevel.Write,
+            ["toml.patch"] = ToolRiskLevel.Write,
+            ["toml.delete"] = ToolRiskLevel.Destructive,
+        };
+
+        foreach (var item in expected)
+        {
+            Assert.True(registry.TryGet(item.Key, out var tool));
+            Assert.Equal(item.Value, tool!.RiskLevel);
+        }
+    }
+
+    [Fact]
+    public void TomlTools_Schema限制路径键路径和Patch操作()
+    {
+        var registry = TomlToolsTestSupport.CreateRegistry(new RecordingTomlDocumentService());
+
+        foreach (var name in new[] { "toml.read", "toml.get", "toml.validate", "toml.set", "toml.patch", "toml.delete" })
+        {
+            var schema = GetSchema(registry, name);
+            Assert.Contains("path", RequiredNames(schema));
+            var pathSchema = schema["properties"]!["path"]!.AsObject();
+            Assert.Equal("string", pathSchema["type"]!.GetValue<string>());
+            Assert.Equal(1, pathSchema["minLength"]!.GetValue<int>());
+            Assert.True(pathSchema["maxLength"]!.GetValue<int>() > 0);
+        }
+
+        foreach (var name in new[] { "toml.get", "toml.set", "toml.delete" })
+        {
+            var schema = GetSchema(registry, name);
+            Assert.Contains("key_path", RequiredNames(schema));
+            AssertBoundedStringArray(schema["properties"]!["key_path"]!);
+        }
+
+        var patchSchema = GetSchema(registry, "toml.patch");
+        Assert.Contains("operations", RequiredNames(patchSchema));
+        var operations = patchSchema["properties"]!["operations"]!.AsObject();
+        Assert.Equal(1, operations["minItems"]!.GetValue<int>());
+        Assert.True(operations["maxItems"]!.GetValue<int>() > 0);
+        var operation = operations["items"]!.AsObject();
+        var allowedOperations = operation["properties"]!["op"]!["enum"]!.AsArray()
+            .Select(item => item!.GetValue<string>())
+            .ToArray();
+        Assert.Equal(["set", "delete"], allowedOperations);
+        AssertBoundedStringArray(operation["properties"]!["key_path"]!);
+    }
+
+    private static JsonObject GetSchema(ToolRegistry registry, string name)
+    {
+        Assert.True(registry.TryGet(name, out var tool));
+        return tool!.ParametersSchema.AsObject();
+    }
+
+    private static string[] RequiredNames(JsonObject schema) =>
+        schema["required"]!.AsArray().Select(item => item!.GetValue<string>()).ToArray();
+
+    private static void AssertBoundedStringArray(JsonNode node)
+    {
+        var schema = node.AsObject();
+        Assert.Equal("array", schema["type"]!.GetValue<string>());
+        Assert.Equal(1, schema["minItems"]!.GetValue<int>());
+        Assert.True(schema["maxItems"]!.GetValue<int>() > 0);
+        Assert.Equal("string", schema["items"]!["type"]!.GetValue<string>());
+        Assert.True(schema["items"]!["maxLength"]!.GetValue<int>() > 0);
     }
 }
