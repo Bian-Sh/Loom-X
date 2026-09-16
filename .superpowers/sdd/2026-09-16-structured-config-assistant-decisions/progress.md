@@ -9,3 +9,4 @@ Ruling: Task 2 在 TomlModels.cs 增加不可变 TomlReadResult，并使用既�
 Task 2: review failed（2 IMPORTANT，2 MINOR）；进入 fix round 1/2。
 Task 2: fix round 1/2（4 项全部 addressed；65 tests passed）。
 Task 2: complete（commits bf1163a..a6f136f，thorough review clean）。
+Ruling: Task 2 Step 2 重命名为“运行 TOML 读取测试确认红灯” — Comet task-checkoff 要求任务文本全计划唯一，原通用文本出现三次 — 若判断错误仅影响计划标签，不改变已执行的 TDD 行为。

@@ -192,7 +192,7 @@ public async Task GetAsync_DistinguishesQuotedDotKeyFromNestedPath()
 }
 ```
 
-- [x] **Step 2: 运行测试确认红灯**
+- [x] **Step 2: 运行 TOML 读取测试确认红灯**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~TomlDocumentServiceTests`
 Expected: FAIL，服务尚不存在。
