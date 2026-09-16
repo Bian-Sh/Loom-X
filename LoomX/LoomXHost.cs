@@ -25,13 +25,6 @@ public static class LoomXHost
         AppDataPaths.EnsureCreated();
 
         LoggingBootstrap.Configure();
-        using (var migrationLoggerFactory = LoggerFactory.Create(builder => builder.AddSerilog(dispose: false)))
-        {
-            var migration = new ApplicationDataMigration(
-                migrationLoggerFactory.CreateLogger<ApplicationDataMigration>());
-            await migration.EnsureMigratedAsync(cancellationToken);
-        }
-
         var databasePath = AppDataPaths.DatabasePath;
         var builder = WebApplication.CreateBuilder(Array.Empty<string>());
         builder.Host.UseSerilog();

@@ -136,8 +136,6 @@ public partial class App : Application
                         activationPending = true;
                 }));
             }
-            var migration = new ApplicationDataMigration(loggerFactory.CreateLogger<ApplicationDataMigration>());
-            migration.EnsureMigratedAsync().GetAwaiter().GetResult();
             var configService = new ConfigSnapshotService(loggerFactory.CreateLogger<ConfigSnapshotService>());
             gatewayService = new GatewayProcessService();
             var toastService = new ToastService();
