@@ -3,5 +3,6 @@
   "openspec_design": "openspec/changes/suppress-meaningless-console-logs/design.md",
   "openspec_tasks": "openspec/changes/suppress-meaningless-console-logs/tasks.md",
   "handoff_context": "openspec/changes/suppress-meaningless-console-logs/.comet/handoff/design-context.json",
-  "handoff_markdown": "openspec/changes/suppress-meaningless-console-logs/.comet/handoff/design-context.md"
+  "handoff_markdown": "openspec/changes/suppress-meaningless-console-logs/.comet/handoff/design-context.md",
+  "archive_directory": "openspec/changes/archive/2026-09-17-suppress-meaningless-console-logs"
 }

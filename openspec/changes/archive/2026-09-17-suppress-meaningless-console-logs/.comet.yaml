@@ -18,7 +18,7 @@ verification_report: docs/superpowers/reports/2026-09-16-suppress-meaningless-co
 branch_status: handled
 created_at: 2026-09-16
 verified_at: 2026-09-16
-archived: false
+archived: true
 direct_override: null
 handoff_context: openspec/changes/suppress-meaningless-console-logs/.comet/handoff/design-context.json
 handoff_hash: 036b7668334c52bf1339b1ad21a942864b52957188038c365fd1e217d6e699c9

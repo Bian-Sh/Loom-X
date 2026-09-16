@@ -1,3 +1,7 @@
+---
+archived-with: 2026-09-17-suppress-meaningless-console-logs
+status: final
+---
 # 清理无意义控制台日志并移除旧数据库迁移实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (推荐) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
