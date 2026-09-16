@@ -1,9 +1,10 @@
 ﻿using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant.UserDecisions;
 
-public interface IUserDecisionBroker
+public interface IUserDecisionBroker : IDisposable
 {
     event EventHandler<PendingUserDecision>? PendingRequested;
 
@@ -22,8 +23,29 @@ public interface IUserDecisionBroker
 public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUserDecisionBroker
 {
     private readonly ConcurrentDictionary<string, PendingEntry> pendingEntries = new(StringComparer.Ordinal);
+    private readonly object lifecycleGate = new();
+    private EventHandler<PendingUserDecision>? pendingRequested;
+    private bool disposed;
 
-    public event EventHandler<PendingUserDecision>? PendingRequested;
+    public event EventHandler<PendingUserDecision>? PendingRequested
+    {
+        add
+        {
+            lock (lifecycleGate)
+            {
+                ThrowIfDisposed();
+                pendingRequested += value;
+            }
+        }
+
+        remove
+        {
+            lock (lifecycleGate)
+            {
+                pendingRequested -= value;
+            }
+        }
+    }
 
     public Task<UserDecisionResult> RequestAsync(
         string ownerId,
@@ -47,13 +69,32 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
             return Task.FromCanceled<UserDecisionResult>(cancellationToken);
         }
 
-        var requestId = CreateRequestId();
-        var completion = new TaskCompletionSource<UserDecisionResult>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var entry = new PendingEntry(ownerId, request, completion);
-        while (!pendingEntries.TryAdd(requestId, entry))
+        EventHandler<PendingUserDecision>? handlers;
+        string? requestId = null;
+        TaskCompletionSource<UserDecisionResult>? completion = null;
+        PendingEntry? entry = null;
+        lock (lifecycleGate)
         {
-            requestId = CreateRequestId();
+            ThrowIfDisposed();
+            handlers = pendingRequested;
+            if (handlers is not null)
+            {
+                requestId = CreateRequestId();
+                completion = new TaskCompletionSource<UserDecisionResult>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                entry = new PendingEntry(ownerId, request, completion);
+                while (!pendingEntries.TryAdd(requestId, entry))
+                {
+                    requestId = CreateRequestId();
+                }
+            }
+        }
+
+        if (handlers is null)
+        {
+            logger.LogWarning("用户决策请求缺少处理器 {FieldCount}", request.Fields.Count);
+            return Task.FromException<UserDecisionResult>(
+                new InvalidOperationException("当前没有可用的用户决策处理器。"));
         }
 
         var cancellationRegistration = cancellationToken.Register(
@@ -64,37 +105,34 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
                     cancellationState.RequestId,
                     cancellationState.CancellationToken);
             },
-            new CancellationState(this, requestId, cancellationToken));
-        entry.SetCancellationRegistration(cancellationRegistration);
+            new CancellationState(this, requestId!, cancellationToken));
+        entry!.SetCancellationRegistration(cancellationRegistration);
 
         logger.LogInformation(
-            "用户决策请求已挂起 {RequestId} {OwnerId} {FieldCount}",
+            "用户决策请求已挂起 {RequestId} {FieldCount}",
             requestId,
-            ownerId,
             request.Fields.Count);
 
         try
         {
-            PendingRequested?.Invoke(this, new PendingUserDecision(requestId, ownerId, request));
+            handlers.Invoke(this, new PendingUserDecision(requestId!, ownerId, request));
         }
         catch (Exception exception)
         {
-            if (pendingEntries.TryRemove(requestId, out var removed))
+            if (pendingEntries.TryRemove(requestId!, out var removed))
             {
                 var publishException = new InvalidOperationException("无法发布用户决策请求。");
-                removed.Completion.TrySetException(publishException);
-                removed.DisposeCancellationRegistration();
+                CompleteEntry(removed, () => removed.Completion.TrySetException(publishException));
                 var safeLogException = new InvalidOperationException("用户决策事件订阅者执行失败。");
                 logger.LogError(
                     safeLogException,
-                    "用户决策请求事件发布失败 {RequestId} {OwnerId} {ErrorType}",
+                    "用户决策请求事件发布失败 {RequestId} {ErrorType}",
                     requestId,
-                    ownerId,
                     exception.GetType().Name);
             }
         }
 
-        return completion.Task;
+        return completion!.Task;
     }
 
     public bool Submit(string requestId, IReadOnlyDictionary<string, object?> values)
@@ -107,29 +145,42 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
             return false;
         }
 
-        var validationErrors = UserDecisionValidator.ValidateSubmission(entry.Request, values);
+        IReadOnlyDictionary<string, object?> snapshot;
+        try
+        {
+            snapshot = CreateSubmissionSnapshot(values);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(
+                "用户决策提交快照失败 {RequestId} {ErrorType}",
+                requestId,
+                exception.GetType().Name);
+            return false;
+        }
+
+        var validationErrors = UserDecisionValidator.ValidateSubmission(entry.Request, snapshot);
         if (validationErrors.Count > 0)
         {
             logger.LogWarning(
-                "用户决策提交校验失败 {RequestId} {OwnerId} {ErrorCount}",
+                "用户决策提交校验失败 {RequestId} {ErrorCount}",
                 requestId,
-                entry.OwnerId,
                 validationErrors.Count);
             return false;
         }
+
+        var result = UserDecisionResult.Submit(snapshot);
 
         if (!pendingEntries.TryRemove(requestId, out var removed))
         {
             return false;
         }
 
-        removed.Completion.TrySetResult(UserDecisionResult.Submit(values));
-        removed.DisposeCancellationRegistration();
+        CompleteEntry(removed, () => removed.Completion.TrySetResult(result));
         logger.LogInformation(
-            "用户决策请求已提交 {RequestId} {OwnerId} {FieldCount}",
+            "用户决策请求已提交 {RequestId} {FieldCount}",
             requestId,
-            removed.OwnerId,
-            values.Count);
+            result.Values.Count);
         return true;
     }
 
@@ -143,12 +194,10 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
             return false;
         }
 
-        entry.Completion.TrySetResult(UserDecisionResult.Cancel(reason));
-        entry.DisposeCancellationRegistration();
+        CompleteEntry(entry, () => entry.Completion.TrySetResult(UserDecisionResult.Cancel(reason)));
         logger.LogInformation(
-            "用户决策请求已取消 {RequestId} {OwnerId}",
-            requestId,
-            entry.OwnerId);
+            "用户决策请求已取消 {RequestId}",
+            requestId);
         return true;
     }
 
@@ -166,20 +215,84 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
                 continue;
             }
 
-            entry.Completion.TrySetResult(UserDecisionResult.Cancel(reason));
-            entry.DisposeCancellationRegistration();
+            CompleteEntry(entry, () => entry.Completion.TrySetResult(UserDecisionResult.Cancel(reason)));
             cancelledCount++;
         }
 
         if (cancelledCount > 0)
         {
             logger.LogInformation(
-                "用户决策 Owner 请求已取消 {OwnerId} {RequestCount}",
-                ownerId,
+                "用户决策所有者请求已取消 {RequestCount}",
                 cancelledCount);
         }
 
         return cancelledCount;
+    }
+
+    public void Dispose()
+    {
+        var removedEntries = new List<PendingEntry>();
+        lock (lifecycleGate)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+            pendingRequested = null;
+            foreach (var pair in pendingEntries)
+            {
+                if (pendingEntries.TryRemove(pair.Key, out var entry))
+                {
+                    removedEntries.Add(entry);
+                }
+            }
+        }
+
+        foreach (var entry in removedEntries)
+        {
+            CompleteEntry(entry, () => entry.Completion.TrySetCanceled());
+        }
+
+        logger.LogInformation("用户决策 Broker 已释放 {RequestCount}", removedEntries.Count);
+        GC.SuppressFinalize(this);
+    }
+
+    private static IReadOnlyDictionary<string, object?> CreateSubmissionSnapshot(
+        IReadOnlyDictionary<string, object?> values)
+    {
+        var snapshot = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var pair in values)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key))
+            {
+                throw new ArgumentException("用户决策结果字段 id 不能为空。", nameof(values));
+            }
+
+            snapshot.Add(pair.Key, CopySubmissionValue(pair.Value));
+        }
+
+        return new ReadOnlyDictionary<string, object?>(snapshot);
+    }
+
+    private static object? CopySubmissionValue(object? value) => value switch
+    {
+        string => value,
+        IEnumerable<string> items => Array.AsReadOnly(items.ToArray()),
+        _ => value,
+    };
+
+    private static void CompleteEntry(PendingEntry entry, Action completion)
+    {
+        try
+        {
+            completion();
+        }
+        finally
+        {
+            entry.DisposeCancellationRegistration();
+        }
     }
 
     private static string CreateRequestId() => Guid.NewGuid().ToString("N");
@@ -191,12 +304,15 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
             return;
         }
 
-        entry.Completion.TrySetCanceled(cancellationToken);
-        entry.DisposeCancellationRegistration();
+        CompleteEntry(entry, () => entry.Completion.TrySetCanceled(cancellationToken));
         logger.LogInformation(
-            "用户决策请求随调用取消 {RequestId} {OwnerId}",
-            requestId,
-            entry.OwnerId);
+            "用户决策请求随调用取消 {RequestId}",
+            requestId);
+    }
+
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
     }
 
     private sealed class PendingEntry(

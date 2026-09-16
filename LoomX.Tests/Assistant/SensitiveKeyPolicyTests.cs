@@ -27,6 +27,30 @@ public sealed class SensitiveKeyPolicyTests
         Assert.False(SensitiveKeyPolicy.IsSensitivePath(["provider", segment]));
     }
 
+    [Theory]
+    [InlineData("accessToken")]
+    [InlineData("api-keys")]
+    [InlineData("headers[refresh_tokens]")]
+    [InlineData("clientSecrets")]
+    [InlineData("serviceKeys")]
+    [InlineData("provider.credentials.value")]
+    [InlineData("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature")]
+    [InlineData("Bearer abcdefghijklmnopqrstuvwxyz123456")]
+    [InlineData("sk-proj-abcdefghijklmnopqrstuvwxyz123456")]
+    public void SensitiveKeyPolicy_识别自由文本中的敏感名称和值(string content)
+    {
+        Assert.True(SensitiveKeyPolicy.ContainsSensitiveContent(content));
+    }
+
+    [Theory]
+    [InlineData("请选择运行模式")]
+    [InlineData("tokenizer 模型设置")]
+    [InlineData("password_policy 保持默认")]
+    public void SensitiveKeyPolicy_不误判普通自由文本(string content)
+    {
+        Assert.False(SensitiveKeyPolicy.ContainsSensitiveContent(content));
+    }
+
     [Fact]
     public void SensitiveKeyPolicy_敏感值固定替换为三个星号()
     {

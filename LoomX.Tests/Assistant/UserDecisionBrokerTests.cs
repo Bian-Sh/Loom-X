@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System.Collections;
+using System.Collections.Concurrent;
 using LoomX.Assistant.UserDecisions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -198,6 +199,220 @@ public sealed class UserDecisionBrokerTests
     }
 
     [Fact]
+    public async Task 无订阅者_请求立即安全失败且不遗留Pending()
+    {
+        var broker = CreateBroker();
+
+        var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => task.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal("当前没有可用的用户决策处理器。", exception.Message);
+        Assert.Equal(0, broker.CancelOwner("owner", "检查残留"));
+    }
+
+    [Fact]
+    public async Task Dispose_取消并移除所有Pending()
+    {
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        var request = await pending.Task;
+
+        broker.Dispose();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => task.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.False(broker.Submit(
+            request.RequestId,
+            new Dictionary<string, object?> { ["note"] = "完成" }));
+        Assert.False(broker.Cancel(request.RequestId, "重复取消"));
+        Assert.Equal(0, broker.CancelOwner("owner", "检查残留"));
+    }
+
+    [Fact]
+    public void Dispose后请求_抛出ObjectDisposedException()
+    {
+        var broker = CreateBroker();
+        broker.PendingRequested += (_, _) => { };
+        broker.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() =>
+        {
+            _ = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        });
+    }
+
+    [Fact]
+    public async Task Dispose与Submit并发_请求只完成一次且不悬挂()
+    {
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        var request = await pending.Task;
+        using var start = new ManualResetEventSlim();
+        var submit = Task.Run(() =>
+        {
+            start.Wait();
+            return broker.Submit(
+                request.RequestId,
+                new Dictionary<string, object?> { ["note"] = "完成" });
+        });
+        var dispose = Task.Run(() =>
+        {
+            start.Wait();
+            broker.Dispose();
+        });
+
+        start.Set();
+        await dispose;
+        var submitted = await submit;
+
+        if (submitted)
+        {
+            Assert.Equal("完成", (await task.WaitAsync(TimeSpan.FromSeconds(5))).Values["note"]);
+        }
+        else
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => task.WaitAsync(TimeSpan.FromSeconds(5)));
+        }
+
+        broker.Dispose();
+    }
+
+    [Fact]
+    public async Task Submit_调用方字典和多选值只枚举一次()
+    {
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync("owner", CreateMultiRequest(), CancellationToken.None);
+        var request = await pending.Task;
+        var selected = new SingleEnumerationSequence("safe");
+        var values = new SingleEnumerationDictionary("features", selected);
+
+        Assert.True(broker.Submit(request.RequestId, values));
+
+        var result = await task;
+        Assert.Equal(1, values.EnumerationCount);
+        Assert.Equal(1, selected.EnumerationCount);
+        Assert.Equal(
+            ["safe"],
+            Assert.IsAssignableFrom<IReadOnlyList<string>>(result.Values["features"]));
+    }
+
+    [Fact]
+    public async Task Submit_快照失败后请求仍可重新提交()
+    {
+        var logger = new RecordingLogger<UserDecisionBroker>();
+        var broker = new UserDecisionBroker(logger);
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        var request = await pending.Task;
+
+        Assert.False(broker.Submit(
+            request.RequestId,
+            new ThrowingEnumerationDictionary()));
+        Assert.True(broker.Submit(
+            request.RequestId,
+            new Dictionary<string, object?> { ["note"] = "有效内容" }));
+
+        Assert.Equal("有效内容", (await task).Values["note"]);
+        Assert.DoesNotContain(logger.Messages, message => message.Contains("Authorization", StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Exceptions, exception => exception.Contains("Bearer", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Submit_敏感文本被拒绝且不会进入结果()
+    {
+        const string sensitive = "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456";
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        var request = await pending.Task;
+
+        Assert.False(broker.Submit(
+            request.RequestId,
+            new Dictionary<string, object?> { ["note"] = sensitive }));
+        Assert.True(broker.Submit(
+            request.RequestId,
+            new Dictionary<string, object?> { ["note"] = "安全内容" }));
+
+        var result = await task;
+        Assert.DoesNotContain(result.Values.Values, value =>
+            string.Equals(value as string, sensitive, StringComparison.Ordinal));
+        Assert.Equal("安全内容", result.Values["note"]);
+    }
+
+    [Fact]
+    public async Task Submit与Cancel并发_只有一个完成请求()
+    {
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        var request = await pending.Task;
+        using var start = new ManualResetEventSlim();
+        var submit = Task.Run(() =>
+        {
+            start.Wait();
+            return broker.Submit(
+                request.RequestId,
+                new Dictionary<string, object?> { ["note"] = "完成" });
+        });
+        var cancel = Task.Run(() =>
+        {
+            start.Wait();
+            return broker.Cancel(request.RequestId, "并发取消");
+        });
+
+        start.Set();
+        var outcomes = await Task.WhenAll(submit, cancel);
+        var result = await task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, outcomes.Count(value => value));
+        Assert.Equal(outcomes[1], result.Cancelled);
+    }
+
+    [Fact]
+    public async Task Submit与Token取消并发_请求总能收敛()
+    {
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        using var cancellation = new CancellationTokenSource();
+        var task = broker.RequestAsync("owner", CreateRequest(), cancellation.Token);
+        var request = await pending.Task;
+        using var start = new ManualResetEventSlim();
+        var submit = Task.Run(() =>
+        {
+            start.Wait();
+            return broker.Submit(
+                request.RequestId,
+                new Dictionary<string, object?> { ["note"] = "完成" });
+        });
+        var cancel = Task.Run(() =>
+        {
+            start.Wait();
+            cancellation.Cancel();
+        });
+
+        start.Set();
+        await cancel;
+        var submitted = await submit;
+
+        if (submitted)
+        {
+            Assert.Equal("完成", (await task.WaitAsync(TimeSpan.FromSeconds(5))).Values["note"]);
+        }
+        else
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => task.WaitAsync(TimeSpan.FromSeconds(5)));
+        }
+
+        Assert.False(broker.Cancel(request.RequestId, "重复取消"));
+    }
+
+    [Fact]
     public async Task 日志_不包含用户提交值或取消原因()
     {
         var logger = new RecordingLogger<UserDecisionBroker>();
@@ -221,6 +436,28 @@ public sealed class UserDecisionBrokerTests
         Assert.DoesNotContain(logger.Messages, message => message.Contains("包含私密原因", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task 日志_不包含原始OwnerId的状态消息或异常()
+    {
+        const string ownerId = "Authorization=Bearer owner-token C:\\Users\\测试\\会话 用户文本";
+        var logger = new RecordingLogger<UserDecisionBroker>();
+        var broker = new UserDecisionBroker(logger);
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync(ownerId, CreateRequest(), CancellationToken.None);
+        var request = await pending.Task;
+
+        Assert.True(broker.Submit(
+            request.RequestId,
+            new Dictionary<string, object?> { ["note"] = "安全内容" }));
+        await task;
+
+        Assert.DoesNotContain(logger.Messages, message => message.Contains(ownerId, StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.States, state => state.Contains(ownerId, StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Exceptions, exception => exception.Contains(ownerId, StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Messages, message => message.Contains("owner-token", StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.States, state => state.Contains("owner-token", StringComparison.Ordinal));
+    }
+
     private static UserDecisionBroker CreateBroker() =>
         new(NullLogger<UserDecisionBroker>.Instance);
 
@@ -231,6 +468,20 @@ public sealed class UserDecisionBrokerTests
         broker.PendingRequested += (_, request) => completion.TrySetResult(request);
         return completion;
     }
+
+    private static UserDecisionRequest CreateMultiRequest() =>
+        new(
+            "确认设置",
+            "请选择能力。",
+            [
+                new UserDecisionField(
+                    id: "features",
+                    label: "能力",
+                    type: UserDecisionFieldType.MultiSelect,
+                    options: [new UserDecisionOption("safe", "安全")],
+                    minSelections: 1,
+                    maxSelections: 1),
+            ]);
 
     private static UserDecisionRequest CreateRequest() =>
         new(
@@ -245,11 +496,94 @@ public sealed class UserDecisionBrokerTests
                     maxLength: 100),
             ]);
 
+    private sealed class SingleEnumerationDictionary(string key, object? value)
+        : IReadOnlyDictionary<string, object?>
+    {
+        private int enumerationCount;
+
+        public int EnumerationCount => Volatile.Read(ref enumerationCount);
+
+        public int Count => throw new InvalidOperationException("不允许读取 Count。");
+
+        public IEnumerable<string> Keys => throw new InvalidOperationException("不允许读取 Keys。");
+
+        public IEnumerable<object?> Values => throw new InvalidOperationException("不允许读取 Values。");
+
+        public object? this[string requestedKey] => throw new InvalidOperationException("不允许读取索引器。");
+
+        public bool ContainsKey(string requestedKey) =>
+            throw new InvalidOperationException("不允许调用 ContainsKey。");
+
+        public bool TryGetValue(string requestedKey, out object? requestedValue) =>
+            throw new InvalidOperationException("不允许调用 TryGetValue。");
+
+        public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
+        {
+            if (Interlocked.Increment(ref enumerationCount) != 1)
+            {
+                throw new InvalidOperationException("字典被重复枚举。");
+            }
+
+            yield return new KeyValuePair<string, object?>(key, value);
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private sealed class ThrowingEnumerationDictionary : IReadOnlyDictionary<string, object?>
+    {
+        public int Count => 1;
+
+        public IEnumerable<string> Keys => ["note"];
+
+        public IEnumerable<object?> Values => ["不应读取"];
+
+        public object? this[string key] => "不应读取";
+
+        public bool ContainsKey(string key) => true;
+
+        public bool TryGetValue(string key, out object? value)
+        {
+            value = "不应读取";
+            return true;
+        }
+
+        public IEnumerator<KeyValuePair<string, object?>> GetEnumerator() =>
+            throw new InvalidOperationException("Authorization: Bearer 不得记录");
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private sealed class SingleEnumerationSequence(string value) : IEnumerable<string>
+    {
+        private int enumerationCount;
+
+        public int EnumerationCount => Volatile.Read(ref enumerationCount);
+
+        public IEnumerator<string> GetEnumerator()
+        {
+            if (Interlocked.Increment(ref enumerationCount) != 1)
+            {
+                throw new InvalidOperationException("多选值被重复枚举。");
+            }
+
+            yield return value;
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
     private sealed class RecordingLogger<T> : ILogger<T>
     {
         private readonly ConcurrentQueue<string> messages = new();
+        private readonly ConcurrentQueue<string> states = new();
+        private readonly ConcurrentQueue<string> exceptions = new();
 
         public IReadOnlyCollection<string> Messages => messages.ToArray();
+
+        public IReadOnlyCollection<string> States => states.ToArray();
+
+        public IReadOnlyCollection<string> Exceptions => exceptions.ToArray();
 
         public IDisposable? BeginScope<TState>(TState state)
             where TState : notnull => null;
@@ -261,7 +595,13 @@ public sealed class UserDecisionBrokerTests
             EventId eventId,
             TState state,
             Exception? exception,
-            Func<TState, Exception?, string> formatter) =>
-            messages.Enqueue($"{formatter(state, exception)} {exception}");
+            Func<TState, Exception?, string> formatter)
+        {
+            messages.Enqueue(formatter(state, exception));
+            states.Enqueue(state is IEnumerable<KeyValuePair<string, object?>> properties
+                ? string.Join(" | ", properties.Select(property => $"{property.Key}={property.Value}"))
+                : state?.ToString() ?? string.Empty);
+            exceptions.Enqueue(exception?.ToString() ?? string.Empty);
+        }
     }
 }

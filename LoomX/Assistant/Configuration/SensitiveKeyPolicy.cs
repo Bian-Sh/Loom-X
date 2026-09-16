@@ -1,8 +1,15 @@
-﻿namespace LoomX.Assistant.Configuration;
+﻿using System.Text;
+using System.Text.RegularExpressions;
+
+namespace LoomX.Assistant.Configuration;
 
 public static class SensitiveKeyPolicy
 {
     private const string RedactedPlaceholder = "***";
+
+    private static readonly Regex SecretValuePattern = new(
+        @"(?ix)(?<![a-z0-9])(?:sk-(?:proj-)?[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|github_pat_[a-z0-9_]{20,}|xox[baprs]-[a-z0-9-]{10,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|eyJ[a-z0-9_-]{6,}\.[a-z0-9_-]{6,}\.[a-z0-9_-]{6,})(?![a-z0-9])",
+        RegexOptions.CultureInvariant);
 
     private static readonly HashSet<string> SensitiveNames = new(StringComparer.Ordinal)
     {
@@ -21,6 +28,70 @@ public static class SensitiveKeyPolicy
         return segments.Any(IsSensitiveSegment);
     }
 
+    public static bool ContainsSensitiveContent(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return false;
+        }
+
+        if (SecretValuePattern.IsMatch(content))
+        {
+            return true;
+        }
+
+        var words = SplitContentWords(content);
+        for (var index = 0; index < words.Count; index++)
+        {
+            var word = words[index];
+            var next = index + 1 < words.Count ? words[index + 1] : null;
+            if (word is "authorization" or "authorizations"
+                or "credential" or "credentials"
+                or "secret" or "secrets"
+                or "bearer")
+            {
+                return true;
+            }
+
+            if (word is "password" or "passwords" or "passwd")
+            {
+                if (next is not "policy" and not "policies")
+                {
+                    return true;
+                }
+            }
+
+            if (word is "key" or "keys")
+            {
+                return true;
+            }
+
+            if (word is "token" or "tokens")
+            {
+                return true;
+            }
+
+            if ((next is "key" or "keys")
+                && (word is "api" or "access" or "private" or "secret"))
+            {
+                return true;
+            }
+
+            if ((next is "token" or "tokens")
+                && (word is "access" or "refresh" or "auth" or "id"))
+            {
+                return true;
+            }
+
+            if (word == "client" && next is "secret" or "secrets")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static TomlValue Redact(TomlValue value, IReadOnlyList<string> path)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -37,6 +108,29 @@ public static class SensitiveKeyPolicy
             TomlValueKind.Object => RedactObject(value, path),
             _ => value,
         };
+    }
+
+    private static IReadOnlyList<string> SplitContentWords(string content)
+    {
+        var normalized = new StringBuilder(content.Length * 2);
+        for (var index = 0; index < content.Length; index++)
+        {
+            var character = content[index];
+            if (char.IsUpper(character)
+                && index > 0
+                && (char.IsLower(content[index - 1]) || char.IsDigit(content[index - 1])))
+            {
+                normalized.Append(' ');
+            }
+
+            normalized.Append(char.IsLetterOrDigit(character)
+                ? char.ToLowerInvariant(character)
+                : ' ');
+        }
+
+        return normalized
+            .ToString()
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
     }
 
     private static bool IsSensitiveSegment(string segment)

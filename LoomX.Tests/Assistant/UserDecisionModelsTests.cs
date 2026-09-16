@@ -1,4 +1,5 @@
-﻿using LoomX.Assistant.UserDecisions;
+﻿using System.Text.Json;
+using LoomX.Assistant.UserDecisions;
 using Xunit;
 
 namespace LoomX.Tests.Assistant;
@@ -149,6 +150,57 @@ public sealed class UserDecisionModelsTests
             && (error.FieldId == UserDecisionValidationError.RequestFieldId || error.FieldId == "mode"));
     }
 
+    [Theory]
+    [InlineData("title")]
+    [InlineData("question")]
+    [InlineData("description")]
+    [InlineData("impact")]
+    [InlineData("field_label")]
+    [InlineData("option_label")]
+    [InlineData("option_description")]
+    [InlineData("default_text")]
+    public void 请求校验_所有展示文本复用内容级敏感检测(string location)
+    {
+        const string sensitive = "clientSecrets=sk-proj-abcdefghijklmnopqrstuvwxyz123456";
+        var option = new UserDecisionOption(
+            "safe",
+            location == "option_label" ? sensitive : "安全模式",
+            location == "option_description" ? sensitive : "普通说明");
+        var field = location == "default_text"
+            ? CreateTextField("note", defaultText: sensitive)
+            : new UserDecisionField(
+                id: "mode",
+                label: location == "field_label" ? sensitive : "运行模式",
+                type: UserDecisionFieldType.SingleSelect,
+                options: [option]);
+        var request = new UserDecisionRequest(
+            title: location == "title" ? sensitive : "确认设置",
+            question: location == "question" ? sensitive : "请选择运行模式。",
+            fields: [field],
+            description: location == "description" ? sensitive : "普通说明",
+            impactSummary: location == "impact" ? sensitive : "仅影响本次运行。");
+
+        var errors = UserDecisionValidator.ValidateRequest(request);
+
+        Assert.Contains(errors, error => error.Message.Contains("敏感", StringComparison.Ordinal));
+        Assert.DoesNotContain(errors, error => error.Message.Contains(sensitive, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void 提交校验_拒绝敏感文本且错误不回显原值()
+    {
+        const string sensitive = "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456";
+        var request = CreateRequest(CreateTextField("note"));
+
+        var error = Assert.Single(UserDecisionValidator.ValidateSubmission(
+            request,
+            new Dictionary<string, object?> { ["note"] = sensitive }));
+
+        Assert.Equal("note", error.FieldId);
+        Assert.Contains("敏感", error.Message);
+        Assert.DoesNotContain(sensitive, error.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void 请求校验_限制问题选项说明与影响摘要长度()
     {
@@ -179,6 +231,69 @@ public sealed class UserDecisionModelsTests
             && error.Message.Contains("影响摘要")
             && error.Message.Contains("长度"));
     }
+    [Fact]
+    public void 字段类型_JSON往返使用稳定蛇形判别值()
+    {
+        var cases = new[]
+        {
+            (CreateValidField(UserDecisionFieldType.SingleSelect), "single_select"),
+            (CreateValidField(UserDecisionFieldType.MultiSelect), "multi_select"),
+            (CreateValidField(UserDecisionFieldType.Number), "number"),
+            (CreateValidField(UserDecisionFieldType.Text), "text"),
+        };
+
+        foreach (var (field, discriminator) in cases)
+        {
+            var json = JsonSerializer.Serialize(field);
+            var roundTrip = JsonSerializer.Deserialize<UserDecisionField>(json);
+
+            Assert.Contains($"\"Type\":\"{discriminator}\"", json, StringComparison.Ordinal);
+            Assert.NotNull(roundTrip);
+            Assert.Equal(field.Type, roundTrip.Type);
+            Assert.Empty(UserDecisionValidator.ValidateRequest(CreateRequest(roundTrip)));
+            Assert.Equal(json, JsonSerializer.Serialize(roundTrip));
+        }
+    }
+
+    [Fact]
+    public void 字段校验_逐类型拒绝典型跨类型属性()
+    {
+        var invalidFields = new[]
+        {
+            new UserDecisionField(
+                "single",
+                "单选",
+                UserDecisionFieldType.SingleSelect,
+                options: [new UserDecisionOption("a", "A")],
+                defaultText: "不应存在"),
+            new UserDecisionField(
+                "multi",
+                "多选",
+                UserDecisionFieldType.MultiSelect,
+                options: [new UserDecisionOption("a", "A")],
+                defaultNumber: 1),
+            new UserDecisionField(
+                "number",
+                "数值",
+                UserDecisionFieldType.Number,
+                options: [new UserDecisionOption("a", "A")]),
+            new UserDecisionField(
+                "text",
+                "文本",
+                UserDecisionFieldType.Text,
+                minSelections: 1),
+        };
+
+        foreach (var field in invalidFields)
+        {
+            var errors = UserDecisionValidator.ValidateRequest(CreateRequest(field));
+
+            Assert.Contains(errors, error =>
+                error.FieldId == field.Id
+                && error.Message.Contains("不适用", StringComparison.Ordinal));
+        }
+    }
+
     [Fact]
     public void 取消结果_不携带请求默认字段值()
     {
@@ -220,6 +335,40 @@ public sealed class UserDecisionModelsTests
         Assert.Single(request.Fields[0].Options);
         Assert.Equal(["safe"], Assert.IsAssignableFrom<IReadOnlyList<string>>(result.Values["mode"]));
     }
+
+    private static UserDecisionField CreateValidField(UserDecisionFieldType type) => type switch
+    {
+        UserDecisionFieldType.SingleSelect => new UserDecisionField(
+            "single",
+            "单选",
+            type,
+            options: [new UserDecisionOption("safe", "安全")],
+            defaultOptionId: "safe"),
+        UserDecisionFieldType.MultiSelect => new UserDecisionField(
+            "multi",
+            "多选",
+            type,
+            options: [new UserDecisionOption("safe", "安全")],
+            defaultOptionIds: ["safe"],
+            minSelections: 1,
+            maxSelections: 1),
+        UserDecisionFieldType.Number => new UserDecisionField(
+            "number",
+            "数值",
+            type,
+            defaultNumber: 2,
+            minNumber: 0,
+            maxNumber: 10,
+            step: 2),
+        UserDecisionFieldType.Text => new UserDecisionField(
+            "text",
+            "文本",
+            type,
+            defaultText: "普通文本",
+            isMultiline: true,
+            maxLength: 100),
+        _ => throw new ArgumentOutOfRangeException(nameof(type)),
+    };
 
     private static UserDecisionRequest CreateRequest(params UserDecisionField[] fields) =>
         new("确认设置", "请选择后续操作。", fields);

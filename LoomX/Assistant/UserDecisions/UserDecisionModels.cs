@@ -1,13 +1,22 @@
 ﻿using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
 using LoomX.Assistant.Configuration;
 
 namespace LoomX.Assistant.UserDecisions;
 
+[JsonConverter(typeof(JsonStringEnumConverter<UserDecisionFieldType>))]
 public enum UserDecisionFieldType
 {
+    [JsonStringEnumMemberName("single_select")]
     SingleSelect,
+
+    [JsonStringEnumMemberName("multi_select")]
     MultiSelect,
+
+    [JsonStringEnumMemberName("number")]
     Number,
+
+    [JsonStringEnumMemberName("text")]
     Text,
 }
 
@@ -296,6 +305,7 @@ public static class UserDecisionValidator
         UserDecisionField field,
         string fieldId)
     {
+        ValidateSingleSelectProperties(errors, field, fieldId);
         var optionIds = ValidateOptions(errors, field, fieldId);
         if (field.DefaultOptionId is not null && !optionIds.Contains(field.DefaultOptionId))
         {
@@ -308,6 +318,7 @@ public static class UserDecisionValidator
         UserDecisionField field,
         string fieldId)
     {
+        ValidateMultiSelectProperties(errors, field, fieldId);
         var optionIds = ValidateOptions(errors, field, fieldId);
         var minimum = field.MinSelections ?? 0;
         var maximum = field.MaxSelections ?? field.Options.Count;
@@ -347,6 +358,79 @@ public static class UserDecisionValidator
         }
     }
 
+    private static void ValidateSingleSelectProperties(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        if (field.DefaultOptionIds.Count > 0
+            || field.MinSelections is not null
+            || field.MaxSelections is not null
+            || HasNumberProperties(field)
+            || HasTextProperties(field))
+        {
+            AddInapplicablePropertyError(errors, fieldId);
+        }
+    }
+
+    private static void ValidateMultiSelectProperties(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        if (field.DefaultOptionId is not null
+            || HasNumberProperties(field)
+            || HasTextProperties(field))
+        {
+            AddInapplicablePropertyError(errors, fieldId);
+        }
+    }
+
+    private static void ValidateNumberProperties(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        if (HasSelectionProperties(field) || HasTextProperties(field))
+        {
+            AddInapplicablePropertyError(errors, fieldId);
+        }
+    }
+
+    private static void ValidateTextProperties(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        if (HasSelectionProperties(field) || HasNumberProperties(field))
+        {
+            AddInapplicablePropertyError(errors, fieldId);
+        }
+    }
+
+    private static bool HasSelectionProperties(UserDecisionField field) =>
+        field.Options.Count > 0
+        || field.DefaultOptionId is not null
+        || field.DefaultOptionIds.Count > 0
+        || field.MinSelections is not null
+        || field.MaxSelections is not null;
+
+    private static bool HasNumberProperties(UserDecisionField field) =>
+        field.DefaultNumber is not null
+        || field.MinNumber is not null
+        || field.MaxNumber is not null
+        || field.Step is not null;
+
+    private static bool HasTextProperties(UserDecisionField field) =>
+        field.DefaultText is not null
+        || field.IsMultiline
+        || field.MaxLength is not null;
+
+    private static void AddInapplicablePropertyError(
+        ICollection<UserDecisionValidationError> errors,
+        string fieldId) =>
+        errors.Add(new UserDecisionValidationError(fieldId, "字段包含当前类型不适用的属性。"));
+
     private static HashSet<string> ValidateOptions(
         ICollection<UserDecisionValidationError> errors,
         UserDecisionField field,
@@ -385,6 +469,7 @@ public static class UserDecisionValidator
         UserDecisionField field,
         string fieldId)
     {
+        ValidateNumberProperties(errors, field, fieldId);
         if (field.MinNumber is not null
             && field.MaxNumber is not null
             && field.MinNumber > field.MaxNumber)
@@ -410,6 +495,7 @@ public static class UserDecisionValidator
         UserDecisionField field,
         string fieldId)
     {
+        ValidateTextProperties(errors, field, fieldId);
         var maxLength = field.MaxLength ?? DefaultTextMaxLength;
         if (maxLength <= 0 || maxLength > MaxTextLength)
         {
@@ -430,7 +516,7 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(fieldId, "文本默认值超过最大长度。"));
         }
-        else if (ContainsSensitivePattern(field.DefaultText))
+        else if (SensitiveKeyPolicy.ContainsSensitiveContent(field.DefaultText))
         {
             errors.Add(new UserDecisionValidationError(fieldId, "文本默认值包含敏感字段模式。"));
         }
@@ -563,6 +649,10 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(field.Id, "文本长度超过最大限制。"));
         }
+        else if (SensitiveKeyPolicy.ContainsSensitiveContent(text))
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "文本内容包含敏感信息。"));
+        }
     }
 
     private static void ValidateNumber(
@@ -636,43 +726,11 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}长度超过限制。"));
         }
-        else if (ContainsSensitivePattern(value))
+        else if (SensitiveKeyPolicy.ContainsSensitiveContent(value))
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}包含敏感字段模式。"));
         }
     }
-
-    private static bool ContainsSensitivePattern(string value)
-    {
-        var start = -1;
-        for (var index = 0; index <= value.Length; index++)
-        {
-            var isTokenCharacter = index < value.Length && IsSensitiveTokenCharacter(value[index]);
-            if (isTokenCharacter && start < 0)
-            {
-                start = index;
-            }
-            else if (!isTokenCharacter && start >= 0)
-            {
-                var token = value[start..index];
-                if (SensitiveKeyPolicy.IsSensitivePath([token]))
-                {
-                    return true;
-                }
-
-                start = -1;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsSensitiveTokenCharacter(char character) =>
-        character is >= 'a' and <= 'z'
-        or >= 'A' and <= 'Z'
-        or >= '0' and <= '9'
-        or '_'
-        or '-';
 
     private static bool TryConvertNumber(object value, out decimal number)
     {
