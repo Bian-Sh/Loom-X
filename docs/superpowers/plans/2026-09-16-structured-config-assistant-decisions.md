@@ -391,24 +391,24 @@ public interface IUserDecisionBroker
 }
 ```
 
-- [ ] **Step 1: 编写模型校验失败测试**
+- [x] **Step 1: 编写模型校验失败测试**
 
 覆盖重复 field id、空标题、未知默认选项、multi min/max、number 范围/步长、必填空文本、过长文本、敏感模式内容。取消结果不得携带默认字段值。
 
-- [ ] **Step 2: 运行模型测试确认红灯**
+- [x] **Step 2: 运行模型测试确认红灯**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~UserDecisionModelsTests`
 Expected: FAIL。
 
-- [ ] **Step 3: 实现不可变模型与集中校验器**
+- [x] **Step 3: 实现不可变模型与集中校验器**
 
 字段用 enum + 明确属性建模，不使用任意 JsonObject 贯穿 UI。校验错误返回字段 id 与中文安全消息；问题、选项说明和影响摘要复用 `SensitiveKeyPolicy` 与长度上限。
 
-- [ ] **Step 4: 编写 Broker 并发和生命周期失败测试**
+- [x] **Step 4: 编写 Broker 并发和生命周期失败测试**
 
 覆盖并发 request id 唯一、事件只发布一次、Submit/Cancel、CancellationToken、CancelOwner、重复完成 false、事件订阅者抛异常不遗留 pending、continuation 异步执行。
 
-- [ ] **Step 5: 实现 Broker**
+- [x] **Step 5: 实现 Broker**
 
 使用 `ConcurrentDictionary<string, PendingEntry>` 与：
 
@@ -418,7 +418,7 @@ new TaskCompletionSource<UserDecisionResult>(TaskCreationOptions.RunContinuation
 
 所有完成路径先 `TryRemove`，再 `TrySetResult`/`TrySetCanceled`；CancellationTokenRegistration 在完成后释放。
 
-- [ ] **Step 6: 运行定向测试并提交**
+- [x] **Step 6: 运行 AskUser 模型与 Broker 定向测试并提交**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~UserDecisionModelsTests|FullyQualifiedName~UserDecisionBrokerTests"`
 Expected: PASS。
