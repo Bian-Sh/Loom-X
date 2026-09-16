@@ -5,7 +5,7 @@
 
 ## 2. 删除旧数据库迁移能力
 
-- [ ] 2.1 先增加负向回归测试，验证启动入口、Host、运行时路径和品牌契约不再引用 `ApplicationDataMigration`、`EnsureMigratedAsync`、旧 OllamaHub 数据库路径或迁移锁
-- [ ] 2.2 删除 `ApplicationDataMigration` 及其异常、启动调用、旧路径属性和迁移专用测试，保持当前 LoomX 数据库初始化流程不变
-- [ ] 2.3 更新 `app-data-migration` 主规格、升级说明和 Comet 设计/任务产物，确认其他 JSON 迁移逻辑不受影响
+- [x] 2.1 先增加负向回归测试，验证启动入口、Host、运行时路径和品牌契约不再引用 `ApplicationDataMigration`、`EnsureMigratedAsync`、旧 OllamaHub 数据库路径或迁移锁
+- [x] 2.2 删除 `ApplicationDataMigration` 及其异常、启动调用、旧路径属性和迁移专用测试，保持当前 LoomX 数据库初始化流程不变
+- [x] 2.3 更新 `app-data-migration` 主规格、升级说明和 Comet 设计/任务产物，确认其他 JSON 迁移逻辑不受影响
 - [ ] 2.4 运行相关测试、完整测试、Release 构建和 win-x64 发布，检查日志中不再出现旧库迁移提示
