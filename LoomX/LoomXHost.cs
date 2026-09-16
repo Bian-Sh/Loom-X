@@ -74,6 +74,7 @@ public static class LoomXHost
         builder.Services.AddSingleton<Assistant.NetworkProbe>();
         builder.Services.AddSingleton<Assistant.DiagnosticSubagent>();
         builder.Services.AddSingleton<Assistant.AssistantModelClientFactory>();
+        builder.Services.AddSingleton<Assistant.UserDecisions.IUserDecisionBroker, Assistant.UserDecisions.UserDecisionBroker>();
         builder.Services.AddSingleton(services => new Assistant.Browser.BrowserBridge(
             port: 17831,
             services.GetRequiredService<ILogger<Assistant.Browser.BrowserBridge>>()));
@@ -98,6 +99,9 @@ public static class LoomXHost
             Assistant.TomlTools.RegisterAll(
                 registry,
                 services.GetRequiredService<Assistant.Configuration.ITomlDocumentService>());
+            Assistant.AssistantTools.RegisterAll(
+                registry,
+                services.GetRequiredService<Assistant.UserDecisions.IUserDecisionBroker>());
             Assistant.LoomXTools.RegisterDiagnosticTool(
                 registry,
                 services.GetRequiredService<Assistant.DiagnosticSubagent>(),

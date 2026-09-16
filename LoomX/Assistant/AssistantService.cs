@@ -1,3 +1,4 @@
+﻿using LoomX.Assistant.UserDecisions;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
@@ -26,24 +27,28 @@ public sealed class AssistantService
     private readonly ToolRegistry toolRegistry;
     private readonly AssistantSessionStore sessionStore;
     private readonly AssistantPreferencesStore? preferencesStore;
+    private readonly IUserDecisionBroker userDecisionBroker;
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantService> logger;
     private readonly SemaphoreSlim runLock = new(1, 1);
 
     private CancellationTokenSource? currentRun;
+    private string? currentRunOwnerId;
 
     public AssistantService(
         AssistantModelClientFactory modelClientFactory,
         ToolRegistry toolRegistry,
         AssistantSessionStore sessionStore,
         ILoggerFactory loggerFactory,
-        AssistantPreferencesStore? preferencesStore = null)
+        AssistantPreferencesStore? preferencesStore,
+        IUserDecisionBroker userDecisionBroker)
     {
         this.modelClientFactory = modelClientFactory;
         this.toolRegistry = toolRegistry;
         this.sessionStore = sessionStore;
         this.loggerFactory = loggerFactory;
         this.preferencesStore = preferencesStore;
+        this.userDecisionBroker = userDecisionBroker;
         logger = loggerFactory.CreateLogger<AssistantService>();
     }
 
@@ -100,6 +105,7 @@ public sealed class AssistantService
     /// <summary>新建空会话并设为当前。</summary>
     public AgentSession NewSession()
     {
+        Cancel();
         CurrentSession = new AgentSession(new AgentSessionOptions
         {
             MaxSteps = 16,
@@ -123,8 +129,16 @@ public sealed class AssistantService
     public Task RenameSessionAsync(string sessionId, string? title, CancellationToken cancellationToken = default) =>
         sessionStore.SetTitleAsync(sessionId, title, cancellationToken);
 
-    /// <summary>取消当前运行。</summary>
-    public void Cancel() => currentRun?.Cancel();
+    /// <summary>取消当前运行及其等待中的用户决策。</summary>
+    public void Cancel()
+    {
+        var ownerId = currentRunOwnerId;
+        currentRun?.Cancel();
+        if (ownerId is not null)
+        {
+            userDecisionBroker.CancelOwner(ownerId, "assistant_run_cancelled");
+        }
+    }
 
     /// <summary>
     /// 用助手模型给当前会话起一个短标题（≤ 20 字）。
@@ -225,22 +239,27 @@ public sealed class AssistantService
             }
 
             var runSession = CurrentSession;
-            var modelClient = await modelClientFactory.TryCreateAsync(cancellationToken);
-            if (modelClient is null)
-            {
-                throw new InvalidOperationException("AI 助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
-            }
-
-            currentRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var ownerId = Guid.NewGuid().ToString("N");
+            using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var ownerScope = AssistantTools.BeginRun(ownerId);
+            currentRun = runCancellation;
+            currentRunOwnerId = ownerId;
             var persistenceBlocked = false;
+
             try
             {
+                var modelClient = await modelClientFactory.TryCreateAsync(runCancellation.Token);
+                if (modelClient is null)
+                {
+                    throw new InvalidOperationException("AI 助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
+                }
+
                 var approvalGate = PermissionMode == AssistantPermissionMode.AskEachTime
                     ? BuildApprovalGate()
                     : null;
                 var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate,
                     ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded);
-                await foreach (var agentEvent in loop.RunAsync(runSession, userMessage, currentRun.Token))
+                await foreach (var agentEvent in loop.RunAsync(runSession, userMessage, runCancellation.Token))
                 {
                     if (agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta or AgentEventKind.MessageCompleted))
                         runSession.RecordActivity(agentEvent);
@@ -261,8 +280,9 @@ public sealed class AssistantService
             }
             finally
             {
-                currentRun.Dispose();
+                userDecisionBroker.CancelOwner(ownerId, "assistant_run_cancelled");
                 currentRun = null;
+                currentRunOwnerId = null;
 
                 try
                 {

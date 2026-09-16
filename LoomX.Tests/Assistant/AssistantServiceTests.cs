@@ -1,5 +1,6 @@
-using Xunit;
+﻿using Xunit;
 using LoomX.Assistant;
+using LoomX.Assistant.UserDecisions;
 using LoomX.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -223,6 +224,106 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.DoesNotContain(events, item => item.Kind == AgentEventKind.ToolApprovalRequested);
     }
 
+    [Fact]
+    public async Task SendAsync_AskUser提交后保留工具结果并继续最终回答()
+    {
+        using var broker = CreateDecisionBroker();
+        var pending = CaptureNext(broker);
+        var registry = CreateAskUserRegistry(broker);
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("ask_1", "assistant.ask_user", AskUserArguments)), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已按安全模式继续。"), new ModelCompletedEvent("stop")]);
+        var service = CreateService(new StubModelClientFactory(model), registry, userDecisionBroker: broker);
+        var events = new List<AgentEvent>();
+
+        var runTask = Task.Run(async () =>
+        {
+            await foreach (var agentEvent in service.SendAsync("请继续配置")) events.Add(agentEvent);
+        });
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Contains(service.CurrentSession.Messages,
+            message => message.Role == ChatRole.Assistant && message.ToolCalls.Any(call => call.Name == "assistant.ask_user"));
+
+        Assert.True(broker.Submit(request.RequestId, new Dictionary<string, object?>
+        {
+            ["mode"] = "safe",
+        }));
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var messages = service.CurrentSession.Messages;
+        var toolMessage = Assert.Single(messages, message => message.Role == ChatRole.Tool);
+        Assert.Equal("assistant.ask_user", toolMessage.ToolName);
+        Assert.Equal("safe", System.Text.Json.Nodes.JsonNode.Parse(toolMessage.Content!)!["values"]!["mode"]!.GetValue<string>());
+        Assert.Contains(messages, message => message.Role == ChatRole.Assistant && message.Content == "已按安全模式继续。");
+        Assert.Contains(events, item => item.Kind == AgentEventKind.TaskCompleted);
+        Assert.Equal(2, model.Requests.Count);
+        Assert.Contains(model.Requests[1].Messages,
+            message => message.Role == ChatRole.Tool && message.ToolName == "assistant.ask_user");
+    }
+
+    [Fact]
+    public async Task Cancel_取消等待中的AskUser并结束当前运行()
+    {
+        using var broker = CreateDecisionBroker();
+        var pending = CaptureNext(broker);
+        var service = CreateService(
+            new StubModelClientFactory(CreateAskUserModel()),
+            CreateAskUserRegistry(broker),
+            userDecisionBroker: broker);
+        var runningSession = service.CurrentSession;
+        var runTask = RunToCompletionAsync(service, "等待选择");
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        service.Cancel();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(AgentSessionState.Cancelled, runningSession.State);
+        Assert.False(broker.Submit(request.RequestId, new Dictionary<string, object?> { ["mode"] = "safe" }));
+    }
+
+    [Fact]
+    public async Task NewSession_取消等待中的AskUser并切换到空会话()
+    {
+        using var broker = CreateDecisionBroker();
+        var pending = CaptureNext(broker);
+        var service = CreateService(
+            new StubModelClientFactory(CreateAskUserModel()),
+            CreateAskUserRegistry(broker),
+            userDecisionBroker: broker);
+        var runningSession = service.CurrentSession;
+        var runTask = RunToCompletionAsync(service, "等待选择");
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var newSession = service.NewSession();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.NotEqual(runningSession.Id, newSession.Id);
+        Assert.Same(newSession, service.CurrentSession);
+        Assert.Equal(AgentSessionState.Cancelled, runningSession.State);
+        Assert.False(broker.Submit(request.RequestId, new Dictionary<string, object?> { ["mode"] = "safe" }));
+    }
+
+    [Fact]
+    public async Task SendAsync_外部取消令牌取消等待中的AskUser()
+    {
+        using var broker = CreateDecisionBroker();
+        var pending = CaptureNext(broker);
+        var service = CreateService(
+            new StubModelClientFactory(CreateAskUserModel()),
+            CreateAskUserRegistry(broker),
+            userDecisionBroker: broker);
+        using var cancellation = new CancellationTokenSource();
+        var runningSession = service.CurrentSession;
+        var runTask = RunToCompletionAsync(service, "等待选择", cancellation.Token);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        cancellation.Cancel();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(AgentSessionState.Cancelled, runningSession.State);
+        Assert.False(broker.Submit(request.RequestId, new Dictionary<string, object?> { ["mode"] = "safe" }));
+    }
+
     [Theory]
     [InlineData(null, null)]
     [InlineData("   \n  ", null)]
@@ -256,7 +357,8 @@ public sealed class AssistantServiceTests : IDisposable
     private AssistantService CreateService(
         AssistantModelClientFactory factory,
         ToolRegistry? registry = null,
-        AssistantPermissionMode? permissionMode = null)
+        AssistantPermissionMode? permissionMode = null,
+        IUserDecisionBroker? userDecisionBroker = null)
     {
         AssistantPreferencesStore? preferencesStore = null;
         if (permissionMode is not null)
@@ -270,7 +372,59 @@ public sealed class AssistantServiceTests : IDisposable
             registry ?? new ToolRegistry(),
             new AssistantSessionStore(Path.Combine(rootDirectory, $"sessions-{Guid.NewGuid():N}")),
             NullLoggerFactory.Instance,
-            preferencesStore);
+            preferencesStore,
+            userDecisionBroker ?? CreateDecisionBroker());
+    }
+
+    private const string AskUserArguments = """
+        {
+          "title": "配置方式",
+          "question": "请选择配置方式",
+          "reason": "需要确认业务偏好",
+          "impact_summary": "影响后续配置步骤",
+          "allow_cancel": true,
+          "fields": [
+            {
+              "id": "mode",
+              "label": "模式",
+              "type": "single_select",
+              "is_required": true,
+              "options": [
+                { "id": "safe", "label": "安全模式" },
+                { "id": "fast", "label": "快速模式" }
+              ]
+            }
+          ]
+        }
+        """;
+
+    private static ScriptedModelClient CreateAskUserModel() => new(
+        [new ModelToolCallEvent(new ToolCall("ask_1", "assistant.ask_user", AskUserArguments)), new ModelCompletedEvent("tool_calls")]);
+
+    private static ToolRegistry CreateAskUserRegistry(IUserDecisionBroker broker)
+    {
+        var registry = new ToolRegistry();
+        AssistantTools.RegisterAll(registry, broker);
+        return registry;
+    }
+
+    private static UserDecisionBroker CreateDecisionBroker() =>
+        new(NullLogger<UserDecisionBroker>.Instance);
+
+    private static TaskCompletionSource<PendingUserDecision> CaptureNext(IUserDecisionBroker broker)
+    {
+        var completion = new TaskCompletionSource<PendingUserDecision>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        broker.PendingRequested += (_, request) => completion.TrySetResult(request);
+        return completion;
+    }
+
+    private static async Task RunToCompletionAsync(
+        AssistantService service,
+        string message,
+        CancellationToken cancellationToken = default)
+    {
+        await foreach (var unused in service.SendAsync(message, cancellationToken)) { }
     }
 
     /// <summary>剧本式模型工厂：TryCreateAsync 返回预置客户端（或 null 模拟未配置）。</summary>
