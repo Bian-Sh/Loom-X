@@ -310,7 +310,7 @@ git commit -m "实现 TOML 原子补丁与失败回滚"
 - Consumes: `ITomlDocumentService`。
 - Produces: `TomlTools.RegisterAll(ToolRegistry registry, ITomlDocumentService service)`。
 
-- [ ] **Step 1: 编写工具注册、Schema 和风险等级失败测试**
+- [x] **Step 1: 编写工具注册、Schema 和风险等级失败测试**
 
 断言名称与风险：
 
@@ -328,16 +328,16 @@ var expected = new Dictionary<string, ToolRiskLevel>
 
 Schema 必须要求 `path` 文件路径；get/set/delete 要求 `key_path` 字符串数组；patch 要求非空 `operations`，每项只能为 set/delete。
 
-- [ ] **Step 2: 运行测试确认红灯**
+- [x] **Step 2: 运行 TOML 工具测试确认红灯**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~TomlToolsTests|FullyQualifiedName~ToolRegistryTests"`
 Expected: FAIL，工具尚未注册。
 
-- [ ] **Step 3: 实现 ToolDefinition 和安全 JSON 结果**
+- [x] **Step 3: 实现 ToolDefinition 和安全 JSON 结果**
 
 `TomlTools` 只解析参数、限制数组长度/字符串长度、调用服务并序列化安全结果；不得返回完整 TOML 文本或 set 值。错误使用固定 error code 与安全消息。
 
-- [ ] **Step 4: 接入 LoomXHost DI 和 ToolRegistry**
+- [x] **Step 4: 接入 LoomXHost DI 和 ToolRegistry**
 
 在 `LoomXHost` 注册 singleton `ITomlDocumentService`，随后在现有 registry factory 内调用：
 
@@ -349,11 +349,11 @@ Assistant.TomlTools.RegisterAll(
 
 不得改变 `AppDataPaths` 或 SQLite 注册。
 
-- [ ] **Step 5: 添加权限、取消和敏感输出测试**
+- [x] **Step 5: 添加权限、取消和敏感输出测试**
 
 验证 Write/Destructive 在逐条审批模式下触发既有 AgentLoop 审批；取消令牌中断服务调用；`api_key = "plain-secret"` 不出现在 ToolResult 或捕获日志。
 
-- [ ] **Step 6: 运行定向测试并提交**
+- [x] **Step 6: 运行 TOML 工具定向测试并提交**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~TomlToolsTests|FullyQualifiedName~ToolRegistryTests|FullyQualifiedName~AgentLoopTests"`
 Expected: PASS。

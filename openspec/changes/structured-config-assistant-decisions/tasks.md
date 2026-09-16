@@ -14,9 +14,9 @@
 
 ## 3. TOML Assistant 工具
 
-- [ ] 3.1 注册 `toml.read`、`toml.get`、`toml.validate`、`toml.set`、`toml.patch` 和 `toml.delete` 的 `ToolDefinition` 与 JSON Schema，并以工具注册测试确认名称、参数和返回结构稳定
-- [ ] 3.2 将 TOML 工具映射到既有风险等级：读取/查询/校验为 Read，设置/补丁为 Write，删除为 Destructive，并复用既有审批与取消机制完成权限测试
-- [ ] 3.3 在工具边界应用路径校验、输入大小限制、敏感字段脱敏和安全错误摘要，并以测试确认异常输入不会写入目标文件或泄露敏感值
+- [x] 3.1 注册 `toml.read`、`toml.get`、`toml.validate`、`toml.set`、`toml.patch` 和 `toml.delete` 的 `ToolDefinition` 与 JSON Schema，并以工具注册测试确认名称、参数和返回结构稳定
+- [x] 3.2 将 TOML 工具映射到既有风险等级：读取/查询/校验为 Read，设置/补丁为 Write，删除为 Destructive，并复用既有审批与取消机制完成权限测试
+- [x] 3.3 在工具边界应用路径校验、输入大小限制、敏感字段脱敏和安全错误摘要，并以测试确认异常输入不会写入目标文件或泄露敏感值
 
 ## 4. 结构化 AskUser Broker
 
