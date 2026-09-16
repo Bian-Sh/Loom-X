@@ -1,5 +1,5 @@
 ---
-archived-with: 2026-09-17-suppress-meaningless-console-logs
+archived-with: 2026-09-16-suppress-meaningless-console-logs
 status: final
 ---
 # 清理无意义控制台日志并移除旧数据库迁移实施计划

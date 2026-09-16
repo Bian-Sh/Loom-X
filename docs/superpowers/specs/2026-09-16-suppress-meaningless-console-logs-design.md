@@ -2,7 +2,7 @@
 comet_change: suppress-meaningless-console-logs
 role: technical-design
 canonical_spec: openspec
-archived-with: 2026-09-17-suppress-meaningless-console-logs
+archived-with: 2026-09-16-suppress-meaningless-console-logs
 status: final
 ---
 
