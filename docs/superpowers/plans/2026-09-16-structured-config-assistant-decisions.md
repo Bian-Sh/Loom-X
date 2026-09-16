@@ -73,7 +73,7 @@ base-ref: a9e755d2ff2e924c6b23a589a027d8f8bca64a2d
 - Produces: `TomlPath`, `TomlValueKind`, `TomlValue`, `TomlPatchOperation`, `TomlValidationResult`, `TomlValueResult`, `TomlWriteResult`。
 - Produces: `SensitiveKeyPolicy.IsSensitivePath(IReadOnlyList<string>)` 与 `SensitiveKeyPolicy.Redact(TomlValue, IReadOnlyList<string>)`。
 
-- [ ] **Step 1: 添加 Tomlyn 2.10.1 包引用并恢复依赖**
+- [x] **Step 1: 添加 Tomlyn 2.10.1 包引用并恢复依赖**
 
 在 `LoomX/LoomX.csproj` 与 `LoomX.Tests/LoomX.Tests.csproj` 的 PackageReference ItemGroup 分别加入：
 
@@ -84,7 +84,7 @@ base-ref: a9e755d2ff2e924c6b23a589a027d8f8bca64a2d
 Run: `dotnet restore LoomX.slnx`
 Expected: restore 成功，未修改数据库路径相关源码。
 
-- [ ] **Step 2: 编写 TOML 值与路径失败测试**
+- [x] **Step 2: 编写 TOML 值与路径失败测试**
 
 在 `TomlModelsTests` 覆盖：空 path、空 segment、string/int64/double/bool/array/object、超出 Int64 的 JSON integer、不支持 null 与任意对象扩展。核心断言示例：
 
@@ -106,12 +106,12 @@ public void SensitiveKeyPolicy_RecognizesSensitiveSegments(string segment)
 }
 ```
 
-- [ ] **Step 3: 运行测试确认红灯**
+- [x] **Step 3: 运行测试确认红灯**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~TomlModelsTests|FullyQualifiedName~SensitiveKeyPolicyTests"`
 Expected: FAIL，类型尚不存在。
 
-- [ ] **Step 4: 实现最小领域契约和统一脱敏策略**
+- [x] **Step 4: 实现最小领域契约和统一脱敏策略**
 
 契约保持不可变，Patch 明确区分 set/delete：
 
@@ -135,7 +135,7 @@ public sealed record TomlWriteResult(
 
 `SensitiveKeyPolicy` 对 segment 做小写与 `-`/`_` 归一化，只返回固定 `***` 占位符，不保留原值长度。
 
-- [ ] **Step 5: 运行定向测试和格式检查**
+- [x] **Step 5: 运行定向测试和格式检查**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~TomlModelsTests|FullyQualifiedName~SensitiveKeyPolicyTests"`
 Expected: PASS。
@@ -143,7 +143,7 @@ Expected: PASS。
 Run: `dotnet format LoomX.slnx --verify-no-changes --no-restore`
 Expected: PASS；若仅新增文件格式不符，先运行 `dotnet format LoomX.slnx --no-restore` 再复验。
 
-- [ ] **Step 6: 勾选 OpenSpec 1.1–1.3 并提交**
+- [x] **Step 6: 勾选 OpenSpec 1.1–1.3 并提交**
 
 ```powershell
 git add LoomX/LoomX.csproj LoomX.Tests/LoomX.Tests.csproj LoomX/Assistant/Configuration LoomX.Tests/Assistant/TomlModelsTests.cs LoomX.Tests/Assistant/SensitiveKeyPolicyTests.cs openspec/changes/structured-config-assistant-decisions/tasks.md
@@ -630,4 +630,5 @@ git commit -m "完成结构化配置与助手决策能力"
 - Type consistency：`ITomlDocumentService`、`IUserDecisionBroker`、`PendingUserDecision`、`TomlPatchOperation` 在首次出现处定义，后续任务使用同一命名。
 - Scope：不包含 Codex Catalog/Profile/configure、环境变量或重启逻辑；后续 Change 通过这里的公共接口接入。
 - No placeholders：计划不含未决实现项；Skill 文件选择存在条件分支，但明确规定优先修改现有最接近 Skill，仅在不存在时创建固定路径。
+
 

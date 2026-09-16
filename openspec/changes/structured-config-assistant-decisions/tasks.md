@@ -1,8 +1,8 @@
 ## 1. 基础依赖与领域契约
 
-- [ ] 1.1 在 `LoomX/LoomX.csproj` 与测试项目中加入 Tomlyn 2.10.1 依赖，并确认 `dotnet restore` 成功且没有改变现有配置数据库路径
-- [ ] 1.2 定义 TOML 路径、受控值类型、读取/校验/写入结果和安全摘要契约，使用 `string[]` 表示路径，并以单元测试覆盖字符串、整数、浮点数、布尔值、数组和表值
-- [ ] 1.3 定义统一的敏感键识别与脱敏策略，覆盖 `key`、`token`、`password`、`secret`、`authorization` 等路径，并以测试确认原始值不进入工具结果或日志
+- [x] 1.1 在 `LoomX/LoomX.csproj` 与测试项目中加入 Tomlyn 2.10.1 依赖，并确认 `dotnet restore` 成功且没有改变现有配置数据库路径
+- [x] 1.2 定义 TOML 路径、受控值类型、读取/校验/写入结果和安全摘要契约，使用 `string[]` 表示路径，并以单元测试覆盖字符串、整数、浮点数、布尔值、数组和表值
+- [x] 1.3 定义统一的敏感键识别与脱敏策略，覆盖 `key`、`token`、`password`、`secret`、`authorization` 等路径，并以测试确认原始值不进入工具结果或日志
 
 ## 2. TOML 文档读取与结构化编辑
 
@@ -42,3 +42,4 @@
 - [ ] 7.2 编写并运行 AskUser Broker、Assistant 工具接入、取消恢复和桌面端 ViewModel 的集成测试，确认提交、取消、页面关闭和会话停止均可收敛
 - [ ] 7.3 运行 `dotnet test` 覆盖 `LoomX.Tests` 与现有测试，修复回归后确认日志、数据库路径和既有 Assistant 工具行为不变
 - [ ] 7.4 运行 `openspec status --change structured-config-assistant-decisions --json`、`openspec validate structured-config-assistant-decisions --strict`，并检查任务勾选状态、变更范围和中文文档完整性
+
