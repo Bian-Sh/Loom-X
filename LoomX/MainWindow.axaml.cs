@@ -292,13 +292,13 @@ public partial class MainWindow : Window
     {
         // 算法选择已固定为 Acrylic；保留参数仅兼容旧版调用方和配置数据。
         algorithm = "acrylic";
-        logger.LogInformation("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
+        logger.LogDebug("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
         opacity = Math.Clamp(opacity, 0, 100);
         blurAmount = Math.Clamp(blurAmount, 0, 64);
         appearanceCoordinator.Apply(enabled, opacity, blurAmount, algorithm);
         // 保留主窗口入口的显式材质赋值，兼容现有外观契约和运行时诊断。
         TransparencyLevelHint = BuildTransparencyLevels(algorithm);
-        logger.LogInformation(
+        logger.LogDebug(
             "透明外观应用完成 {Enabled} {Opacity} {BlurAmount} {Algorithm} {WindowBackgroundType} {GlassType} {ActualTransparencyLevel}",
             enabled,
             appearanceCoordinator.Current.Opacity,

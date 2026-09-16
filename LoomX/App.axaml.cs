@@ -85,7 +85,7 @@ public partial class App : Application
                             {
                                 LoggingBootstrap.Configure();
                                 loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
-                                loggerFactory.CreateLogger<App>().LogWarning(exception, "桌面应用自启动子进程失败，继续当前进程 {ProcessId}", Environment.ProcessId);
+                                loggerFactory.CreateLogger<App>().LogDebug(exception, "桌面应用自启动子进程失败，继续当前进程 {ProcessId}", Environment.ProcessId);
                             }
                         }
                     }
