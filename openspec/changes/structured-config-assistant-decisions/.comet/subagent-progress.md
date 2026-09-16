@@ -13,3 +13,6 @@
 
 
 
+
+- Task 2 允许补充不可变 `TomlReadResult`，字段固定为 `Exists`、`IsValid`、`TopLevelKeys`、`Errors`；示例使用既有 `TomlValue.Value`。
+

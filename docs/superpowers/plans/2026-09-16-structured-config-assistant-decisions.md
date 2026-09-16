@@ -153,7 +153,7 @@ git commit -m "新增 TOML 领域契约与敏感键策略"
 ### Task 2: TOML 读取、路径查询与语法校验
 
 **Files:**
-- Create: `LoomX/Assistant/Configuration/ITomlDocumentService.cs`
+- Modify: `LoomX/Assistant/Configuration/TomlModels.cs` — 补充不可变 `TomlReadResult`（`Exists`、`IsValid`、`TopLevelKeys`、`Errors`）`n- Create: `LoomX/Assistant/Configuration/ITomlDocumentService.cs`
 - Create: `LoomX/Assistant/Configuration/TomlDocumentService.cs`
 - Create: `LoomX.Tests/Assistant/TomlDocumentServiceTests.cs`
 - Modify: `openspec/changes/structured-config-assistant-decisions/tasks.md`
@@ -186,8 +186,8 @@ public async Task GetAsync_DistinguishesQuotedDotKeyFromNestedPath()
     var quoted = await service.GetAsync(file, new TomlPath(["root", "a.b"]));
     var nested = await service.GetAsync(file, new TomlPath(["root", "a", "b"]));
 
-    Assert.Equal("quoted", quoted.Value?.StringValue);
-    Assert.Equal("nested", nested.Value?.StringValue);
+    Assert.Equal("quoted", quoted.Value?.Value);
+    Assert.Equal("nested", nested.Value?.Value);
 }
 ```
 
@@ -221,7 +221,7 @@ Expected: PASS。
 - [ ] **Step 6: 勾选 OpenSpec 2.1 与读取/日志相关项并提交**
 
 ```powershell
-git add LoomX/Assistant/Configuration/ITomlDocumentService.cs LoomX/Assistant/Configuration/TomlDocumentService.cs LoomX.Tests/Assistant/TomlDocumentServiceTests.cs openspec/changes/structured-config-assistant-decisions/tasks.md
+git add LoomX/Assistant/Configuration/TomlModels.cs LoomX/Assistant/Configuration/ITomlDocumentService.cs LoomX/Assistant/Configuration/TomlDocumentService.cs LoomX.Tests/Assistant/TomlDocumentServiceTests.cs openspec/changes/structured-config-assistant-decisions/tasks.md
 git commit -m "实现 TOML 读取查询与语法校验"
 ```
 
@@ -630,5 +630,6 @@ git commit -m "完成结构化配置与助手决策能力"
 - Type consistency：`ITomlDocumentService`、`IUserDecisionBroker`、`PendingUserDecision`、`TomlPatchOperation` 在首次出现处定义，后续任务使用同一命名。
 - Scope：不包含 Codex Catalog/Profile/configure、环境变量或重启逻辑；后续 Change 通过这里的公共接口接入。
 - No placeholders：计划不含未决实现项；Skill 文件选择存在条件分支，但明确规定优先修改现有最接近 Skill，仅在不存在时创建固定路径。
+
 
 
