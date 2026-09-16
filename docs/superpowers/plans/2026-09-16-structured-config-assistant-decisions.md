@@ -173,7 +173,7 @@ public interface ITomlDocumentService
 }
 ```
 
-- [ ] **Step 1: 编写读取、查询与解析失败测试**
+- [x] **Step 1: 编写读取、查询与解析失败测试**
 
 使用 xUnit 临时目录覆盖：nested table、quoted key、包含点号的 key、dotted key、数组、数组表、空文件、未闭合字符串、缺失文件、中文和空格路径。示例：
 
@@ -192,12 +192,12 @@ public async Task GetAsync_DistinguishesQuotedDotKeyFromNestedPath()
 }
 ```
 
-- [ ] **Step 2: 运行测试确认红灯**
+- [x] **Step 2: 运行测试确认红灯**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~TomlDocumentServiceTests`
 Expected: FAIL，服务尚不存在。
 
-- [ ] **Step 3: 实现统一解析入口**
+- [x] **Step 3: 实现统一解析入口**
 
 `TomlDocumentService` 构造函数注入 `ILogger<TomlDocumentService>`；内部 `ParseDocument` 同时服务于 Read/Get/Validate。限制文件大小，解析错误只返回行列和消息，不回显原文：
 
@@ -210,16 +210,16 @@ public TomlDocumentService(ILogger<TomlDocumentService> logger)
 
 查询通过语法节点真实 key segment 遍历，读取值后转换为 Task 1 的受控 `TomlValue`，敏感路径在返回前脱敏。
 
-- [ ] **Step 4: 添加结构化日志捕获测试**
+- [x] **Step 4: 添加结构化日志捕获测试**
 
 使用测试 Logger 验证成功日志包含操作类型、文件安全摘要和耗时；解析失败日志包含异常/错误类型，但不包含 TOML 原文和 `secret-value-123`。
 
-- [ ] **Step 5: 运行定向测试**
+- [x] **Step 5: 运行定向测试**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~TomlDocumentServiceTests`
 Expected: PASS。
 
-- [ ] **Step 6: 勾选 OpenSpec 2.1 与读取/日志相关项并提交**
+- [x] **Step 6: 勾选 OpenSpec 2.1 与读取/日志相关项并提交**
 
 ```powershell
 git add LoomX/Assistant/Configuration/TomlModels.cs LoomX/Assistant/Configuration/ITomlDocumentService.cs LoomX/Assistant/Configuration/TomlDocumentService.cs LoomX.Tests/Assistant/TomlDocumentServiceTests.cs openspec/changes/structured-config-assistant-decisions/tasks.md
