@@ -18,7 +18,7 @@ verification_report: docs/superpowers/reports/2026-09-16-hide-missing-gateway-co
 branch_status: handled
 created_at: 2026-09-16
 verified_at: 2026-09-16
-archived: false
+archived: true
 direct_override: null
 handoff_context: null
 handoff_hash: null
