@@ -48,6 +48,19 @@ public sealed class MainWindowViewModel : NotifyViewModel
     public double SelectedNavigationOffset => selectedNavigationOffset;
     public bool HasActiveNavigationItem => hasActiveNavigationItem;
     public UpdateCoordinator Update => updateCoordinator;
+    public string VersionLabel => AppVersion.Label;
+    public string GatewayStatusText => gatewayService.State switch
+    {
+        GatewayState.Running => Loc("overview.gateway.status.running"),
+        GatewayState.Starting => Loc("overview.gateway.status.starting"),
+        GatewayState.Stopping => Loc("overview.gateway.status.stopping"),
+        GatewayState.Failed => string.Format(CultureInfo.CurrentCulture, Loc("overview.gateway.status.failed"), gatewayService.Error ?? ""),
+        _ => Loc("overview.gateway.status.not_running")
+    };
+    public bool IsGatewayRunning => gatewayService.State == GatewayState.Running;
+    public bool IsGatewayTransitioning => gatewayService.State is GatewayState.Starting or GatewayState.Stopping;
+    public bool IsGatewayFailed => gatewayService.State == GatewayState.Failed;
+    public bool IsGatewayStopped => gatewayService.State == GatewayState.Stopped;
 
     public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null, Action<bool, int, int, string>? applyAppearance = null, AppDataStore? dataStore = null, IStringLocalizer<MainWindowViewModel>? localizer = null)
     {
@@ -79,6 +92,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
         SetActive("nav.overview");
         this.dataStore.ConfigurationReady += OnConfigurationReady;
         this.dataStore.ConfigurationChanged += OnConfigurationChanged;
+        gatewayService.StateChanged += OnGatewayStateChanged;
         LocaleService.CultureChanged += OnCultureChanged;
         _ = InitializeDataStoreAsync();
     }
@@ -185,12 +199,29 @@ public sealed class MainWindowViewModel : NotifyViewModel
     {
         OnPropertyChanged(nameof(PageTitle));
         OnPropertyChanged(nameof(PageDescription));
+        OnPropertyChanged(nameof(GatewayStatusText));
+    }
+
+    private void OnGatewayStateChanged(object? sender, EventArgs args)
+    {
+        void Apply()
+        {
+            OnPropertyChanged(nameof(GatewayStatusText));
+            OnPropertyChanged(nameof(IsGatewayRunning));
+            OnPropertyChanged(nameof(IsGatewayTransitioning));
+            OnPropertyChanged(nameof(IsGatewayFailed));
+            OnPropertyChanged(nameof(IsGatewayStopped));
+        }
+
+        if (Dispatcher.UIThread.CheckAccess()) Apply();
+        else Dispatcher.UIThread.Post(Apply);
     }
 
     public void Dispose()
     {
         dataStore.ConfigurationReady -= OnConfigurationReady;
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
+        gatewayService.StateChanged -= OnGatewayStateChanged;
         LocaleService.CultureChanged -= OnCultureChanged;
         overviewViewModel.Dispose();
         providersViewModel.Dispose();

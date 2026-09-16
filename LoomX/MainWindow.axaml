@@ -162,15 +162,16 @@
               </Border>
             </Grid>
           </ScrollViewer>
-          <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="8,16,8,0">
-            <StackPanel Spacing="4">
-              <TextBlock Text="{l:Locale sidebar.service}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" />
-              <TextBlock Text="{l:Locale sidebar.version}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" />
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <Ellipse Width="7" Height="7" Fill="{DynamicResource SuccessBrush}" VerticalAlignment="Center" />
-                <TextBlock Text="{l:Locale sidebar.service}" FontSize="11" Foreground="{DynamicResource SuccessBrush}" />
-              </StackPanel>
-            </StackPanel>
+          <Border x:Name="sidebarRuntimeStatus" Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="8,16,8,0">
+            <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="{Binding GatewayStatusText}" AutomationProperties.Name="{Binding GatewayStatusText}">
+              <TextBlock Text="{Binding VersionLabel}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
+              <Panel Grid.Column="1" Width="8" Height="8" VerticalAlignment="Center">
+                <Ellipse Width="8" Height="8" Fill="{DynamicResource SuccessBrush}" IsVisible="{Binding IsGatewayRunning}" />
+                <Ellipse Width="8" Height="8" Fill="{DynamicResource WarningBrush}" IsVisible="{Binding IsGatewayTransitioning}" />
+                <Ellipse Width="8" Height="8" Fill="{DynamicResource DangerBrush}" IsVisible="{Binding IsGatewayFailed}" />
+                <Ellipse Width="8" Height="8" Fill="{DynamicResource TextTertiaryBrush}" IsVisible="{Binding IsGatewayStopped}" />
+              </Panel>
+            </Grid>
           </Border>
         </Grid>
       </Border>
