@@ -261,29 +261,29 @@ data: {"type":"message_stop"}
 - 产出：`BindProvider(ProviderEditorViewModel?)`、`SendCommand`、`StopCommand`、`RetryCommand`、`ClearCommand`。
 - 产出：`SelectedModel`、`Prompt`、`SelectedMode`、`ResponseText`、`Summary`、`IsRunning`、`CanSend`、`HasResult`、`HasError`。
 
-- [ ] **步骤 1：写默认状态失败测试**
+- [x] **步骤 1：写默认状态失败测试**
 
 断言默认 Prompt 为“每日一言”，默认模式为常规，第一个启用真实模型被选中；只有禁用模型或无模型时 `CanSend=false`。
 
-- [ ] **步骤 2：写生命周期失败测试**
+- [x] **步骤 2：写生命周期失败测试**
 
 使用可控制完成的假服务，覆盖发送、停止、重试、清空，以及切换 Provider 后旧请求被取消且晚到进度被忽略。
 
-- [ ] **步骤 3：运行测试并确认红灯**
+- [x] **步骤 3：运行测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestPanelViewModelTests`
 
 预期：编译失败，ViewModel 不存在。
 
-- [ ] **步骤 4：实现最小 ViewModel**
+- [x] **步骤 4：实现最小 ViewModel**
 
 每次发送递增 `requestVersion`；进度回调捕获版本号并在 UI Dispatcher 上批量追加。`Retry` 保存上次不可变 `ProviderTestRequest`，不得重新读取已切换 Provider。
 
-- [ ] **步骤 5：补齐命令状态与本地化刷新**
+- [x] **步骤 5：补齐命令状态与本地化刷新**
 
 所有影响 `CanExecute` 的属性变化后调用 `RaiseCanExecuteChanged`；`RefreshLocalization` 仅刷新资源派生文本，不修改响应正文。
 
-- [ ] **步骤 6：运行测试并提交**
+- [x] **步骤 6：运行测试并提交**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestPanelViewModelTests`
 

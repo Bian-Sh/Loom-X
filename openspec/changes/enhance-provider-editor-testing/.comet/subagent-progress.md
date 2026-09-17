@@ -6,7 +6,7 @@
 - Branch: feature/20260917/enhance-provider-editor-testing
 - Review mode: standard
 - TDD mode: tdd
-- Current task: 3 — 流式解析、代理与 CLI 身份
+- Current task: 5 — 接入 ProvidersViewModel 并移除旧连接测试块
 - Stage: checkpoint
 - Base commit: 441cc35
 - Last verified baseline: 948/948 passed
@@ -36,3 +36,5 @@
 - Task 3 reviewer: 01a0b131-7da2-7a10-a5ed-e477daf33a33
 - Task 3 reviewer previous attempt: 01a0b131 errored 502，已重新派发审查。
 - Task 3 result: implementation a98152b, tests 43/43; reviewer attempts 01a0b131 and 01a0b16a failed due route 502, manual controller review required
+- Task 4 base commit: 6fd9999
+- Task 4 result: local implementation 8a71094, ProviderTestPanelViewModelTests 3/3; agent dispatch unavailable due route 502
