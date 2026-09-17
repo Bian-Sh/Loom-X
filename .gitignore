@@ -372,3 +372,6 @@ FodyWeavers.xsd
 /.workbuddy
 /.tmp-install
 /.local
+
+# Codex 隔离工作区
+/.worktrees/
