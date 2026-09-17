@@ -4,7 +4,7 @@
 - 分支：`codex/structured-config-assistant-decisions`
 - 起始 HEAD：`9681855ae6bfb0c79657c5877abf30456ad77986`
 - 范围：仅修复 `whole-branch-review.md` 的 C1、C2、I1、I2、I3、I4、M1
-- 约束：未修改数据库路径、计划勾选、OpenSpec tasks、Comet 状态或首轮审查报告；未执行 publish；未 commit、未 push
+- 约束：未修改数据库路径、计划勾选、OpenSpec tasks、Comet 状态或首轮审查报告；已从生产代码提交 HEAD 完成 standalone publish 验证；本修复会话未 commit、未 push
 
 ## 调试方法
 
@@ -219,4 +219,73 @@ dotnet test LoomX.Tests\LoomX.Tests.csproj --no-restore --filter "FullyQualified
 - 文件 fingerprint compare 与真正的 OS 原子替换之间仍存在外部进程极短竞争窗口；仓库内跨实例竞争已由 per-path lock 消除，提交前也执行二次 fingerprint 检查。若未来要求对任意外部编辑器做到严格 CAS，需要引入平台级文件锁或带版本语义的存储协议。
 - 无 projector 的旧/第三方工具会隐藏全部参数而不是保留细节，这是故意的安全失败；若某工具需要在 UI/后续模型中显示非敏感结构，应显式增加专用 projector。
 - 未处理用户明确排除的既有 NU1903、CS8618、CA2024、CS8602 和全仓 formatter 基线。
-- 未执行 publish，符合协调者要求。
+- standalone 发布已从生产代码提交 HEAD `2f0f315c3f16fad706f278af0ea2887ceaadae1d` 完成验证；本修复会话未 commit、未 push。
+
+## Standalone 发布验证
+
+- 验证日期：`2026-09-17`
+- 生产代码 HEAD：`2f0f315c3f16fad706f278af0ea2887ceaadae1d`
+- 输出目录：`D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1732-structured-config-assistant-decisions`
+- 发布前确认目标目录不存在；未覆盖、删除或移动任何既有 `outputs` 目录。
+
+### 发布命令与版本
+
+```powershell
+dotnet publish LoomX\LoomX.csproj -c Release -r win-x64 --self-contained true -o "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1732-structured-config-assistant-decisions" -p:SourceRevisionId=2f0f315c3f16fad706f278af0ea2887ceaadae1d
+```
+
+发布成功；仅出现既有 NU1903、CS8618、CA2024 警告。
+
+- `LoomX.dll` ProductVersion：`0.12.6+2f0f315c3f16fad706f278af0ea2887ceaadae1d`
+- `LoomX.exe` ProductVersion：`0.12.6+2f0f315c3f16fad706f278af0ea2887ceaadae1d`
+- `LoomX.dll` SHA-256：`0125513B880D2748CAED3345A8F692A72CB42001B162B42E7F93E0ADD36227D9`
+- `LoomX.exe` SHA-256：`EEC1F27266A11E6673ED4962810C8931A9FFB2EF80632F9A8BA00EEF1DC01C6B`
+
+### 启动命令与进程验证
+
+```powershell
+Start-Process -FilePath "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1732-structured-config-assistant-decisions\LoomX.exe" -ArgumentList "--allow-multiple-instances" -WorkingDirectory "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1732-structured-config-assistant-decisions" -WindowStyle Hidden -PassThru
+```
+
+- 启动时间：`2026-09-17 17:33:35.592 +08:00`
+- 本轮 PID：`43340`
+- 等待：`12` 秒
+- 等待后 PID `43340` 仍存活且 `Responding=true`。
+- `Process.Path`：`D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1732-structured-config-assistant-decisions\LoomX.exe`
+- `Process.Path` 与本轮绝对 exe 路径精确匹配：`True`。
+
+启动前 PID 清单：
+
+- PID `28460`：`D:\AppData\Github\Loom-X\outputs\LoomX-win-x64-2026-09-17-activity-scrollbar-right\LoomX.exe`
+
+启动后 PID 清单：
+
+- PID `28460`：既有实例，路径未变。
+- PID `43340`：本轮 standalone 实例。
+
+### 日志证据
+
+日志文件：`C:\Users\BianShanghai\AppData\Local\LoomX\logs\loomx-20260917.log`
+
+```text
+2026-09-17 17:33:36.290 +08:00 [WRN] LoomX.App 调试启动已允许多个桌面实例，进程 43340
+2026-09-17 17:33:36.321 +08:00 [INF] LoomX.App 桌面应用启动，进程 43340，用户 "BianShanghai"，进程路径 "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1732-structured-config-assistant-decisions\LoomX.exe"，基目录 "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1732-structured-config-assistant-decisions\"，启动工作目录 "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1732-structured-config-assistant-decisions"，规范化工作目录 "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1732-structured-config-assistant-decisions"
+2026-09-17 17:33:38.878 +08:00 [INF] LoomX.ViewModels.MainWindowViewModel 概览刷新完成 6 个 Provider、18 个模型、3 个 Endpoint、13 条路由，网关状态 Stopped，配置库 "C:\Users\BianShanghai\AppData\Local\LoomX\LoomX.db"，进程 43340
+```
+
+- PID `43340` 的“调试启动已允许多个桌面实例”：`1` 条。
+- PID `43340` 的“桌面应用启动”：`1` 条。
+- PID `43340` 的后续“概览刷新完成”初始化证据：`1` 条。
+- PID `43340` 的“检测到已有实例”“Shell bootstrap 创建/子进程失败”日志：`0` 条。
+
+### 停止与隔离验证
+
+```powershell
+Stop-Process -Id 43340
+Start-Sleep -Seconds 5
+```
+
+- 停止命令发送时间：`2026-09-17 17:34:26.011 +08:00`。
+- 延迟 `5` 秒后 PID `43340` 已消失。
+- 既有 PID `28460` 在停止前后均存活，路径未变。
+- 仅停止本轮 PID；其他既有 LoomX 实例未被停止。

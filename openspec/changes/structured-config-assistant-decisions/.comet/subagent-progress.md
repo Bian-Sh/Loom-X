@@ -4,7 +4,7 @@
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
 - Current task: Whole branch review
-- Stage: implementer
+- Stage: review
 - Fix round: 1
 
 ## Rulings
@@ -40,3 +40,4 @@
 - Task 8 complete：资料通道顺序、网站挑战交还、历史会话当前策略、无绕过边界与可追溯 standalone 发布均通过修复轮 1 scoped re-review；计划 Step 1–8 与 OpenSpec 6.1–7.4 已由协调者统一勾选。
 - 整分支 review 开始：以原始基线 a9e755d2 到当前完成 HEAD 覆盖 TOML、AskUser、UI 生命周期、敏感边界、资料通道、数据库路径、日志与 standalone 交付；整分支仅允许一个完整修复 wave。
 - 整分支首轮审查接受 2 个 Critical、4 个 Important 与 1 个 Minor：工具参数安全投影、toml.get 内容/容器脱敏、事务 commit point、并发冲突、AskUser 无 claim 收敛、Schema/运行时一致性及 BOM 格式报告进入唯一修复 wave 1。
+- 整分支 fix wave 1 已实现并进入唯一 scoped re-review：2 Critical、4 Important、1 Minor 均有 TDD 回归，主会话复核 920/920；standalone 版本绑定代码 HEAD 2f0f315 并完成同 PID Path/日志验证。
