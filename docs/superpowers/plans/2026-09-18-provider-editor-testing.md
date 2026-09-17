@@ -38,7 +38,7 @@ base-ref: 1aab9a75f9e698651f3797e57959c2cf47445a4b
 
 ---
 
-### 任务 1：兼容类型映射与自动 Provider ID
+### Task 1: 兼容类型映射与自动 Provider ID
 
 **文件：**
 - 新建：`LoomX/ViewModels/ProviderCompatibilityOption.cs`
@@ -129,7 +129,7 @@ EndpointFormat = "responses"
 
 ---
 
-### 任务 2：测试请求 DTO、普通请求与安全结果
+### Task 2: 测试请求 DTO、普通请求与安全结果
 
 **文件：**
 - 新建：`LoomX/Services/ProviderTestService.cs`
@@ -184,7 +184,7 @@ Responses 同时支持顶层 `output_text` 与 `output[].content[].text`。
 
 ---
 
-### 任务 3：流式解析、代理与 CLI 身份
+### Task 3: 流式解析、代理与 CLI 身份
 
 **文件：**
 - 修改：`LoomX/Services/ProviderTestService.cs`
@@ -251,7 +251,7 @@ data: {"type":"message_stop"}
 
 ---
 
-### 任务 4：测试面板 ViewModel
+### Task 4: 测试面板 ViewModel
 
 **文件：**
 - 新建：`LoomX/ViewModels/ProviderTestPanelViewModel.cs`
@@ -293,7 +293,7 @@ data: {"type":"message_stop"}
 
 ---
 
-### 任务 5：接入 ProvidersViewModel 并移除旧连接测试块
+### Task 5: 接入 ProvidersViewModel 并移除旧连接测试块
 
 **文件：**
 - 修改：`LoomX/ViewModels/MainWindowViewModel.cs`
@@ -332,7 +332,7 @@ data: {"type":"message_stop"}
 
 ---
 
-### 任务 6：四 Tab UI 与本地化
+### Task 6: 四 Tab UI 与本地化
 
 **文件：**
 - 修改：`LoomX/Views/ProvidersView.axaml`
@@ -381,7 +381,7 @@ data: {"type":"message_stop"}
 
 ---
 
-### 任务 7：定向回归、完整构建与 OpenSpec 同步
+### Task 7: 定向回归、完整构建与 OpenSpec 同步
 
 **文件：**
 - 修改：`openspec/changes/enhance-provider-editor-testing/tasks.md`
@@ -420,7 +420,7 @@ dotnet build LoomX.slnx -c Release --no-restore
 
 ---
 
-### 任务 8：CUA 验证与发布包
+### Task 8: CUA 验证与发布包
 
 **文件：**
 - 新建：`outputs/<YYYY-MM-DD_HH-mm-ss>/` 发布目录。
