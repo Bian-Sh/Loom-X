@@ -3,7 +3,9 @@
 // 不实现 Provider/Relay 业务、AI Agent、Skill 或模型发现逻辑——那些属于 LoomX。
 
 const BRIDGE_URL = "ws://127.0.0.1:17831/loomx-browser/";
+const BRIDGE_HEALTH_URL = "http://127.0.0.1:17831/loomx-browser/";
 const PROTOCOL_VERSION = 1;
+const PROBE_TIMEOUT_MS = 1000;
 const RECONNECT_DELAY_MS = 3000;
 const KEEPALIVE_INTERVAL_MS = 20000;
 const RECONNECT_ALARM_NAME = "loomx-browser-reconnect";
@@ -12,6 +14,7 @@ const RECONNECT_ALARM_PERIOD_MINUTES = 0.5;
 /** targetId -> { sessionId, tabId, url, title } 仅登记本扩展创建的 automation tab。 */
 const targets = new Map();
 let socket = null;
+let connectPromise = null;
 let connectTimer = null;
 let keepAliveTimer = null;
 
@@ -32,6 +35,21 @@ function ensureReconnectAlarm() {
   });
 }
 function connect() {
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+  if (connectPromise) return;
+
+  connectPromise = connectAfterProbe().finally(() => {
+    connectPromise = null;
+  });
+}
+
+async function connectAfterProbe() {
+  if (!(await probeBridge())) {
+    scheduleReconnect();
+    return;
+  }
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
     return;
   }
@@ -78,6 +96,23 @@ function connect() {
       // 忽略，onclose 会处理重连
     }
   };
+}
+
+async function probeBridge() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  try {
+    const response = await fetch(BRIDGE_HEALTH_URL, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    return response.status === 204;
+  } catch (error) {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function startKeepAlive() {

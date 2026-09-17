@@ -94,6 +94,7 @@ base-ref: 76d801b558e26aeecb16bbee42c079a221bc30d4
 
 - [x] 增加 `alarms` 权限和 Chrome 120 最低版本。
 - [x] 实现心跳、快速重试和 alarm 唤醒共用的幂等 `connect()`。
+- [x] 为本地 Bridge 增加无缓存 HTTP 健康响应；Extension 在创建 WebSocket 前先做可取消探针，离线时静默重试。
 - [x] 断线时保留自动化目标，重新握手上报目标快照。
 - [x] 用 `active: false` 创建 tab，并通过 `Page.captureScreenshot` 截图。
 - [x] 运行 `node --check` 和 manifest JSON 解析验证。

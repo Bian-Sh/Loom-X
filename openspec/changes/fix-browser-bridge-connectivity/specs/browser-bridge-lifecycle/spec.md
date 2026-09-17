@@ -68,6 +68,10 @@ Extension MUST 使用已连接 WebSocket 的周期消息维持 Service Worker，
 - **WHEN** Extension 已加载但 Bridge 尚未监听
 - **THEN** alarm 在后续周期唤醒 Extension 并重新尝试连接
 
+#### Scenario: Bridge 未启用时静默等待
+- **WHEN** Extension 被 alarm 唤醒但当前没有 Assistant Session 持有 Bridge 租约
+- **THEN** Extension 先执行可取消的 HTTP 健康探针；探针失败时不创建 WebSocket，只安排后续重试且不产生连接拒绝扩展错误
+
 #### Scenario: WebSocket 临时断开
 - **WHEN** 已有自动化目标且 WebSocket 断开后恢复
 - **THEN** 自动化 tab 保持打开，Extension 在 hello 中上报目标快照，服务端恢复目标注册

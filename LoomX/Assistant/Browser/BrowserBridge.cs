@@ -240,16 +240,22 @@ public sealed class BrowserBridge : IBrowserBridge, IBrowserBridgeLifecycle, IDi
                 break;
             }
 
-            if (!context.Request.IsWebSocketRequest)
+            if (!IPAddress.IsLoopback(context.Request.RemoteEndPoint.Address))
             {
-                context.Response.StatusCode = 400;
+                context.Response.StatusCode = 403;
                 context.Response.Close();
                 continue;
             }
 
-            if (!IPAddress.IsLoopback(context.Request.RemoteEndPoint.Address))
+            if (!context.Request.IsWebSocketRequest)
             {
-                context.Response.StatusCode = 403;
+                context.Response.StatusCode = string.Equals(
+                    context.Request.HttpMethod,
+                    "GET",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? (int)HttpStatusCode.NoContent
+                    : (int)HttpStatusCode.MethodNotAllowed;
+                context.Response.Headers[HttpResponseHeader.CacheControl] = "no-store";
                 context.Response.Close();
                 continue;
             }

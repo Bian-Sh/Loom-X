@@ -60,6 +60,16 @@ public sealed class BrowserBridgeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task 健康探针_监听时返回NoContent()
+    {
+        using var client = new HttpClient();
+
+        using var response = await client.GetAsync($"http://127.0.0.1:{port}/loomx-browser/");
+
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Stop后允许在同一端口重新启动()
     {
         await bridge.StopAsync();

@@ -37,6 +37,7 @@ Gateway 初始化、启动和停止不得直接调用 Bridge 启停。
 
 - 已连接时每 20 秒发送 `Bridge.keepAlive`。
 - 增加 `alarms` 权限与最低 Chrome 120；创建 30 秒周期 alarm，在脚本加载、安装、浏览器启动和 alarm 回调时调用幂等 `connect()`。
+- `connect()` 先用可取消的 HTTP GET 健康探针确认本地 Bridge 正在监听，仅探针成功后创建 WebSocket；Bridge 未启动时只进入定时重试，避免 Chrome 把预期的 `ERR_CONNECTION_REFUSED` 累积为扩展错误。
 - WebSocket 断开只停止心跳并计划重连，不 detach 或清空自动化目标。
 - `Bridge.hello` 附带当前目标快照；服务端握手时重建 `Targets`。
 - 用户主动关闭 tab 或 `browser.close` 才移除目标。

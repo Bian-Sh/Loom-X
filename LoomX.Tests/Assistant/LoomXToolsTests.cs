@@ -122,6 +122,13 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         var manifest = ReadRepositoryFile("LoomX", "BrowserExtension", "manifest.json");
 
         Assert.Contains("const KEEPALIVE_INTERVAL_MS = 20000;", source, StringComparison.Ordinal);
+        Assert.Contains("const BRIDGE_HEALTH_URL = \"http://127.0.0.1:17831/loomx-browser/\";", source, StringComparison.Ordinal);
+        Assert.Contains("async function probeBridge()", source, StringComparison.Ordinal);
+        Assert.Contains("if (!(await probeBridge()))", source, StringComparison.Ordinal);
+        Assert.True(
+            source.IndexOf("if (!(await probeBridge()))", StringComparison.Ordinal)
+            < source.IndexOf("new WebSocket(BRIDGE_URL)", StringComparison.Ordinal),
+            "Extension 必须先探测 Bridge，再创建 WebSocket，避免离线时产生连接拒绝错误。");
         Assert.Contains("Bridge.keepAlive", source, StringComparison.Ordinal);
         Assert.Contains("chrome.alarms", source, StringComparison.Ordinal);
         Assert.Contains("targets: currentTargets()", source, StringComparison.Ordinal);

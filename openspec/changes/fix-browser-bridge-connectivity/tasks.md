@@ -14,14 +14,16 @@
 - [x] 3.1 实现 alarm + WebSocket 心跳、断线保留目标和 hello 目标快照重同步。
 - [x] 3.2 将正文 Secret 收割集中到 .NET，完善 Provider `api_key_secret_ref` schema、后台 tab、CDP 截图和日志启动修复。
 - [x] 3.3 更新 Browser Skill，规定 AI 按需申请/释放自己的 Session 租约。
+- [x] 3.4 增加本地 HTTP 健康探针与 Extension WebSocket 静默预检，Bridge 离线时只重试、不累积连接拒绝错误。
 
 ## 4. 验证与交付
 
 - [x] 4.1 运行定向测试、完整测试和 Release build，检查日志与持久化无明文 Secret。
 - [x] 4.2 发布时间命名的独立桌面包，重新加载 Extension，验证多 Session 与重连矩阵。
 - [x] 4.3 让 LoomX 小助手使用 Browser Bridge 完成 `Loomx` Provider 录入并验证。
+- [x] 4.4 运行健康探针回环测试、Extension 契约测试、离线/在线脚本模拟、完整测试与 Release 发布，确认 Bridge 离线时不创建 WebSocket。
 
 ## 构建记录
 
 - 执行方式：`direct`；TDD 模式按当前 Comet 状态为 `direct`，关键 bug 仍完成遮罩 Key 的 RED/GREEN 回归。
-- 自动代码审查：`review_mode: off`。原因：继续既有单会话实现，且共享工作区存在其他 Session 改动；本轮以定向测试、947 项完整测试、Release build、GUI 端到端与 Secret 扫描作为风险控制，避免并行 reviewer 触碰共享状态。
+- 自动代码审查：`review_mode: off`。原因：继续既有单会话实现，且共享工作区存在其他 Session 改动；本轮追加健康探针 RED/GREEN、948 项串行完整测试、Release build、离线/在线 Extension 脚本模拟与独立发布包校验作为风险控制。
