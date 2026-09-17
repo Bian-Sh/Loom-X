@@ -3,7 +3,8 @@ comet_change: structured-config-assistant-decisions
 role: technical-design
 canonical_spec: openspec
 language: zh-CN
-status: approved
+archived-with: 2026-09-17-structured-config-assistant-decisions
+status: final
 ---
 
 # LoomX 结构化配置与 Assistant 用户决策技术设计

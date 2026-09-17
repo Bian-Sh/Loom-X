@@ -18,7 +18,7 @@ verification_report: docs/superpowers/reports/2026-09-17-structured-config-assis
 branch_status: handled
 created_at: 2026-09-16
 verified_at: 2026-09-17
-archived: false
+archived: true
 direct_override: null
 handoff_context: openspec/changes/structured-config-assistant-decisions/.comet/handoff/design-context.json
 handoff_hash: c817bb5814bab0e9fef8e3d5c6074ffe7d650102e7719638c1c79fcaa3a24313

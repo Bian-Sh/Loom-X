@@ -2,6 +2,7 @@
 change: structured-config-assistant-decisions
 design-doc: docs/superpowers/specs/2026-09-16-structured-config-assistant-decisions-design.md
 base-ref: a9e755d2ff2e924c6b23a589a027d8f8bca64a2d
+archived-with: 2026-09-17-structured-config-assistant-decisions
 ---
 
 # LoomX 结构化配置与 Assistant 用户决策实施计划
@@ -56,6 +57,7 @@ base-ref: a9e755d2ff2e924c6b23a589a027d8f8bca64a2d
 - Test: `LoomX.Tests/Assistant/AssistantViewModelTests.cs`
 - Test: `LoomX.Tests/Views/AskUserDialogContractTests.cs`
 
+archived-with: 2026-09-17-structured-config-assistant-decisions
 ---
 
 ### Task 1: TOML 依赖、领域契约与敏感键策略

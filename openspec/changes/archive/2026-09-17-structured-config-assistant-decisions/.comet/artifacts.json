@@ -4,5 +4,6 @@
   "openspec_tasks": "openspec/changes/structured-config-assistant-decisions/tasks.md",
   "openspec_delta_spec": "openspec/changes/structured-config-assistant-decisions/specs/assistant-user-decisions/spec.md",
   "handoff_context": "openspec/changes/structured-config-assistant-decisions/.comet/handoff/design-context.json",
-  "handoff_markdown": "openspec/changes/structured-config-assistant-decisions/.comet/handoff/design-context.md"
+  "handoff_markdown": "openspec/changes/structured-config-assistant-decisions/.comet/handoff/design-context.md",
+  "archive_directory": "openspec/changes/archive/2026-09-17-structured-config-assistant-decisions"
 }
