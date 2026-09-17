@@ -1,4 +1,5 @@
 ﻿using LoomX.Assistant.UserDecisions;
+using LoomX.Assistant.Browser;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
@@ -30,6 +31,7 @@ public sealed class AssistantService
     private readonly AssistantSessionStore sessionStore;
     private readonly AssistantPreferencesStore? preferencesStore;
     private readonly IUserDecisionBroker userDecisionBroker;
+    private readonly BrowserBridgeLeaseManager? browserBridgeLeaseManager;
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantService> logger;
     private readonly SemaphoreSlim runLock = new(1, 1);
@@ -43,7 +45,8 @@ public sealed class AssistantService
         AssistantSessionStore sessionStore,
         ILoggerFactory loggerFactory,
         AssistantPreferencesStore? preferencesStore,
-        IUserDecisionBroker userDecisionBroker)
+        IUserDecisionBroker userDecisionBroker,
+        BrowserBridgeLeaseManager? browserBridgeLeaseManager = null)
     {
         this.modelClientFactory = modelClientFactory;
         this.toolRegistry = toolRegistry;
@@ -51,17 +54,26 @@ public sealed class AssistantService
         this.loggerFactory = loggerFactory;
         this.preferencesStore = preferencesStore;
         this.userDecisionBroker = userDecisionBroker;
+        this.browserBridgeLeaseManager = browserBridgeLeaseManager;
         logger = loggerFactory.CreateLogger<AssistantService>();
+        CurrentSession = CreateSession();
     }
 
-    public AgentSession CurrentSession { get; private set; } = new(new AgentSessionOptions
-    {
-        MaxSteps = 16,
-        SystemPrompt = SystemPrompt,
-    });
+    public AgentSession CurrentSession { get; private set; }
 
     public bool IsRunning => CurrentSession.State == AgentSessionState.Running;
 
+    private static AgentSession CreateSession()
+    {
+        var session = new AgentSession(new AgentSessionOptions { MaxSteps = 16 });
+        session.ApplySystemPrompt(BuildSystemPrompt(session.Id));
+        return session;
+    }
+
+    private static string BuildSystemPrompt(string assistantSessionId) => $"""
+        {SystemPrompt}
+        8. 当前 Assistant Session ID：{assistantSessionId}。需要浏览器时先调用 browser.bridge_start，并把此 ID 作为 assistant_session_id；完成本 Session 的全部浏览器操作后主动调用 browser.bridge_stop 释放同一 ID。不得使用或释放其他 Session ID。新建、切换、离开或关闭 Session UI 不会自动释放租约；删除 Session 仅清理意外残留。
+        """;
     /// <summary>助手模型是否可用（安全摘要，不含 Key）。</summary>
     public async Task<AssistantModelInfo?> DescribeModelAsync(CancellationToken cancellationToken = default) =>
         await modelClientFactory.DescribeAsync(cancellationToken);
@@ -108,11 +120,7 @@ public sealed class AssistantService
     public AgentSession NewSession()
     {
         Cancel();
-        CurrentSession = new AgentSession(new AgentSessionOptions
-        {
-            MaxSteps = 16,
-            SystemPrompt = SystemPrompt,
-        });
+        CurrentSession = CreateSession();
         return CurrentSession;
     }
 
@@ -121,12 +129,28 @@ public sealed class AssistantService
     {
         var session = await sessionStore.LoadAsync(sessionId, cancellationToken);
         if (session is null) return false;
-        session.ApplySystemPrompt(SystemPrompt);
+        session.ApplySystemPrompt(BuildSystemPrompt(session.Id));
         CurrentSession = session;
         return true;
     }
 
-    public void DeleteSession(string sessionId) => sessionStore.Delete(sessionId);
+    /// <summary>删除会话；租约释放仅作为意外残留的被动兜底。</summary>
+    public async Task DeleteSessionAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        if (browserBridgeLeaseManager is not null)
+        {
+            try
+            {
+                await browserBridgeLeaseManager.ReleaseAsync(sessionId, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogWarning(exception, "删除 AI 助手会话时清理 Browser Bridge 残留租约失败 {SessionId}", sessionId);
+            }
+        }
+
+        sessionStore.Delete(sessionId);
+    }
 
     /// <summary>重命名历史会话（空值表示回到自动标题）。</summary>
     public Task RenameSessionAsync(string sessionId, string? title, CancellationToken cancellationToken = default) =>

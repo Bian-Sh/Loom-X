@@ -1,4 +1,4 @@
-using System.Text.Encodings.Web;
+﻿using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using LoomX.Configuration;
@@ -173,13 +173,14 @@ public static class LoomXTools
         registry.Register(new ToolDefinition
         {
             Name = "loomx.create_provider",
-            Description = "创建 Provider。api_key 只会加密存入本地（DPAPI），不会回显。",
+            Description = "创建 Provider。api_key 只会加密存入本地（DPAPI），不会回显；可用 api_key_secret_ref 引用浏览器收割的 Key。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{
                   "business_id":{"type":"string"},"display_name":{"type":"string"},
                   "base_url":{"type":"string","description":"HTTP/HTTPS 绝对地址"},
                   "api_mode":{"type":"string","enum":["openai","anthropic","ollama"]},
                   "enabled":{"type":"boolean"},"api_key":{"type":"string"},
+                  "api_key_secret_ref":{"type":"string","description":"secret://browser/... 形式的引用"},
                   "use_proxy":{"type":"boolean"},"model_list_url":{"type":"string"},
                   "endpoint_format":{"type":"string","enum":["responses","chat_completions"]},
                   "headers":{"type":"object","description":"自定义请求头"}

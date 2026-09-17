@@ -1,4 +1,4 @@
-using Serilog;
+﻿using Serilog;
 using Serilog.Events;
 using Serilog.Formatting;
 
@@ -30,7 +30,7 @@ public static class LoggingBootstrap
                     rollOnFileSizeLimit: true,
                     retainedFileCountLimit: 30,
                     // buffered：批量落盘，避免每条日志在调用线程上做一次同步文件写入。
-                    shared: true,
+                    // Serilog 不允许 shared 与 buffered 同时启用；桌面应用为单进程写入，无需 shared。
                     buffered: true)
                 .CreateLogger();
             configured = true;

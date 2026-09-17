@@ -1,7 +1,8 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
 using LoomX.Assistant;
+using LoomX.Assistant.Browser;
 using LoomX.Configuration;
 using LoomX.Services;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ public sealed class LoomXToolsTests : IAsyncLifetime
     private ConfigurationManagementService configuration = null!;
     private ToolRegistry registry = null!;
     private GatewayStateHub gatewayStateHub = null!;
+    private BrowserSecretVault secretVault = null!;
 
     public async Task InitializeAsync()
     {
@@ -49,7 +51,8 @@ public sealed class LoomXToolsTests : IAsyncLifetime
 
         registry = new ToolRegistry();
         gatewayStateHub = new GatewayStateHub();
-        LoomXTools.RegisterAll(registry, configuration, configurationProvider, tester, new SkillStore(skillsDirectory), gatewayStateHub: gatewayStateHub);
+        secretVault = new BrowserSecretVault();
+        LoomXTools.RegisterAll(registry, configuration, configurationProvider, tester, new SkillStore(skillsDirectory), secretVault, gatewayStateHub);
     }
 
     public async Task DisposeAsync()
@@ -79,6 +82,77 @@ public sealed class LoomXToolsTests : IAsyncLifetime
             new ProviderInput("demo", "演示 Provider", "https://api.example.com/v1", "openai", true, PlaintextApiKey, false, null),
             CancellationToken.None);
         return provider.Id.ToString();
+    }
+
+    [Fact]
+    public async Task CreateProvider_支持浏览器SecretRef并在Schema中公开参数()
+    {
+        var tool = Assert.Single(registry.All, item => item.Name == "loomx.create_provider");
+        Assert.NotNull(tool.ParametersSchema["properties"]?["api_key_secret_ref"]);
+
+        var secretRef = secretVault.Store(PlaintextApiKey, "api_key");
+        var result = await InvokeAsync(
+            "loomx.create_provider",
+            $$"""{"business_id":"browser-secret","display_name":"浏览器 Secret","base_url":"https://api.example.com/v1","api_mode":"openai","api_key_secret_ref":"{{secretRef}}"}""");
+
+        Assert.True(result.Success, result.Content);
+        Assert.DoesNotContain(PlaintextApiKey, result.Content);
+        var provider = await InvokeAsync("loomx.get_provider", """{"id":"browser-secret"}""");
+        Assert.True(provider.Success, provider.Content);
+        Assert.Contains("\"configured\":true", provider.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GatewayProcessService_不直接控制BrowserBridge生命周期()
+    {
+        var source = ReadRepositoryFile("LoomX", "Services", "GatewayProcessService.cs");
+
+        Assert.DoesNotContain("BrowserBridge>().Start", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("BrowserBridge>().Stop", source, StringComparison.Ordinal);
+        Assert.Contains("browserBridge ??= new", source, StringComparison.Ordinal);
+        Assert.Contains("browserBridgeLeaseManager ??= new", source, StringComparison.Ordinal);
+        Assert.Contains("LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager", source, StringComparison.Ordinal);
+        Assert.Contains("browserBridge?.Dispose();", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BrowserExtension_具备Alarm保活目标恢复与纯传输契约()
+    {
+        var source = ReadRepositoryFile("LoomX", "BrowserExtension", "background.js");
+        var manifest = ReadRepositoryFile("LoomX", "BrowserExtension", "manifest.json");
+
+        Assert.Contains("const KEEPALIVE_INTERVAL_MS = 20000;", source, StringComparison.Ordinal);
+        Assert.Contains("Bridge.keepAlive", source, StringComparison.Ordinal);
+        Assert.Contains("chrome.alarms", source, StringComparison.Ordinal);
+        Assert.Contains("targets: currentTargets()", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("detachAllTargets()", source, StringComparison.Ordinal);
+        Assert.Contains("active: false", source, StringComparison.Ordinal);
+        Assert.Contains("Page.captureScreenshot", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("secretPattern", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("api_key: apiKey", source, StringComparison.Ordinal);
+        Assert.Contains("\"alarms\"", manifest, StringComparison.Ordinal);
+        Assert.Contains("\"minimum_chrome_version\": \"120\"", manifest, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BrowserSkill_要求AI主动管理当前AssistantSession租约()
+    {
+        var source = ReadRepositoryFile("LoomX", "Skills", "relays", "new-api", "SKILL.md");
+
+        Assert.Contains("browser.bridge_start", source, StringComparison.Ordinal);
+        Assert.Contains("browser.bridge_stop", source, StringComparison.Ordinal);
+        Assert.Contains("assistant_session_id", source, StringComparison.Ordinal);
+        Assert.Contains("当前 Assistant Session ID", source, StringComparison.Ordinal);
+        Assert.Contains("删除 Session", source, StringComparison.Ordinal);
+        Assert.Contains("意外残留", source, StringComparison.Ordinal);
+    }
+    [Fact]
+    public void LoggingBootstrap_文件Sink不组合Shared与Buffered()
+    {
+        var source = ReadRepositoryFile("LoomX", "Logging", "LoggingBootstrap.cs");
+
+        Assert.Contains("buffered: true", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("shared: true", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -334,6 +408,18 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         Assert.False(result.Success);
         Assert.DoesNotContain(privateId, result.Content, StringComparison.Ordinal);
         Assert.Contains("不存在", result.Content, StringComparison.Ordinal);
+    }
+
+    private static string ReadRepositoryFile(params string[] segments)
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "LoomX.slnx")))
+        {
+            directory = directory.Parent;
+        }
+
+        Assert.NotNull(directory);
+        return File.ReadAllText(Path.Combine([directory.FullName, .. segments]));
     }
 
 }

@@ -1,9 +1,10 @@
-{
+﻿{
   "manifest_version": 3,
   "name": "LoomX Browser Bridge",
   "version": "0.1.0",
+  "minimum_chrome_version": "120",
   "description": "Connects LoomX Assistant to automation tabs in your Chrome via a local WebSocket bridge.",
-  "permissions": ["debugger", "tabs"],
+  "permissions": ["debugger", "tabs", "alarms"],
   "host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js"

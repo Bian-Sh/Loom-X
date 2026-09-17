@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -160,6 +160,8 @@ public partial class App : Application
                     instanceActivationServer = null;
                 }
                 await gatewayService.StopAsync();
+                gatewayService.Dispose();
+                gatewayService = null;
                 if (mainWindow.DataContext is MainWindowViewModel viewModel) viewModel.Dispose();
                 dataStore?.Dispose();
                 dataStore = null;

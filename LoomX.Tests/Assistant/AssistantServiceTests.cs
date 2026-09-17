@@ -1,5 +1,6 @@
 ﻿using Xunit;
 using LoomX.Assistant;
+using LoomX.Assistant.Browser;
 using LoomX.Assistant.UserDecisions;
 using LoomX.Configuration;
 using Microsoft.EntityFrameworkCore;
@@ -50,9 +51,29 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.Contains("JS challenge", prompt);
         Assert.Contains("立即暂停并交还用户", prompt);
         Assert.Contains("禁止绕过网站安全机制", prompt);
+        Assert.Contains("当前 Assistant Session ID", prompt);
+        Assert.Contains(service.CurrentSession.Id, prompt, StringComparison.Ordinal);
+        Assert.Contains("browser.bridge_start", prompt, StringComparison.Ordinal);
+        Assert.Contains("browser.bridge_stop", prompt, StringComparison.Ordinal);
         AssertNoSearchSecretConfiguration(prompt);
     }
 
+
+    [Fact]
+    public async Task 删除Session会被动清理意外残留的Bridge租约()
+    {
+        var lifecycle = new FakeBrowserBridgeLifecycle();
+        var leases = new BrowserBridgeLeaseManager(lifecycle, NullLogger<BrowserBridgeLeaseManager>.Instance);
+        var service = CreateService(new StubModelClientFactory(null), browserBridgeLeaseManager: leases);
+        var sessionId = service.CurrentSession.Id;
+        await leases.AcquireAsync(sessionId);
+
+        await service.DeleteSessionAsync(sessionId);
+
+        Assert.Empty(leases.ActiveSessionIds);
+        Assert.False(lifecycle.IsListening);
+        Assert.Equal(1, lifecycle.StopCount);
+    }
     [Fact]
     public async Task SendAsync_StreamsEvents_AndPersistsSession()
     {
@@ -178,6 +199,10 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.Contains("JS challenge", prompt);
         Assert.Contains("立即暂停并交还用户", prompt);
         Assert.Contains("禁止绕过网站安全机制", prompt);
+        Assert.Contains("当前 Assistant Session ID", prompt);
+        Assert.Contains(service.CurrentSession.Id, prompt, StringComparison.Ordinal);
+        Assert.Contains("browser.bridge_start", prompt, StringComparison.Ordinal);
+        Assert.Contains("browser.bridge_stop", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain(oldPrompt, prompt, StringComparison.Ordinal);
         Assert.DoesNotContain(request.Messages, message =>
             message.Role == ChatRole.System && message.Content == oldPrompt);
@@ -455,7 +480,8 @@ public sealed class AssistantServiceTests : IDisposable
         ToolRegistry? registry = null,
         AssistantPermissionMode? permissionMode = null,
         IUserDecisionBroker? userDecisionBroker = null,
-        AssistantSessionStore? sessionStore = null)
+        AssistantSessionStore? sessionStore = null,
+        BrowserBridgeLeaseManager? browserBridgeLeaseManager = null)
     {
         AssistantPreferencesStore? preferencesStore = null;
         if (permissionMode is not null)
@@ -470,7 +496,8 @@ public sealed class AssistantServiceTests : IDisposable
             sessionStore ?? new AssistantSessionStore(Path.Combine(rootDirectory, $"sessions-{Guid.NewGuid():N}")),
             NullLoggerFactory.Instance,
             preferencesStore,
-            userDecisionBroker ?? CreateDecisionBroker());
+            userDecisionBroker ?? CreateDecisionBroker(),
+            browserBridgeLeaseManager);
     }
 
     private const string AskUserArguments = """
@@ -678,4 +705,22 @@ public sealed class AssistantServiceTests : IDisposable
     {
         public HttpClient CreateClient(string name) => throw new NotSupportedException();
     }
-}
+
+    private sealed class FakeBrowserBridgeLifecycle : IBrowserBridgeLifecycle
+    {
+        public bool IsListening { get; private set; }
+        public int StopCount { get; private set; }
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            IsListening = true;
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken = default)
+        {
+            StopCount++;
+            IsListening = false;
+            return Task.CompletedTask;
+        }
+    }}

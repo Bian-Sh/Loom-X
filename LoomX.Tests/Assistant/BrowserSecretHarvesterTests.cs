@@ -85,6 +85,24 @@ public sealed class BrowserSecretHarvesterTests
         Assert.Equal(result.ToJsonString(), harvested.ToJsonString());
     }
 
+    [Theory]
+    [InlineData("sk-897...a551")]
+    [InlineData("sk-897…a551")]
+    public void Harvest_MaskedApiKey_NotTreatedAsSecret(string maskedKey)
+    {
+        var vault = new BrowserSecretVault();
+        var result = new JsonObject
+        {
+            ["content"] = $"Loomx {maskedKey}",
+            ["api_key"] = maskedKey,
+        };
+
+        var harvested = BrowserSecretHarvester.Harvest(result, vault);
+
+        Assert.Equal(result.ToJsonString(), harvested.ToJsonString());
+        Assert.Null(harvested["harvested_secrets"]);
+    }
+
     [Fact]
     public void Harvest_DeeplyNestedSecrets_AllRedacted()
     {

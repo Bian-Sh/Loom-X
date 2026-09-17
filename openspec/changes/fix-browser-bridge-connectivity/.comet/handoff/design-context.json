@@ -1,0 +1,14 @@
+{
+  "change": "fix-browser-bridge-connectivity",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "ba12acdf96669dbb49794de83d2208ac8733180b52b6786ec180fd9d216b9e14",
+  "files": [
+    { "path": "openspec/changes/fix-browser-bridge-connectivity/proposal.md", "sha256": "b9abface45235ab1523520f94a4d7f77177cf0905acf7c807da69600f2ce2c96" },
+    { "path": "openspec/changes/fix-browser-bridge-connectivity/design.md", "sha256": "a575966ac8e2f4e02e8e63bcc11f0d2f00c09d7ef67985121e0e47304e75b725" },
+    { "path": "openspec/changes/fix-browser-bridge-connectivity/tasks.md", "sha256": "bfe0a3da2d077a192ac2de715af8957dce5bffe7438746f24ded934f53118a0f" },
+    { "path": "openspec/changes/fix-browser-bridge-connectivity/specs/browser-bridge-lifecycle/spec.md", "sha256": "667681ca92b256b5e18203f931e1344d9afa6cdcf154c9697806cdc75e6762d4" }
+  ]
+}

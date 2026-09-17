@@ -1,16 +1,36 @@
-// LoomX Browser Bridge - MV3 background service worker.
+﻿// LoomX Browser Bridge - MV3 background service worker.
 // 职责（仅此五项）：Chrome API / chrome.debugger / chrome.tabs / WebSocket / target-session 映射。
 // 不实现 Provider/Relay 业务、AI Agent、Skill 或模型发现逻辑——那些属于 LoomX。
 
 const BRIDGE_URL = "ws://127.0.0.1:17831/loomx-browser/";
 const PROTOCOL_VERSION = 1;
 const RECONNECT_DELAY_MS = 3000;
+const KEEPALIVE_INTERVAL_MS = 20000;
+const RECONNECT_ALARM_NAME = "loomx-browser-reconnect";
+const RECONNECT_ALARM_PERIOD_MINUTES = 0.5;
 
 /** targetId -> { sessionId, tabId, url, title } 仅登记本扩展创建的 automation tab。 */
 const targets = new Map();
 let socket = null;
 let connectTimer = null;
+let keepAliveTimer = null;
 
+
+function currentTargets() {
+  return Array.from(targets.entries()).map(([targetId, info]) => ({
+    targetId,
+    sessionId: info.sessionId,
+    tabId: info.tabId,
+    url: info.url,
+    title: info.title,
+  }));
+}
+
+function ensureReconnectAlarm() {
+  chrome.alarms.create(RECONNECT_ALARM_NAME, {
+    periodInMinutes: RECONNECT_ALARM_PERIOD_MINUTES,
+  });
+}
 function connect() {
   if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
     return;
@@ -26,8 +46,13 @@ function connect() {
   socket.onopen = () => {
     send({
       method: "Bridge.hello",
-      params: { protocol: PROTOCOL_VERSION, extension: chrome.runtime.getManifest().version },
+      params: {
+        protocol: PROTOCOL_VERSION,
+        extension: chrome.runtime.getManifest().version,
+        targets: currentTargets(),
+      },
     });
+    startKeepAlive();
   };
 
   socket.onmessage = (event) => {
@@ -41,7 +66,8 @@ function connect() {
   };
 
   socket.onclose = () => {
-    detachAllTargets();
+    stopKeepAlive();
+    socket = null;
     scheduleReconnect();
   };
 
@@ -52,6 +78,19 @@ function connect() {
       // 忽略，onclose 会处理重连
     }
   };
+}
+
+function startKeepAlive() {
+  stopKeepAlive();
+  keepAliveTimer = setInterval(() => {
+    send({ method: "Bridge.keepAlive" });
+  }, KEEPALIVE_INTERVAL_MS);
+}
+
+function stopKeepAlive() {
+  if (!keepAliveTimer) return;
+  clearInterval(keepAliveTimer);
+  keepAliveTimer = null;
 }
 
 function scheduleReconnect() {
@@ -86,18 +125,12 @@ async function handleCommand(message) {
     switch (method) {
       case "Target.getTargets":
         respond(id, {
-          targets: Array.from(targets.entries()).map(([targetId, info]) => ({
-            targetId,
-            sessionId: info.sessionId,
-            tabId: info.tabId,
-            url: info.url,
-            title: info.title,
-          })),
+          targets: currentTargets(),
         });
         break;
 
       case "Target.createTarget": {
-        const tab = await chrome.tabs.create({ url: params.url, active: true });
+        const tab = await chrome.tabs.create({ url: params.url, active: false });
         const targetId = `target-${tab.id}`;
         await chrome.debugger.attach({ tabId: tab.id }, "1.3");
         const sessionId = `session-${tab.id}`;
@@ -157,8 +190,11 @@ async function handleSessionCommand(info, method, params) {
     case "Page.wait":
       return await waitFor(info.tabId, params);
     case "Page.captureScreenshot": {
-      const capture = await chrome.tabs.captureVisibleTab(null, { format: "png" });
-      return { format: "png", base64: capture.split(",")[1] || capture };
+      const capture = await chrome.debugger.sendCommand({ tabId: info.tabId }, "Page.captureScreenshot", {
+        format: "png",
+        captureBeyondViewport: Boolean(params.fullPage),
+      });
+      return { format: "png", base64: capture.data };
     }
     case "Network.getRecent":
       return await evaluateInTab(info.tabId, networkSnippet(params.urlContains, params.limit));
@@ -272,14 +308,6 @@ async function closeTarget(targetId, info) {
   emitEvent("targetClosed", { targetId });
 }
 
-function detachAllTargets() {
-  for (const [targetId, info] of targets) {
-    chrome.debugger.detach({ tabId: info.tabId }).catch(() => {});
-    emitEvent("targetClosed", { targetId });
-  }
-  targets.clear();
-}
-
 // 用户手动关闭 automation tab 时同步登记
 chrome.tabs.onRemoved.addListener((tabId) => {
   for (const [targetId, info] of targets) {
@@ -290,7 +318,17 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   }
 });
 
-// MV3 service worker 休眠后恢复时保持连接
-chrome.runtime.onStartup.addListener(connect);
-chrome.runtime.onInstalled.addListener(connect);
+// MV3 service worker 休眠后通过 alarm 唤醒并恢复连接
+chrome.runtime.onStartup.addListener(() => {
+  ensureReconnectAlarm();
+  connect();
+});
+chrome.runtime.onInstalled.addListener(() => {
+  ensureReconnectAlarm();
+  connect();
+});
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === RECONNECT_ALARM_NAME) connect();
+});
+ensureReconnectAlarm();
 connect();

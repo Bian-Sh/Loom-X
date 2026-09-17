@@ -907,14 +907,14 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     }
 
     /// <summary>删除历史会话；删除当前会话时自动开新会话。</summary>
-    public void DeleteSession(AssistantSessionItemViewModel? item)
+    public async Task DeleteSessionAsync(AssistantSessionItemViewModel? item)
     {
         if (item is null) return;
         var service = ResolveService();
         if (service is null) return;
 
         var wasCurrent = service.CurrentSession.Id == item.SessionId;
-        service.DeleteSession(item.SessionId);
+        await service.DeleteSessionAsync(item.SessionId);
 
         RefreshSessions();
 

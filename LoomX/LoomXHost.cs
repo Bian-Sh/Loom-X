@@ -20,7 +20,13 @@ namespace LoomX;
 
 public static class LoomXHost
 {
-    public static async Task<WebApplication> CreateAsync(CancellationToken cancellationToken = default)
+    public static Task<WebApplication> CreateAsync(CancellationToken cancellationToken = default) =>
+        CreateAsync(null, null, cancellationToken);
+
+    internal static async Task<WebApplication> CreateAsync(
+        Assistant.Browser.BrowserBridge? browserBridge,
+        Assistant.Browser.BrowserBridgeLeaseManager? browserBridgeLeaseManager,
+        CancellationToken cancellationToken = default)
     {
         AppDataPaths.EnsureCreated();
 
@@ -68,12 +74,29 @@ public static class LoomXHost
         builder.Services.AddSingleton<Assistant.DiagnosticSubagent>();
         builder.Services.AddSingleton<Assistant.AssistantModelClientFactory>();
         builder.Services.AddSingleton<Assistant.UserDecisions.IUserDecisionBroker, Assistant.UserDecisions.UserDecisionBroker>();
-        builder.Services.AddSingleton(services => new Assistant.Browser.BrowserBridge(
-            port: 17831,
-            services.GetRequiredService<ILogger<Assistant.Browser.BrowserBridge>>()));
+        if (browserBridge is null)
+        {
+            builder.Services.AddSingleton(services => new Assistant.Browser.BrowserBridge(
+                port: 17831,
+                services.GetRequiredService<ILogger<Assistant.Browser.BrowserBridge>>()));
+        }
+        else
+        {
+            builder.Services.AddSingleton(browserBridge);
+        }
+
         builder.Services.AddSingleton<Assistant.Browser.IBrowserBridge>(services =>
             services.GetRequiredService<Assistant.Browser.BrowserBridge>());
-        builder.Services.AddHostedService<Assistant.Browser.BrowserBridgeHost>();
+        builder.Services.AddSingleton<Assistant.Browser.IBrowserBridgeLifecycle>(services =>
+            services.GetRequiredService<Assistant.Browser.BrowserBridge>());
+        if (browserBridgeLeaseManager is null)
+        {
+            builder.Services.AddSingleton<Assistant.Browser.BrowserBridgeLeaseManager>();
+        }
+        else
+        {
+            builder.Services.AddSingleton(browserBridgeLeaseManager);
+        }
         builder.Services.AddSingleton(services =>
         {
             var registry = new Assistant.ToolRegistry();
@@ -88,7 +111,8 @@ public static class LoomXHost
             Assistant.Browser.BrowserTools.RegisterAll(
                 registry,
                 services.GetRequiredService<Assistant.Browser.IBrowserBridge>(),
-                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>());
+                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>(),
+                services.GetRequiredService<Assistant.Browser.BrowserBridgeLeaseManager>());
             Assistant.TomlTools.RegisterAll(
                 registry,
                 services.GetRequiredService<Assistant.Configuration.ITomlDocumentService>());

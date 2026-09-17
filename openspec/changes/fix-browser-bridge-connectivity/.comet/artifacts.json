@@ -1,0 +1,7 @@
+{
+  "openspec_proposal": "openspec/changes/fix-browser-bridge-connectivity/proposal.md",
+  "openspec_design": "openspec/changes/fix-browser-bridge-connectivity/design.md",
+  "openspec_tasks": "openspec/changes/fix-browser-bridge-connectivity/tasks.md",
+  "handoff_context": "openspec/changes/fix-browser-bridge-connectivity/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/fix-browser-bridge-connectivity/.comet/handoff/design-context.md"
+}

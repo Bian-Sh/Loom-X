@@ -1,4 +1,4 @@
-using System.Text.Encodings.Web;
+﻿using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -15,12 +15,46 @@ public static class BrowserTools
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
-    public static void RegisterAll(ToolRegistry registry, IBrowserBridge bridge, BrowserSecretVault vault)
+    private static readonly TimeSpan ExtensionConnectWaitTimeout = TimeSpan.FromSeconds(35);
+
+    public static void RegisterAll(
+        ToolRegistry registry,
+        IBrowserBridge bridge,
+        BrowserSecretVault vault,
+        BrowserBridgeLeaseManager leaseManager)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(bridge);
         ArgumentNullException.ThrowIfNull(vault);
+        ArgumentNullException.ThrowIfNull(leaseManager);
 
+        registry.Register(new ToolDefinition
+        {
+            Name = "browser.bridge_start",
+            Description = "为当前 Assistant Session 申请 Browser Bridge 租约。使用系统提示中的当前 Assistant Session ID；重复调用幂等。",
+            ParametersSchema = Schema("""{"type":"object","properties":{"assistant_session_id":{"type":"string","description":"系统提示中的当前 Assistant Session ID"}},"required":["assistant_session_id"]}"""),
+            RiskLevel = ToolRiskLevel.External,
+            Timeout = TimeSpan.FromSeconds(40),
+            Handler = async (args, cancellationToken) => await GuardAsync(async () =>
+            {
+                await leaseManager.AcquireAsync(RequireString(args, "assistant_session_id"), cancellationToken);
+                await WaitForExtensionAsync(bridge, cancellationToken);
+                return Ok(BridgeState(bridge, leaseManager));
+            }),
+        });
+
+        registry.Register(new ToolDefinition
+        {
+            Name = "browser.bridge_stop",
+            Description = "主动释放当前 Assistant Session 的 Browser Bridge 租约。只有最后一个租约释放后才停止 Bridge；不得传入其他 Session ID。",
+            ParametersSchema = Schema("""{"type":"object","properties":{"assistant_session_id":{"type":"string","description":"系统提示中的当前 Assistant Session ID"}},"required":["assistant_session_id"]}"""),
+            RiskLevel = ToolRiskLevel.External,
+            Handler = async (args, cancellationToken) => await GuardAsync(async () =>
+            {
+                await leaseManager.ReleaseAsync(RequireString(args, "assistant_session_id"), cancellationToken);
+                return Ok(BridgeState(bridge, leaseManager));
+            }),
+        });
         registry.Register(new ToolDefinition
         {
             Name = "browser.tabs",
@@ -210,6 +244,32 @@ public static class BrowserTools
         });
     }
 
+    private static async Task WaitForExtensionAsync(IBrowserBridge bridge, CancellationToken cancellationToken)
+    {
+        if (bridge.IsExtensionConnected) return;
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(ExtensionConnectWaitTimeout);
+        try
+        {
+            while (!bridge.IsExtensionConnected)
+            {
+                await Task.Delay(100, timeout.Token);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Extension 可能处于休眠；超时后返回当前状态，由模型决定稍后重试。
+        }
+    }
+
+    private static JsonObject BridgeState(IBrowserBridge bridge, BrowserBridgeLeaseManager leaseManager) => new()
+    {
+        ["listening"] = bridge is IBrowserBridgeLifecycle lifecycle && lifecycle.IsListening,
+        ["extension_connected"] = bridge.IsExtensionConnected,
+        ["lease_count"] = leaseManager.ActiveSessionIds.Count,
+    };
+
     // ---------- 参数与结果辅助 ----------
 
     private static JsonNode Schema(string json) => JsonNode.Parse(json)!;
@@ -217,7 +277,7 @@ public static class BrowserTools
     private static ToolResult Ok(JsonObject json) => ToolResult.Ok(json.ToJsonString(OutputJsonOptions));
 
     private static ToolResult Fail(string code, string message) =>
-        ToolResult.Fail(new JsonObject { ["error"] = code, ["message"] = message }.ToJsonString(OutputJsonOptions));
+        ToolResult.SafeFail(new JsonObject { ["error"] = code, ["message"] = message }.ToJsonString(OutputJsonOptions));
 
     private static async Task<ToolResult> GuardAsync(Func<Task<ToolResult>> action)
     {

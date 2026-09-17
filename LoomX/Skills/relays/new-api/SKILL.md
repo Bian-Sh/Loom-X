@@ -1,4 +1,4 @@
-# New-API 系中转站接入
+﻿# New-API 系中转站接入
 
 ## 识别特征
 
@@ -16,6 +16,13 @@ New-API / One-API 及其衍生面板（Sub2API 等）的共同特征：
 4. 中转站模型名与上游一致（如 `gpt-4o`、`claude-sonnet-4-5`），family 按模型实际系列填写。
 
 ## 浏览器自动配置流程（Browser Bridge）
+
+### Browser Bridge Session 租约
+
+- 系统提示会给出“当前 Assistant Session ID”。需要使用浏览器前，先调用 `browser.bridge_start`，把该 ID 作为 `assistant_session_id`。
+- 只有 AI 确认本 Session 已完成全部浏览器操作后，才主动调用 `browser.bridge_stop` 释放同一 `assistant_session_id`；不得传入或释放其他 Session ID。
+- 新建、切换、离开或关闭 Session UI 都不会自动释放租约。删除 Session 只会在存在意外残留时尝试被动清理，不能替代 AI 的正常主动释放。
+- 多个 Session 可共享单例 Bridge；释放自己的租约后若仍有其他 Session 使用，Bridge 会继续运行。
 
 用户说"帮我配置这个中转站"且只给了网址时：
 

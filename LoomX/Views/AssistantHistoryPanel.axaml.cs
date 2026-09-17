@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -35,11 +35,11 @@ public partial class AssistantHistoryPanel : UserControl
     }
 
     /// <summary>删除：留在浮窗里，允许连续删除。</summary>
-    private void DeleteItem_OnClick(object? sender, RoutedEventArgs args)
+    private async void DeleteItem_OnClick(object? sender, RoutedEventArgs args)
     {
         if (sender is not Button { Tag: AssistantSessionItemViewModel item }) return;
         if (DataContext is not AssistantViewModel viewModel) return;
-        viewModel.DeleteSession(item);
+        await viewModel.DeleteSessionAsync(item);
     }
 
     /// <summary>铅笔：进入编辑态并聚焦编辑框。</summary>

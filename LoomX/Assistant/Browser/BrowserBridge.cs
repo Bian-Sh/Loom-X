@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
@@ -28,14 +28,16 @@ public interface IBrowserBridge
 /// CDP-like 会话（targetId/sessionId/tabId 映射）。只允许 Extension 创建/登记的
 /// automation tab，绝不读取用户其他 Chrome 标签页。
 /// </summary>
-public sealed class BrowserBridge : IBrowserBridge, IDisposable
+public sealed class BrowserBridge : IBrowserBridge, IBrowserBridgeLifecycle, IDisposable, IAsyncDisposable
 {
     private readonly ILogger<BrowserBridge> logger;
     private readonly HttpListener listener = new();
     private readonly ConcurrentDictionary<string, BrowserTargetInfo> targets = new();
     private readonly SemaphoreSlim sendLock = new(1, 1);
-    private readonly CancellationTokenSource shutdown = new();
+    private readonly SemaphoreSlim lifecycleLock = new(1, 1);
+    private readonly object connectionSync = new();
 
+    private CancellationTokenSource? lifecycleCancellation;
     private WebSocket? socket;
     private long nextCommandId;
     private JsonObject? pendingResponse;
@@ -56,17 +58,104 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
 
     public TimeSpan CommandTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
+    public bool IsListening => listener.IsListening;
+
     public bool IsExtensionConnected => extensionReady && socket is { State: WebSocketState.Open };
 
     public IReadOnlyCollection<BrowserTargetInfo> Targets => targets.Values.ToArray();
 
     public event Action<BrowserBridgeEvent>? BridgeEvent;
 
-    public void Start()
+    public async Task StartAsync(CancellationToken cancellationToken = default)
     {
-        listener.Start();
-        listenTask = Task.Run(AcceptLoopAsync);
-        logger.LogInformation("Browser Bridge 已启动 127.0.0.1:{Port}", Port);
+        await lifecycleLock.WaitAsync(cancellationToken);
+        try
+        {
+            ObjectDisposedException.ThrowIf(disposed, this);
+            if (listener.IsListening) return;
+
+            try
+            {
+                listener.Start();
+            }
+            catch (HttpListenerException exception)
+            {
+                throw new BrowserBridgeException("bridge_port_unavailable", $"Browser Bridge 端口 {Port} 不可用。", exception);
+            }
+
+            lifecycleCancellation?.Dispose();
+            lifecycleCancellation = new CancellationTokenSource();
+            listenTask = Task.Run(() => AcceptLoopAsync(lifecycleCancellation.Token), CancellationToken.None);
+            logger.LogInformation("Browser Bridge 已启动 127.0.0.1:{Port}", Port);
+        }
+        finally
+        {
+            lifecycleLock.Release();
+        }
+    }
+
+    public async Task StopAsync(CancellationToken cancellationToken = default)
+    {
+        await lifecycleLock.WaitAsync(cancellationToken);
+        try
+        {
+            if (!listener.IsListening && lifecycleCancellation is null) return;
+
+            var cancellation = lifecycleCancellation;
+            var currentListenTask = listenTask;
+            var currentReceiveTask = receiveTask;
+            WebSocket? currentSocket;
+            lock (connectionSync)
+            {
+                currentSocket = socket;
+                socket = null;
+                extensionReady = false;
+            }
+
+            cancellation?.Cancel();
+            try { listener.Stop(); } catch (ObjectDisposedException) { }
+
+            if (currentSocket is not null)
+            {
+                try
+                {
+                    using var closeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    closeTimeout.CancelAfter(TimeSpan.FromSeconds(2));
+                    if (currentSocket.State == WebSocketState.Open)
+                    {
+                        await currentSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bridge_stopped", closeTimeout.Token);
+                    }
+                }
+                catch (Exception exception) when (exception is WebSocketException or OperationCanceledException or ObjectDisposedException)
+                {
+                    // 对端可能已离开，继续强制释放。
+                }
+
+                try { currentSocket.Abort(); } catch { }
+                currentSocket.Dispose();
+            }
+
+            await AwaitQuietlyAsync(currentReceiveTask);
+            await AwaitQuietlyAsync(currentListenTask);
+
+            foreach (var target in targets.Values)
+            {
+                Raise(BrowserBridgeEvent.TargetClosed, target, "bridge_stopped");
+            }
+
+            targets.Clear();
+            pendingResponse = null;
+            pendingError = "Browser Bridge 已停止。";
+            receiveTask = null;
+            listenTask = null;
+            lifecycleCancellation = null;
+            cancellation?.Dispose();
+            logger.LogInformation("Browser Bridge 已停止 127.0.0.1:{Port}", Port);
+        }
+        finally
+        {
+            lifecycleLock.Release();
+        }
     }
 
     public async Task<JsonNode> SendCommandAsync(string method, JsonNode? parameters, CancellationToken cancellationToken)
@@ -76,7 +165,6 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
             throw new BrowserBridgeException("browser_bridge_offline", "Chrome Extension 未连接 Browser Bridge。");
         }
 
-        // WebSocket 全双工但本协议一次只允许一个未完成命令，简化响应匹配
         await sendLock.WaitAsync(cancellationToken);
         try
         {
@@ -85,9 +173,17 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
             pendingResponse = null;
             pendingError = null;
 
-            await socket!.SendAsync(Encoding.UTF8.GetBytes(payload), WebSocketMessageType.Text, true, cancellationToken);
+            WebSocket activeSocket;
+            CancellationToken lifecycleToken;
+            lock (connectionSync)
+            {
+                activeSocket = socket ?? throw new BrowserBridgeException("browser_bridge_offline", "Chrome Extension 未连接 Browser Bridge。");
+                lifecycleToken = lifecycleCancellation?.Token ?? CancellationToken.None;
+            }
 
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, shutdown.Token);
+            await activeSocket.SendAsync(Encoding.UTF8.GetBytes(payload), WebSocketMessageType.Text, true, cancellationToken);
+
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifecycleToken);
             timeout.CancelAfter(CommandTimeout);
             while (true)
             {
@@ -130,16 +226,16 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
         }, cancellationToken);
     }
 
-    private async Task AcceptLoopAsync()
+    private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
-        while (!shutdown.IsCancellationRequested)
+        while (!cancellationToken.IsCancellationRequested)
         {
             HttpListenerContext context;
             try
             {
-                context = await listener.GetContextAsync();
+                context = await listener.GetContextAsync().WaitAsync(cancellationToken);
             }
-            catch (Exception exception) when (exception is HttpListenerException or ObjectDisposedException)
+            catch (Exception exception) when (exception is HttpListenerException or ObjectDisposedException or OperationCanceledException)
             {
                 break;
             }
@@ -151,7 +247,6 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
                 continue;
             }
 
-            // 只接受本地回环连接
             if (!IPAddress.IsLoopback(context.Request.RemoteEndPoint.Address))
             {
                 context.Response.StatusCode = 403;
@@ -162,58 +257,63 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
             try
             {
                 var accepted = await context.AcceptWebSocketAsync(null);
-                await AttachSocketAsync(accepted.WebSocket);
+                await AttachSocketAsync(accepted.WebSocket, cancellationToken);
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
             {
                 logger.LogWarning(exception, "Browser Bridge 接受 WebSocket 连接失败");
             }
         }
     }
 
-    private async Task AttachSocketAsync(WebSocket webSocket)
+    private async Task AttachSocketAsync(WebSocket webSocket, CancellationToken cancellationToken)
     {
-        // 新连接顶替旧连接（Extension 重连/刷新场景）
-        if (socket is not null)
+        WebSocket? previous;
+        lock (connectionSync)
+        {
+            previous = socket;
+            socket = webSocket;
+            extensionReady = false;
+        }
+
+        if (previous is not null)
         {
             try
             {
-                using var closeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-                // 只发出关闭帧，不等对端确认（对端可能已不再读取），随后强制释放
-                await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "replaced", closeTimeout.Token);
+                using var closeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                closeTimeout.CancelAfter(TimeSpan.FromSeconds(2));
+                await previous.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "replaced", closeTimeout.Token);
             }
-            catch { /* 旧连接已断开 */ }
+            catch { }
 
-            try { socket.Abort(); } catch { /* 忽略 */ }
+            try { previous.Abort(); } catch { }
+            previous.Dispose();
         }
 
-        socket = webSocket;
-        extensionReady = false;
         targets.Clear();
-        receiveTask = Task.Run(() => ReceiveLoopAsync(webSocket));
+        receiveTask = Task.Run(() => ReceiveLoopAsync(webSocket, cancellationToken), CancellationToken.None);
     }
 
-    private async Task ReceiveLoopAsync(WebSocket webSocket)
+    private async Task ReceiveLoopAsync(WebSocket webSocket, CancellationToken cancellationToken)
     {
         var buffer = new byte[64 * 1024];
         try
         {
-            while (webSocket.State == WebSocketState.Open && !shutdown.IsCancellationRequested)
+            while (webSocket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
             {
                 using var stream = new MemoryStream();
                 WebSocketReceiveResult segment;
                 do
                 {
-                    segment = await webSocket.ReceiveAsync(buffer, shutdown.Token);
+                    segment = await webSocket.ReceiveAsync(buffer, cancellationToken);
                     if (segment.MessageType == WebSocketMessageType.Close)
                     {
-                        // 关闭握手是双向的：必须回 Close 帧，否则对端 CloseAsync 永远等待
                         try
                         {
                             using var closeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
                             await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, null, closeTimeout.Token);
                         }
-                        catch { /* 对端可能已离开 */ }
+                        catch { }
 
                         throw new WebSocketException("closed");
                     }
@@ -225,24 +325,27 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
                 HandleMessage(Encoding.UTF8.GetString(stream.ToArray()));
             }
         }
-        catch (Exception exception) when (exception is WebSocketException or OperationCanceledException or IOException)
+        catch (Exception exception) when (exception is WebSocketException or OperationCanceledException or IOException or ObjectDisposedException)
         {
-            // 连接断开，走下面的清理逻辑
+            // 连接断开，走下面的清理逻辑。
         }
 
-        if (ReferenceEquals(socket, webSocket))
+        lock (connectionSync)
         {
+            if (!ReferenceEquals(socket, webSocket)) return;
+            socket = null;
             extensionReady = false;
-            foreach (var target in targets.Values)
-            {
-                Raise(BrowserBridgeEvent.TargetClosed, target, "extension_disconnected");
-            }
-
-            targets.Clear();
-            Raise(BrowserBridgeEvent.ExtensionDisconnected, null, null);
-            pendingError ??= "Extension 连接已断开。";
-            logger.LogInformation("Browser Bridge Extension 已断开");
         }
+
+        foreach (var target in targets.Values)
+        {
+            Raise(BrowserBridgeEvent.TargetClosed, target, "extension_disconnected");
+        }
+
+        targets.Clear();
+        Raise(BrowserBridgeEvent.ExtensionDisconnected, null, null);
+        pendingError ??= "Extension 连接已断开。";
+        logger.LogInformation("Browser Bridge Extension 已断开");
     }
 
     private void HandleMessage(string json)
@@ -261,9 +364,10 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
                 return;
             }
 
+            RestoreTargetSnapshot(message["params"]?["targets"] as JsonArray);
             extensionReady = true;
             Raise(BrowserBridgeEvent.ExtensionConnected, null, message["params"]?["extension"]?.GetValue<string>());
-            logger.LogInformation("Browser Bridge Extension 已连接");
+            logger.LogInformation("Browser Bridge Extension 已连接 {TargetCount}", targets.Count);
             return;
         }
 
@@ -287,29 +391,34 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
         }
     }
 
+    private void RestoreTargetSnapshot(JsonArray? snapshot)
+    {
+        targets.Clear();
+        if (snapshot is null) return;
+
+        foreach (var node in snapshot.OfType<JsonObject>())
+        {
+            if (!TryCreateTarget(node, out var target)) continue;
+            targets[target.TargetId] = target;
+            Raise(BrowserBridgeEvent.TargetCreated, target, "hello_snapshot");
+        }
+    }
+
     private void HandleExtensionEvent(JsonObject? parameters)
     {
         var name = parameters?["name"]?.GetValue<string>();
         switch (name)
         {
-            case "targetCreated":
-            {
-                var target = new BrowserTargetInfo(
-                    parameters!["targetId"]!.GetValue<string>(),
-                    parameters["sessionId"]!.GetValue<string>(),
-                    parameters["tabId"]!.GetValue<int>(),
-                    parameters["url"]?.GetValue<string>() ?? string.Empty,
-                    parameters["title"]?.GetValue<string>() ?? string.Empty);
+            case "targetCreated" when TryCreateTarget(parameters!, out var target):
                 targets[target.TargetId] = target;
                 Raise(BrowserBridgeEvent.TargetCreated, target, null);
                 break;
-            }
             case "targetClosed":
             {
                 var targetId = parameters!["targetId"]!.GetValue<string>();
-                if (targets.TryRemove(targetId, out var target))
+                if (targets.TryRemove(targetId, out var closedTarget))
                 {
-                    Raise(BrowserBridgeEvent.TargetClosed, target, null);
+                    Raise(BrowserBridgeEvent.TargetClosed, closedTarget, null);
                 }
 
                 break;
@@ -317,27 +426,61 @@ public sealed class BrowserBridge : IBrowserBridge, IDisposable
         }
     }
 
+    private static bool TryCreateTarget(JsonObject parameters, out BrowserTargetInfo target)
+    {
+        target = default!;
+        if (parameters["targetId"] is not JsonValue targetIdValue
+            || parameters["sessionId"] is not JsonValue sessionIdValue
+            || parameters["tabId"] is not JsonValue tabIdValue
+            || !targetIdValue.TryGetValue<string>(out var targetId)
+            || !sessionIdValue.TryGetValue<string>(out var sessionId)
+            || !tabIdValue.TryGetValue<int>(out var tabId)
+            || string.IsNullOrWhiteSpace(targetId)
+            || string.IsNullOrWhiteSpace(sessionId))
+        {
+            return false;
+        }
+
+        target = new BrowserTargetInfo(
+            targetId,
+            sessionId,
+            tabId,
+            parameters["url"]?.GetValue<string>() ?? string.Empty,
+            parameters["title"]?.GetValue<string>() ?? string.Empty);
+        return true;
+    }
+
     private void Raise(string kind, BrowserTargetInfo? target, string? detail) =>
         BridgeEvent?.Invoke(new BrowserBridgeEvent(kind, target, detail));
 
+    private static async Task AwaitQuietlyAsync(Task? task)
+    {
+        if (task is null) return;
+        try { await task.WaitAsync(TimeSpan.FromSeconds(3)); }
+        catch (Exception exception) when (exception is TimeoutException or OperationCanceledException or WebSocketException or ObjectDisposedException) { }
+    }
+
     public void Dispose()
     {
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
         if (disposed) return;
+        await StopAsync();
         disposed = true;
-        shutdown.Cancel();
-        try { socket?.Abort(); } catch { /* 忽略 */ }
-        try { listener.Stop(); } catch { /* 忽略 */ }
-        try { receiveTask?.Wait(TimeSpan.FromSeconds(2)); } catch { /* 忽略 */ }
-        try { listenTask?.Wait(TimeSpan.FromSeconds(2)); } catch { /* 忽略 */ }
-        shutdown.Dispose();
+        listener.Close();
+        lifecycleLock.Dispose();
         sendLock.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
 
 /// <summary>Browser Bridge 错误。Code/Message 只含安全摘要。</summary>
 public sealed class BrowserBridgeException : Exception
 {
-    public BrowserBridgeException(string code, string message) : base(message)
+    public BrowserBridgeException(string code, string message, Exception? innerException = null) : base(message, innerException)
     {
         Code = code;
     }
