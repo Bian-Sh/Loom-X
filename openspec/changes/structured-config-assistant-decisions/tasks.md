@@ -42,4 +42,3 @@
 - [x] 7.2 编写并运行 AskUser Broker、Assistant 工具接入、取消恢复和桌面端 ViewModel 的集成测试，确认提交、取消、页面关闭和会话停止均可收敛
 - [x] 7.3 运行 `dotnet test` 覆盖 `LoomX.Tests` 与现有测试，修复回归后确认日志、数据库路径和既有 Assistant 工具行为不变
 - [x] 7.4 运行 `openspec status --change structured-config-assistant-decisions --json`、`openspec validate structured-config-assistant-decisions --strict`，并检查任务勾选状态、变更范围和中文文档完整性
-

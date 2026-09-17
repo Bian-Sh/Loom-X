@@ -631,7 +631,3 @@ git commit -m "完成结构化配置与助手决策能力"
 - Type consistency：`ITomlDocumentService`、`IUserDecisionBroker`、`PendingUserDecision`、`TomlPatchOperation` 在首次出现处定义，后续任务使用同一命名。
 - Scope：不包含 Codex Catalog/Profile/configure、环境变量或重启逻辑；后续 Change 通过这里的公共接口接入。
 - No placeholders：计划不含未决实现项；Skill 文件选择存在条件分支，但明确规定优先修改现有最接近 Skill，仅在不存在时创建固定路径。
-
-
-
-

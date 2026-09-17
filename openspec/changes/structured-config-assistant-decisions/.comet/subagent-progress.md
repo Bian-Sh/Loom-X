@@ -4,8 +4,8 @@
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
 - Current task: Whole branch review
-- Stage: review
-- Fix round: 0
+- Stage: implementer
+- Fix round: 1
 
 ## Rulings
 - Task 1 同时向 `LoomX` 与 `LoomX.Tests` 添加 Tomlyn 2.10.1，以满足 OpenSpec 1.1。
@@ -39,3 +39,4 @@
 - Task 8 修复轮 1 已实现并进入 scoped re-review：历史会话恢复会以唯一当前 System Prompt 替换旧策略；新 standalone 产物版本绑定代码 HEAD，并以多实例参数完成同 PID Path/日志核验。
 - Task 8 complete：资料通道顺序、网站挑战交还、历史会话当前策略、无绕过边界与可追溯 standalone 发布均通过修复轮 1 scoped re-review；计划 Step 1–8 与 OpenSpec 6.1–7.4 已由协调者统一勾选。
 - 整分支 review 开始：以原始基线 a9e755d2 到当前完成 HEAD 覆盖 TOML、AskUser、UI 生命周期、敏感边界、资料通道、数据库路径、日志与 standalone 交付；整分支仅允许一个完整修复 wave。
+- 整分支首轮审查接受 2 个 Critical、4 个 Important 与 1 个 Minor：工具参数安全投影、toml.get 内容/容器脱敏、事务 commit point、并发冲突、AskUser 无 claim 收敛、Schema/运行时一致性及 BOM 格式报告进入唯一修复 wave 1。
