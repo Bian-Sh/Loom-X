@@ -402,8 +402,8 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~Provider
 运行：
 
 ```powershell
-dotnet test LoomX.sln -c Release
-dotnet build LoomX.sln -c Release --no-restore
+dotnet test LoomX.slnx -c Release
+dotnet build LoomX.slnx -c Release --no-restore
 ```
 
 预期：退出码 0；不以终端中文显示异常推断源文件编码损坏。
