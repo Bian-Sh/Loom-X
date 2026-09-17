@@ -8,8 +8,8 @@
 
 - [x] 2.1 定义测试请求、进度、结果和错误 DTO，并用测试固定安全摘要、响应截断和取消语义
 - [x] 2.2 为 OpenAI Chat、OpenAI Responses 和 Anthropic Messages 编写失败测试，实现普通请求构造、鉴权、自定义 Header 与响应解析
-- [ ] 2.3 为三种协议编写流式响应测试，实现文本增量归一化、完成状态、错误事件和长度限制
-- [ ] 2.4 接入 Provider 代理设置与 CLI 身份 Header，验证代理开关真实影响 HttpClient 且日志不包含密钥、Header 值、Prompt 或响应正文
+- [x] 2.3 为三种协议编写流式响应测试，实现文本增量归一化、完成状态、错误事件和长度限制
+- [x] 2.4 接入 Provider 代理设置与 CLI 身份 Header，验证代理开关真实影响 HttpClient 且日志不包含密钥、Header 值、Prompt 或响应正文
 
 ## 3. 测试面板状态与命令
 

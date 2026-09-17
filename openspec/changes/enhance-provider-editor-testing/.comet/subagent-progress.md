@@ -8,7 +8,7 @@
 - TDD mode: tdd
 - Current task: 3 — 流式解析、代理与 CLI 身份
 - Stage: checkpoint
-- Base commit: 3e29467
+- Base commit: 441cc35
 - Last verified baseline: 948/948 passed
 
 - Implementer: 01a0b0d5-0aaf-7363-9555-d32c8292446e
@@ -28,3 +28,11 @@
 - Task 2 fix commit: 81568f4
 - Task 2 fix verification: ProviderTestServiceTests 29/29
 - Task 2 result: complete, commits 64ac329 + 81568f4, re-review approved (0/0/0), tests 29/29
+- Task 3 base commit: 441cc35
+- Task 3 risk expected: 安全敏感面（代理凭据/Header/流式外部响应）
+- Task 3 implementer: 01a0b11d-8f67-7a20-b27c-cb7c8fc6bf44
+- Task 3 implementation commit: a98152b
+- Task 3 verification: ProviderTestServiceTests 43/43
+- Task 3 reviewer: 01a0b131-7da2-7a10-a5ed-e477daf33a33
+- Task 3 reviewer previous attempt: 01a0b131 errored 502，已重新派发审查。
+- Task 3 result: implementation a98152b, tests 43/43; reviewer attempts 01a0b131 and 01a0b16a failed due route 502, manual controller review required

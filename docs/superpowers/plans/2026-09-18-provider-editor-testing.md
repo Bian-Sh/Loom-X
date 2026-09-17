@@ -196,7 +196,7 @@ Responses 同时支持顶层 `output_text` 与 `output[].content[].text`。
 - 产出：可注入的代理设置读取器和 HttpClient 创建器，测试中无需真实网络。
 - 消费：`CliIdentityService.DetectCliIdentity/DetectCliVersion`。
 
-- [ ] **步骤 1：写流式失败测试**
+- [x] **步骤 1：写流式失败测试**
 
 为三协议提供内存 SSE：
 
@@ -223,25 +223,25 @@ data: {"type":"message_stop"}
 
 断言进度回调按顺序收到文本、最终结果为完整文本、超过上限标记 `IsTruncated`。
 
-- [ ] **步骤 2：运行流式测试并确认红灯**
+- [x] **步骤 2：运行流式测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~ProviderTestServiceTests&Name~流式"`
 
 预期：FAIL，尚未调用 `ExecuteStreamingAsync` 或未解析增量。
 
-- [ ] **步骤 3：实现 SSE 帧读取和协议分派**
+- [x] **步骤 3：实现 SSE 帧读取和协议分派**
 
 使用逐行读取器累计 `event:` 和多行 `data:`，空行提交一帧；`[DONE]` 结束 OpenAI 流。解析器只返回文本增量，未知事件忽略，无效 JSON 返回协议错误。
 
-- [ ] **步骤 4：写代理与 CLI 失败测试**
+- [x] **步骤 4：写代理与 CLI 失败测试**
 
 断言：`UseProxy=false` 直连；system/custom 模式创建正确 Handler；无效 custom 配置返回配置错误且不静默直连；CLI Header 实际进入请求；摘要只显示身份名、版本和 Header 数量。
 
-- [ ] **步骤 5：实现代理租约和 CLI 摘要**
+- [x] **步骤 5：实现代理租约和 CLI 摘要**
 
 自定义代理客户端按请求创建并释放；系统代理设置 `UseProxy=true` 且不显式赋值 `Proxy`。调用 `CliIdentityService` 从最终 Header 字典检测身份与版本。代理密码只存在局部变量，不写日志和结果。
 
-- [ ] **步骤 6：运行测试并提交**
+- [x] **步骤 6：运行测试并提交**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestServiceTests`
 
