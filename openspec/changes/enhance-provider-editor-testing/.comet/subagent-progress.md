@@ -7,6 +7,6 @@
 - Review mode: standard
 - TDD mode: tdd
 - Current task: 1 — 兼容类型映射与自动 Provider ID
-- Stage: implementer-dispatch-pending
-- Base commit: 0f6e55b
+- Stage: implementer-running
+- Base commit: 0b04f57
 - Last verified baseline: 948/948 passed
