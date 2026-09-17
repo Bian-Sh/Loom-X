@@ -4,7 +4,7 @@
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
 - Current task: Task 8
-- Stage: implementer
+- Stage: review
 - Fix round: 1
 
 ## Rulings
@@ -36,3 +36,4 @@
 - Task 7 complete：原子 request ownership、生产生命周期、安全结构化日志与 Locale 资源已通过第 1 轮 scoped re-review；计划 Step 1–7 与 OpenSpec 5.1–5.3 已由协调者统一勾选。
 - Task 8 实现已完成并进入 thorough review；资料通道契约、挑战交还、安全边界、全量验证与 standalone 发布为审查范围，formatter 全仓失败按既有基线单独核查。
 - Task 8 首轮审查接受 1 个 Important 与 1 个 Minor：历史会话恢复必须应用当前资料通道/挑战安全提示；standalone 验证必须区分 bootstrap 与实际应用进程并给出可复核日志，进入修复轮 1。
+- Task 8 修复轮 1 已实现并进入 scoped re-review：历史会话恢复会以唯一当前 System Prompt 替换旧策略；新 standalone 产物版本绑定代码 HEAD，并以多实例参数完成同 PID Path/日志核验。

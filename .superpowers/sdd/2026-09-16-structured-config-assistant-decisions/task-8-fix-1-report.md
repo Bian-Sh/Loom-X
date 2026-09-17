@@ -2,13 +2,13 @@
 
 日期：2026-09-17  
 分支：`codex/structured-config-assistant-decisions`  
-范围：仅处理首轮审查 I1，并完成 M1 的代码侧确认与提交后发布验证方案；本轮未执行最终 publish、未提交、未 push。
+范围：仅处理首轮审查 I1，并完成 M1 的代码侧确认与发布验证；代码修复由协调者提交至 HEAD `164b1e94f0f337fb9a2ad69f09a248c312cb43ec` 后，本轮已从该干净 HEAD 完成 standalone 发布与启动核验，未 commit、未 push。
 
 ## 结论
 
 - I1 已通过 TDD 修复：历史会话继续发送前，会把持久化的旧 System 策略规范化为当前 `AssistantService.SystemPrompt`，实际 `ModelRequest.Messages` 中只保留一条当前 LoomX 策略。
 - M1 已确认：`--allow-multiple-instances` 与 `LOOMX_ALLOW_MULTIPLE_INSTANCES=1` 都会令 `allowMultipleInstances=true`；该判断发生在 shell bootstrap 与单实例 mutex 之前，因此会同时绕过 bootstrap 父子进程切换和已有实例误判。对应单元测试 3/3 通过。
-- 按协调要求没有执行最终发布；后续必须从协调者提交后的 HEAD 生成新产物，以程序集版本关联提交。
+- 已从协调者提交后的干净 HEAD `164b1e94f0f337fb9a2ad69f09a248c312cb43ec` 生成新 standalone 产物；`LoomX.dll` 的 `ProductVersion` 包含完整 HEAD，并完成指定参数启动、PID/Path/日志与安全停止验证。
 
 ## 根因与最小修复
 
@@ -86,74 +86,91 @@
 
 未修改 `AssistantSessionStore.cs`、OpenSpec tasks、计划、Comet 状态、Task 8 首轮审查报告或其他无关文件。
 
-## 协调者提交后执行的发布与启动验证
+## M1 standalone 发布与启动验证（已完成）
 
-### 1. 必须从已提交 HEAD 发布
+验证时间：2026-09-17 16:01（Asia/Shanghai）
+代码 HEAD：`164b1e94f0f337fb9a2ad69f09a248c312cb43ec`
 
-在协调者完成提交后，从仓库根目录执行：
+### 1. 发布与版本追溯
+
+发布前确认：
+
+- `git status --short --branch` 仅显示分支跟踪信息，没有工作区修改；
+- `git rev-parse HEAD` 为 `164b1e94f0f337fb9a2ad69f09a248c312cb43ec`；
+- 目标目录此前不存在，没有覆盖、删除或移动任何既有 `outputs` 内容。
+
+实际执行：
 
 ```powershell
-$repo = 'D:\AppData\Github\Loom-X - Copy'
-Set-Location -LiteralPath $repo
-$head = (git rev-parse HEAD).Trim()
-$stamp = Get-Date -Format 'yyyy-MM-dd-HHmm'
-$out = Join-Path $repo "outputs\$stamp-task-8-fix-1-$($head.Substring(0, 7))"
+$head = '164b1e94f0f337fb9a2ad69f09a248c312cb43ec'
+$out = 'D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1601-structured-config-assistant-decisions'
 dotnet publish LoomX/LoomX.csproj -c Release -r win-x64 --self-contained true -p:SourceRevisionId=$head -o $out
-$version = (Get-Item -LiteralPath (Join-Path $out 'LoomX.dll')).VersionInfo.ProductVersion
-[pscustomobject]@{ Head = $head; Output = $out; ProductVersion = $version }
 ```
 
-必须核对：
+结果：
 
-- publish 退出码为 0；
-- 输出目录是本次新建、可读时间命名的 `outputs/...`，不得覆盖或清理其他 Session 产物；
-- `ProductVersion` 包含本次已提交的完整 `$head`（预期形如 `0.12.6+<HEAD>`）。
+- publish 退出码：`0`；
+- 输出目录：`D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1601-structured-config-assistant-decisions`；
+- `LoomX.dll ProductVersion`：`0.12.6+164b1e94f0f337fb9a2ad69f09a248c312cb43ec`；
+- ProductVersion 包含指定完整 HEAD，程序集可追溯；
+- publish 仅出现仓库既有 NU1903、CS8618、CA2024 警告，没有发布错误。
 
-### 2. 推荐使用命令行参数启动
+### 2. 启动前 PID 清单
+
+启动前仅存在一个其他 LoomX 实例：
+
+| PID | Path | StartTime |
+|---:|---|---|
+| 35476 | `D:\AppData\Github\Loom-X\outputs\LoomX-win-x64-2026-09-16-activity-scrollbar-right\LoomX.exe` | 2026-09-17 03:02:58 |
+
+该实例不是本轮产物，验证全过程未停止或修改它。
+
+### 3. 指定参数启动与进程核对
+
+实际执行：
 
 ```powershell
-$exe = (Resolve-Path -LiteralPath (Join-Path $out 'LoomX.exe')).Path
-$log = Join-Path $env:LOCALAPPDATA ("LoomX\logs\loomx-{0}.log" -f (Get-Date -Format 'yyyyMMdd'))
-$process = Start-Process -FilePath $exe -ArgumentList '--allow-multiple-instances' -WorkingDirectory $out -WindowStyle Hidden -PassThru
-Start-Sleep -Seconds 5
-$actual = Get-Process -Id $process.Id -ErrorAction Stop
-if ($actual.Path -ne $exe) { throw "启动进程路径不匹配：$($actual.Path)" }
-$actual | Select-Object Id, Path, StartTime
-Get-Content -LiteralPath $log -Tail 500 | Select-String -Pattern "进程 $($process.Id)"
+$process = Start-Process -FilePath 'D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1601-structured-config-assistant-decisions\LoomX.exe' -ArgumentList '--allow-multiple-instances' -WorkingDirectory 'D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1601-structured-config-assistant-decisions' -WindowStyle Hidden -PassThru
 ```
 
-由于参数令 `allowMultipleInstances=true`，本次 `Start-Process -PassThru` 返回的 PID 应直接是完成初始化的发布应用 PID，而不是短生命周期 bootstrap 父进程。
+等待 8 秒后的结果：
 
-### 3. 环境变量等价启动方式
+- 本轮 PID：`43440`；
+- PID 仍存活；
+- `Process.Path`：`D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1601-structured-config-assistant-decisions\LoomX.exe`；
+- Path 与启动的绝对 exe 路径完全一致；
+- StartTime：`2026-09-17T16:01:53.8300250+08:00`；
+- 启动后 PID 清单包含原有 `35476` 和本轮 `43440`，证明没有把 bootstrap 父进程误当成实际应用 PID。
 
-如需验证环境变量入口，使用独立一次启动：
+### 4. 日志核对
+
+日志文件：`C:\Users\BianShanghai\AppData\Local\LoomX\logs\loomx-20260917.log`
+
+同一 PID `43440` 的关键日志：
+
+- 第 8558 行：`2026-09-17 16:01:54.906 +08:00 [WRN] LoomX.App 调试启动已允许多个桌面实例，进程 43440`；
+- 第 8559 行：`2026-09-17 16:01:54.938 +08:00 [INF] LoomX.App 桌面应用启动，进程 43440`；该行记录的进程路径、基目录、启动工作目录和规范化工作目录均指向本轮输出目录；
+- 后续同一 PID 还有配置服务创建、Provider 页面刷新和概览刷新完成日志，证明应用已继续完成初始化，而不是短生命周期 bootstrap 进程。
+
+匹配统计：
+
+- “调试启动已允许多个桌面实例”：`1` 条；
+- “桌面应用启动”：`1` 条；
+- 同一 PID 的“检测到已有 LoomX 桌面实例”、自启动子进程失败或 bootstrap 失败信息：`0` 条。
+
+### 5. 安全停止与最终 PID 清单
+
+仅执行：
 
 ```powershell
-$previous = $env:LOOMX_ALLOW_MULTIPLE_INSTANCES
-try {
-    $env:LOOMX_ALLOW_MULTIPLE_INSTANCES = '1'
-    $process = Start-Process -FilePath $exe -WorkingDirectory $out -WindowStyle Hidden -PassThru
-}
-finally {
-    if ($null -eq $previous) { Remove-Item Env:LOOMX_ALLOW_MULTIPLE_INSTANCES -ErrorAction SilentlyContinue }
-    else { $env:LOOMX_ALLOW_MULTIPLE_INSTANCES = $previous }
-}
-Start-Sleep -Seconds 5
-$actual = Get-Process -Id $process.Id -ErrorAction Stop
-if ($actual.Path -ne $exe) { throw "启动进程路径不匹配：$($actual.Path)" }
-$actual | Select-Object Id, Path, StartTime
-Get-Content -LiteralPath $log -Tail 500 | Select-String -Pattern "进程 $($process.Id)"
+Stop-Process -Id 43440 -ErrorAction Stop
 ```
 
-### 4. PID、Path 与日志核对清单
+结果：
 
-只针对本轮 `$process.Id` 核对：
+- 本轮 PID `43440` 已停止；最终延迟 2 秒复核 `Get-Process -Id 43440` 返回不存在；
+- 原有 PID `35476` 仍存活，Path 保持不变；
+- 最终 LoomX PID 清单仅剩 `35476`；
+- 未停止或影响其他 LoomX 进程。
 
-1. `Get-Process -Id $process.Id` 在等待后仍存在；
-2. `Path` 与本轮新发布目录中的 `LoomX.exe` 完全相等；
-3. 日志存在同一 PID 的“调试启动已允许多个桌面实例”；
-4. 日志存在同一 PID 的“桌面应用启动”，且其中“进程路径”与 `$exe` 完全一致；
-5. 同一 PID 不应出现“检测到已有 LoomX 桌面实例”或 bootstrap 失败/退出记录；
-6. 记录启动前已有 LoomX PID，仅在验证结束时执行 `Stop-Process -Id $process.Id`，不得结束其他已有实例。
-
-本轮未执行上述 publish/启动步骤，等待协调者提交代码后再从提交 HEAD 验证。
+M1 发布验证已完成，不再存在“待协调者提交后执行”的步骤。
