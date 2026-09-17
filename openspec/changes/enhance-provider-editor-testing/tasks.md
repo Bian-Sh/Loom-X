@@ -1,7 +1,7 @@
 ## 1. Provider 基础配置模型
 
-- [ ] 1.1 为兼容类型映射和旧配置反向解析编写失败测试，实现 OpenAI Chat、OpenAI Responses、Anthropic Messages 三种映射并验证测试通过
-- [ ] 1.2 为新 Provider 稳定唯一业务 ID 编写失败测试，实现自动生成与冲突保护，并验证名称和类型变化不会修改 ID
+- [x] 1.1 为兼容类型映射和旧配置反向解析编写失败测试，实现 OpenAI Chat、OpenAI Responses、Anthropic Messages 三种映射并验证测试通过
+- [x] 1.2 为新 Provider 稳定唯一业务 ID 编写失败测试，实现自动生成与冲突保护，并验证名称和类型变化不会修改 ID
 - [ ] 1.3 调整 Provider 编辑持久化属性与加载行为，验证已有 Provider ID、API Key 和旧协议配置仍可无损读取保存
 
 ## 2. 真实请求测试服务

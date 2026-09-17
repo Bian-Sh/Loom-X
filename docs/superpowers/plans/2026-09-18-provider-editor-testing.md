@@ -50,7 +50,7 @@ base-ref: 1aab9a75f9e698651f3797e57959c2cf47445a4b
 - 产出：`ProviderCompatibilityOption.All`、`FromFields(string apiMode, string endpointFormat)`、`ApplyTo(ProviderEditorViewModel provider)`。
 - 产出：`ProvidersViewModel.GenerateProviderBusinessId(IEnumerable<ProviderEditorViewModel>)`，返回 `provider-xxxxxxxx`。
 
-- [ ] **步骤 1：写兼容映射失败测试**
+- [x] **步骤 1：写兼容映射失败测试**
 
 `ProviderCompatibilityOptionTests` 至少固定以下断言：
 
@@ -75,13 +75,13 @@ public void 应用兼容类型不会修改ProviderId()
 }
 ```
 
-- [ ] **步骤 2：运行映射测试并确认红灯**
+- [x] **步骤 2：运行映射测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderCompatibilityOptionTests`
 
 预期：编译失败，提示 `ProviderCompatibilityOption` 不存在。
 
-- [ ] **步骤 3：实现最小映射类型**
+- [x] **步骤 3：实现最小映射类型**
 
 实现三个静态选项和旧值回退：
 
@@ -97,17 +97,17 @@ public sealed record ProviderCompatibilityOption(string Value, string ApiMode, s
 
 在 `ProviderEditorViewModel` 暴露 `SelectedCompatibility`，setter 调用 `ApplyTo`，`ApiMode/EndpointFormat` 变化时通知该属性。
 
-- [ ] **步骤 4：写自动 ID 失败测试**
+- [x] **步骤 4：写自动 ID 失败测试**
 
 覆盖：格式、当前集合冲突重试、名称和兼容类型变化不改 ID、已有 Provider 加载保持原值。
 
-- [ ] **步骤 5：运行 ID 测试并确认红灯**
+- [x] **步骤 5：运行 ID 测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~ProviderEditorViewModelTests|FullyQualifiedName~ProviderCompatibilityOptionTests"`
 
 预期：新建 Provider 的 `BusinessId` 为空或生成器不存在。
 
-- [ ] **步骤 6：实现 ID 生成并改造 NewProvider**
+- [x] **步骤 6：实现 ID 生成并改造 NewProvider**
 
 `NewProvider` 创建时设置：
 
@@ -119,7 +119,7 @@ EndpointFormat = "responses"
 
 生成器循环使用 `Guid.NewGuid().ToString("N")[..8]`，按 `OrdinalIgnoreCase` 检查冲突。
 
-- [ ] **步骤 7：运行测试并提交**
+- [x] **步骤 7：运行测试并提交**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~ProviderCompatibilityOptionTests|FullyQualifiedName~ProviderEditorViewModelTests"`
 
