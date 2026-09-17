@@ -27,9 +27,9 @@
 
 ## 5. AskUser 桌面端交互
 
-- [ ] 5.1 在 AssistantViewModel 中订阅 Broker 的 pending request、提交、取消和页面卸载事件，维护当前会话状态，并以 ViewModel 测试确认关闭页面会取消所有等待请求
-- [ ] 5.2 基于 `GlassDialogWindow` 风格实现 AskUser Dialog/ViewModel，渲染单选、多选、数字和自由文本字段，支持必填校验、默认值展示、提交和取消，并以 UI/视图模型测试覆盖各种字段组合
-- [ ] 5.3 将 AskUser 的用户可见反馈接入 `ToastService`，区分提交成功、取消和错误状态，确认 Toast 不包含 Secret、Authorization、完整请求/响应正文或用户敏感输入
+- [x] 5.1 在 AssistantViewModel 中订阅 Broker 的 pending request、提交、取消和页面卸载事件，维护当前会话状态，并以 ViewModel 测试确认关闭页面会取消所有等待请求
+- [x] 5.2 基于 `GlassDialogWindow` 风格实现 AskUser Dialog/ViewModel，渲染单选、多选、数字和自由文本字段，支持必填校验、默认值展示、提交和取消，并以 UI/视图模型测试覆盖各种字段组合
+- [x] 5.3 将 AskUser 的用户可见反馈接入 `ToastService`，区分提交成功、取消和错误状态，确认 Toast 不包含 Secret、Authorization、完整请求/响应正文或用户敏感输入
 
 ## 6. 资料收集与后续 Skill 约束
 

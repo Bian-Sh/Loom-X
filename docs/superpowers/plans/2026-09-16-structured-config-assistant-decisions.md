@@ -504,7 +504,7 @@ git commit -m "接入 AskUser 工具与会话恢复"
 - Consumes: `PendingUserDecision` 与 `IUserDecisionBroker`。
 - Produces: `AskUserDialogViewModel.TryBuildResult(out IReadOnlyDictionary<string, object?> values)`。
 
-- [ ] **Step 1: 编写 ViewModel 字段投影和校验失败测试**
+- [x] **Step 1: 编写 ViewModel 字段投影和校验失败测试**
 
 覆盖 single/multi/number/text、默认值、必填、多选最少/最多、数字范围、文本长度、取消。示例：
 
@@ -518,29 +518,29 @@ public void TryBuildResult_WhenRequiredTextIsEmpty_ReturnsFieldError()
 }
 ```
 
-- [ ] **Step 2: 运行 ViewModel 测试确认红灯**
+- [x] **Step 2: 运行 ViewModel 测试确认红灯**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AssistantViewModelTests|FullyQualifiedName~AskUserDialogContractTests"`
 Expected: FAIL。
 
-- [ ] **Step 3: 实现专用 Dialog ViewModel 和 XAML**
+- [x] **Step 3: 实现专用 Dialog ViewModel 和 XAML**
 
 使用现有动态资源、圆角、边框与透明背景风格；通过字段类型选择 DataTemplate。Dialog 至少包含标题、问题、原因/影响摘要、滚动字段区、错误区、取消与提交按钮。不得把用户输入绑定到日志或 Toast。
 
-- [ ] **Step 4: 接入 AssistantViewModel 生命周期**
+- [x] **Step 4: 接入 AssistantViewModel 生命周期**
 
 激活时订阅 `PendingRequested`，UI 线程中打开 `AskUserDialog`；关闭页面/Dispose 时解除订阅并 `CancelOwner`。Dialog 关闭等价于取消；提交只调用 Broker 的 request id，不直接操纵 AgentLoop。
 
-- [ ] **Step 5: 接入安全 Toast**
+- [x] **Step 5: 接入安全 Toast**
 
 提交成功显示“已提交助手决策”，取消显示“已取消助手决策”，错误显示安全错误摘要；任何 Toast 不包含字段值、问题正文、API Key 或 Authorization。
 
-- [ ] **Step 6: 运行 ViewModel、视图契约与外观测试**
+- [x] **Step 6: 运行 ViewModel、视图契约与外观测试**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AssistantViewModelTests|FullyQualifiedName~AskUserDialogContractTests|FullyQualifiedName~WindowAppearanceCoordinatorTests"`
 Expected: PASS。
 
-- [ ] **Step 7: 勾选 OpenSpec 5.1–5.3 并提交**
+- [x] **Step 7: 勾选 OpenSpec 5.1–5.3 并提交**
 
 ```powershell
 git add LoomX/ViewModels/AskUserDialogViewModel.cs LoomX/Views/AskUserDialog.axaml LoomX/Views/AskUserDialog.axaml.cs LoomX/ViewModels/AssistantViewModel.cs LoomX.Tests/Assistant/AssistantViewModelTests.cs LoomX.Tests/Views/AskUserDialogContractTests.cs openspec/changes/structured-config-assistant-decisions/tasks.md
