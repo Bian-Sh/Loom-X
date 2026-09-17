@@ -538,7 +538,11 @@ public sealed class AssistantServiceTests : IDisposable
     {
         var completion = new TaskCompletionSource<PendingUserDecision>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        broker.PendingRequested += (_, request) => completion.TrySetResult(request);
+        broker.PendingRequested += (_, request) =>
+        {
+            broker.TryClaim(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId);
+            completion.TrySetResult(request);
+        };
         return completion;
     }
 

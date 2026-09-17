@@ -30,6 +30,7 @@ public sealed class ToolDefinition
     public required string Description { get; init; }
     public required JsonNode ParametersSchema { get; init; }
     public required Func<JsonNode?, CancellationToken, Task<ToolResult>> Handler { get; init; }
+    public Func<JsonNode?, JsonNode?>? SafeArgumentsProjector { get; init; }
     public TimeSpan Timeout { get; init; } = TimeSpan.FromSeconds(30);
     public ToolRiskLevel RiskLevel { get; init; } = ToolRiskLevel.Read;
 }

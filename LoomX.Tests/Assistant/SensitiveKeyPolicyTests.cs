@@ -86,6 +86,59 @@ public sealed class SensitiveKeyPolicyTests
         Assert.Equal(true, nested["enabled"].Value);
     }
 
+
+    [Theory]
+    [InlineData("headers")]
+    [InlineData("custom_headers")]
+    [InlineData("http_headers")]
+    public void SensitiveKeyPolicy_Header容器的所有后代都视为敏感(string container)
+    {
+        Assert.True(SensitiveKeyPolicy.IsSensitivePath(["provider", container, "X-Arbitrary-Name"]));
+    }
+
+    [Theory]
+    [InlineData("Bearer abcdefghijklmnopqrstuvwxyz123456")]
+    [InlineData("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.signature123")]
+    [InlineData("sk-proj-abcdefghijklmnopqrstuvwxyz123456")]
+    public void SensitiveKeyPolicy_非敏感键名下的秘密字符串也脱敏(string secret)
+    {
+        var original = TomlValue.FromObject(new Dictionary<string, object?>
+        {
+            ["benign"] = secret,
+            ["nested"] = new object?[]
+            {
+                new Dictionary<string, object?> { ["value"] = secret },
+            },
+        });
+
+        var redacted = SensitiveKeyPolicy.Redact(original, ["provider"]);
+        var root = Assert.IsAssignableFrom<IReadOnlyDictionary<string, TomlValue>>(redacted.Value);
+        Assert.Equal("***", root["benign"].Value);
+        var array = Assert.IsAssignableFrom<IReadOnlyList<TomlValue>>(root["nested"].Value);
+        var nested = Assert.IsAssignableFrom<IReadOnlyDictionary<string, TomlValue>>(array[0].Value);
+        Assert.Equal("***", nested["value"].Value);
+    }
+
+    [Fact]
+    public void SensitiveKeyPolicy_Header父容器读取隐藏任意Header值但保留普通值()
+    {
+        var original = TomlValue.FromObject(new Dictionary<string, object?>
+        {
+            ["headers"] = new Dictionary<string, object?>
+            {
+                ["X-Custom"] = "private-header-value",
+                ["X-Trace"] = "trace-value",
+            },
+            ["model"] = "loomx",
+        });
+
+        var redacted = SensitiveKeyPolicy.Redact(original, ["provider"]);
+        var root = Assert.IsAssignableFrom<IReadOnlyDictionary<string, TomlValue>>(redacted.Value);
+        var headers = Assert.IsAssignableFrom<IReadOnlyDictionary<string, TomlValue>>(root["headers"].Value);
+        Assert.All(headers.Values, value => Assert.Equal("***", value.Value));
+        Assert.Equal("loomx", root["model"].Value);
+    }
+
     [Fact]
     public void SensitiveKeyPolicy_非敏感标量保持原实例()
     {

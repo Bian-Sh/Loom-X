@@ -40,6 +40,7 @@ public static class AssistantTools
             Description = "暂停当前步骤并向用户收集一组结构化业务决策；不得用于索取密钥或认证信息。",
             ParametersSchema = CreateAskUserSchema(),
             RiskLevel = ToolRiskLevel.Read,
+            SafeArgumentsProjector = CreateSafeArgumentsProjection,
             Timeout = System.Threading.Timeout.InfiniteTimeSpan,
             Handler = async (arguments, cancellationToken) =>
             {
@@ -74,6 +75,45 @@ public static class AssistantTools
         return new OwnerScope(previous);
     }
 
+
+    private static JsonNode CreateSafeArgumentsProjection(JsonNode? arguments)
+    {
+        var root = arguments as JsonObject ?? throw new ArgumentException("工具参数必须是对象。", nameof(arguments));
+        var fields = root["fields"] as JsonArray;
+        var fieldSummaries = new JsonArray();
+        if (fields is not null)
+        {
+            foreach (var item in fields)
+            {
+                var field = item as JsonObject;
+                var type = field?["type"] is JsonValue typeValue
+                    && typeValue.TryGetValue<string>(out var rawType)
+                    && rawType is "single_select" or "multi_select" or "number" or "text"
+                        ? rawType
+                        : "unknown";
+                var required = field?["is_required"] is JsonValue requiredValue
+                    && requiredValue.TryGetValue<bool>(out var isRequired)
+                    && isRequired;
+                fieldSummaries.Add(new JsonObject
+                {
+                    ["type"] = type,
+                    ["required"] = required,
+                    ["option_count"] = field?["options"] is JsonArray options ? options.Count : 0,
+                });
+            }
+        }
+
+        return new JsonObject
+        {
+            ["field_count"] = fields?.Count ?? 0,
+            ["fields"] = fieldSummaries,
+            ["allow_cancel"] = root["allow_cancel"] is JsonValue allowCancelValue
+                && allowCancelValue.TryGetValue<bool>(out var allowCancel)
+                ? allowCancel
+                : true,
+        };
+    }
+
     private static UserDecisionRequest ParseRequest(JsonNode? arguments)
     {
         var root = arguments as JsonObject
@@ -103,8 +143,7 @@ public static class AssistantTools
                 [new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, "用户决策字段无效。")]);
         ValidateProperties(field, FieldProperties);
         var type = ParseFieldType(RequireString(field, "type"));
-        var options = (field["options"] as JsonArray)?.Select(ParseOption).ToArray()
-            ?? Array.Empty<UserDecisionOption>();
+        var options = ReadOptions(field, "options");
 
         return new UserDecisionField(
             RequireString(field, "id"),
@@ -271,27 +310,113 @@ public static class AssistantTools
     private static UserDecisionValidationException InvalidRequest(string message) =>
         new([new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, message)]);
 
-    private static string RequireString(JsonObject source, string propertyName) =>
-        source[propertyName]?.GetValue<string>()
-        ?? throw new UserDecisionValidationException(
-            [new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, "用户决策请求缺少必填属性。")]);
+    private static string RequireString(JsonObject source, string propertyName)
+    {
+        if (source[propertyName] is JsonValue value && value.TryGetValue<string>(out var result))
+        {
+            return result;
+        }
 
-    private static string? OptionalString(JsonObject source, string propertyName) =>
-        source[propertyName]?.GetValue<string>();
+        throw InvalidRequest("用户决策请求缺少必填属性或属性类型无效。");
+    }
 
-    private static T OptionalValue<T>(JsonObject source, string propertyName, T defaultValue) =>
-        source[propertyName] is { } node ? node.Deserialize<T>()! : defaultValue;
+    private static string? OptionalString(JsonObject source, string propertyName)
+    {
+        if (!source.TryGetPropertyValue(propertyName, out var node))
+        {
+            return null;
+        }
+
+        if (node is null)
+        {
+            throw InvalidRequest("用户决策可选属性类型无效。");
+        }
+
+        return node is JsonValue value && value.TryGetValue<string>(out var result)
+            ? result
+            : throw InvalidRequest("用户决策可选属性类型无效。");
+    }
+
+    private static T OptionalValue<T>(JsonObject source, string propertyName, T defaultValue)
+    {
+        if (!source.TryGetPropertyValue(propertyName, out var node))
+        {
+            return defaultValue;
+        }
+
+        if (node is null)
+        {
+            throw InvalidRequest("用户决策可选属性类型无效。");
+        }
+
+        return ReadValue<T>(node);
+    }
 
     private static T? OptionalNullableValue<T>(JsonObject source, string propertyName)
-        where T : struct => source[propertyName] is { } node ? node.Deserialize<T>() : null;
+        where T : struct
+    {
+        if (!source.TryGetPropertyValue(propertyName, out var node))
+        {
+            return null;
+        }
 
-    private static IReadOnlyList<string> ReadStringArray(JsonObject source, string propertyName) =>
-        source[propertyName] is JsonArray items
-            ? items.Select(item => item?.GetValue<string>()
-                ?? throw new UserDecisionValidationException(
-                    [new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, "用户决策默认选项无效。")]))
-                .ToArray()
-            : Array.Empty<string>();
+        if (node is null)
+        {
+            throw InvalidRequest("用户决策可选属性类型无效。");
+        }
+
+        return ReadValue<T>(node);
+    }
+
+    private static T ReadValue<T>(JsonNode node)
+    {
+        if (node is not JsonValue)
+        {
+            throw InvalidRequest("用户决策可选属性类型无效。");
+        }
+
+        try
+        {
+            return node.Deserialize<T>()!;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException or FormatException)
+        {
+            throw InvalidRequest("用户决策可选属性类型无效。");
+        }
+    }
+
+    private static IReadOnlyList<UserDecisionOption> ReadOptions(JsonObject source, string propertyName)
+    {
+        if (!source.TryGetPropertyValue(propertyName, out var node))
+        {
+            return [];
+        }
+
+        if (node is not JsonArray items)
+        {
+            throw InvalidRequest("用户决策选项类型无效。");
+        }
+
+        return items.Select(ParseOption).ToArray();
+    }
+
+    private static IReadOnlyList<string> ReadStringArray(JsonObject source, string propertyName)
+    {
+        if (!source.TryGetPropertyValue(propertyName, out var node))
+        {
+            return [];
+        }
+
+        if (node is not JsonArray items)
+        {
+            throw InvalidRequest("用户决策默认选项类型无效。");
+        }
+
+        return items.Select(item => item is JsonValue value && value.TryGetValue<string>(out var result)
+                ? result
+                : throw InvalidRequest("用户决策默认选项无效。"))
+            .ToArray();
+    }
 
     private static ToolResult Fail(string code, string message) =>
         ToolResult.Fail(new JsonObject

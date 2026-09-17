@@ -248,4 +248,35 @@ public sealed class AssistantSessionStoreTests : IDisposable
     {
         Assert.Equal(expected, AssistantSessionStore.SecretLeakScan($"{{\"content\":\"{content}\"}}"));
     }
+    [Fact]
+    public async Task LoadAsync_旧Jsonl未标记工具参数时隐藏原文()
+    {
+        const string sessionId = "legacy-unsafe-tool-arguments";
+        const string secret = "legacy-private-value";
+        var root = Path.Combine(Path.GetTempPath(), $"loomx-session-store-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var lines = new[]
+            {
+                $$"""{"type":"session","version":2,"session_id":"{{sessionId}}"}""",
+                $$"""{"type":"message","role":"Assistant","content":null,"tool_calls":[{"id":"legacy-call","name":"legacy.tool","arguments":"{\"value\":\"{{secret}}\"}"}]}""",
+                """{"type":"custom","kind":"State","state":"Completed"}""",
+            };
+            await File.WriteAllLinesAsync(Path.Combine(root, $"{sessionId}.jsonl"), lines);
+            var store = new AssistantSessionStore(root);
+
+            var loaded = await store.LoadAsync(sessionId);
+
+            Assert.NotNull(loaded);
+            var arguments = Assert.Single(loaded.Messages.Single().ToolCalls).ArgumentsJson;
+            Assert.DoesNotContain(secret, arguments, StringComparison.Ordinal);
+            Assert.Contains("参数已隐藏", arguments, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
 }

@@ -1620,9 +1620,10 @@ public sealed class ProcessToolCallViewModel : NotifyViewModel
 
     public ProcessToolCallViewModel(ToolCall toolCall, Action changed)
     {
-        id = toolCall.Id;
-        name = toolCall.Name;
-        argumentsJson = toolCall.ArgumentsJson;
+        var safeToolCall = ToolArgumentSafety.EnsureSafe(toolCall);
+        id = safeToolCall.Id;
+        name = safeToolCall.Name;
+        argumentsJson = safeToolCall.ArgumentsJson;
         this.changed = changed;
     }
 
@@ -1664,9 +1665,10 @@ public sealed class ProcessToolCallViewModel : NotifyViewModel
 
     public void UpdateDefinition(ToolCall toolCall)
     {
-        id = toolCall.Id;
-        name = toolCall.Name;
-        argumentsJson = toolCall.ArgumentsJson;
+        var safeToolCall = ToolArgumentSafety.EnsureSafe(toolCall);
+        id = safeToolCall.Id;
+        name = safeToolCall.Name;
+        argumentsJson = safeToolCall.ArgumentsJson;
         NotifyDetailsChanged();
     }
 

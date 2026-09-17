@@ -53,7 +53,7 @@ public sealed class AgentSession
     public IReadOnlyList<ChatMessage> Messages => messages;
     public IReadOnlyList<AgentEvent> Activities => activities;
 
-    internal void AddMessage(ChatMessage message) => messages.Add(message);
+    internal void AddMessage(ChatMessage message) => messages.Add(ToolArgumentSafety.EnsureSafe(message));
 
     /// <summary>应用宿主当前系统策略；替换历史策略并保留原消息标识，避免追加重复策略消息。</summary>
     internal void ApplySystemPrompt(string systemPrompt)
@@ -73,7 +73,7 @@ public sealed class AgentSession
     }
 
     /// <summary>从持久化恢复消息（不清空系统提示之外的校验，内容由存储层保证安全）。</summary>
-    internal void RestoreMessage(ChatMessage message) => messages.Add(message);
+    internal void RestoreMessage(ChatMessage message) => messages.Add(ToolArgumentSafety.EnsureSafe(message));
     internal void RecordActivity(AgentEvent activity) => activities.Add(activity);
 
     /// <summary>从持久化恢复状态；Running 属于崩溃残留，恢复为 Cancelled。</summary>

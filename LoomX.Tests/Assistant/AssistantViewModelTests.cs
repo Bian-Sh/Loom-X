@@ -213,7 +213,7 @@ public sealed class AssistantViewModelTests
     public void Project_ToolMessages_PreserveArgumentsAndResultsByCallId()
     {
         var viewModel = CreateViewModel();
-        var toolCall = new ToolCall("call-42", "loomx.inspect", """{"path":"D:/demo","depth":3}""");
+        var toolCall = new ToolCall("call-42", "loomx.inspect", """{"path":"D:/demo","depth":3}""") { ArgumentsAreSafe = true };
 
         viewModel.Project(Event(AgentEventKind.MessageCompleted) with
         {
@@ -337,6 +337,22 @@ public sealed class AssistantViewModelTests
         Assert.True(option.MatchesSearch("GPT"));
         Assert.False(option.MatchesSearch("claude"));
         Assert.True(option.MatchesSearch(""));
+    }
+
+    [Fact]
+    public void Project_未标记安全的旧工具参数不会进入UI详情()
+    {
+        const string secret = "legacy-ui-private-value";
+        var viewModel = CreateViewModel();
+        var message = ChatMessage.AssistantToolCalls(
+            [new ToolCall("legacy-ui", "legacy.tool", $$"""{"value":"{{secret}}"}""")]);
+
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with { Message = message });
+
+        var process = Assert.Single(viewModel.Messages, item => item.IsProcess);
+        var toolItem = Assert.Single(process.Items, item => item.Label.Contains("工具"));
+        Assert.DoesNotContain(secret, toolItem.DetailsText, StringComparison.Ordinal);
+        Assert.Contains("summary", toolItem.DetailsText, StringComparison.Ordinal);
     }
 
     private static AssistantViewModel CreateViewModel() => new(new GatewayProcessService());

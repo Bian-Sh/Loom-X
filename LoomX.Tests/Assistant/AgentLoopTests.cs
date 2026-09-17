@@ -367,4 +367,58 @@ public sealed class AgentLoopTests
         // 第二轮请求应携带第一轮完整历史（用户1 + 助手1 + 用户2）
         Assert.Equal(3, modelClient.Requests[1].Messages.Count);
     }
+
+    [Fact]
+    public async Task UnknownTool_原始参数不进入Session事件或下一轮ModelRequest()
+    {
+        const string fullPath = @"C:\Users\Alice\private\config.toml";
+        const string secret = "unknown-tool-private-value";
+        var raw = $$"""{"path":"{{fullPath.Replace("\\", "\\\\")}}","value":"{{secret}}"}""";
+        var modelClient = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("unknown-1", "unknown.tool", raw)), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已处理。"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        var events = await CollectAsync(CreateLoop(modelClient).RunAsync(session, "执行未知工具"));
+
+        var stored = Assert.Single(session.Messages, message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson;
+        var completedMessage = Assert.Single(events, item => item.Kind == AgentEventKind.MessageCompleted && item.Message?.ToolCalls.Count > 0)
+            .Message!.ToolCalls[0].ArgumentsJson;
+        var nextRequest = modelClient.Requests[1].Messages.Single(message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson;
+        foreach (var safe in new[] { stored, completedMessage, nextRequest })
+        {
+            Assert.DoesNotContain(fullPath, safe, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(secret, safe, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task SafeArgumentsProjector异常时安全失败但Handler仍收到原始参数()
+    {
+        const string secret = "projection-failure-secret";
+        string? handled = null;
+        var registry = new ToolRegistry();
+        registry.Register(new ToolDefinition
+        {
+            Name = "mock.projector_failure",
+            Description = "投影失败测试",
+            ParametersSchema = System.Text.Json.Nodes.JsonNode.Parse("""{"type":"object"}""")!,
+            SafeArgumentsProjector = _ => throw new ApplicationException("projection failed"),
+            Handler = (arguments, _) =>
+            {
+                handled = arguments?["value"]?.GetValue<string>();
+                return Task.FromResult(ToolResult.Ok("{}"));
+            },
+        });
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("call-projector", "mock.projector_failure", $$"""{"value":"{{secret}}"}""")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("完成"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        await CollectAsync(CreateLoop(model, registry).RunAsync(session, "执行"));
+
+        Assert.Equal(secret, handled);
+        Assert.DoesNotContain(secret, session.Messages.Single(message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson, StringComparison.Ordinal);
+    }
+
 }

@@ -136,6 +136,17 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
             }
         }
 
+        if (pendingEntries.TryGetValue(requestId!, out var publishedEntry)
+            && !publishedEntry.HasClaim
+            && pendingEntries.TryRemove(requestId!, out var unclaimed))
+        {
+            logger.LogWarning("用户决策请求发布后无人接管 {RequestId} {FieldCount}", requestId, request.Fields.Count);
+            CompleteEntry(
+                unclaimed,
+                () => unclaimed.Completion.TrySetException(
+                    new InvalidOperationException("当前没有可用的用户决策处理器。")));
+        }
+
         return completion!.Task;
     }
 
@@ -381,6 +392,17 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
         private string? claimantId;
 
         public TaskCompletionSource<UserDecisionResult> Completion { get; } = completion;
+
+        public bool HasClaim
+        {
+            get
+            {
+                lock (registrationGate)
+                {
+                    return !completed && claimantId is not null;
+                }
+            }
+        }
 
         public bool TryClaim(string candidate)
         {

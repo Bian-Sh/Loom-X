@@ -154,10 +154,15 @@ public sealed class AgentLoop
             // tool_call_id 必须唯一，否则把历史回传给上游时违反 OpenAI 协议触发 400。
             // 保留首次出现的完整调用（arguments 已逐步追加完整）。
             var dedupedToolCalls = DedupeToolCallsById(toolCalls);
+            var safeToolCalls = dedupedToolCalls
+                .Select(call => ToolArgumentSafety.Project(
+                    call,
+                    toolRegistry.TryGet(call.Name, out var definition) ? definition : null))
+                .ToArray();
 
-            blocks.AddRange(dedupedToolCalls.Select(call => new ChatContentBlock(ChatContentKind.ToolCall, ToolCall: call)));
+            blocks.AddRange(safeToolCalls.Select(call => new ChatContentBlock(ChatContentKind.ToolCall, ToolCall: call)));
             session.AddMessage(ChatMessage.AssistantToolCalls(
-                dedupedToolCalls,
+                safeToolCalls,
                 textBuilder.Length > 0 ? textBuilder.ToString() : null) with { Blocks = blocks });
             yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1], Step = step + 1 };
 
@@ -168,12 +173,14 @@ public sealed class AgentLoop
                 break;
             }
 
-            foreach (var toolCall in dedupedToolCalls)
+            for (var toolIndex = 0; toolIndex < dedupedToolCalls.Count; toolIndex++)
             {
+                var toolCall = dedupedToolCalls[toolIndex];
+                var safeToolCall = safeToolCalls[toolIndex];
                 yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallStarted) with
                 {
-                    ToolName = toolCall.Name,
-                    ToolCallId = toolCall.Id,
+                    ToolName = safeToolCall.Name,
+                    ToolCallId = safeToolCall.Id,
                 };
 
                 // 逐条批准模式：写/删工具先等用户批准
@@ -184,15 +191,15 @@ public sealed class AgentLoop
                 {
                     yield return AgentEvent.Create(session.Id, AgentEventKind.ToolApprovalRequested) with
                     {
-                        ToolName = toolCall.Name,
-                        ToolCallId = toolCall.Id,
-                        Detail = SummarizeArguments(toolCall.ArgumentsJson),
+                        ToolName = safeToolCall.Name,
+                        ToolCallId = safeToolCall.Id,
+                        Detail = SummarizeArguments(safeToolCall.ArgumentsJson),
                     };
 
                     bool approved;
                     try
                     {
-                        approved = await approvalGate(toolCall, pendingTool, cancellationToken);
+                        approved = await approvalGate(safeToolCall, pendingTool, cancellationToken);
                     }
                     catch (OperationCanceledException)
                     {
@@ -203,7 +210,7 @@ public sealed class AgentLoop
                     if (!approved)
                     {
                         logger.LogInformation("Agent 工具调用被用户拒绝 {ToolName}", toolCall.Name);
-                        session.AddMessage(ChatMessage.ToolResult(toolCall, "用户拒绝了这次修改操作，没有执行。"));
+                        session.AddMessage(ChatMessage.ToolResult(safeToolCall, "用户拒绝了这次修改操作，没有执行。"));
                         yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1] };
                         yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallCompleted) with
                         {
@@ -223,7 +230,7 @@ public sealed class AgentLoop
                     break;
                 }
 
-                session.AddMessage(ChatMessage.ToolResult(toolCall, result!.Content));
+                session.AddMessage(ChatMessage.ToolResult(safeToolCall, result!.Content));
                 yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1] };
 
                 yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallCompleted) with

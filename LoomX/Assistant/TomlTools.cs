@@ -1,4 +1,6 @@
-﻿using System.Text.Encodings.Web;
+﻿using System.Security.Cryptography;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using LoomX.Assistant.Configuration;
@@ -33,6 +35,7 @@ public static class TomlTools
             Description = "读取 TOML 文件的安全摘要，包括存在性、合法性和顶层键，不返回完整文件文本。",
             ParametersSchema = ReadSchema(),
             RiskLevel = ToolRiskLevel.Read,
+            SafeArgumentsProjector = args => CreateSafeArgumentsProjection("read", args),
             Handler = (args, cancellationToken) => GuardAsync(async () =>
             {
                 var path = RequirePath(args);
@@ -60,6 +63,7 @@ public static class TomlTools
             Description = "按分段键路径读取 TOML 值；敏感路径和值会脱敏。",
             ParametersSchema = KeyPathSchema(includeValue: false),
             RiskLevel = ToolRiskLevel.Read,
+            SafeArgumentsProjector = args => CreateSafeArgumentsProjection("get", args),
             Handler = (args, cancellationToken) => GuardAsync(async () =>
             {
                 var path = RequirePath(args);
@@ -96,6 +100,7 @@ public static class TomlTools
             Description = "验证 TOML 文件语法并返回安全的定位摘要，不返回文件内容。",
             ParametersSchema = ReadSchema(),
             RiskLevel = ToolRiskLevel.Read,
+            SafeArgumentsProjector = args => CreateSafeArgumentsProjection("validate", args),
             Handler = (args, cancellationToken) => GuardAsync(async () =>
             {
                 var path = RequirePath(args);
@@ -116,6 +121,7 @@ public static class TomlTools
             Description = "设置一个 TOML 键路径。输出只包含修改摘要，不回显输入值。",
             ParametersSchema = KeyPathSchema(includeValue: true),
             RiskLevel = ToolRiskLevel.Write,
+            SafeArgumentsProjector = args => CreateSafeArgumentsProjection("set", args),
             Handler = (args, cancellationToken) => GuardAsync(async () =>
             {
                 var path = RequirePath(args);
@@ -134,6 +140,7 @@ public static class TomlTools
             Description = "原子应用非空 TOML set/delete 操作列表。输出不回显输入值。",
             ParametersSchema = PatchSchema(),
             RiskLevel = ToolRiskLevel.Write,
+            SafeArgumentsProjector = args => CreateSafeArgumentsProjection("patch", args),
             Handler = (args, cancellationToken) => GuardAsync(async () =>
             {
                 var path = RequirePath(args);
@@ -148,6 +155,7 @@ public static class TomlTools
             Description = "删除一个 TOML 键路径。",
             ParametersSchema = KeyPathSchema(includeValue: false),
             RiskLevel = ToolRiskLevel.Destructive,
+            SafeArgumentsProjector = args => CreateSafeArgumentsProjection("delete", args),
             Handler = (args, cancellationToken) => GuardAsync(async () =>
             {
                 var path = RequirePath(args);
@@ -158,6 +166,59 @@ public static class TomlTools
                     cancellationToken));
             }),
         });
+    }
+
+
+    private static JsonNode CreateSafeArgumentsProjection(string operation, JsonNode? arguments)
+    {
+        var root = arguments as JsonObject ?? throw new ArgumentException("工具参数必须是对象。", nameof(arguments));
+        var projection = new JsonObject
+        {
+            ["operation"] = operation,
+        };
+        if (root["path"] is JsonValue pathValue && pathValue.TryGetValue<string>(out var path))
+        {
+            var fileName = Path.GetFileName(path);
+            projection["file"] = new JsonObject
+            {
+                ["name"] = SensitiveKeyPolicy.ContainsSensitiveContent(fileName) ? "[hidden]" : fileName,
+                ["path_sha256"] = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(path))),
+            };
+        }
+
+        if (root["key_path"] is JsonArray keyPath)
+        {
+            projection["key_path"] = CreateKeyPathSummary(keyPath);
+        }
+
+        if (root["operations"] is JsonArray operations)
+        {
+            projection["operation_count"] = operations.Count;
+            projection["operations"] = new JsonArray(operations.Select(item =>
+            {
+                var operationObject = item as JsonObject;
+                var rawKind = operationObject?["op"]?.GetValue<string>();
+                return (JsonNode?)new JsonObject
+                {
+                    ["op"] = rawKind is "set" or "delete" ? rawKind : "unknown",
+                    ["key_path"] = operationObject?["key_path"] is JsonArray segments
+                        ? CreateKeyPathSummary(segments)
+                        : null,
+                };
+            }).ToArray());
+        }
+
+        return projection;
+    }
+
+    private static JsonObject CreateKeyPathSummary(JsonArray segments)
+    {
+        var normalized = string.Join("\u001F", segments.Select(item => item?.GetValue<string>() ?? string.Empty));
+        return new JsonObject
+        {
+            ["segment_count"] = segments.Count,
+            ["sha256"] = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(normalized))),
+        };
     }
 
     private static JsonNode ReadSchema() => Schema($$"""

@@ -411,6 +411,75 @@ public sealed class TomlToolsTests
         }
     }
 
+
+    [Fact]
+    public async Task Patch_真实链路仅保存安全投影而Handler仍收到原始参数()
+    {
+        const string fullPath = @"C:\Users\Alice\.codex\config.toml";
+        const string secret = "private-header-value";
+        var arguments = new JsonObject
+        {
+            ["path"] = fullPath,
+            ["operations"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["op"] = "set",
+                    ["key_path"] = new JsonArray("provider", "headers", "X-Custom"),
+                    ["value"] = secret,
+                },
+            },
+        }.ToJsonString();
+        var service = new RecordingTomlDocumentService();
+        ToolCall? approvalCall = null;
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("safe-call", "toml.patch", arguments)), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已完成。"), new ModelCompletedEvent("stop")]);
+        var loop = new AgentLoop(
+            model,
+            TomlToolsTestSupport.CreateRegistry(service),
+            NullLogger<AgentLoop>.Instance,
+            approvalGate: (call, _, _) =>
+            {
+                approvalCall = call;
+                return Task.FromResult(true);
+            });
+        var session = new AgentSession();
+
+        var events = await CollectAsync(loop.RunAsync(session, "修改配置"));
+
+        Assert.Equal(fullPath, service.LastPath);
+        Assert.Equal(secret, service.LastOperations![0].Value!.Value);
+        var safePayloads = new List<string>
+        {
+            Assert.Single(session.Messages, message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson,
+            approvalCall!.ArgumentsJson,
+            Assert.Single(events, item => item.Kind == AgentEventKind.ToolApprovalRequested).Detail ?? string.Empty,
+            Assert.Single(events, item => item.Kind == AgentEventKind.MessageCompleted && item.Message?.ToolCalls.Count > 0)
+                .Message!.ToolCalls[0].ArgumentsJson,
+            model.Requests[1].Messages.Single(message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson,
+        };
+        var storeRoot = Path.Combine(Path.GetTempPath(), $"loomx-safe-session-{Guid.NewGuid():N}");
+        try
+        {
+            var store = new AssistantSessionStore(storeRoot);
+            await store.SaveAsync(session);
+            safePayloads.Add(await File.ReadAllTextAsync(Directory.GetFiles(storeRoot, "*.jsonl").Single()));
+        }
+        finally
+        {
+            if (Directory.Exists(storeRoot)) Directory.Delete(storeRoot, recursive: true);
+        }
+
+        Assert.All(safePayloads, payload =>
+        {
+            Assert.DoesNotContain(fullPath, payload, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(secret, payload, StringComparison.Ordinal);
+            Assert.DoesNotContain("X-Custom", payload, StringComparison.Ordinal);
+        });
+        Assert.Contains("operation", safePayloads[0], StringComparison.Ordinal);
+    }
+
     private static ToolDefinition GetTool(string name, ITomlDocumentService service)
     {
         var registry = TomlToolsTestSupport.CreateRegistry(service);

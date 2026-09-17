@@ -20,6 +20,9 @@ public static class SensitiveKeyPolicy
         "secret",
         "authorization",
         "credential",
+        "headers",
+        "custom_headers",
+        "http_headers",
     };
 
     public static bool IsSensitivePath(IReadOnlyList<string> segments)
@@ -97,17 +100,24 @@ public static class SensitiveKeyPolicy
         ArgumentNullException.ThrowIfNull(value);
         ArgumentNullException.ThrowIfNull(path);
 
-        if (IsSensitivePath(path))
+        if (value.Kind == TomlValueKind.Array)
+        {
+            return RedactArray(value, path);
+        }
+
+        if (value.Kind == TomlValueKind.Object)
+        {
+            return RedactObject(value, path);
+        }
+
+        if (IsSensitivePath(path)
+            || value.Kind == TomlValueKind.String
+            && ContainsSensitiveContent((string)value.Value))
         {
             return TomlValue.FromObject(RedactedPlaceholder);
         }
 
-        return value.Kind switch
-        {
-            TomlValueKind.Array => RedactArray(value, path),
-            TomlValueKind.Object => RedactObject(value, path),
-            _ => value,
-        };
+        return value;
     }
 
     private static IReadOnlyList<string> SplitContentWords(string content)

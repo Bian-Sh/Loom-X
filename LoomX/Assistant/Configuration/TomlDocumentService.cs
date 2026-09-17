@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Tomlyn.Parsing;
@@ -155,6 +156,8 @@ public sealed class TomlDocumentService : ITomlDocumentService
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(operations);
         cancellationToken.ThrowIfCancellationRequested();
+        path = Path.GetFullPath(path);
+        await using var pathLock = await TomlPathLockPool.AcquireAsync(path, cancellationToken);
 
         logger.LogDebug(
             "TOML 操作开始 {Operation} {FileSummary}",
@@ -218,7 +221,7 @@ public sealed class TomlDocumentService : ITomlDocumentService
             return new TomlWriteResult(true, false, null, false, []);
         }
 
-        var writeResult = await WriteCandidateAsync(path, candidate, cancellationToken);
+        var writeResult = await WriteCandidateAsync(path, candidate, sourceResult, cancellationToken);
         if (!writeResult.Success)
         {
             LogFailure(
@@ -245,7 +248,7 @@ public sealed class TomlDocumentService : ITomlDocumentService
             var fileInfo = new FileInfo(path);
             if (!fileInfo.Exists)
             {
-                return PatchSourceResult.Success(string.Empty);
+                return PatchSourceResult.Success(string.Empty, exists: false, hasUtf8Bom: false, []);
             }
 
             if (fileInfo.Length > MaxFileSizeBytes)
@@ -286,7 +289,11 @@ public sealed class TomlDocumentService : ITomlDocumentService
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            return PatchSourceResult.Success(content);
+            return PatchSourceResult.Success(
+                content,
+                exists: true,
+                HasUtf8Bom(bytes),
+                SHA256.HashData(bytes));
         }
         catch (DecoderFallbackException exception)
         {
@@ -837,9 +844,10 @@ public sealed class TomlDocumentService : ITomlDocumentService
     private async Task<WriteCandidateResult> WriteCandidateAsync(
         string path,
         string candidate,
+        PatchSourceResult source,
         CancellationToken cancellationToken)
     {
-        var targetExists = File.Exists(path);
+        var targetExists = source.Exists;
         var backupPath = targetExists
             ? $"{path}.{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}.{Guid.NewGuid():N}.bak"
             : null;
@@ -848,6 +856,11 @@ public sealed class TomlDocumentService : ITomlDocumentService
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (await SourceChangedAsync(path, source, cancellationToken))
+            {
+                return CreateSourceConflict(null);
+            }
+
             if (backupPath is not null)
             {
                 try
@@ -876,10 +889,11 @@ public sealed class TomlDocumentService : ITomlDocumentService
 
             try
             {
+                var writeEncoding = new UTF8Encoding(source.HasUtf8Bom, true);
                 await fileOperations.WriteAllTextAsync(
                     tempPath,
                     candidate,
-                    StrictUtf8,
+                    writeEncoding,
                     cancellationToken);
             }
             catch (IOException exception)
@@ -912,6 +926,11 @@ public sealed class TomlDocumentService : ITomlDocumentService
                     tempValidation.Exception);
             }
 
+            if (await SourceChangedAsync(path, source, cancellationToken))
+            {
+                return CreateSourceConflict(backupPath);
+            }
+
             var replaceFailure = await TryAtomicReplaceAsync(
                 tempPath,
                 path,
@@ -927,7 +946,7 @@ public sealed class TomlDocumentService : ITomlDocumentService
                     replaceFailure);
             }
 
-            var targetValidation = await ParseDocumentAsync(path, cancellationToken);
+            var targetValidation = await ParseDocumentAsync(path, CancellationToken.None);
             if (targetValidation.IsValid)
             {
                 return WriteCandidateResult.CreateSuccess(backupPath);
@@ -937,7 +956,7 @@ public sealed class TomlDocumentService : ITomlDocumentService
                 path,
                 backupPath,
                 targetValidation,
-                cancellationToken);
+                CancellationToken.None);
         }
         finally
         {
@@ -988,6 +1007,33 @@ public sealed class TomlDocumentService : ITomlDocumentService
         }
 
         return new IOException("TOML 原子替换未完成。");
+    }
+
+    private static WriteCandidateResult CreateSourceConflict(string? backupPath) =>
+        WriteCandidateResult.Failure(
+            backupPath,
+            ["TOML 文件已被其他操作修改，请重新读取后重试。"],
+            AtomicReplaceStage,
+            "SourceChanged");
+
+    private static async Task<bool> SourceChangedAsync(
+        string path,
+        PatchSourceResult source,
+        CancellationToken cancellationToken)
+    {
+        var exists = File.Exists(path);
+        if (exists != source.Exists)
+        {
+            return true;
+        }
+
+        if (!exists)
+        {
+            return false;
+        }
+
+        var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+        return !CryptographicOperations.FixedTimeEquals(SHA256.HashData(bytes), source.Fingerprint);
     }
 
     private async Task<WriteCandidateResult> RestoreAfterValidationFailureAsync(
@@ -1252,14 +1298,15 @@ public sealed class TomlDocumentService : ITomlDocumentService
                 || (bytes[0] == 0xFE && bytes[1] == 0xFF));
     }
 
+    private static bool HasUtf8Bom(ReadOnlySpan<byte> bytes) =>
+        bytes.Length >= 3
+        && bytes[0] == 0xEF
+        && bytes[1] == 0xBB
+        && bytes[2] == 0xBF;
+
     private static string DecodeUtf8(byte[] bytes)
     {
-        var offset = bytes.Length >= 3
-            && bytes[0] == 0xEF
-            && bytes[1] == 0xBB
-            && bytes[2] == 0xBF
-            ? 3
-            : 0;
+        var offset = HasUtf8Bom(bytes) ? 3 : 0;
         return StrictUtf8.GetString(bytes.AsSpan(offset));
     }
 
@@ -1726,20 +1773,27 @@ public sealed class TomlDocumentService : ITomlDocumentService
     private sealed record PatchSourceResult(
         bool IsValid,
         string? Content,
+        bool Exists,
+        bool HasUtf8Bom,
+        byte[] Fingerprint,
         IReadOnlyList<string> Errors,
         string Stage,
         string ErrorType,
         Exception? Exception)
     {
-        public static PatchSourceResult Success(string content) =>
-            new(true, content, [], string.Empty, string.Empty, null);
+        public static PatchSourceResult Success(
+            string content,
+            bool exists,
+            bool hasUtf8Bom,
+            byte[] fingerprint) =>
+            new(true, content, exists, hasUtf8Bom, fingerprint, [], string.Empty, string.Empty, null);
 
         public static PatchSourceResult Failure(
             IReadOnlyList<string> errors,
             string stage,
             string errorType,
             Exception? exception = null) =>
-            new(false, null, errors, stage, errorType, exception);
+            new(false, null, false, false, [], errors, stage, errorType, exception);
     }
 
     private sealed record PatchOperationResult(

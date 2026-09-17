@@ -121,7 +121,8 @@ public sealed class AssistantSessionStore
                     {
                         ["id"] = call.Id,
                         ["name"] = call.Name,
-                        ["arguments"] = call.ArgumentsJson,
+                        ["arguments"] = ToolArgumentSafety.EnsureSafe(call).ArgumentsJson,
+                        ["arguments_safe"] = true,
                     }).ToArray()),
                 ["blocks"] = message.Blocks.Count == 0 ? null : new JsonArray(message.Blocks.Select(block => (JsonNode?)new JsonObject
                 {
@@ -132,7 +133,8 @@ public sealed class AssistantSessionStore
                     {
                         ["id"] = block.ToolCall.Id,
                         ["name"] = block.ToolCall.Name,
-                        ["arguments"] = block.ToolCall.ArgumentsJson,
+                        ["arguments"] = ToolArgumentSafety.EnsureSafe(block.ToolCall).ArgumentsJson,
+                        ["arguments_safe"] = true,
                     },
                 }).ToArray()),
             }.ToJsonString(StoreJsonOptions));
@@ -271,13 +273,19 @@ public sealed class AssistantSessionStore
                 .Select(call => new ToolCall(
                     call!["id"]!.GetValue<string>(),
                     call["name"]!.GetValue<string>(),
-                    call["arguments"]!.GetValue<string>()))
+                    call["arguments"]!.GetValue<string>())
+                {
+                    ArgumentsAreSafe = call["arguments_safe"]?.GetValue<bool>() == true,
+                })
                 .ToArray() ?? [];
             var blocks = item["blocks"]?.AsArray().Select(block => new ChatContentBlock(
                 Enum.Parse<ChatContentKind>(block!["kind"]!.GetValue<string>()),
                 block["text"]?.GetValue<string>(),
                 block["summary"]?.GetValue<bool>() ?? false,
-                block["tool_call"] is JsonObject callNode ? new ToolCall(callNode["id"]!.GetValue<string>(), callNode["name"]!.GetValue<string>(), callNode["arguments"]!.GetValue<string>()) : null)).ToArray() ?? [];
+                block["tool_call"] is JsonObject callNode ? new ToolCall(callNode["id"]!.GetValue<string>(), callNode["name"]!.GetValue<string>(), callNode["arguments"]!.GetValue<string>())
+                {
+                    ArgumentsAreSafe = callNode["arguments_safe"]?.GetValue<bool>() == true,
+                } : null)).ToArray() ?? [];
             session.RestoreMessage(new ChatMessage(role, content)
             {
                 Id = item["id"]?.GetValue<string>() ?? Guid.NewGuid().ToString("N"),

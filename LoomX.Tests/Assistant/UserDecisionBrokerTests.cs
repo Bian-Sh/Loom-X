@@ -15,7 +15,11 @@ public sealed class UserDecisionBrokerTests
         var broker = CreateBroker();
         var pending = new ConcurrentBag<PendingUserDecision>();
         var tasks = new ConcurrentBag<Task<UserDecisionResult>>();
-        broker.PendingRequested += (_, request) => pending.Add(request);
+        broker.PendingRequested += (_, request) =>
+        {
+            broker.TryClaim(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId);
+            pending.Add(request);
+        };
 
         Parallel.For(0, 64, index =>
         {
@@ -41,6 +45,7 @@ public sealed class UserDecisionBrokerTests
         PendingUserDecision? pending = null;
         broker.PendingRequested += (_, request) =>
         {
+            broker.TryClaim(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId);
             Interlocked.Increment(ref publishCount);
             pending = request;
         };
@@ -110,7 +115,11 @@ public sealed class UserDecisionBrokerTests
     {
         var broker = CreateBroker();
         var pending = new ConcurrentBag<PendingUserDecision>();
-        broker.PendingRequested += (_, request) => pending.Add(request);
+        broker.PendingRequested += (_, request) =>
+        {
+            broker.TryClaim(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId);
+            pending.Add(request);
+        };
         var first = broker.RequestAsync("page-a", CreateRequest(), CancellationToken.None);
         var second = broker.RequestAsync("page-a", CreateRequest(), CancellationToken.None);
         var other = broker.RequestAsync("page-b", CreateRequest(), CancellationToken.None);
@@ -209,6 +218,40 @@ public sealed class UserDecisionBrokerTests
             () => task.WaitAsync(TimeSpan.FromSeconds(1)));
         Assert.Equal("当前没有可用的用户决策处理器。", exception.Message);
         Assert.Equal(0, broker.CancelOwner("owner", "检查残留"));
+    }
+
+
+    [Fact]
+    public async Task 订阅者返回前未Claim_请求立即安全失败且不遗留Pending()
+    {
+        using var broker = CreateBroker();
+        broker.PendingRequested += (_, _) => { };
+
+        var task = broker.RequestAsync("owner-no-claim", CreateRequest(), CancellationToken.None);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await task.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.Equal("当前没有可用的用户决策处理器。", exception.Message);
+        Assert.False(broker.CancelOwner("owner-no-claim", "cleanup") > 0);
+    }
+
+    [Fact]
+    public async Task 事件快照后订阅者解除且旧Handler未Claim_请求仍立即收敛()
+    {
+        using var broker = CreateBroker();
+        var staleInvoked = false;
+        EventHandler<PendingUserDecision>? stale = null;
+        stale = (_, _) => staleInvoked = true;
+        EventHandler<PendingUserDecision> unsubscribe = (_, _) => broker.PendingRequested -= stale;
+        broker.PendingRequested += unsubscribe;
+        broker.PendingRequested += stale;
+
+        var task = broker.RequestAsync("owner-stale", CreateRequest(), CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await task.WaitAsync(TimeSpan.FromSeconds(1)));
+        Assert.True(staleInvoked);
+        Assert.Equal(0, broker.CancelOwner("owner-stale", "cleanup"));
     }
 
     [Fact]
@@ -418,7 +461,11 @@ public sealed class UserDecisionBrokerTests
         var logger = new RecordingLogger<UserDecisionBroker>();
         var broker = new UserDecisionBroker(logger);
         var pending = new ConcurrentQueue<PendingUserDecision>();
-        broker.PendingRequested += (_, request) => pending.Enqueue(request);
+        broker.PendingRequested += (_, request) =>
+        {
+            broker.TryClaim(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId);
+            pending.Enqueue(request);
+        };
 
         var submitted = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
         Assert.True(pending.TryDequeue(out var submitRequest));
@@ -466,6 +513,7 @@ public sealed class UserDecisionBrokerTests
         var pending = CaptureNext(broker);
         var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
         var request = await pending.Task;
+        Assert.True(broker.Release(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId));
         using var start = new ManualResetEventSlim();
 
         var first = Task.Run(() =>
@@ -503,6 +551,7 @@ public sealed class UserDecisionBrokerTests
         var pending = CaptureNext(broker);
         var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
         var request = await pending.Task;
+        Assert.True(broker.Release(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId));
         Assert.True(broker.TryClaim(request.RequestId, "ui-first"));
         var values = new BlockingEnumerationDictionary("note", "完成");
 
@@ -523,11 +572,10 @@ public sealed class UserDecisionBrokerTests
         const string claimantId = "Authorization=Bearer ui-secret 用户自由文本";
         var logger = new RecordingLogger<UserDecisionBroker>();
         var broker = new UserDecisionBroker(logger);
-        var pending = CaptureNext(broker);
+        var pending = CaptureNext(broker, claimantId);
         var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
         var request = await pending.Task;
 
-        Assert.True(broker.TryClaim(request.RequestId, claimantId));
         Assert.True(broker.Cancel(request.RequestId, claimantId, "Secret 取消原因"));
         await task;
 
@@ -540,11 +588,17 @@ public sealed class UserDecisionBrokerTests
     private static UserDecisionBroker CreateBroker() =>
         new(NullLogger<UserDecisionBroker>.Instance);
 
-    private static TaskCompletionSource<PendingUserDecision> CaptureNext(UserDecisionBroker broker)
+    private static TaskCompletionSource<PendingUserDecision> CaptureNext(
+        UserDecisionBroker broker,
+        string claimantId = UserDecisionBrokerTestExtensions.ClaimantId)
     {
         var completion = new TaskCompletionSource<PendingUserDecision>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        broker.PendingRequested += (_, request) => completion.TrySetResult(request);
+        broker.PendingRequested += (_, request) =>
+        {
+            broker.TryClaim(request.RequestId, claimantId);
+            completion.TrySetResult(request);
+        };
         return completion;
     }
 

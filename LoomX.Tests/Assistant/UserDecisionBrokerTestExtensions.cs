@@ -2,7 +2,7 @@
 
 internal static class UserDecisionBrokerTestExtensions
 {
-    private const string ClaimantId = "loomx-test-ui";
+    internal const string ClaimantId = "loomx-test-ui";
 
     public static bool Submit(
         this IUserDecisionBroker broker,

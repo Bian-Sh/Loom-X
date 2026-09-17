@@ -335,6 +335,122 @@ public sealed class AssistantToolsTests
         Assert.DoesNotContain("sk-proj-", result.Content, StringComparison.Ordinal);
     }
 
+
+
+    [Fact]
+    public async Task AskUser_Handler拒绝前Session事件和下一轮请求只保留字段结构投影()
+    {
+        const string sensitiveText = "Authorization: Bearer rejected-before-handler-secret";
+        using var broker = CreateBroker();
+        var registry = new ToolRegistry();
+        AssistantTools.RegisterAll(registry, broker);
+        var arguments = CreateValidArguments();
+        arguments["question"] = sensitiveText;
+        arguments["fields"]![0]!["default_text"] = "[provider.headers]\nX-Custom = \"private\"";
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("ask-safe", "assistant.ask_user", arguments.ToJsonString())), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("请求无效。"), new ModelCompletedEvent("stop")]);
+        var loop = new AgentLoop(model, registry, NullLogger<AgentLoop>.Instance);
+        var session = new AgentSession();
+
+        var events = new List<AgentEvent>();
+        await foreach (var item in loop.RunAsync(session, "请询问用户")) events.Add(item);
+
+        var safePayloads = new[]
+        {
+            session.Messages.Single(message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson,
+            events.Single(item => item.Kind == AgentEventKind.MessageCompleted && item.Message?.ToolCalls.Count > 0)
+                .Message!.ToolCalls[0].ArgumentsJson,
+            model.Requests[1].Messages.Single(message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson,
+        };
+        Assert.All(safePayloads, payload =>
+        {
+            Assert.DoesNotContain(sensitiveText, payload, StringComparison.Ordinal);
+            Assert.DoesNotContain("private", payload, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("配置方式", payload, StringComparison.Ordinal);
+            Assert.DoesNotContain("模式", payload, StringComparison.Ordinal);
+        });
+        Assert.Contains("field_count", safePayloads[0], StringComparison.Ordinal);
+        Assert.Contains("single_select", safePayloads[0], StringComparison.Ordinal);
+    }
+
+    public static IEnumerable<object[]> InvalidOptionalPropertyTypes()
+    {
+        yield return ["request", "reason", "123"];
+        yield return ["request", "reason", "null"];
+        yield return ["request", "impact_summary", "false"];
+        yield return ["request", "allow_cancel", "\"yes\""];
+        yield return ["field", "is_required", "1"];
+        yield return ["field", "options", "{}"];
+        yield return ["field", "options", "null"];
+        yield return ["field", "default_option_id", "true"];
+        yield return ["field", "default_option_ids", "\"safe\""];
+        yield return ["field", "min_selections", "false"];
+        yield return ["field", "max_selections", "\"2\""];
+        yield return ["field", "default_number", "true"];
+        yield return ["field", "min_number", "\"0\""];
+        yield return ["field", "max_number", "[]"];
+        yield return ["field", "step", "{}"];
+        yield return ["field", "default_text", "42"];
+        yield return ["field", "is_multiline", "\"false\""];
+        yield return ["field", "max_length", "true"];
+        yield return ["option", "description", "42"];
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidOptionalPropertyTypes))]
+    public async Task AskUser_已知Optional属性存在时错误Json类型统一返回InvalidRequest(
+        string scope,
+        string propertyName,
+        string invalidJson)
+    {
+        using var broker = CreateBroker();
+        broker.PendingRequested += (_, pending) =>
+        {
+            if (broker.TryClaim(pending.RequestId, "test-ui"))
+            {
+                broker.Cancel(pending.RequestId, "test-ui", "invalid-test-cleanup");
+            }
+        };
+        var tool = GetTool(broker);
+        var arguments = CreateArgumentsForOptionalProperty(scope, propertyName);
+        var invalidValue = JsonNode.Parse(invalidJson);
+        var field = arguments["fields"]![0]!.AsObject();
+        var target = scope switch
+        {
+            "request" => arguments,
+            "field" => field,
+            "option" => field["options"]![0]!.AsObject(),
+            _ => throw new ArgumentOutOfRangeException(nameof(scope)),
+        };
+        target[propertyName] = invalidValue;
+
+        var result = await tool.Handler(arguments, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("invalid_request", JsonNode.Parse(result.Content)!["error"]!.GetValue<string>());
+    }
+
+    private static JsonObject CreateArgumentsForOptionalProperty(string scope, string propertyName)
+    {
+        var arguments = CreateValidArguments();
+        var field = arguments["fields"]![0]!.AsObject();
+        if (propertyName == "options")
+        {
+            field["type"] = "number";
+            field.Remove("options");
+            field.Remove("default_option_id");
+        }
+        else if (propertyName == "default_option_ids")
+        {
+            field["type"] = "text";
+            field.Remove("options");
+            field.Remove("default_option_id");
+        }
+
+        return arguments;
+    }
+
     private static JsonObject CreateValidArguments() => new()
     {
         ["title"] = "配置方式",
@@ -381,7 +497,11 @@ public sealed class AssistantToolsTests
     {
         var completion = new TaskCompletionSource<PendingUserDecision>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        broker.PendingRequested += (_, request) => completion.TrySetResult(request);
+        broker.PendingRequested += (_, request) =>
+        {
+            broker.TryClaim(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId);
+            completion.TrySetResult(request);
+        };
         return completion;
     }
 
