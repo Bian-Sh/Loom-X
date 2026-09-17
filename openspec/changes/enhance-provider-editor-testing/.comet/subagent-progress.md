@@ -7,7 +7,7 @@
 - Review mode: standard
 - TDD mode: tdd
 - Current task: 2 — 测试请求 DTO、普通请求与安全结果
-- Stage: implementer-dispatch-pending
+- Stage: implementer-running
 - Base commit: 3e29467
 - Last verified baseline: 948/948 passed
 
@@ -16,3 +16,6 @@
 - Risk review triggered: DONE_WITH_CONCERNS
 
 - Task 1 result: complete, commit a2b6a07, review approved (0/0/0)
+
+- Task 2 base commit: 17c8a46
+- Task 2 risk expected: 安全敏感面（API Key/Header/外部响应）
