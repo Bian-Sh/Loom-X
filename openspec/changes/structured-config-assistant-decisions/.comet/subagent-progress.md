@@ -3,9 +3,9 @@
 - Change: structured-config-assistant-decisions
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
-- Current task: Task 6
-- Stage: review
-- Fix round: 2
+- Current task: Task 7
+- Stage: implementer
+- Fix round: 0
 
 ## Rulings
 - Task 1 同时向 `LoomX` 与 `LoomX.Tests` 添加 Tomlyn 2.10.1，以满足 OpenSpec 1.1。
@@ -28,3 +28,6 @@
 - Task 6 首轮审查接受 2 个 Critical 与 2 个 Important：Text 原文不得进入 ToolResult/Session；AskUser 必须拒绝完整 TOML、请求/响应正文、Header 形态并封闭运行时属性；owner 传播不得依赖跨 yield 的 AsyncLocal；人工决策不得继承默认 30 秒工具超时，进入修复轮 1。
 - Task 6 的 OpenSpec 4.3–4.4 与计划 Step 勾选继续由协调者在复审 clean 后统一完成，避免在阻断缺陷未修复时虚假标记完成。代价是状态文件会晚于首轮实现提交更新。
 - Task 6 修复轮 1 复审：Text 安全结果、运行 owner 与无限人工等待已 addressed；Header 边界仍漏掉 `Server`、`Date`、`Location`、`Tenant` 等无连字符名称，接受该剩余 Critical，进入修复轮 2。修复应封闭单 token ASCII Header 名，同时保留带空格的普通短句。
+- Task 6 修复轮 2 复审结论：剩余 Header 边界 finding 已 addressed，修复 diff 无新增 Critical/Important breakage。
+- Task 6 计划 Step 2 与 Step 6 最小改名为“运行 AskUser 工具测试确认红灯”和“运行 AskUser 工具与会话恢复定向测试并提交”，确保 Comet task-checkoff 文本语义明确且全计划唯一。
+- Task 6 complete：`assistant.ask_user`、会话恢复、敏感边界、稳定 owner 与人工等待生命周期均通过两轮修复后的 thorough review；OpenSpec 4.3–4.4 已由协调者统一勾选。

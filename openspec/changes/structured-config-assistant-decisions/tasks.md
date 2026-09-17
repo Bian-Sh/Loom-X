@@ -22,8 +22,8 @@
 
 - [x] 4.1 定义 AskUser 请求、字段、选项、默认值、必填标记、影响摘要、取消状态和结构化结果模型，支持单选、多选、数字与自由文本，并以序列化/校验测试覆盖字段 id 冲突与非法选项
 - [x] 4.2 实现 `UserDecisionBroker` 的 request id 分配、pending 事件、`TaskCompletionSource` 等待、提交、取消、超时/会话取消和重复完成保护，并以并发与生命周期测试确认不会永久阻塞
-- [ ] 4.3 注册 `assistant.ask_user` 工具并接入 AssistantService/AgentLoop，使工具调用可以暂停当前步骤、保留会话上下文并在用户提交后恢复，以集成测试验证提交、取消和页面关闭路径
-- [ ] 4.4 在 AskUser 边界过滤 API Key、Authorization、完整请求正文和其他敏感内容，并以安全测试确认问题文本、选项、影响摘要和结果不会泄露敏感信息
+- [x] 4.3 注册 `assistant.ask_user` 工具并接入 AssistantService/AgentLoop，使工具调用可以暂停当前步骤、保留会话上下文并在用户提交后恢复，以集成测试验证提交、取消和页面关闭路径
+- [x] 4.4 在 AskUser 边界过滤 API Key、Authorization、完整请求正文和其他敏感内容，并以安全测试确认问题文本、选项、影响摘要和结果不会泄露敏感信息
 
 ## 5. AskUser 桌面端交互
 

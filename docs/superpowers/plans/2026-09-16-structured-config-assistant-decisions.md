@@ -444,7 +444,7 @@ git commit -m "新增 AskUser 决策模型与 Broker"
 - Consumes: `IUserDecisionBroker`。
 - Produces: `AssistantTools.RegisterAll(ToolRegistry registry, IUserDecisionBroker broker)`，注册 `assistant.ask_user`，风险等级为 Read。
 
-- [ ] **Step 1: 编写工具等待、提交和取消失败测试**
+- [x] **Step 1: 编写工具等待、提交和取消失败测试**
 
 构造 ToolDefinition Handler 后启动未完成任务，捕获 Broker pending request，再 Submit；断言工具任务恢复并返回字段 id 映射。Cancel 返回：
 
@@ -454,20 +454,20 @@ git commit -m "新增 AskUser 决策模型与 Broker"
 
 敏感请求在进入 pending 前失败，ToolResult 不含原始敏感文本。
 
-- [ ] **Step 2: 运行测试确认红灯**
+- [x] **Step 2: 运行 AskUser 工具测试确认红灯**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~AssistantToolsTests`
 Expected: FAIL。
 
-- [ ] **Step 3: 实现 `assistant.ask_user` 并注册 DI**
+- [x] **Step 3: 实现 `assistant.ask_user` 并注册 DI**
 
 JSON Schema 支持 title、question、reason、impact_summary、allow_cancel、fields；Handler 把 JSON 转为强类型模型，通过当前 tool CancellationToken 调用 Broker，不自行阻塞线程。
 
-- [ ] **Step 4: 编写 AssistantService 集成失败测试**
+- [x] **Step 4: 编写 AssistantService 集成失败测试**
 
 用 scripted model 先返回 `assistant.ask_user` tool call，再在提交后返回最终文本；断言 Session 消息、ToolResult 和后续回答连续。另测 `Stop()`、新会话和 CancellationToken 会取消 pending request。
 
-- [ ] **Step 5: 最小修改 AssistantService 生命周期**
+- [x] **Step 5: 最小修改 AssistantService 生命周期**
 
 为一次 Run 生成稳定 owner id，并在停止/切换会话的 finally 路径调用：
 
@@ -477,7 +477,7 @@ userDecisionBroker.CancelOwner(ownerId, "assistant_run_cancelled");
 
 不修改现有 `ApprovalHandler` 和 `ToolApprovalGate` 语义。
 
-- [ ] **Step 6: 运行定向测试并提交**
+- [x] **Step 6: 运行 AskUser 工具与会话恢复定向测试并提交**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AssistantToolsTests|FullyQualifiedName~AssistantServiceTests|FullyQualifiedName~AgentLoopTests"`
 Expected: PASS。
