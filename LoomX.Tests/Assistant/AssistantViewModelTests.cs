@@ -1,5 +1,6 @@
-using Xunit;
+﻿using Xunit;
 using LoomX.Assistant;
+using LoomX.Assistant.UserDecisions;
 using LoomX.ViewModels;
 using LoomX.Services;
 
@@ -338,4 +339,196 @@ public sealed class AssistantViewModelTests
     private static AssistantViewModel CreateViewModel() => new(new GatewayProcessService());
 
     private static AgentEvent Event(AgentEventKind kind) => AgentEvent.Create("test-session", kind);
+}
+
+public sealed class AssistantViewModelUserDecisionTests
+{
+    [Fact]
+    public async Task PendingRequested_通过UI调度提交且只调用Broker请求Id()
+    {
+        var broker = new RecordingUserDecisionBroker();
+        var toast = new ToastService();
+        var notifications = new List<ToastNotification>();
+        toast.Requested += (_, notification) => notifications.Add(notification);
+        var dispatchCount = 0;
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            toastService: toast,
+            userDecisionBroker: broker,
+            uiDispatcher: action =>
+            {
+                dispatchCount++;
+                action();
+            },
+            showAskUserDialog: dialog =>
+            {
+                Assert.IsType<AskUserTextFieldViewModel>(Assert.Single(dialog.Fields)).TextValue = "批准";
+                return Task.FromResult<bool?>(true);
+            });
+
+        broker.Raise(CreatePending("submit-id", "问题正文 API Key Secret Authorization"));
+        await broker.WaitForCompletionAsync();
+
+        Assert.Equal(1, dispatchCount);
+        Assert.Equal("submit-id", broker.SubmittedRequestId);
+        Assert.Null(broker.CancelledRequestId);
+        Assert.Equal("批准", broker.SubmittedValues!["answer"]);
+        var notification = Assert.Single(notifications);
+        Assert.Equal("已提交助手决策", notification.Message);
+        Assert.Equal(ToastLevel.Success, notification.Level);
+        Assert.DoesNotContain("批准", notification.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("问题正文", notification.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Secret", notification.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Dialog关闭_按请求Id取消且不提交默认值()
+    {
+        var broker = new RecordingUserDecisionBroker();
+        var toast = new ToastService();
+        ToastNotification? notification = null;
+        toast.Requested += (_, item) => notification = item;
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            toastService: toast,
+            userDecisionBroker: broker,
+            uiDispatcher: action => action(),
+            showAskUserDialog: _ => Task.FromResult<bool?>(null));
+
+        broker.Raise(CreatePending("cancel-id", "包含 Secret 的问题正文"));
+        await broker.WaitForCompletionAsync();
+
+        Assert.Equal("cancel-id", broker.CancelledRequestId);
+        Assert.Null(broker.SubmittedRequestId);
+        Assert.Null(broker.SubmittedValues);
+        Assert.NotNull(notification);
+        Assert.Equal("已取消助手决策", notification.Message);
+        Assert.Equal(ToastLevel.Info, notification.Level);
+        Assert.DoesNotContain("Secret", notification.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Deactivate_解除订阅并取消当前页面请求且重复完成安全收敛()
+    {
+        var broker = new RecordingUserDecisionBroker();
+        var dialogStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogCompletion = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            userDecisionBroker: broker,
+            uiDispatcher: action => action(),
+            showAskUserDialog: _ =>
+            {
+                dialogStarted.TrySetResult();
+                return dialogCompletion.Task;
+            });
+        Assert.Equal(1, broker.SubscriberCount);
+
+        broker.Raise(CreatePending("pending-id", "待处理问题"));
+        await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        viewModel.Deactivate();
+        dialogCompletion.TrySetResult(true);
+        await broker.WaitForCompletionAsync();
+
+        Assert.Equal(0, broker.SubscriberCount);
+        Assert.Equal("pending-id", broker.CancelledRequestId);
+        Assert.Null(broker.SubmittedRequestId);
+
+        viewModel.Activate();
+        Assert.Equal(1, broker.SubscriberCount);
+        viewModel.Dispose();
+        Assert.Equal(0, broker.SubscriberCount);
+    }
+
+    [Fact]
+    public async Task Broker拒绝提交_仅显示固定安全错误摘要()
+    {
+        var broker = new RecordingUserDecisionBroker { SubmitResult = false };
+        var toast = new ToastService();
+        ToastNotification? notification = null;
+        toast.Requested += (_, item) => notification = item;
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            toastService: toast,
+            userDecisionBroker: broker,
+            uiDispatcher: action => action(),
+            showAskUserDialog: dialog =>
+            {
+                Assert.IsType<AskUserTextFieldViewModel>(Assert.Single(dialog.Fields)).TextValue = "普通决定";
+                return Task.FromResult<bool?>(true);
+            });
+
+        broker.Raise(CreatePending("stale-id", "API Key 问题正文"));
+        await broker.WaitForCompletionAsync();
+
+        Assert.NotNull(notification);
+        Assert.Equal("助手决策未能提交，请重试", notification.Message);
+        Assert.Equal(ToastLevel.Error, notification.Level);
+        Assert.DoesNotContain("普通决定", notification.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("API Key", notification.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Authorization", notification.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static PendingUserDecision CreatePending(string requestId, string question) => new(
+        requestId,
+        "owner-sensitive-id",
+        new UserDecisionRequest(
+            "确认",
+            question,
+            [new UserDecisionField("answer", "回答", UserDecisionFieldType.Text, isRequired: true, defaultText: "默认值")]));
+
+    private sealed class RecordingUserDecisionBroker : IUserDecisionBroker
+    {
+        private EventHandler<PendingUserDecision>? pendingRequested;
+        private readonly TaskCompletionSource completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int SubscriberCount { get; private set; }
+        public bool SubmitResult { get; init; } = true;
+        public string? SubmittedRequestId { get; private set; }
+        public IReadOnlyDictionary<string, object?>? SubmittedValues { get; private set; }
+        public string? CancelledRequestId { get; private set; }
+
+        public event EventHandler<PendingUserDecision>? PendingRequested
+        {
+            add
+            {
+                pendingRequested += value;
+                SubscriberCount++;
+            }
+            remove
+            {
+                pendingRequested -= value;
+                SubscriberCount--;
+            }
+        }
+
+        public Task<UserDecisionResult> RequestAsync(string ownerId, UserDecisionRequest request, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public bool Submit(string requestId, IReadOnlyDictionary<string, object?> values)
+        {
+            SubmittedRequestId = requestId;
+            SubmittedValues = values;
+            completion.TrySetResult();
+            return SubmitResult;
+        }
+
+        public bool Cancel(string requestId, string reason)
+        {
+            CancelledRequestId = requestId;
+            completion.TrySetResult();
+            return true;
+        }
+
+        public int CancelOwner(string ownerId, string reason) => 0;
+
+        public void Dispose()
+        {
+        }
+
+        public void Raise(PendingUserDecision pending) => pendingRequested?.Invoke(this, pending);
+
+        public Task WaitForCompletionAsync() => completion.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
 }

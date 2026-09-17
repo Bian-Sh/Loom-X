@@ -1,11 +1,15 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows.Input;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using LoomX.Assistant;
+using LoomX.Assistant.UserDecisions;
 using LoomX.Localization;
 using LoomX.Services;
+using LoomX.Views;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.ViewModels;
@@ -15,12 +19,16 @@ namespace LoomX.ViewModels;
 /// 助手服务复用网关容器中的配置与工具注册，但首次使用时可在不监听网关端口的状态下初始化。
 /// 底部工具栏承载：修改权限（自动批准/逐条批准）、模型指定（只走 Provider 模型，不走 combo）、思考等级。
 /// </summary>
-public sealed class AssistantViewModel : NotifyViewModel
+public sealed class AssistantViewModel : NotifyViewModel, IDisposable
 {
     private readonly GatewayProcessService gatewayService;
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantViewModel> logger;
     private readonly ToastService? toastService;
+    private readonly IUserDecisionBroker? configuredUserDecisionBroker;
+    private readonly Action<Action> uiDispatcher;
+    private readonly Func<AskUserDialogViewModel, Task<bool?>> showAskUserDialog;
+    private readonly object userDecisionGate = new();
 
     private string inputText = string.Empty;
     private string statusText = string.Empty;
@@ -40,13 +48,26 @@ public sealed class AssistantViewModel : NotifyViewModel
     private AssistantReasoningOption selectedReasoningEffort;
     private ApprovalRequestViewModel? pendingApproval;
     private IReadOnlyList<AssistantModelGroupViewModel> allModelGroups = [];
+    private IUserDecisionBroker? subscribedUserDecisionBroker;
+    private string? ownedUserDecisionRequestId;
+    private bool isUserDecisionActive = true;
+    private bool disposed;
 
-    public AssistantViewModel(GatewayProcessService gatewayService, ILoggerFactory? loggerFactory = null, ToastService? toastService = null)
+    public AssistantViewModel(
+        GatewayProcessService gatewayService,
+        ILoggerFactory? loggerFactory = null,
+        ToastService? toastService = null,
+        IUserDecisionBroker? userDecisionBroker = null,
+        Action<Action>? uiDispatcher = null,
+        Func<AskUserDialogViewModel, Task<bool?>>? showAskUserDialog = null)
     {
         this.gatewayService = gatewayService;
         this.loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
         logger = this.loggerFactory.CreateLogger<AssistantViewModel>();
         this.toastService = toastService;
+        configuredUserDecisionBroker = userDecisionBroker;
+        this.uiDispatcher = uiDispatcher ?? (action => Dispatcher.UIThread.Post(action));
+        this.showAskUserDialog = showAskUserDialog ?? ShowAskUserDialogAsync;
 
         SendCommand = new AsyncCommand(SendAsync, () => !IsRunning && !string.IsNullOrWhiteSpace(InputText));
         CancelCommand = new DelegateCommand(Cancel);
@@ -77,6 +98,7 @@ public sealed class AssistantViewModel : NotifyViewModel
         RefreshSessions();
         RefreshModelSummary();
         StartElapsedTimer();
+        Activate();
     }
 
     /// <summary>每秒刷新运行中的过程块耗时；没有 UI 线程（单元测试）时静默降级。</summary>
@@ -230,12 +252,224 @@ public sealed class AssistantViewModel : NotifyViewModel
 
     private AssistantService? ResolveService() => gatewayService.GetHostedService<AssistantService>();
 
+    private IUserDecisionBroker? ResolveUserDecisionBroker() =>
+        configuredUserDecisionBroker ?? gatewayService.GetHostedService<IUserDecisionBroker>();
+
     private async Task<AssistantService?> EnsureServiceAsync(CancellationToken cancellationToken = default)
     {
         await gatewayService.EnsureHostedServicesAsync(cancellationToken);
+        Activate();
         return ResolveService();
     }
 
+    public void Activate()
+    {
+        lock (userDecisionGate)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            isUserDecisionActive = true;
+            var broker = ResolveUserDecisionBroker();
+            if (broker is null || ReferenceEquals(subscribedUserDecisionBroker, broker))
+            {
+                return;
+            }
+
+            if (subscribedUserDecisionBroker is not null)
+            {
+                subscribedUserDecisionBroker.PendingRequested -= OnPendingUserDecisionRequested;
+            }
+
+            subscribedUserDecisionBroker = broker;
+            broker.PendingRequested += OnPendingUserDecisionRequested;
+        }
+    }
+
+    public void Deactivate()
+    {
+        IUserDecisionBroker? broker;
+        string? requestId;
+        lock (userDecisionGate)
+        {
+            if (!isUserDecisionActive && subscribedUserDecisionBroker is null)
+            {
+                return;
+            }
+
+            isUserDecisionActive = false;
+            broker = subscribedUserDecisionBroker;
+            subscribedUserDecisionBroker = null;
+            requestId = ownedUserDecisionRequestId;
+            ownedUserDecisionRequestId = null;
+        }
+
+        if (broker is null)
+        {
+            return;
+        }
+
+        broker.PendingRequested -= OnPendingUserDecisionRequested;
+        if (requestId is not null && broker.Cancel(requestId, "assistant_ui_closed"))
+        {
+            toastService?.Show("已取消助手决策", ToastLevel.Info);
+        }
+    }
+
+    private void OnPendingUserDecisionRequested(object? sender, PendingUserDecision pending)
+    {
+        if (sender is not IUserDecisionBroker broker)
+        {
+            return;
+        }
+
+        string? cancelReason = null;
+        lock (userDecisionGate)
+        {
+            if (disposed
+                || !isUserDecisionActive
+                || !ReferenceEquals(subscribedUserDecisionBroker, broker))
+            {
+                cancelReason = "assistant_ui_closed";
+            }
+            else if (ownedUserDecisionRequestId is null)
+            {
+                ownedUserDecisionRequestId = pending.RequestId;
+            }
+            else if (!string.Equals(ownedUserDecisionRequestId, pending.RequestId, StringComparison.Ordinal))
+            {
+                cancelReason = "assistant_ui_busy";
+            }
+            else
+            {
+                return;
+            }
+        }
+
+        if (cancelReason is not null)
+        {
+            broker.Cancel(pending.RequestId, cancelReason);
+            if (cancelReason == "assistant_ui_busy")
+            {
+                toastService?.Show("助手决策暂时无法处理，请重试", ToastLevel.Error);
+            }
+
+            return;
+        }
+
+        try
+        {
+            uiDispatcher(() => _ = HandlePendingUserDecisionAsync(broker, pending));
+        }
+        catch (Exception)
+        {
+            lock (userDecisionGate)
+            {
+                if (string.Equals(ownedUserDecisionRequestId, pending.RequestId, StringComparison.Ordinal))
+                {
+                    ownedUserDecisionRequestId = null;
+                }
+            }
+
+            broker.Cancel(pending.RequestId, "assistant_ui_failed");
+            toastService?.Show("助手决策处理失败，请重试", ToastLevel.Error);
+        }
+    }
+
+    private async Task HandlePendingUserDecisionAsync(
+        IUserDecisionBroker broker,
+        PendingUserDecision pending)
+    {
+        lock (userDecisionGate)
+        {
+            if (disposed
+                || !isUserDecisionActive
+                || !ReferenceEquals(subscribedUserDecisionBroker, broker)
+                || !string.Equals(ownedUserDecisionRequestId, pending.RequestId, StringComparison.Ordinal))
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            var dialogViewModel = new AskUserDialogViewModel(pending);
+            var submitted = await showAskUserDialog(dialogViewModel);
+
+            lock (userDecisionGate)
+            {
+                if (disposed
+                    || !isUserDecisionActive
+                    || !ReferenceEquals(subscribedUserDecisionBroker, broker)
+                    || !string.Equals(ownedUserDecisionRequestId, pending.RequestId, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                ownedUserDecisionRequestId = null;
+            }
+
+            if (submitted == true)
+            {
+                if (!dialogViewModel.TryBuildResult(out var values))
+                {
+                    toastService?.Show("助手决策内容无效，请检查后重试", ToastLevel.Error);
+                    broker.Cancel(pending.RequestId, "assistant_ui_validation_failed");
+                    return;
+                }
+
+                if (broker.Submit(pending.RequestId, values))
+                {
+                    toastService?.Show("已提交助手决策", ToastLevel.Success);
+                }
+                else
+                {
+                    toastService?.Show("助手决策未能提交，请重试", ToastLevel.Error);
+                }
+
+                return;
+            }
+
+            if (broker.Cancel(pending.RequestId, "assistant_ui_cancelled"))
+            {
+                toastService?.Show("已取消助手决策", ToastLevel.Info);
+            }
+            else
+            {
+                toastService?.Show("助手决策未能取消，请重试", ToastLevel.Error);
+            }
+        }
+        catch (Exception)
+        {
+            lock (userDecisionGate)
+            {
+                if (string.Equals(ownedUserDecisionRequestId, pending.RequestId, StringComparison.Ordinal))
+                {
+                    ownedUserDecisionRequestId = null;
+                }
+            }
+
+            broker.Cancel(pending.RequestId, "assistant_ui_failed");
+            toastService?.Show("助手决策处理失败，请重试", ToastLevel.Error);
+        }
+    }
+
+    private static async Task<bool?> ShowAskUserDialogAsync(AskUserDialogViewModel viewModel)
+    {
+        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime
+            {
+                MainWindow: MainWindow owner,
+            })
+        {
+            return null;
+        }
+
+        var dialog = new AskUserDialog { DataContext = viewModel };
+        owner.AppearanceCoordinator.ApplyTo(dialog);
+        return await dialog.ShowDialog<bool?>(owner);
+    }
     private async Task SendAsync()
     {
         var text = InputText.Trim();
@@ -363,11 +597,11 @@ public sealed class AssistantViewModel : NotifyViewModel
                 break;
 
             case AgentEventKind.ReasoningDelta:
-            {
-                EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), ThinkingLabel)
-                    .Append(agentEvent.Text ?? string.Empty);
-                break;
-            }
+                {
+                    EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), ThinkingLabel)
+                        .Append(agentEvent.Text ?? string.Empty);
+                    break;
+                }
 
             case AgentEventKind.MessageCompleted:
                 if (agentEvent.Message is { Role: ChatRole.Assistant } assistantMessage)
@@ -819,6 +1053,25 @@ public sealed class AssistantViewModel : NotifyViewModel
     private void AddSystemMessage(string text) => Messages.Add(ChatMessageViewModel.Status(text));
 
     public void NotifyCopied() => toastService?.Show(ResourceLookup.Resolve("assistant.copied"), ToastLevel.Success);
+
+    public void Dispose()
+    {
+        lock (userDecisionGate)
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            disposed = true;
+        }
+
+        Deactivate();
+        PendingApproval?.Resolve(false);
+        elapsedTimer?.Stop();
+        elapsedTimer = null;
+        GC.SuppressFinalize(this);
+    }
 }
 
 /// <summary>
