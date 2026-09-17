@@ -140,7 +140,7 @@ EndpointFormat = "responses"
 - 产出：`IProviderTestService.ExecuteAsync(ProviderTestRequest, IProgress<ProviderTestProgress>?, CancellationToken)`。
 - 消费：`IProviderExecutionPipeline.ExecuteAsync/ExecuteStreamingAsync`。
 
-- [ ] **步骤 1：写三协议普通请求失败测试**
+- [x] **步骤 1：写三协议普通请求失败测试**
 
 使用捕获请求的假 `IProviderExecutionPipeline`，分别断言：
 
@@ -149,13 +149,13 @@ EndpointFormat = "responses"
 - Anthropic URL 以 `/v1/messages` 结束，body 含 `messages/max_tokens/stream=false`，使用 `x-api-key` 与 `anthropic-version`。
 - 自定义 Header 被发送，但 `ProviderTestSummary` 只保存数量。
 
-- [ ] **步骤 2：运行测试并确认红灯**
+- [x] **步骤 2：运行测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestServiceTests`
 
 预期：编译失败，测试服务和 DTO 不存在。
 
-- [ ] **步骤 3：实现请求构造和普通响应解析**
+- [x] **步骤 3：实现请求构造和普通响应解析**
 
 `ProviderTestRequest` 使用不可变 record，并包含 `RequestId`、Provider/Model、Base URL、协议字段、API Key、Header、`UseProxy`、Prompt、模式和展示上限。普通解析最少支持：
 
@@ -166,15 +166,15 @@ private static string ParseAnthropic(JsonNode root) => string.Concat(root["conte
 
 Responses 同时支持顶层 `output_text` 与 `output[].content[].text`。
 
-- [ ] **步骤 4：写错误、截断与日志安全失败测试**
+- [x] **步骤 4：写错误、截断与日志安全失败测试**
 
 覆盖 401、404、429、5xx、非 JSON、超长正文、超时和用户取消。使用内存 Logger 断言日志不含测试 API Key、Header 值、Prompt 和响应正文。
 
-- [ ] **步骤 5：实现安全错误分类和截断**
+- [x] **步骤 5：实现安全错误分类和截断**
 
 错误结果只保存受限 UI 摘要；日志模板仅使用 Provider、Model、协议、路径、状态码、内容类型、字节数、代理状态和耗时。`OperationCanceledException` 根据调用方 Token 区分“用户取消”和“超时”。
 
-- [ ] **步骤 6：运行测试并提交**
+- [x] **步骤 6：运行测试并提交**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestServiceTests`
 
