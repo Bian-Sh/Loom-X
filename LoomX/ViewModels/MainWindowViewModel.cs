@@ -1150,7 +1150,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         LocaleService.CultureChanged -= OnCultureChanged;
     }
 
-    private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = Loc("providers.edit.new.displayname"), ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); SetStatus("providers.status.edit.new"); }
+    private void NewProvider() { var provider = new ProviderEditorViewModel { BusinessId = GenerateProviderBusinessId(Providers), DisplayName = Loc("providers.edit.new.displayname"), ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); SetStatus("providers.status.edit.new"); }
 
     private async Task SavePendingChangesAsync()
     {
@@ -1730,6 +1730,19 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         OnPropertyChanged(nameof(ProviderHealthSummary));
     }
 
+    public static string GenerateProviderBusinessId(IEnumerable<ProviderEditorViewModel> providers)
+        => GenerateProviderBusinessId(providers, () => Guid.NewGuid().ToString("N")[..8]);
+
+    internal static string GenerateProviderBusinessId(IEnumerable<ProviderEditorViewModel> providers, Func<string> suffixFactory)
+    {
+        var existingIds = providers.Select(provider => provider.BusinessId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        while (true)
+        {
+            var candidate = $"provider-{suffixFactory()}";
+            if (existingIds.Add(candidate)) return candidate;
+        }
+    }
+
     internal static bool MatchesProviderSearch(ProviderEditorViewModel provider, string query)
     {
         query = query.Trim();
@@ -1760,8 +1773,10 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     private bool suppressDirtyTracking;
     private bool suppressCliIdentityVersionChange;
     public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ModelListUrl { get => modelListUrl; set => SetProperty(ref modelListUrl, value); }
-    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); UpdateCliIdentityRecommendations(); } }
-    public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); } }
+    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); OnPropertyChanged(nameof(SelectedCompatibility)); UpdateCliIdentityRecommendations(); } }
+    public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); OnPropertyChanged(nameof(SelectedCompatibility)); } }
+    public IReadOnlyList<ProviderCompatibilityOption> CompatibilityOptions { get; } = ProviderCompatibilityOption.All;
+    public ProviderCompatibilityOption SelectedCompatibility { get => ProviderCompatibilityOption.FromFields(ApiMode, EndpointFormat); set => value?.ApplyTo(this); }
     public IReadOnlyList<EndpointFormatOption> EndpointFormatOptions { get; } = EndpointFormatOption.All;
     public EndpointFormatOption SelectedEndpointFormat { get => EndpointFormatOption.FromValue(EndpointFormat); set { if (value is not null) EndpointFormat = value.Value; } }
     public bool IsEndpointFormatVisible => string.Equals(ApiMode, "openai", StringComparison.OrdinalIgnoreCase);
