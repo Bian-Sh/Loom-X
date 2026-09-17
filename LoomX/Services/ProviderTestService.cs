@@ -133,15 +133,22 @@ public sealed class ProviderTestService : IProviderTestService
     private readonly HttpClient httpClient;
     private readonly ILogger<ProviderTestService> logger;
     private readonly IProviderExecutionPipeline executionPipeline;
+    private readonly Func<CancellationToken, Task<UpdateProxySettings>> proxySettingsReader;
+    private readonly Func<HttpClientHandler, HttpClient> proxyHttpClientFactory;
 
     public ProviderTestService(
         HttpClient httpClient,
         ILogger<ProviderTestService>? logger = null,
-        IProviderExecutionPipeline? executionPipeline = null)
+        IProviderExecutionPipeline? executionPipeline = null,
+        Func<CancellationToken, Task<UpdateProxySettings>>? proxySettingsReader = null,
+        Func<HttpClientHandler, HttpClient>? proxyHttpClientFactory = null)
     {
         this.httpClient = httpClient;
         this.logger = logger ?? NullLogger<ProviderTestService>.Instance;
         this.executionPipeline = executionPipeline ?? new ProviderExecutionPipeline();
+        this.proxySettingsReader = proxySettingsReader ?? (_ => Task.FromResult(
+            new UpdateProxySettings(false, "direct", string.Empty, 0, null, null)));
+        this.proxyHttpClientFactory = proxyHttpClientFactory ?? (handler => new HttpClient(handler));
     }
 
     public async Task<ProviderTestResult> ExecuteAsync(
@@ -160,28 +167,48 @@ public sealed class ProviderTestService : IProviderTestService
             protocol,
             path,
             request.Mode,
-            request.UseProxy,
-            request.UseProxy ? "enabled" : "direct",
-            null,
+            false,
+            "direct",
+            CreateCliSummary(request.Headers),
             request.Headers.Count);
 
-        logger.LogInformation(
-            "Provider 测试开始 {ProviderId}/{ModelId} {Protocol} {Path} {Mode} {UseProxy}",
-            request.ProviderId,
-            request.ModelId,
-            protocol,
-            path,
-            request.Mode,
-            request.UseProxy);
 
         var startedAt = Stopwatch.GetTimestamp();
         progress?.Report(new ProviderTestProgress(request.RequestId, ProviderTestStatus.Sending));
 
         try
         {
+            var proxySelection = await ResolveProxySelectionAsync(request.UseProxy, cancellationToken);
+            summary = summary with
+            {
+                UseProxy = proxySelection.UseProxy,
+                ProxySummary = proxySelection.Mode,
+            };            logger.LogInformation(
+                "Provider 测试开始 {ProviderId}/{ModelId} {Protocol} {Path} {Mode} {UseProxy}",
+                request.ProviderId,
+                request.ModelId,
+                protocol,
+                path,
+                request.Mode,
+                summary.UseProxy);
+            using var clientLease = CreateHttpClientLease(proxySelection);
             using var httpRequest = BuildRequest(request, protocol, path);
+            if (request.Mode == ProviderTestMode.Streaming)
+            {
+                return await ExecuteStreamingRequestAsync(
+                    clientLease.Client,
+                    httpRequest,
+                    request,
+                    summary,
+                    progress,
+                    startedAt,
+                    protocol,
+                    path,
+                    cancellationToken);
+            }
+
             var executionResult = await executionPipeline.ExecuteAsync(
-                httpClient,
+                clientLease.Client,
                 httpRequest,
                 new ProviderExecutionContext(request.ProviderId, request.ModelId, request.ApiMode, path),
                 cancellationToken);
@@ -221,39 +248,26 @@ public sealed class ProviderTestService : IProviderTestService
             }
 
             var truncated = Truncate(responseText, request.MaxDisplayCharacters);
-            var elapsedMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
-            var statusCode = (int)executionResult.StatusCode;
-            var providerResult = new ProviderTestResult(
-                request.RequestId,
-                ProviderTestStatus.Completed,
+            return CreateSuccessResult(
+                request,
                 summary,
-                statusCode,
-                executionResult.ContentType,
-                elapsedMs,
-                executionResult.Body.LongLength,
+                progress,
+                startedAt,
                 truncated.Text,
-                truncated.IsTruncated);
-
-            progress?.Report(new ProviderTestProgress(
-                request.RequestId,
-                ProviderTestStatus.Completed,
-                AccumulatedCharacters: truncated.Text.Length,
-                IsTruncated: truncated.IsTruncated,
-                StatusCode: statusCode,
-                ContentType: executionResult.ContentType,
-                ResponseBytes: executionResult.Body.LongLength));
-            logger.LogInformation(
-                "Provider 测试完成 {ProviderId}/{ModelId} {Protocol} {Path} {StatusCode} {ContentType} {ResponseBytes}B {UseProxy} {ElapsedMs}ms",
-                request.ProviderId,
-                request.ModelId,
-                protocol,
-                path,
-                statusCode,
+                truncated.IsTruncated,
+                (int)executionResult.StatusCode,
                 executionResult.ContentType,
-                executionResult.Body.LongLength,
-                request.UseProxy,
-                elapsedMs);
-            return providerResult;
+                executionResult.Body.LongLength);
+        }
+        catch (InvalidProxyConfigurationException)
+        {
+            return CreateFailureResult(
+                request,
+                summary,
+                progress,
+                startedAt,
+                "invalid_proxy_configuration",
+                false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -298,6 +312,384 @@ public sealed class ProviderTestService : IProviderTestService
         }
     }
 
+    private async Task<ProxySelection> ResolveProxySelectionAsync(
+        bool useProxy,
+        CancellationToken cancellationToken)
+    {
+        if (!useProxy)
+            return ProxySelection.Direct;
+
+        var settings = await proxySettingsReader(cancellationToken)
+            ?? throw new InvalidProxyConfigurationException();
+        var mode = settings.ProxyMode?.Trim().ToLowerInvariant();
+        return mode switch
+        {
+            "direct" => ProxySelection.Direct,
+            "system" => new ProxySelection("system", true, settings),
+            "custom" => new ProxySelection("custom", true, settings),
+            _ => throw new InvalidProxyConfigurationException(),
+        };
+    }
+
+    private HttpClientLease CreateHttpClientLease(ProxySelection selection)
+    {
+        if (!selection.UseProxy)
+            return new HttpClientLease(httpClient, ownsClient: false);
+
+        var handler = new HttpClientHandler { UseProxy = true };
+        if (string.Equals(selection.Mode, "custom", StringComparison.Ordinal))
+        {
+            var settings = selection.Settings ?? throw new InvalidProxyConfigurationException();
+            if (!Uri.TryCreate(settings.ProxyHost?.Trim(), UriKind.Absolute, out var proxyUri)
+                || proxyUri.Scheme is not ("http" or "https")
+                || settings.ProxyPort is < 1 or > 65535)
+            {
+                handler.Dispose();
+                throw new InvalidProxyConfigurationException();
+            }
+
+            var proxy = new WebProxy($"{proxyUri.Scheme}://{proxyUri.Host}:{settings.ProxyPort}");
+            var password = settings.ProxyPassword;
+            if (!string.IsNullOrWhiteSpace(settings.ProxyUsername) || !string.IsNullOrWhiteSpace(password))
+            {
+                proxy.Credentials = new NetworkCredential(
+                    settings.ProxyUsername ?? string.Empty,
+                    password ?? string.Empty);
+            }
+            handler.Proxy = proxy;
+        }
+
+        try
+        {
+            return new HttpClientLease(proxyHttpClientFactory(handler), ownsClient: true);
+        }
+        catch
+        {
+            handler.Dispose();
+            throw;
+        }
+    }
+
+    private static string? CreateCliSummary(IReadOnlyDictionary<string, string> headers)
+    {
+        var identity = CliIdentityService.DetectCliIdentity(headers);
+        if (identity is null)
+            return null;
+
+        var displayName = CliIdentityService.GetProfile(identity.Value).DisplayName;
+        var version = CliIdentityService.DetectCliVersion(headers, identity.Value);
+        return string.IsNullOrWhiteSpace(version) ? displayName : $"{displayName} {version}";
+    }
+
+    private async Task<ProviderTestResult> ExecuteStreamingRequestAsync(
+        HttpClient client,
+        HttpRequestMessage httpRequest,
+        ProviderTestRequest request,
+        ProviderTestSummary summary,
+        IProgress<ProviderTestProgress>? progress,
+        long startedAt,
+        string protocol,
+        string path,
+        CancellationToken cancellationToken)
+    {
+        await using var executionResult = await executionPipeline.ExecuteStreamingAsync(
+            client,
+            httpRequest,
+            new ProviderExecutionContext(request.ProviderId, request.ModelId, request.ApiMode, path),
+            cancellationToken);
+
+        var statusCode = (int)executionResult.StatusCode;
+        if (!executionResult.IsSuccess)
+        {
+            var failure = MapHttpFailure(executionResult.StatusCode);
+            return CreateFailureResult(
+                request,
+                summary,
+                progress,
+                startedAt,
+                failure.ErrorCode,
+                failure.CanRetry,
+                statusCode,
+                executionResult.ContentType);
+        }
+
+        var builder = new StringBuilder();
+        var isTruncated = false;
+        long responseBytes = 0;
+        string? eventName = null;
+        var dataLines = new List<string>();
+        var completed = false;
+
+        using var reader = new StreamReader(
+            executionResult.Body,
+            Encoding.UTF8,
+            detectEncodingFromByteOrderMarks: true,
+            bufferSize: 1024,
+            leaveOpen: true);
+
+        try
+        {
+            while (await reader.ReadLineAsync(cancellationToken) is { } line)
+            {
+                responseBytes += Encoding.UTF8.GetByteCount(line) + 1;
+                if (line.Length == 0)
+                {
+                    if (dataLines.Count > 0)
+                    {
+                        completed = ProcessStreamingFrame(
+                            protocol,
+                            eventName,
+                            string.Join('\n', dataLines),
+                            request,
+                            progress,
+                            statusCode,
+                            executionResult.ContentType,
+                            responseBytes,
+                            builder,
+                            ref isTruncated);
+                    }
+
+                    eventName = null;
+                    dataLines.Clear();
+                    if (completed)
+                        break;
+                    continue;
+                }
+
+                if (line.StartsWith("event:", StringComparison.OrdinalIgnoreCase))
+                {
+                    eventName = line[6..].Trim();
+                }
+                else if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                {
+                    var data = line[5..];
+                    dataLines.Add(data.StartsWith(' ') ? data[1..] : data);
+                }
+            }
+
+            if (!completed && dataLines.Count > 0)
+            {
+                _ = ProcessStreamingFrame(
+                    protocol,
+                    eventName,
+                    string.Join('\n', dataLines),
+                    request,
+                    progress,
+                    statusCode,
+                    executionResult.ContentType,
+                    responseBytes,
+                    builder,
+                    ref isTruncated);
+            }
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidProviderResponseException)
+        {
+            return CreateFailureResult(
+                request,
+                summary,
+                progress,
+                startedAt,
+                exception is JsonException ? "invalid_json" : "invalid_response",
+                false,
+                statusCode,
+                executionResult.ContentType,
+                responseBytes);
+        }
+
+        return CreateSuccessResult(
+            request,
+            summary,
+            progress,
+            startedAt,
+            builder.ToString(),
+            isTruncated,
+            statusCode,
+            executionResult.ContentType,
+            responseBytes);
+    }
+
+    private static bool ProcessStreamingFrame(
+        string protocol,
+        string? eventName,
+        string data,
+        ProviderTestRequest request,
+        IProgress<ProviderTestProgress>? progress,
+        int statusCode,
+        string? contentType,
+        long responseBytes,
+        StringBuilder builder,
+        ref bool isTruncated)
+    {
+        var frame = ParseStreamingFrame(protocol, eventName, data);
+        if (frame.IsCompleted)
+            return true;
+        if (string.IsNullOrEmpty(frame.TextDelta))
+            return false;
+
+        var limit = Math.Max(0, request.MaxDisplayCharacters);
+        var remaining = Math.Max(0, limit - builder.Length);
+        var appendedLength = Math.Min(remaining, frame.TextDelta.Length);
+        var appended = appendedLength == 0 ? string.Empty : frame.TextDelta[..appendedLength];
+        if (appendedLength < frame.TextDelta.Length)
+            isTruncated = true;
+        builder.Append(appended);
+
+        progress?.Report(new ProviderTestProgress(
+            request.RequestId,
+            ProviderTestStatus.Sending,
+            appended,
+            builder.Length,
+            isTruncated,
+            statusCode,
+            contentType,
+            responseBytes));
+        return false;
+    }
+
+    private static StreamingFrame ParseStreamingFrame(string protocol, string? eventName, string data)
+    {
+        if (string.Equals(data.Trim(), "[DONE]", StringComparison.OrdinalIgnoreCase))
+            return new StreamingFrame(string.Empty, true);
+
+        return protocol switch
+        {
+            "openai_responses" => ParseOpenAiResponsesFrame(eventName, data),
+            "anthropic" => ParseAnthropicFrame(eventName, data),
+            _ => ParseOpenAiChatFrame(eventName, data),
+        };
+    }
+
+    private static StreamingFrame ParseOpenAiChatFrame(string? eventName, string data)
+    {
+        if (!string.IsNullOrEmpty(eventName))
+            return default;
+
+        var root = JsonNode.Parse(data) as JsonObject ?? throw new InvalidProviderResponseException();
+        if (root["choices"] is not JsonArray { Count: > 0 } choices
+            || choices[0] is not JsonObject choice
+            || choice["delta"] is not JsonObject delta)
+        {
+            throw new InvalidProviderResponseException();
+        }
+
+        if (delta["content"] is null)
+            return default;
+        if (delta["content"] is not JsonValue content || !content.TryGetValue<string>(out var text))
+            throw new InvalidProviderResponseException();
+        return new StreamingFrame(text, false);
+    }
+
+    private static StreamingFrame ParseOpenAiResponsesFrame(string? eventName, string data)
+    {
+        if (string.Equals(eventName, "response.completed", StringComparison.Ordinal))
+            return new StreamingFrame(string.Empty, true);
+        if (!string.IsNullOrEmpty(eventName)
+            && !string.Equals(eventName, "response.output_text.delta", StringComparison.Ordinal))
+        {
+            return default;
+        }
+
+        var root = JsonNode.Parse(data) as JsonObject ?? throw new InvalidProviderResponseException();
+        var type = root["type"]?.GetValue<string>();
+        if (string.Equals(type, "response.completed", StringComparison.Ordinal))
+            return new StreamingFrame(string.Empty, true);
+        if (!string.Equals(eventName ?? type, "response.output_text.delta", StringComparison.Ordinal))
+            return default;
+        if (root["delta"] is not JsonValue delta || !delta.TryGetValue<string>(out var text))
+            throw new InvalidProviderResponseException();
+        return new StreamingFrame(text, false);
+    }
+
+    private static StreamingFrame ParseAnthropicFrame(string? eventName, string data)
+    {
+        if (string.Equals(eventName, "message_stop", StringComparison.Ordinal))
+            return new StreamingFrame(string.Empty, true);
+        if (!string.IsNullOrEmpty(eventName)
+            && !string.Equals(eventName, "content_block_delta", StringComparison.Ordinal))
+        {
+            return default;
+        }
+
+        var root = JsonNode.Parse(data) as JsonObject ?? throw new InvalidProviderResponseException();
+        var type = root["type"]?.GetValue<string>();
+        if (string.Equals(type, "message_stop", StringComparison.Ordinal))
+            return new StreamingFrame(string.Empty, true);
+        if (!string.Equals(eventName ?? type, "content_block_delta", StringComparison.Ordinal))
+            return default;
+        if (root["delta"] is not JsonObject delta
+            || delta["text"] is not JsonValue textValue
+            || !textValue.TryGetValue<string>(out var text))
+        {
+            throw new InvalidProviderResponseException();
+        }
+        return new StreamingFrame(text, false);
+    }
+
+    private ProviderTestResult CreateSuccessResult(
+        ProviderTestRequest request,
+        ProviderTestSummary summary,
+        IProgress<ProviderTestProgress>? progress,
+        long startedAt,
+        string responseText,
+        bool isTruncated,
+        int statusCode,
+        string? contentType,
+        long responseBytes)
+    {
+        var elapsedMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
+        progress?.Report(new ProviderTestProgress(
+            request.RequestId,
+            ProviderTestStatus.Completed,
+            AccumulatedCharacters: responseText.Length,
+            IsTruncated: isTruncated,
+            StatusCode: statusCode,
+            ContentType: contentType,
+            ResponseBytes: responseBytes));
+        logger.LogInformation(
+            "Provider 测试完成 {ProviderId}/{ModelId} {Protocol} {Path} {StatusCode} {ContentType} {ResponseBytes}B {UseProxy} {ElapsedMs}ms",
+            request.ProviderId,
+            request.ModelId,
+            summary.Protocol,
+            summary.Path,
+            statusCode,
+            contentType,
+            responseBytes,
+            summary.UseProxy,
+            elapsedMs);
+        return new ProviderTestResult(
+            request.RequestId,
+            ProviderTestStatus.Completed,
+            summary,
+            statusCode,
+            contentType,
+            elapsedMs,
+            responseBytes,
+            responseText,
+            isTruncated);
+    }
+
+    private readonly record struct StreamingFrame(string? TextDelta, bool IsCompleted);
+
+    private sealed record ProxySelection(string Mode, bool UseProxy, UpdateProxySettings? Settings)
+    {
+        public static ProxySelection Direct { get; } = new("direct", false, null);
+    }
+
+    private sealed class HttpClientLease(HttpClient client, bool ownsClient) : IDisposable
+    {
+        public HttpClient Client { get; } = client;
+
+        public void Dispose()
+        {
+            if (ownsClient)
+                Client.Dispose();
+        }
+    }
+
+    private sealed class InvalidProxyConfigurationException : Exception
+    {
+    }
+
     private ProviderTestResult CreateFailureResult(
         ProviderTestRequest request,
         ProviderTestSummary summary,
@@ -326,7 +718,7 @@ public sealed class ProviderTestService : IProviderTestService
                 request.ModelId,
                 summary.Protocol,
                 summary.Path,
-                request.UseProxy,
+                summary.UseProxy,
                 elapsedMs);
         }
         else
@@ -340,7 +732,7 @@ public sealed class ProviderTestService : IProviderTestService
                 statusCode,
                 contentType,
                 responseBytes,
-                request.UseProxy,
+                summary.UseProxy,
                 elapsedMs,
                 errorCode);
         }
@@ -376,19 +768,19 @@ public sealed class ProviderTestService : IProviderTestService
                 model = request.ModelId,
                 max_tokens = 1024,
                 messages = new[] { new { role = "user", content = request.Prompt } },
-                stream = false,
+                stream = request.Mode == ProviderTestMode.Streaming,
             },
             "openai_responses" => new
             {
                 model = request.ModelId,
                 input = request.Prompt,
-                stream = false,
+                stream = request.Mode == ProviderTestMode.Streaming,
             },
             _ => new
             {
                 model = request.ModelId,
                 messages = new[] { new { role = "user", content = request.Prompt } },
-                stream = false,
+                stream = request.Mode == ProviderTestMode.Streaming,
             },
         };
 

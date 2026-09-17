@@ -11,6 +11,103 @@ namespace LoomX.Tests.Services;
 
 public sealed class ProviderTestServiceTests
 {
+    public static TheoryData<string, string, string, string> 流式协议样例 => new()
+    {
+        {
+            "openai",
+            "chat_completions",
+            """
+            event: ignored.event
+            data: not-json
+
+            data: {"choices":[
+            data: {"delta":{"content":"你"}}]}
+
+            data: {"choices":[{"delta":{"content":"好"}}]}
+
+            data: [DONE]
+
+            data: {invalid-after-done}
+
+            """,
+            "[DONE]"
+        },
+        {
+            "openai",
+            "responses",
+            """
+            event: ignored.event
+            data: not-json
+
+            event: response.output_text.delta
+            data: {"type":"response.output_text.delta","delta":"你"}
+
+            event: response.output_text.delta
+            data: {"type":"response.output_text.delta","delta":"好"}
+
+            event: response.completed
+            data: {"type":"response.completed"}
+
+            event: response.output_text.delta
+            data: {invalid-after-completed}
+
+            """,
+            "response.completed"
+        },
+        {
+            "anthropic",
+            "messages",
+            """
+            event: ignored.event
+            data: not-json
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"你"}}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"好"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+
+            event: content_block_delta
+            data: {invalid-after-stop}
+
+            """,
+            "message_stop"
+        },
+    };
+
+    public static TheoryData<string, string, string> 流式无效Json样例 => new()
+    {
+        {
+            "openai",
+            "chat_completions",
+            """
+            data: {invalid-json}
+
+            """
+        },
+        {
+            "openai",
+            "responses",
+            """
+            event: response.output_text.delta
+            data: {invalid-json}
+
+            """
+        },
+        {
+            "anthropic",
+            "messages",
+            """
+            event: content_block_delta
+            data: {invalid-json}
+
+            """
+        },
+    };
+
     [Fact]
     public async Task OpenAiChat普通请求携带Bearer与自定义Header并解析响应()
     {
@@ -93,6 +190,261 @@ public sealed class ProviderTestServiceTests
         Assert.Equal(1024, body["max_tokens"]!.GetValue<int>());
         Assert.False(body["stream"]!.GetValue<bool>());
         Assert.Equal("hello world", result.ResponseText);
+    }
+
+    [Theory]
+    [MemberData(nameof(流式协议样例))]
+    public async Task 三协议流式按顺序报告增量并由完成事件结束(
+        string apiMode,
+        string endpointFormat,
+        string sse,
+        string completionMarker)
+    {
+        var pipeline = CapturingPipeline.ForStreaming(sse);
+        var service = CreateService(pipeline);
+        var deltas = new List<string>();
+        var statuses = new List<ProviderTestStatus>();
+
+        var result = await service.ExecuteAsync(
+            CreateRequest(apiMode, endpointFormat) with { Mode = ProviderTestMode.Streaming },
+            new InlineProgress<ProviderTestProgress>(item =>
+            {
+                statuses.Add(item.Status);
+                if (item.TextDelta.Length > 0)
+                    deltas.Add(item.TextDelta);
+            }));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new[] { "你", "好" }, deltas);
+        Assert.Equal("你好", result.ResponseText);
+        Assert.False(result.IsTruncated);
+        Assert.Equal(ProviderTestStatus.Completed, statuses[^1]);
+        Assert.True(pipeline.UsedStreaming);
+        Assert.False(pipeline.UsedRegular);
+
+        var body = JsonNode.Parse(pipeline.Body!)!;
+        Assert.True(body["stream"]!.GetValue<bool>());
+        Assert.DoesNotContain(completionMarker, result.ResponseText, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [MemberData(nameof(流式协议样例))]
+    public async Task 三协议流式超过展示上限时只报告可展示增量并标记截断(
+        string apiMode,
+        string endpointFormat,
+        string sse,
+        string _)
+    {
+        var pipeline = CapturingPipeline.ForStreaming(sse);
+        var service = CreateService(pipeline);
+        var deltas = new List<string>();
+        var truncationStates = new List<bool>();
+
+        var result = await service.ExecuteAsync(
+            CreateRequest(apiMode, endpointFormat, maxDisplayCharacters: 1) with { Mode = ProviderTestMode.Streaming },
+            new InlineProgress<ProviderTestProgress>(item =>
+            {
+                if (item.TextDelta.Length > 0)
+                    deltas.Add(item.TextDelta);
+                truncationStates.Add(item.IsTruncated);
+            }));
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new[] { "你" }, deltas);
+        Assert.Equal("你", result.ResponseText);
+        Assert.True(result.IsTruncated);
+        Assert.Contains(true, truncationStates);
+    }
+
+    [Theory]
+    [MemberData(nameof(流式无效Json样例))]
+    public async Task 三协议流式无效Json返回安全协议错误(
+        string apiMode,
+        string endpointFormat,
+        string sse)
+    {
+        var logger = new RecordingLogger<ProviderTestService>();
+        var pipeline = CapturingPipeline.ForStreaming(sse);
+        var service = new ProviderTestService(new HttpClient(new ThrowingHandler()), logger, pipeline);
+
+        var result = await service.ExecuteAsync(
+            CreateRequest(apiMode, endpointFormat) with { Mode = ProviderTestMode.Streaming });
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("invalid_json", result.ErrorCode);
+        Assert.Empty(result.ResponseText);
+        Assert.DoesNotContain("invalid-json", result.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("invalid-json", string.Join("\n", logger.Entries), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 关闭代理时使用注入的直连客户端且不读取全局代理设置()
+    {
+        using var directClient = new HttpClient(new ThrowingHandler());
+        var pipeline = new CapturingPipeline(JsonResult("""{"choices":[{"message":{"content":"ok"}}]}"""));
+        var factoryCalled = false;
+        var service = new ProviderTestService(
+            directClient,
+            NullLogger<ProviderTestService>.Instance,
+            pipeline,
+            proxySettingsReader: _ => throw new InvalidOperationException("直连不应读取代理设置。"),
+            proxyHttpClientFactory: _ =>
+            {
+                factoryCalled = true;
+                throw new InvalidOperationException("直连不应创建代理客户端。");
+            });
+
+        var result = await service.ExecuteAsync(CreateRequest("openai", "chat_completions"));
+
+        Assert.True(result.IsSuccess);
+        Assert.Same(directClient, pipeline.HttpClient);
+        Assert.False(factoryCalled);
+        Assert.False(result.Summary.UseProxy);
+        Assert.Equal("direct", result.Summary.ProxySummary);
+    }
+
+    [Fact]
+    public async Task System代理只启用UseProxy且不显式设置Proxy()
+    {
+        var pipeline = new CapturingPipeline(JsonResult("""{"choices":[{"message":{"content":"ok"}}]}"""));
+        HttpClientHandler? capturedHandler = null;
+        var service = new ProviderTestService(
+            new HttpClient(new ThrowingHandler()),
+            NullLogger<ProviderTestService>.Instance,
+            pipeline,
+            proxySettingsReader: _ => Task.FromResult(new UpdateProxySettings(
+                true, "system", string.Empty, 0, null, null)),
+            proxyHttpClientFactory: handler =>
+            {
+                capturedHandler = handler;
+                return new HttpClient(handler);
+            });
+
+        var result = await service.ExecuteAsync(CreateRequest(
+            "openai",
+            "chat_completions",
+            useProxy: true));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(capturedHandler);
+        Assert.True(capturedHandler.UseProxy);
+        Assert.Null(capturedHandler.Proxy);
+        Assert.True(result.Summary.UseProxy);
+        Assert.Equal("system", result.Summary.ProxySummary);
+    }
+
+    [Fact]
+    public async Task Custom代理应用地址和凭据并按请求释放客户端()
+    {
+        const string proxyPassword = "proxy-password-secret";
+        var logger = new RecordingLogger<ProviderTestService>();
+        var pipeline = new CapturingPipeline(JsonResult("""{"choices":[{"message":{"content":"ok"}}]}"""));
+        HttpClientHandler? capturedHandler = null;
+        TrackingHttpClient? proxyClient = null;
+        var service = new ProviderTestService(
+            new HttpClient(new ThrowingHandler()),
+            logger,
+            pipeline,
+            proxySettingsReader: _ => Task.FromResult(new UpdateProxySettings(
+                true, "custom", "https://proxy.example", 7890, "proxy-user", proxyPassword)),
+            proxyHttpClientFactory: handler =>
+            {
+                capturedHandler = handler;
+                proxyClient = new TrackingHttpClient(handler);
+                return proxyClient;
+            });
+
+        var result = await service.ExecuteAsync(CreateRequest(
+            "openai",
+            "chat_completions",
+            useProxy: true));
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(capturedHandler);
+        Assert.True(capturedHandler.UseProxy);
+        Assert.Equal(new Uri("https://proxy.example:7890/"), capturedHandler.Proxy!.GetProxy(new Uri("https://provider.example")));
+        var credential = capturedHandler.Proxy.Credentials!.GetCredential(
+            new Uri("https://proxy.example:7890/"),
+            "Basic");
+        Assert.Equal("proxy-user", credential!.UserName);
+        Assert.Equal(proxyPassword, credential.Password);
+        Assert.True(proxyClient!.IsDisposed);
+        Assert.Equal("custom", result.Summary.ProxySummary);
+        Assert.DoesNotContain(proxyPassword, result.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(proxyPassword, string.Join("\n", logger.Entries), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 无效Custom代理返回安全配置错误且不静默直连()
+    {
+        const string proxyPassword = "invalid-proxy-password-secret";
+        var logger = new RecordingLogger<ProviderTestService>();
+        var pipeline = new CapturingPipeline(JsonResult("""{"choices":[{"message":{"content":"unexpected"}}]}"""));
+        var factoryCalled = false;
+        var service = new ProviderTestService(
+            new HttpClient(new ThrowingHandler()),
+            logger,
+            pipeline,
+            proxySettingsReader: _ => Task.FromResult(new UpdateProxySettings(
+                true, "custom", "not-a-proxy-uri", 70000, "proxy-user", proxyPassword)),
+            proxyHttpClientFactory: _ =>
+            {
+                factoryCalled = true;
+                throw new InvalidOperationException("无效配置不应创建客户端。");
+            });
+
+        var result = await service.ExecuteAsync(CreateRequest(
+            "openai",
+            "chat_completions",
+            useProxy: true));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("invalid_proxy_configuration", result.ErrorCode);
+        Assert.False(result.CanRetry);
+        Assert.False(pipeline.UsedRegular);
+        Assert.False(factoryCalled);
+        Assert.DoesNotContain(proxyPassword, result.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(proxyPassword, string.Join("\n", logger.Entries), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Cli身份Header真实进入请求且摘要只保留身份版本和Header数量()
+    {
+        const string customHeaderValue = "custom-header-secret";
+        const string prompt = "prompt-secret";
+        const string apiKey = "api-key-secret";
+        var headers = CliIdentityService.BuildCliIdentityHeaders(CliIdentityType.Codex, "0.153.4");
+        headers["X-Custom"] = customHeaderValue;
+        var logger = new RecordingLogger<ProviderTestService>();
+        var pipeline = new CapturingPipeline(JsonResult("""{"choices":[{"message":{"content":"response-secret"}}]}"""));
+        var service = new ProviderTestService(new HttpClient(new ThrowingHandler()), logger, pipeline);
+
+        var result = await service.ExecuteAsync(CreateRequest(
+            "openai",
+            "chat_completions",
+            headers,
+            apiKey,
+            prompt));
+
+        Assert.Equal("codex_cli_rs/0.153.4", pipeline.Headers["User-Agent"]);
+        Assert.Equal("codex_cli_rs", pipeline.Headers["originator"]);
+        Assert.Equal("0.153.4", pipeline.Headers["version"]);
+        Assert.Equal(customHeaderValue, pipeline.Headers["X-Custom"]);
+        Assert.Equal("Codex CLI 0.153.4", result.Summary.CliSummary);
+        Assert.Equal(4, result.Summary.CustomHeaderCount);
+
+        var summary = result.Summary.ToString();
+        Assert.DoesNotContain(apiKey, summary, StringComparison.Ordinal);
+        Assert.DoesNotContain(customHeaderValue, summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("codex_cli_rs/0.153.4", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain(prompt, summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("response-secret", summary, StringComparison.Ordinal);
+
+        var logs = string.Join("\n", logger.Entries);
+        Assert.DoesNotContain(apiKey, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(customHeaderValue, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(prompt, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain("response-secret", logs, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -343,7 +695,8 @@ public sealed class ProviderTestServiceTests
         IReadOnlyDictionary<string, string>? headers = null,
         string apiKey = "api-secret",
         string prompt = "每日一言",
-        int maxDisplayCharacters = 1000) =>
+        int maxDisplayCharacters = 1000,
+        bool useProxy = false) =>
         new(
             RequestId: "request-1",
             ProviderId: "provider-1",
@@ -353,7 +706,7 @@ public sealed class ProviderTestServiceTests
             EndpointFormat: endpointFormat,
             ApiKey: apiKey,
             Headers: headers ?? new Dictionary<string, string>(),
-            UseProxy: false,
+            UseProxy: useProxy,
             Prompt: prompt,
             Mode: ProviderTestMode.Regular,
             MaxDisplayCharacters: maxDisplayCharacters);
@@ -377,7 +730,8 @@ public sealed class ProviderTestServiceTests
 
     private sealed class CapturingPipeline : IProviderExecutionPipeline
     {
-        private readonly Func<CancellationToken, Task<ProviderExecutionResult>> execute;
+        private readonly Func<CancellationToken, Task<ProviderExecutionResult>>? execute;
+        private readonly Func<CancellationToken, Task<ProviderStreamingResult>>? executeStreaming;
 
         public CapturingPipeline(ProviderExecutionResult result)
             : this(_ => Task.FromResult(result))
@@ -389,10 +743,21 @@ public sealed class ProviderTestServiceTests
             this.execute = execute;
         }
 
+        private CapturingPipeline(Func<CancellationToken, Task<ProviderStreamingResult>> executeStreaming)
+        {
+            this.executeStreaming = executeStreaming;
+        }
+
+        public static CapturingPipeline ForStreaming(string body) => new(_ =>
+            Task.FromResult(CreateStreamingResult(body)));
+
         public Uri? RequestUri { get; private set; }
         public AuthenticationHeaderValue? Authorization { get; private set; }
         public Dictionary<string, string> Headers { get; } = new(StringComparer.OrdinalIgnoreCase);
         public string? Body { get; private set; }
+        public HttpClient? HttpClient { get; private set; }
+        public bool UsedRegular { get; private set; }
+        public bool UsedStreaming { get; private set; }
 
         public async Task<ProviderExecutionResult> ExecuteAsync(
             HttpClient httpClient,
@@ -400,6 +765,8 @@ public sealed class ProviderTestServiceTests
             ProviderExecutionContext context,
             CancellationToken cancellationToken)
         {
+            UsedRegular = true;
+            HttpClient = httpClient;
             RequestUri = request.RequestUri;
             Authorization = request.Headers.Authorization;
             foreach (var header in request.Headers)
@@ -407,15 +774,52 @@ public sealed class ProviderTestServiceTests
             Body = request.Content is null
                 ? null
                 : await request.Content.ReadAsStringAsync(cancellationToken);
-            return await execute(cancellationToken);
+            return execute is null
+                ? throw new InvalidOperationException("流式测试不应调用普通管线。")
+                : await execute(cancellationToken);
         }
 
-        public Task<ProviderStreamingResult> ExecuteStreamingAsync(
+        public async Task<ProviderStreamingResult> ExecuteStreamingAsync(
             HttpClient httpClient,
             HttpRequestMessage request,
             ProviderExecutionContext context,
-            CancellationToken cancellationToken) =>
-            throw new InvalidOperationException("普通请求测试不应调用流式管线。");
+            CancellationToken cancellationToken)
+        {
+            UsedStreaming = true;
+            HttpClient = httpClient;
+            RequestUri = request.RequestUri;
+            Authorization = request.Headers.Authorization;
+            foreach (var header in request.Headers)
+                Headers[header.Key] = string.Join(",", header.Value);
+            Body = request.Content is null
+                ? null
+                : await request.Content.ReadAsStringAsync(cancellationToken);
+            return executeStreaming is null
+                ? throw new InvalidOperationException("普通请求测试不应调用流式管线。")
+                : await executeStreaming(cancellationToken);
+        }
+
+        private static ProviderStreamingResult CreateStreamingResult(string body)
+        {
+            var stream = new MemoryStream(Encoding.UTF8.GetBytes(body), writable: false);
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(stream),
+            };
+            response.Content.Headers.ContentType = new MediaTypeHeaderValue("text/event-stream");
+            return new ProviderStreamingResult(response, stream);
+        }
+    }
+
+    private sealed class TrackingHttpClient(HttpMessageHandler handler) : HttpClient(handler)
+    {
+        public bool IsDisposed { get; private set; }
+
+        protected override void Dispose(bool disposing)
+        {
+            IsDisposed = true;
+            base.Dispose(disposing);
+        }
     }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
