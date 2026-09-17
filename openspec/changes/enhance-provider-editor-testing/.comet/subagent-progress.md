@@ -6,7 +6,7 @@
 - Branch: feature/20260917/enhance-provider-editor-testing
 - Review mode: standard
 - TDD mode: tdd
-- Current task: 5 — 接入 ProvidersViewModel 并移除旧连接测试块
+- Current task: 6 — 四 Tab UI、本地化与复制响应 Toast
 - Stage: checkpoint
 - Base commit: 441cc35
 - Last verified baseline: 948/948 passed
@@ -38,3 +38,8 @@
 - Task 3 result: implementation a98152b, tests 43/43; reviewer attempts 01a0b131 and 01a0b16a failed due route 502, manual controller review required
 - Task 4 base commit: 6fd9999
 - Task 4 result: local implementation 8a71094, ProviderTestPanelViewModelTests 3/3; agent dispatch unavailable due route 502
+
+- Task 5 implementation commit: 802fb51 接入提供商测试面板生命周期
+- Task 5 status commit: 5327909 记录提供商测试面板接入任务完成
+- Task 5 verification: ProvidersViewModel/ProviderEditorViewModelTests 28/28; ProviderEditorViewModelTests/ProviderHealthServiceTests/ProvidersViewModel 41/41
+- Task 5 result: complete; 覆盖 TestPanel 创建、Provider 切换取消、未保存内存配置快照、Dispose 取消和文化变化转发
