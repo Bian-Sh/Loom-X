@@ -28,11 +28,6 @@ public static class AssistantTools
     {
         "id", "label", "description",
     };
-    private static readonly HashSet<string> KnownHttpHeaders = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "accept", "authorization", "cache-control", "connection", "content-length", "content-type",
-        "cookie", "host", "origin", "referer", "user-agent",
-    };
 
     public static void RegisterAll(ToolRegistry registry, IUserDecisionBroker broker)
     {
@@ -266,12 +261,11 @@ public static class AssistantTools
         }
 
         var name = trimmed[..colonIndex];
-        if (name.Any(character => !char.IsLetterOrDigit(character) && character != '-'))
-        {
-            return false;
-        }
-
-        return name.Contains('-', StringComparison.Ordinal) || KnownHttpHeaders.Contains(name);
+        return name.All(character => character is >= 'A' and <= 'Z'
+            or >= 'a' and <= 'z'
+            or >= '0' and <= '9'
+            or '!' or '#' or '$' or '%' or '&' or '\'' or '*' or '+' or '-' or '.'
+            or '^' or '_' or '`' or '|' or '~');
     }
 
     private static UserDecisionValidationException InvalidRequest(string message) =>

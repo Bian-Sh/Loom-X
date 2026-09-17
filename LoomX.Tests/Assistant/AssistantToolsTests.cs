@@ -167,6 +167,10 @@ public sealed class AssistantToolsTests
     [InlineData("{\"model\":\"demo\",\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}")]
     [InlineData("{\"status\":\"ok\",\"items\":[1,2]}")]
     [InlineData("X-Tenant: acme")]
+    [InlineData("Server: nginx")]
+    [InlineData("Date: Wed, 16 Sep 2026 12:00:00 GMT")]
+    [InlineData("Location: /next")]
+    [InlineData("Tenant: acme")]
     public async Task AskUser_禁止完整正文配置块与Header进入Pending(string prohibitedContent)
     {
         using var broker = CreateBroker();
@@ -228,6 +232,24 @@ public sealed class AssistantToolsTests
         arguments["fields"]![0]!["options"] = new JsonArray(
             new JsonObject { ["id"] = "string", ["label"] = "string" });
         arguments["fields"]![0]!["default_option_id"] = "string";
+
+        var execution = tool.Handler(arguments, CancellationToken.None);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.True(broker.Cancel(request.RequestId, "测试结束"));
+        Assert.True((await execution.WaitAsync(TimeSpan.FromSeconds(2))).Success);
+    }
+
+    [Fact]
+    public async Task AskUser_带空格普通短句可用于问题原因与合法选项()
+    {
+        using var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var tool = GetTool(broker);
+        var arguments = CreateValidArguments();
+        arguments["question"] = "Please choose: option A";
+        arguments["reason"] = "Please explain why: normal business reason";
+        arguments["fields"]![0]!["options"]![0]!["label"] = "Option A: recommended";
 
         var execution = tool.Handler(arguments, CancellationToken.None);
         var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
