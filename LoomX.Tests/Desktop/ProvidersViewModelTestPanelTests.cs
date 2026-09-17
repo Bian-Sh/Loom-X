@@ -101,6 +101,29 @@ public sealed class ProvidersViewModelTestPanelTests
         await service.WaitForCancellationAsync();
     }
 
+    [Fact]
+    public void 文化变化会转发给测试面板()
+    {
+        using var fixture = TestFixture.Create();
+        using var viewModel = fixture.CreateViewModel();
+        var notified = false;
+        viewModel.TestPanel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.TestPanel.Prompt)) notified = true;
+        };
+        var previousCulture = LocaleService.CurrentCulture.Name;
+        var nextCulture = string.Equals(previousCulture, "en-US", StringComparison.OrdinalIgnoreCase) ? "zh-CN" : "en-US";
+        try
+        {
+            LocaleService.SetCulture(nextCulture);
+            Assert.True(notified);
+        }
+        finally
+        {
+            LocaleService.SetCulture(previousCulture);
+        }
+    }
+
     private static ProviderEditorViewModel CreateProvider(string businessId, string baseUrl = "https://example.com/v1")
     {
         var id = Guid.NewGuid();
