@@ -19,7 +19,7 @@ using LoomX.Services;
 
 namespace LoomX.ViewModels;
 
-public sealed class MainWindowViewModel : NotifyViewModel
+public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
 {
     private readonly GatewayProcessService gatewayService;
     private readonly AppDataStore dataStore;
@@ -40,6 +40,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
     private PlaceholderViewModel? currentError;
     private double selectedNavigationOffset;
     private bool hasActiveNavigationItem;
+    private bool disposed;
 
     public ObservableCollection<NavigationItemViewModel> NavigationItems { get; }
     public object CurrentView => currentView;
@@ -62,7 +63,15 @@ public sealed class MainWindowViewModel : NotifyViewModel
     public bool IsGatewayFailed => gatewayService.State == GatewayState.Failed;
     public bool IsGatewayStopped => gatewayService.State == GatewayState.Stopped;
 
-    public MainWindowViewModel(GatewayProcessService gatewayService, ToastService? toastService = null, ILoggerFactory? loggerFactory = null, ConfigSnapshotService? configService = null, Action<bool, int, int, string>? applyAppearance = null, AppDataStore? dataStore = null, IStringLocalizer<MainWindowViewModel>? localizer = null)
+    public MainWindowViewModel(
+        GatewayProcessService gatewayService,
+        ToastService? toastService = null,
+        ILoggerFactory? loggerFactory = null,
+        ConfigSnapshotService? configService = null,
+        Action<bool, int, int, string>? applyAppearance = null,
+        AppDataStore? dataStore = null,
+        IStringLocalizer<MainWindowViewModel>? localizer = null,
+        AssistantViewModel? assistantViewModel = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
@@ -76,7 +85,7 @@ public sealed class MainWindowViewModel : NotifyViewModel
         providersViewModel = new ProvidersViewModel(this.dataStore, this.toastService, this.loggerFactory.CreateLogger<ProvidersViewModel>());
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
         activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
-        assistantViewModel = new AssistantViewModel(gatewayService, this.loggerFactory, this.toastService);
+        this.assistantViewModel = assistantViewModel ?? new AssistantViewModel(gatewayService, this.loggerFactory, this.toastService);
         updateCoordinator = new UpdateCoordinator(this.dataStore, logger: this.loggerFactory.CreateLogger<UpdateCoordinator>());
         settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, localizer: LocalizerFactory.Create<SettingsViewModel>());
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
@@ -219,6 +228,12 @@ public sealed class MainWindowViewModel : NotifyViewModel
 
     public void Dispose()
     {
+        if (disposed)
+        {
+            return;
+        }
+
+        disposed = true;
         dataStore.ConfigurationReady -= OnConfigurationReady;
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
         gatewayService.StateChanged -= OnGatewayStateChanged;
@@ -227,10 +242,12 @@ public sealed class MainWindowViewModel : NotifyViewModel
         providersViewModel.Dispose();
         gatewayViewModel.Dispose();
         activityViewModel.Dispose();
+        assistantViewModel.Dispose();
         settingsViewModel.Dispose();
         updateCoordinator.Dispose();
         consoleViewModel.Dispose();
         dataStore.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
 

@@ -657,8 +657,9 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             if (message.ToolCalls.Count > 0)
             {
                 var calls = new JsonArray();
-                foreach (var call in message.ToolCalls)
+                foreach (var rawCall in message.ToolCalls)
                 {
+                    var call = ToolArgumentSafety.EnsureSafe(rawCall);
                     calls.Add(new JsonObject
                     {
                         ["id"] = call.Id,

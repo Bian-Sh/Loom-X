@@ -1,3 +1,4 @@
+﻿using LoomX.Assistant.UserDecisions;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
@@ -18,32 +19,38 @@ public sealed class AssistantService
         1. 配置类操作遵循：读取 → 备份 → 修改 → 验证 → 测试，不要跳步。
         2. 涉及中转站/Provider/模型概念时先用 skill.list / skill.load 加载对应 Skill 再行动。
         3. API Key 永远以 secret_ref 形式出现是正常的，不要向用户索要明文，也不要试图拼出明文。
-        4. 登录、CAPTCHA、2FA、高风险不可逆操作时才打断用户；正常步骤不要逐步询问。
+        4. 高风险不可逆操作时打断用户；正常步骤不要逐步询问。
         5. 回答使用中文，简洁直接，配置结果用要点列出。
+        6. 资料顺序：优先使用模型原生或已有的官方资料能力；其次用 Browser Bridge 的 browser.open、browser.read、browser.wait 读取用户授权页面；无可用通道时用 assistant.ask_user 请求用户提供资料或结论。
+        7. 遇到登录、CAPTCHA、Cloudflare 或 JS challenge，立即暂停并交还用户；禁止绕过网站安全机制。
         """;
 
     private readonly AssistantModelClientFactory modelClientFactory;
     private readonly ToolRegistry toolRegistry;
     private readonly AssistantSessionStore sessionStore;
     private readonly AssistantPreferencesStore? preferencesStore;
+    private readonly IUserDecisionBroker userDecisionBroker;
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantService> logger;
     private readonly SemaphoreSlim runLock = new(1, 1);
 
     private CancellationTokenSource? currentRun;
+    private string? currentRunOwnerId;
 
     public AssistantService(
         AssistantModelClientFactory modelClientFactory,
         ToolRegistry toolRegistry,
         AssistantSessionStore sessionStore,
         ILoggerFactory loggerFactory,
-        AssistantPreferencesStore? preferencesStore = null)
+        AssistantPreferencesStore? preferencesStore,
+        IUserDecisionBroker userDecisionBroker)
     {
         this.modelClientFactory = modelClientFactory;
         this.toolRegistry = toolRegistry;
         this.sessionStore = sessionStore;
         this.loggerFactory = loggerFactory;
         this.preferencesStore = preferencesStore;
+        this.userDecisionBroker = userDecisionBroker;
         logger = loggerFactory.CreateLogger<AssistantService>();
     }
 
@@ -100,6 +107,7 @@ public sealed class AssistantService
     /// <summary>新建空会话并设为当前。</summary>
     public AgentSession NewSession()
     {
+        Cancel();
         CurrentSession = new AgentSession(new AgentSessionOptions
         {
             MaxSteps = 16,
@@ -113,6 +121,7 @@ public sealed class AssistantService
     {
         var session = await sessionStore.LoadAsync(sessionId, cancellationToken);
         if (session is null) return false;
+        session.ApplySystemPrompt(SystemPrompt);
         CurrentSession = session;
         return true;
     }
@@ -123,8 +132,16 @@ public sealed class AssistantService
     public Task RenameSessionAsync(string sessionId, string? title, CancellationToken cancellationToken = default) =>
         sessionStore.SetTitleAsync(sessionId, title, cancellationToken);
 
-    /// <summary>取消当前运行。</summary>
-    public void Cancel() => currentRun?.Cancel();
+    /// <summary>取消当前运行及其等待中的用户决策。</summary>
+    public void Cancel()
+    {
+        var ownerId = currentRunOwnerId;
+        currentRun?.Cancel();
+        if (ownerId is not null)
+        {
+            userDecisionBroker.CancelOwner(ownerId, "assistant_run_cancelled");
+        }
+    }
 
     /// <summary>
     /// 用助手模型给当前会话起一个短标题（≤ 20 字）。
@@ -225,23 +242,41 @@ public sealed class AssistantService
             }
 
             var runSession = CurrentSession;
-            var modelClient = await modelClientFactory.TryCreateAsync(cancellationToken);
-            if (modelClient is null)
-            {
-                throw new InvalidOperationException("AI 助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
-            }
-
-            currentRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var ownerId = Guid.NewGuid().ToString("N");
+            using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            currentRun = runCancellation;
+            currentRunOwnerId = ownerId;
             var persistenceBlocked = false;
+
             try
             {
+                var modelClient = await modelClientFactory.TryCreateAsync(runCancellation.Token);
+                if (modelClient is null)
+                {
+                    throw new InvalidOperationException("AI 助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
+                }
+
                 var approvalGate = PermissionMode == AssistantPermissionMode.AskEachTime
                     ? BuildApprovalGate()
                     : null;
                 var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate,
                     ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded);
-                await foreach (var agentEvent in loop.RunAsync(runSession, userMessage, currentRun.Token))
+                await using var enumerator = loop
+                    .RunAsync(runSession, userMessage, runCancellation.Token)
+                    .GetAsyncEnumerator(runCancellation.Token);
+                while (true)
                 {
+                    AgentEvent agentEvent;
+                    using (AssistantTools.BeginRun(ownerId))
+                    {
+                        if (!await enumerator.MoveNextAsync())
+                        {
+                            break;
+                        }
+
+                        agentEvent = enumerator.Current;
+                    }
+
                     if (agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta or AgentEventKind.MessageCompleted))
                         runSession.RecordActivity(agentEvent);
                     if (!persistenceBlocked && agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta))
@@ -261,8 +296,9 @@ public sealed class AssistantService
             }
             finally
             {
-                currentRun.Dispose();
+                userDecisionBroker.CancelOwner(ownerId, "assistant_run_cancelled");
                 currentRun = null;
+                currentRunOwnerId = null;
 
                 try
                 {

@@ -1485,4 +1485,5 @@
   <data name="assistant.error.upstream">
     <value>サービスメッセージ：{0}</value>
   </data>
+  <data name="assistant.decision.validation_failed"><value>決定項目を確認して、もう一度お試しください。</value></data>
 </root>

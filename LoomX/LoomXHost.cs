@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
@@ -41,6 +41,7 @@ public static class LoomXHost
         builder.Services.AddDbContextFactory<ConfigurationDbContext>(options => options.UseSqlite(CreateConnectionString(databasePath)));
         builder.Services.AddSingleton<IDatabaseConfigurationProvider>(startupConfiguration);
         builder.Services.AddSingleton<ConfigurationManagementService>();
+        builder.Services.AddSingleton<Assistant.Configuration.ITomlDocumentService, Assistant.Configuration.TomlDocumentService>();
         builder.Services.AddSingleton<IAnthropicRequestFactory, AnthropicRequestFactory>();
         builder.Services.AddSingleton<IAnthropicResponseMapper, AnthropicResponseMapper>();
         builder.Services.AddSingleton<IProviderExecutionPipeline, ProviderExecutionPipeline>();
@@ -66,6 +67,7 @@ public static class LoomXHost
         builder.Services.AddSingleton<Assistant.NetworkProbe>();
         builder.Services.AddSingleton<Assistant.DiagnosticSubagent>();
         builder.Services.AddSingleton<Assistant.AssistantModelClientFactory>();
+        builder.Services.AddSingleton<Assistant.UserDecisions.IUserDecisionBroker, Assistant.UserDecisions.UserDecisionBroker>();
         builder.Services.AddSingleton(services => new Assistant.Browser.BrowserBridge(
             port: 17831,
             services.GetRequiredService<ILogger<Assistant.Browser.BrowserBridge>>()));
@@ -87,6 +89,12 @@ public static class LoomXHost
                 registry,
                 services.GetRequiredService<Assistant.Browser.IBrowserBridge>(),
                 services.GetRequiredService<Assistant.Browser.BrowserSecretVault>());
+            Assistant.TomlTools.RegisterAll(
+                registry,
+                services.GetRequiredService<Assistant.Configuration.ITomlDocumentService>());
+            Assistant.AssistantTools.RegisterAll(
+                registry,
+                services.GetRequiredService<Assistant.UserDecisions.IUserDecisionBroker>());
             Assistant.LoomXTools.RegisterDiagnosticTool(
                 registry,
                 services.GetRequiredService<Assistant.DiagnosticSubagent>(),

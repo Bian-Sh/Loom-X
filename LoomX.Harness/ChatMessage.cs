@@ -11,7 +11,10 @@ public enum ChatRole
 /// <summary>
 /// 一次模型工具调用。ArgumentsJson 为模型输出的原始 JSON 参数。
 /// </summary>
-public sealed record ToolCall(string Id, string Name, string ArgumentsJson);
+public sealed record ToolCall(string Id, string Name, string ArgumentsJson)
+{
+    public bool ArgumentsAreSafe { get; init; }
+}
 
 public enum ChatContentKind { Thinking, Text, ToolCall }
 

@@ -1,5 +1,6 @@
-using Xunit;
+﻿using Xunit;
 using LoomX.Assistant;
+using LoomX.Assistant.UserDecisions;
 using LoomX.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,6 +28,29 @@ public sealed class AssistantServiceTests : IDisposable
     public void Dispose()
     {
         try { if (Directory.Exists(rootDirectory)) Directory.Delete(rootDirectory, recursive: true); } catch (IOException) { }
+    }
+
+    [Fact]
+    public void NewSession_SystemPrompt_DeclaresResearchChannelsAndChallengeHandoff()
+    {
+        var service = CreateService(new StubModelClientFactory(null));
+
+        var prompt = Assert.IsType<string>(service.CurrentSession.Options.SystemPrompt);
+        var nativeIndex = prompt.IndexOf("优先使用模型原生或已有的官方资料能力", StringComparison.Ordinal);
+        var browserIndex = prompt.IndexOf("其次用 Browser Bridge", StringComparison.Ordinal);
+        var askUserIndex = prompt.IndexOf("无可用通道时用 assistant.ask_user", StringComparison.Ordinal);
+
+        Assert.True(nativeIndex >= 0 && nativeIndex < browserIndex && browserIndex < askUserIndex);
+        Assert.Contains("browser.open", prompt);
+        Assert.Contains("browser.read", prompt);
+        Assert.Contains("browser.wait", prompt);
+        Assert.Contains("登录", prompt);
+        Assert.Contains("CAPTCHA", prompt);
+        Assert.Contains("Cloudflare", prompt);
+        Assert.Contains("JS challenge", prompt);
+        Assert.Contains("立即暂停并交还用户", prompt);
+        Assert.Contains("禁止绕过网站安全机制", prompt);
+        AssertNoSearchSecretConfiguration(prompt);
     }
 
     [Fact]
@@ -118,6 +142,45 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.True(await service.LoadSessionAsync(sessionId));
         Assert.Equal(sessionId, service.CurrentSession.Id);
         Assert.Contains(service.CurrentSession.Messages, message => message.Content == "查询 Provider");
+    }
+
+    [Fact]
+    public async Task LoadSession_继续发送时使用当前系统策略且不重复旧策略()
+    {
+        var sessionDirectory = Path.Combine(rootDirectory, $"sessions-{Guid.NewGuid():N}");
+        var sessionStore = new AssistantSessionStore(sessionDirectory);
+        const string oldPrompt = "旧策略：只使用 Browser Bridge，并允许自动绕过 JS challenge。";
+        var oldSession = new AgentSession(new AgentSessionOptions
+        {
+            MaxSteps = 16,
+            SystemPrompt = oldPrompt,
+        });
+        oldSession.RestoreMessage(ChatMessage.User("历史问题"));
+        oldSession.RestoreMessage(ChatMessage.Assistant("历史回答"));
+        await sessionStore.SaveAsync(oldSession);
+
+        var model = new ScriptedModelClient(
+            [new TextDeltaEvent("继续回答"), new ModelCompletedEvent("stop")]);
+        var service = CreateService(new StubModelClientFactory(model), sessionStore: sessionStore);
+
+        Assert.True(await service.LoadSessionAsync(oldSession.Id));
+        await foreach (var unused in service.SendAsync("继续发送")) { }
+
+        var request = Assert.Single(model.Requests);
+        var systemMessage = Assert.Single(request.Messages, message => message.Role == ChatRole.System);
+        var prompt = Assert.IsType<string>(systemMessage.Content);
+        var nativeIndex = prompt.IndexOf("优先使用模型原生或已有的官方资料能力", StringComparison.Ordinal);
+        var browserIndex = prompt.IndexOf("其次用 Browser Bridge", StringComparison.Ordinal);
+        var askUserIndex = prompt.IndexOf("无可用通道时用 assistant.ask_user", StringComparison.Ordinal);
+
+        Assert.True(nativeIndex >= 0 && nativeIndex < browserIndex && browserIndex < askUserIndex);
+        Assert.Contains("Cloudflare", prompt);
+        Assert.Contains("JS challenge", prompt);
+        Assert.Contains("立即暂停并交还用户", prompt);
+        Assert.Contains("禁止绕过网站安全机制", prompt);
+        Assert.DoesNotContain(oldPrompt, prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain(request.Messages, message =>
+            message.Role == ChatRole.System && message.Content == oldPrompt);
     }
 
     [Fact]
@@ -223,6 +286,140 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.DoesNotContain(events, item => item.Kind == AgentEventKind.ToolApprovalRequested);
     }
 
+    [Fact]
+    public async Task SendAsync_AskUser提交后安全保留结构化结果并继续最终回答()
+    {
+        const string originalText = "自由文本原文-绝不可进入模型上下文-981273";
+        using var broker = CreateDecisionBroker();
+        var pending = CaptureNext(broker);
+        var registry = CreateAskUserRegistry(broker);
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("ask_1", "assistant.ask_user", AskUserArguments)), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已按安全模式继续。"), new ModelCompletedEvent("stop")]);
+        var service = CreateService(new StubModelClientFactory(model), registry, userDecisionBroker: broker);
+        var events = new List<AgentEvent>();
+
+        var runTask = Task.Run(async () =>
+        {
+            await foreach (var agentEvent in service.SendAsync("请继续配置")) events.Add(agentEvent);
+        });
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Contains(service.CurrentSession.Messages,
+            message => message.Role == ChatRole.Assistant && message.ToolCalls.Any(call => call.Name == "assistant.ask_user"));
+
+        Assert.True(broker.Submit(request.RequestId, new Dictionary<string, object?>
+        {
+            ["mode"] = "safe",
+            ["count"] = 3m,
+            ["note"] = originalText,
+        }));
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var messages = service.CurrentSession.Messages;
+        var toolMessage = Assert.Single(messages, message => message.Role == ChatRole.Tool);
+        Assert.Equal("assistant.ask_user", toolMessage.ToolName);
+        var toolResult = System.Text.Json.Nodes.JsonNode.Parse(toolMessage.Content!)!;
+        Assert.Equal("safe", toolResult["values"]!["mode"]!.GetValue<string>());
+        Assert.Equal(3m, toolResult["values"]!["count"]!.GetValue<decimal>());
+        Assert.True(toolResult["values"]!["note"]!["provided"]!.GetValue<bool>());
+        Assert.DoesNotContain(originalText, toolMessage.Content!, StringComparison.Ordinal);
+        Assert.DoesNotContain(messages, message => message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
+        Assert.DoesNotContain(events, item =>
+            item.Kind == AgentEventKind.MessageCompleted
+            && item.Message?.Content?.Contains(originalText, StringComparison.Ordinal) == true);
+        Assert.Contains(messages, message => message.Role == ChatRole.Assistant && message.Content == "已按安全模式继续。");
+        Assert.Contains(events, item => item.Kind == AgentEventKind.TaskCompleted);
+        Assert.Equal(2, model.Requests.Count);
+        Assert.Contains(model.Requests[1].Messages,
+            message => message.Role == ChatRole.Tool && message.ToolName == "assistant.ask_user");
+        Assert.DoesNotContain(model.Requests[1].Messages,
+            message => message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task Cancel_取消等待中的AskUser并结束当前运行()
+    {
+        using var broker = CreateDecisionBroker();
+        var pending = CaptureNext(broker);
+        var service = CreateService(
+            new StubModelClientFactory(CreateAskUserModel()),
+            CreateAskUserRegistry(broker),
+            userDecisionBroker: broker);
+        var runningSession = service.CurrentSession;
+        var runTask = RunToCompletionAsync(service, "等待选择");
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        service.Cancel();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(AgentSessionState.Cancelled, runningSession.State);
+        Assert.False(broker.Submit(request.RequestId, new Dictionary<string, object?> { ["mode"] = "safe" }));
+    }
+
+    [Fact]
+    public async Task NewSession_取消等待中的AskUser并切换到空会话()
+    {
+        using var broker = CreateDecisionBroker();
+        var pending = CaptureNext(broker);
+        var service = CreateService(
+            new StubModelClientFactory(CreateAskUserModel()),
+            CreateAskUserRegistry(broker),
+            userDecisionBroker: broker);
+        var runningSession = service.CurrentSession;
+        var runTask = RunToCompletionAsync(service, "等待选择");
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var newSession = service.NewSession();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.NotEqual(runningSession.Id, newSession.Id);
+        Assert.Same(newSession, service.CurrentSession);
+        Assert.Equal(AgentSessionState.Cancelled, runningSession.State);
+        Assert.False(broker.Submit(request.RequestId, new Dictionary<string, object?> { ["mode"] = "safe" }));
+    }
+
+    [Fact]
+    public async Task SendAsync_外部取消令牌取消等待中的AskUser()
+    {
+        using var broker = CreateDecisionBroker();
+        var pending = CaptureNext(broker);
+        var service = CreateService(
+            new StubModelClientFactory(CreateAskUserModel()),
+            CreateAskUserRegistry(broker),
+            userDecisionBroker: broker);
+        using var cancellation = new CancellationTokenSource();
+        var runningSession = service.CurrentSession;
+        var runTask = RunToCompletionAsync(service, "等待选择", cancellation.Token);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        cancellation.Cancel();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(AgentSessionState.Cancelled, runningSession.State);
+        Assert.False(broker.Submit(request.RequestId, new Dictionary<string, object?> { ["mode"] = "safe" }));
+    }
+
+    [Fact]
+    public async Task SendAsync_同一运行的Request与Finally取消使用相同Owner()
+    {
+        using var broker = new RecordingUserDecisionBroker();
+        var pending = CaptureNext(broker);
+        var service = CreateService(
+            new StubModelClientFactory(CreateAskUserModel()),
+            CreateAskUserRegistry(broker),
+            userDecisionBroker: broker);
+        using var cancellation = new CancellationTokenSource();
+        var runTask = RunToCompletionAsync(service, "等待选择", cancellation.Token);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.False(runTask.IsCompleted);
+        cancellation.Cancel();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal([request.OwnerId], broker.RequestOwnerIds);
+        Assert.Equal(request.OwnerId, Assert.Single(broker.CancelOwnerIds));
+    }
+
     [Theory]
     [InlineData(null, null)]
     [InlineData("   \n  ", null)]
@@ -256,7 +453,9 @@ public sealed class AssistantServiceTests : IDisposable
     private AssistantService CreateService(
         AssistantModelClientFactory factory,
         ToolRegistry? registry = null,
-        AssistantPermissionMode? permissionMode = null)
+        AssistantPermissionMode? permissionMode = null,
+        IUserDecisionBroker? userDecisionBroker = null,
+        AssistantSessionStore? sessionStore = null)
     {
         AssistantPreferencesStore? preferencesStore = null;
         if (permissionMode is not null)
@@ -268,11 +467,141 @@ public sealed class AssistantServiceTests : IDisposable
         return new AssistantService(
             factory,
             registry ?? new ToolRegistry(),
-            new AssistantSessionStore(Path.Combine(rootDirectory, $"sessions-{Guid.NewGuid():N}")),
+            sessionStore ?? new AssistantSessionStore(Path.Combine(rootDirectory, $"sessions-{Guid.NewGuid():N}")),
             NullLoggerFactory.Instance,
-            preferencesStore);
+            preferencesStore,
+            userDecisionBroker ?? CreateDecisionBroker());
     }
 
+    private const string AskUserArguments = """
+        {
+          "title": "配置方式",
+          "question": "请选择配置方式",
+          "reason": "需要确认业务偏好",
+          "impact_summary": "影响后续配置步骤",
+          "allow_cancel": true,
+          "fields": [
+            {
+              "id": "mode",
+              "label": "模式",
+              "type": "single_select",
+              "is_required": true,
+              "options": [
+                { "id": "safe", "label": "安全模式" },
+                { "id": "fast", "label": "快速模式" }
+              ]
+            },
+            {
+              "id": "count",
+              "label": "数量",
+              "type": "number"
+            },
+            {
+              "id": "note",
+              "label": "补充说明",
+              "type": "text"
+            }
+          ]
+        }
+        """;
+
+    private static ScriptedModelClient CreateAskUserModel() => new(
+        [new ModelToolCallEvent(new ToolCall("ask_1", "assistant.ask_user", AskUserArguments)), new ModelCompletedEvent("tool_calls")]);
+
+    private static ToolRegistry CreateAskUserRegistry(IUserDecisionBroker broker)
+    {
+        var registry = new ToolRegistry();
+        AssistantTools.RegisterAll(registry, broker);
+        return registry;
+    }
+
+    private static UserDecisionBroker CreateDecisionBroker() =>
+        new(NullLogger<UserDecisionBroker>.Instance);
+
+    private static void AssertNoSearchSecretConfiguration(string content)
+    {
+        foreach (var forbidden in new[]
+        {
+            "SEARCH_API_KEY",
+            "SERPAPI_API_KEY",
+            "TAVILY_API_KEY",
+            "BRAVE_SEARCH_API_KEY",
+            "BING_SEARCH_API_KEY",
+            "GOOGLE_SEARCH_API_KEY",
+        })
+        {
+            Assert.DoesNotContain(forbidden, content, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    private static TaskCompletionSource<PendingUserDecision> CaptureNext(IUserDecisionBroker broker)
+    {
+        var completion = new TaskCompletionSource<PendingUserDecision>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        broker.PendingRequested += (_, request) =>
+        {
+            broker.TryClaim(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId);
+            completion.TrySetResult(request);
+        };
+        return completion;
+    }
+
+    private static async Task RunToCompletionAsync(
+        AssistantService service,
+        string message,
+        CancellationToken cancellationToken = default)
+    {
+        await foreach (var unused in service.SendAsync(message, cancellationToken)) { }
+    }
+
+    private sealed class RecordingUserDecisionBroker : IUserDecisionBroker
+    {
+        private readonly UserDecisionBroker inner = CreateDecisionBroker();
+        private readonly System.Collections.Concurrent.ConcurrentQueue<string> requestOwnerIds = new();
+        private readonly System.Collections.Concurrent.ConcurrentQueue<string> cancelOwnerIds = new();
+
+        public event EventHandler<PendingUserDecision>? PendingRequested
+        {
+            add => inner.PendingRequested += value;
+            remove => inner.PendingRequested -= value;
+        }
+
+        public IReadOnlyList<string> RequestOwnerIds => requestOwnerIds.ToArray();
+
+        public IReadOnlyList<string> CancelOwnerIds => cancelOwnerIds.ToArray();
+
+        public Task<UserDecisionResult> RequestAsync(
+            string ownerId,
+            UserDecisionRequest request,
+            CancellationToken cancellationToken)
+        {
+            requestOwnerIds.Enqueue(ownerId);
+            return inner.RequestAsync(ownerId, request, cancellationToken);
+        }
+
+        public bool TryClaim(string requestId, string claimantId) =>
+            inner.TryClaim(requestId, claimantId);
+
+        public bool Release(string requestId, string claimantId) =>
+            inner.Release(requestId, claimantId);
+
+        public bool Submit(
+            string requestId,
+            string claimantId,
+            IReadOnlyDictionary<string, object?> values) =>
+            inner.Submit(requestId, claimantId, values);
+
+        public bool Cancel(string requestId, string claimantId, string reason) =>
+            inner.Cancel(requestId, claimantId, reason);
+
+        public int CancelOwner(string ownerId, string reason)
+        {
+            cancelOwnerIds.Enqueue(ownerId);
+            return inner.CancelOwner(ownerId, reason);
+        }
+
+        public void Dispose() => inner.Dispose();
+    }
     /// <summary>剧本式模型工厂：TryCreateAsync 返回预置客户端（或 null 模拟未配置）。</summary>
     private sealed class StubModelClientFactory(IModelClient? client)
         : AssistantModelClientFactory(

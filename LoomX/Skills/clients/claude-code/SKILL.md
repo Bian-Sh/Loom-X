@@ -36,3 +36,10 @@ Claude Code 通过环境变量切换网关：
 
 - Claude Code 用的是 Anthropic Messages 协议；LoomX 侧需要 Combo 路由到 anthropic 模式的模型，或确认桥接能力可用。
 - Key 不进入聊天上下文；已暴露的 Key 建议轮换（Endpoint 设置里支持一键轮换）。
+
+## 资料获取边界
+
+1. 优先使用模型原生或已有的官方资料能力。
+2. 其次使用 Browser Bridge 的 `browser.open`、`browser.read`、`browser.wait` 读取用户授权页面。
+3. 遇到登录、CAPTCHA、Cloudflare 或 JS challenge 时立即暂停并交还用户，禁止绕过网站安全机制。
+4. 没有可用资料通道时，使用 `assistant.ask_user` 请求用户提供资料或结论。

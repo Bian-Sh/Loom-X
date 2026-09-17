@@ -390,6 +390,7 @@ public sealed class OpenAiCompatibleModelClientTests
             Description = "读取 Endpoint 的无副作用验收工具。",
             ParametersSchema = JsonNode.Parse(
                 """{"type":"object","properties":{"key":{"type":"string"}},"required":["key"]}""")!,
+            SafeArgumentsProjector = arguments => arguments?.DeepClone(),
             Handler = (arguments, _) =>
             {
                 executionCount++;
@@ -424,8 +425,8 @@ public sealed class OpenAiCompatibleModelClientTests
         var persistedCall = assistantToolMessage!["tool_calls"]![0]!;
         Assert.Equal("call_lifecycle", persistedCall["id"]!.GetValue<string>());
         Assert.Equal(
-            """{"key": "openai"}""",
-            persistedCall["function"]!["arguments"]!.GetValue<string>());
+            "openai",
+            JsonNode.Parse(persistedCall["function"]!["arguments"]!.GetValue<string>())!["key"]!.GetValue<string>());
         var toolResultMessage = messages.Single(message => message?["role"]?.GetValue<string>() == "tool");
         Assert.Equal("call_lifecycle", toolResultMessage!["tool_call_id"]!.GetValue<string>());
         Assert.Equal("生命周期验收通过", session.Messages[^1].Content);
