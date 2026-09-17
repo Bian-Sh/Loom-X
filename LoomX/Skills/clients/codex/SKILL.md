@@ -89,3 +89,10 @@ wire_api = "responses"
 - 不需要重启 LoomX；Codex 重启后读取新的 Catalog。
 - `model_catalog_json` 是 Codex 的客户端模型目录，不是 LoomX Router 的路由配置。
 - `auth.json` 里如有官方登录态，切换 `model_provider` 后不会被使用，不要删除。
+
+## 资料获取边界
+
+1. 优先使用模型原生或已有的官方资料能力。
+2. 其次使用 Browser Bridge 的 `browser.open`、`browser.read`、`browser.wait` 读取用户授权页面。
+3. 遇到登录、CAPTCHA、Cloudflare 或 JS challenge 时立即暂停并交还用户，禁止绕过网站安全机制。
+4. 没有可用资料通道时，使用 `assistant.ask_user` 请求用户提供资料或结论。

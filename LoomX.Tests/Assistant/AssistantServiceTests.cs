@@ -31,6 +31,29 @@ public sealed class AssistantServiceTests : IDisposable
     }
 
     [Fact]
+    public void NewSession_SystemPrompt_DeclaresResearchChannelsAndChallengeHandoff()
+    {
+        var service = CreateService(new StubModelClientFactory(null));
+
+        var prompt = Assert.IsType<string>(service.CurrentSession.Options.SystemPrompt);
+        var nativeIndex = prompt.IndexOf("优先使用模型原生或已有的官方资料能力", StringComparison.Ordinal);
+        var browserIndex = prompt.IndexOf("其次用 Browser Bridge", StringComparison.Ordinal);
+        var askUserIndex = prompt.IndexOf("无可用通道时用 assistant.ask_user", StringComparison.Ordinal);
+
+        Assert.True(nativeIndex >= 0 && nativeIndex < browserIndex && browserIndex < askUserIndex);
+        Assert.Contains("browser.open", prompt);
+        Assert.Contains("browser.read", prompt);
+        Assert.Contains("browser.wait", prompt);
+        Assert.Contains("登录", prompt);
+        Assert.Contains("CAPTCHA", prompt);
+        Assert.Contains("Cloudflare", prompt);
+        Assert.Contains("JS challenge", prompt);
+        Assert.Contains("立即暂停并交还用户", prompt);
+        Assert.Contains("禁止绕过网站安全机制", prompt);
+        AssertNoSearchSecretConfiguration(prompt);
+    }
+
+    [Fact]
     public async Task SendAsync_StreamsEvents_AndPersistsSession()
     {
         var model = new ScriptedModelClient(
@@ -454,6 +477,22 @@ public sealed class AssistantServiceTests : IDisposable
 
     private static UserDecisionBroker CreateDecisionBroker() =>
         new(NullLogger<UserDecisionBroker>.Instance);
+
+    private static void AssertNoSearchSecretConfiguration(string content)
+    {
+        foreach (var forbidden in new[]
+        {
+            "SEARCH_API_KEY",
+            "SERPAPI_API_KEY",
+            "TAVILY_API_KEY",
+            "BRAVE_SEARCH_API_KEY",
+            "BING_SEARCH_API_KEY",
+            "GOOGLE_SEARCH_API_KEY",
+        })
+        {
+            Assert.DoesNotContain(forbidden, content, StringComparison.OrdinalIgnoreCase);
+        }
+    }
 
     private static TaskCompletionSource<PendingUserDecision> CaptureNext(IUserDecisionBroker broker)
     {
