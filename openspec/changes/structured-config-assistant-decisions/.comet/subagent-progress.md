@@ -4,7 +4,7 @@
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
 - Current task: Task 8
-- Stage: implementer
+- Stage: review
 - Fix round: 0
 
 ## Rulings
@@ -34,3 +34,4 @@
 - Task 7 首轮审查接受 1 个 Critical、2 个 Important：Broker request ownership 必须原子且排他，未 claim 的 UI 不得取消他人请求；生产页面/主窗口必须接入激活、停用与释放；事件流程必须补齐安全结构化日志，进入修复轮 1。Minor 本地化同时纳入修复，避免新增硬编码用户文案。
 - Task 7 修复轮 1 已实现并进入 scoped re-review：以真实 Broker 原子 claim、生产生命周期、安全日志和 Locale 回归测试作为首轮 finding 的验收边界。
 - Task 7 complete：原子 request ownership、生产生命周期、安全结构化日志与 Locale 资源已通过第 1 轮 scoped re-review；计划 Step 1–7 与 OpenSpec 5.1–5.3 已由协调者统一勾选。
+- Task 8 实现已完成并进入 thorough review；资料通道契约、挑战交还、安全边界、全量验证与 standalone 发布为审查范围，formatter 全仓失败按既有基线单独核查。
