@@ -324,4 +324,16 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         Assert.False(missing.Success);
         Assert.Contains("不存在", missing.Content);
     }
+    [Fact]
+    public async Task GetProvider不存在_真实Handler不回显原始Id()
+    {
+        const string privateId = "private-header-value";
+
+        var result = await InvokeAsync("loomx.get_provider", $$"""{"id":"{{privateId}}"}""");
+
+        Assert.False(result.Success);
+        Assert.DoesNotContain(privateId, result.Content, StringComparison.Ordinal);
+        Assert.Contains("不存在", result.Content, StringComparison.Ordinal);
+    }
+
 }

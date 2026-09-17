@@ -168,4 +168,13 @@ public sealed class ToolRegistryTests
         Assert.Equal("string", schema["items"]!["type"]!.GetValue<string>());
         Assert.True(schema["items"]!["maxLength"]!.GetValue<int>() > 0);
     }
+    [Fact]
+    public void FailureFactories_普通Fail默认不可信且SafeFail显式可信()
+    {
+        var unsafeFailure = ToolResult.Fail("private-header-value");
+        var safeFailure = ToolResult.SafeFail("固定安全错误");
+
+        Assert.False(unsafeFailure.FailureContentIsSafe);
+        Assert.True(safeFailure.FailureContentIsSafe);
+    }
 }

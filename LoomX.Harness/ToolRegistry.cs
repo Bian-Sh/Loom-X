@@ -14,11 +14,31 @@ public enum ToolRiskLevel
 /// <summary>
 /// 工具执行结果。Content 会进入模型上下文，必须是不含 Secret 的安全内容。
 /// </summary>
-public sealed record ToolResult(bool Success, string Content)
+public sealed record ToolResult
 {
-    public static ToolResult Ok(string content) => new(true, content);
+    private const string UnsafeFailureMessage = "工具执行失败。";
 
-    public static ToolResult Fail(string error) => new(false, error);
+    private ToolResult(bool success, string content, bool failureContentIsSafe)
+    {
+        Success = success;
+        Content = content;
+        FailureContentIsSafe = failureContentIsSafe;
+    }
+
+    public bool Success { get; }
+
+    public string Content { get; }
+
+    internal bool FailureContentIsSafe { get; }
+
+    public static ToolResult Ok(string content) => new(true, content, true);
+
+    public static ToolResult Fail(string error) => new(false, error, false);
+
+    public static ToolResult SafeFail(string error) => new(false, error, true);
+
+    internal ToolResult EnsureSafeFailure() =>
+        Success || FailureContentIsSafe ? this : SafeFail(UnsafeFailureMessage);
 }
 
 /// <summary>

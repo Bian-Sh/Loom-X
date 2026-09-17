@@ -381,7 +381,7 @@ public static class TomlTools
         ToolResult.Ok(json.ToJsonString(OutputJsonOptions));
 
     private static ToolResult Fail(string code, string message) =>
-        ToolResult.Fail(new JsonObject
+        ToolResult.SafeFail(new JsonObject
         {
             ["error"] = code,
             ["message"] = message,

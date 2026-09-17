@@ -419,7 +419,7 @@ public static class AssistantTools
     }
 
     private static ToolResult Fail(string code, string message) =>
-        ToolResult.Fail(new JsonObject
+        ToolResult.SafeFail(new JsonObject
         {
             ["error"] = code,
             ["message"] = message,

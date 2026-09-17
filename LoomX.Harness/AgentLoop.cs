@@ -209,13 +209,13 @@ public sealed class AgentLoop
 
                     if (!approved)
                     {
-                        logger.LogInformation("Agent 工具调用被用户拒绝 {ToolName}", toolCall.Name);
+                        logger.LogInformation("Agent 工具调用被用户拒绝 {ToolName}", safeToolCall.Name);
                         session.AddMessage(ChatMessage.ToolResult(safeToolCall, "用户拒绝了这次修改操作，没有执行。"));
                         yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1] };
                         yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallCompleted) with
                         {
-                            ToolName = toolCall.Name,
-                            ToolCallId = toolCall.Id,
+                            ToolName = safeToolCall.Name,
+                            ToolCallId = safeToolCall.Id,
                             Success = false,
                             Detail = "已被你拒绝，未执行。",
                         };
@@ -230,13 +230,14 @@ public sealed class AgentLoop
                     break;
                 }
 
-                session.AddMessage(ChatMessage.ToolResult(safeToolCall, result!.Content));
+                result = result!.EnsureSafeFailure();
+                session.AddMessage(ChatMessage.ToolResult(safeToolCall, result.Content));
                 yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1] };
 
                 yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallCompleted) with
                 {
-                    ToolName = toolCall.Name,
-                    ToolCallId = toolCall.Id,
+                    ToolName = safeToolCall.Name,
+                    ToolCallId = safeToolCall.Id,
                     Success = result.Success,
                     Detail = result.Success ? null : ModelErrorClassifier.SanitizeUpstreamMessage(result.Content),
                 };
@@ -390,8 +391,8 @@ public sealed class AgentLoop
     {
         if (!toolRegistry.TryGet(toolCall.Name, out var tool) || tool is null)
         {
-            logger.LogWarning("Agent 调用了未注册的工具 {ToolName}", toolCall.Name);
-            return (ToolResult.Fail($"未注册的工具：{toolCall.Name}"), false);
+            logger.LogWarning("Agent 调用了未注册的工具");
+            return (ToolResult.SafeFail("未注册的工具。"), false);
         }
 
         JsonNode? arguments;
@@ -401,7 +402,7 @@ public sealed class AgentLoop
         }
         catch (JsonException)
         {
-            return (ToolResult.Fail("工具参数不是有效的 JSON。"), false);
+            return (ToolResult.SafeFail("工具参数不是有效的 JSON。"), false);
         }
 
         using var toolTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -414,12 +415,17 @@ public sealed class AgentLoop
         {
             if (cancellationToken.IsCancellationRequested) return (null, true);
             logger.LogWarning("Agent 工具执行超时 {ToolName}", tool.Name);
-            return (ToolResult.Fail("工具执行超时。"), false);
+            return (ToolResult.SafeFail("工具执行超时。"), false);
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "Agent 工具执行失败 {ToolName}", tool.Name);
-            return (ToolResult.Fail($"工具执行失败：{exception.Message}"), false);
+            var safeException = new InvalidOperationException("工具处理器执行失败。");
+            logger.LogError(
+                safeException,
+                "Agent 工具执行失败 {ToolName} {ExceptionType}",
+                tool.Name,
+                exception.GetType().FullName ?? exception.GetType().Name);
+            return (ToolResult.SafeFail("工具执行失败。"), false);
         }
     }
 }
