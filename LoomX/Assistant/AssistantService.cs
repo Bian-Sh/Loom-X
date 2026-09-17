@@ -121,6 +121,7 @@ public sealed class AssistantService
     {
         var session = await sessionStore.LoadAsync(sessionId, cancellationToken);
         if (session is null) return false;
+        session.ApplySystemPrompt(SystemPrompt);
         CurrentSession = session;
         return true;
     }

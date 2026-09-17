@@ -46,7 +46,7 @@ public sealed class AgentSession
     /// <summary>从持久化恢复会话标识，保证再次保存时写回同一文件。</summary>
     internal void RestoreId(string id) => Id = id;
 
-    public AgentSessionOptions Options { get; }
+    public AgentSessionOptions Options { get; private set; }
 
     public AgentSessionState State { get; private set; } = AgentSessionState.Created;
 
@@ -54,6 +54,23 @@ public sealed class AgentSession
     public IReadOnlyList<AgentEvent> Activities => activities;
 
     internal void AddMessage(ChatMessage message) => messages.Add(message);
+
+    /// <summary>应用宿主当前系统策略；替换历史策略并保留原消息标识，避免追加重复策略消息。</summary>
+    internal void ApplySystemPrompt(string systemPrompt)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(systemPrompt);
+        var persistedSystem = messages.FirstOrDefault(message => message.Role == ChatRole.System);
+        messages.RemoveAll(message => message.Role == ChatRole.System);
+        var currentSystem = persistedSystem is null
+            ? ChatMessage.System(systemPrompt)
+            : ChatMessage.System(systemPrompt) with
+            {
+                Id = persistedSystem.Id,
+                Timestamp = persistedSystem.Timestamp,
+            };
+        messages.Insert(0, currentSystem);
+        Options = Options with { SystemPrompt = systemPrompt };
+    }
 
     /// <summary>从持久化恢复消息（不清空系统提示之外的校验，内容由存储层保证安全）。</summary>
     internal void RestoreMessage(ChatMessage message) => messages.Add(message);

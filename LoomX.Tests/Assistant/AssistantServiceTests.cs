@@ -145,6 +145,45 @@ public sealed class AssistantServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadSession_继续发送时使用当前系统策略且不重复旧策略()
+    {
+        var sessionDirectory = Path.Combine(rootDirectory, $"sessions-{Guid.NewGuid():N}");
+        var sessionStore = new AssistantSessionStore(sessionDirectory);
+        const string oldPrompt = "旧策略：只使用 Browser Bridge，并允许自动绕过 JS challenge。";
+        var oldSession = new AgentSession(new AgentSessionOptions
+        {
+            MaxSteps = 16,
+            SystemPrompt = oldPrompt,
+        });
+        oldSession.RestoreMessage(ChatMessage.User("历史问题"));
+        oldSession.RestoreMessage(ChatMessage.Assistant("历史回答"));
+        await sessionStore.SaveAsync(oldSession);
+
+        var model = new ScriptedModelClient(
+            [new TextDeltaEvent("继续回答"), new ModelCompletedEvent("stop")]);
+        var service = CreateService(new StubModelClientFactory(model), sessionStore: sessionStore);
+
+        Assert.True(await service.LoadSessionAsync(oldSession.Id));
+        await foreach (var unused in service.SendAsync("继续发送")) { }
+
+        var request = Assert.Single(model.Requests);
+        var systemMessage = Assert.Single(request.Messages, message => message.Role == ChatRole.System);
+        var prompt = Assert.IsType<string>(systemMessage.Content);
+        var nativeIndex = prompt.IndexOf("优先使用模型原生或已有的官方资料能力", StringComparison.Ordinal);
+        var browserIndex = prompt.IndexOf("其次用 Browser Bridge", StringComparison.Ordinal);
+        var askUserIndex = prompt.IndexOf("无可用通道时用 assistant.ask_user", StringComparison.Ordinal);
+
+        Assert.True(nativeIndex >= 0 && nativeIndex < browserIndex && browserIndex < askUserIndex);
+        Assert.Contains("Cloudflare", prompt);
+        Assert.Contains("JS challenge", prompt);
+        Assert.Contains("立即暂停并交还用户", prompt);
+        Assert.Contains("禁止绕过网站安全机制", prompt);
+        Assert.DoesNotContain(oldPrompt, prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain(request.Messages, message =>
+            message.Role == ChatRole.System && message.Content == oldPrompt);
+    }
+
+    [Fact]
     public async Task SendAsync_SwitchSessionDuringStreaming_PersistsOriginalRunWithoutPollutingViewedSession()
     {
         var model = new SessionSwitchModelClient();
@@ -415,7 +454,8 @@ public sealed class AssistantServiceTests : IDisposable
         AssistantModelClientFactory factory,
         ToolRegistry? registry = null,
         AssistantPermissionMode? permissionMode = null,
-        IUserDecisionBroker? userDecisionBroker = null)
+        IUserDecisionBroker? userDecisionBroker = null,
+        AssistantSessionStore? sessionStore = null)
     {
         AssistantPreferencesStore? preferencesStore = null;
         if (permissionMode is not null)
@@ -427,7 +467,7 @@ public sealed class AssistantServiceTests : IDisposable
         return new AssistantService(
             factory,
             registry ?? new ToolRegistry(),
-            new AssistantSessionStore(Path.Combine(rootDirectory, $"sessions-{Guid.NewGuid():N}")),
+            sessionStore ?? new AssistantSessionStore(Path.Combine(rootDirectory, $"sessions-{Guid.NewGuid():N}")),
             NullLoggerFactory.Instance,
             preferencesStore,
             userDecisionBroker ?? CreateDecisionBroker());
