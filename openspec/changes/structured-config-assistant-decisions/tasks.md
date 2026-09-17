@@ -33,13 +33,13 @@
 
 ## 6. 资料收集与后续 Skill 约束
 
-- [ ] 6.1 为后续 Client Skill 提供资料收集服务边界说明：优先使用 Assistant 模型已有搜索能力，其次使用现有 Browser Bridge，最后通过 AskUser 请求用户提供资料，并以文档测试确认流程不新增搜索 API Key
-- [ ] 6.2 更新相关 Assistant/Browser 文档或 Skill 说明，明确登录、验证码、Cloudflare、JS challenge 等情况交还用户处理，禁止绕过网站安全机制，并确认本 Change 不引入 WebView、爬虫或第三方搜索 Provider
+- [x] 6.1 为后续 Client Skill 提供资料收集服务边界说明：优先使用 Assistant 模型已有搜索能力，其次使用现有 Browser Bridge，最后通过 AskUser 请求用户提供资料，并以文档测试确认流程不新增搜索 API Key
+- [x] 6.2 更新相关 Assistant/Browser 文档或 Skill 说明，明确登录、验证码、Cloudflare、JS challenge 等情况交还用户处理，禁止绕过网站安全机制，并确认本 Change 不引入 WebView、爬虫或第三方搜索 Provider
 
 ## 7. 验证与交付
 
-- [ ] 7.1 编写并运行 TOML 服务、原子写入、敏感信息保护和失败回滚单元测试，确认新增测试全部通过
-- [ ] 7.2 编写并运行 AskUser Broker、Assistant 工具接入、取消恢复和桌面端 ViewModel 的集成测试，确认提交、取消、页面关闭和会话停止均可收敛
-- [ ] 7.3 运行 `dotnet test` 覆盖 `LoomX.Tests` 与现有测试，修复回归后确认日志、数据库路径和既有 Assistant 工具行为不变
-- [ ] 7.4 运行 `openspec status --change structured-config-assistant-decisions --json`、`openspec validate structured-config-assistant-decisions --strict`，并检查任务勾选状态、变更范围和中文文档完整性
+- [x] 7.1 编写并运行 TOML 服务、原子写入、敏感信息保护和失败回滚单元测试，确认新增测试全部通过
+- [x] 7.2 编写并运行 AskUser Broker、Assistant 工具接入、取消恢复和桌面端 ViewModel 的集成测试，确认提交、取消、页面关闭和会话停止均可收敛
+- [x] 7.3 运行 `dotnet test` 覆盖 `LoomX.Tests` 与现有测试，修复回归后确认日志、数据库路径和既有 Assistant 工具行为不变
+- [x] 7.4 运行 `openspec status --change structured-config-assistant-decisions --json`、`openspec validate structured-config-assistant-decisions --strict`，并检查任务勾选状态、变更范围和中文文档完整性
 

@@ -1,7 +1,7 @@
 # Task 8 修复轮 1 实现报告
 
-日期：2026-09-17  
-分支：`codex/structured-config-assistant-decisions`  
+日期：2026-09-17
+分支：`codex/structured-config-assistant-decisions`
 范围：仅处理首轮审查 I1，并完成 M1 的代码侧确认与发布验证；代码修复由协调者提交至 HEAD `164b1e94f0f337fb9a2ad69f09a248c312cb43ec` 后，本轮已从该干净 HEAD 完成 standalone 发布与启动核验，未 commit、未 push。
 
 ## 结论

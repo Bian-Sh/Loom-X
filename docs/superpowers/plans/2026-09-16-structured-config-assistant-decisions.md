@@ -560,20 +560,20 @@ git commit -m "实现 AskUser 桌面交互"
 - Consumes: 已实现 `assistant.ask_user` 和现有 `browser.open/read/wait`。
 - Produces: 明确的资料获取顺序与网站挑战处理说明，不新增搜索工具或 Secret。
 
-- [ ] **Step 1: 编写文档/Skill 契约失败测试**
+- [x] **Step 1: 编写文档/Skill 契约失败测试**
 
 断言系统提示或 Skill 包含：优先模型已有能力、其次 Browser Bridge、最后 AskUser；并包含登录/CAPTCHA/Cloudflare/JS challenge 交还用户、不得绕过；断言不出现新的搜索 API Key 配置键。
 
-- [ ] **Step 2: 运行 Skill 测试确认红灯**
+- [x] **Step 2: 运行 Skill 测试确认红灯**
 
 Run: `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~SkillStoreTests`
 Expected: FAIL，约束尚未写入。
 
-- [ ] **Step 3: 更新系统提示与 Skill 说明**
+- [x] **Step 3: 更新系统提示与 Skill 说明**
 
 保持短而明确：模型有官方资料能力时直接使用；否则通过 Browser Bridge 读取用户授权页面；出现挑战时暂停；没有资料通道时用 AskUser 请求用户提供结论。不得增加 Browser Bridge 绕过代码。
 
-- [ ] **Step 4: 运行新增能力完整定向测试**
+- [x] **Step 4: 运行新增能力完整定向测试**
 
 Run:
 
@@ -583,7 +583,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~Toml|Ful
 
 Expected: PASS。
 
-- [ ] **Step 5: 运行完整构建、测试与格式验证**
+- [x] **Step 5: 运行完整构建、测试与格式验证**
 
 Run:
 
@@ -595,7 +595,7 @@ dotnet format LoomX.slnx --verify-no-changes --no-restore
 
 Expected: 全部 PASS；日志测试确认无 Secret，数据库路径测试保持唯一位置。
 
-- [ ] **Step 6: 运行 OpenSpec 验证并完成任务勾选**
+- [x] **Step 6: 运行 OpenSpec 验证并完成任务勾选**
 
 Run:
 
@@ -606,7 +606,7 @@ openspec validate structured-config-assistant-decisions --strict
 
 Expected: strict validate PASS，`tasks.md` 1.1–7.4 全部勾选。
 
-- [ ] **Step 7: 发布 standalone 应用**
+- [x] **Step 7: 发布 standalone 应用**
 
 用当前时间生成可读目录名，例如 `outputs/2026-09-16-2230-structured-config-assistant-decisions/`，执行：
 
@@ -616,7 +616,7 @@ dotnet publish LoomX/LoomX.csproj -c Release -r win-x64 --self-contained true -o
 
 Expected: 发布目录包含可启动的 LoomX exe；使用 `Start-Process -FilePath <绝对exe路径>` 隐藏/正常启动并按进程 `Path` 校验，禁止通过 app resolver 按 exe 路径启动。
 
-- [ ] **Step 8: 最终提交**
+- [x] **Step 8: 最终提交**
 
 ```powershell
 git add LoomX LoomX.Tests openspec/changes/structured-config-assistant-decisions/tasks.md docs/superpowers/specs/2026-09-16-structured-config-assistant-decisions-design.md docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
