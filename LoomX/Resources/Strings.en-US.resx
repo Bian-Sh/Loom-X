@@ -539,4 +539,5 @@
   <data name="assistant.error.status"><value>HTTP status: {0}</value></data>
   <data name="assistant.error.code"><value>Error code: {0}</value></data>
   <data name="assistant.error.upstream"><value>Service message: {0}</value></data>
+  <data name="assistant.decision.validation_failed"><value>Review the decision fields and try again.</value></data>
 </root>

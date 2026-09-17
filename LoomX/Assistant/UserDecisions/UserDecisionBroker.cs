@@ -13,9 +13,13 @@ public interface IUserDecisionBroker : IDisposable
         UserDecisionRequest request,
         CancellationToken cancellationToken);
 
-    bool Submit(string requestId, IReadOnlyDictionary<string, object?> values);
+    bool TryClaim(string requestId, string claimantId);
 
-    bool Cancel(string requestId, string reason);
+    bool Release(string requestId, string claimantId);
+
+    bool Submit(string requestId, string claimantId, IReadOnlyDictionary<string, object?> values);
+
+    bool Cancel(string requestId, string claimantId, string reason);
 
     int CancelOwner(string ownerId, string reason);
 }
@@ -135,13 +139,48 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
         return completion!.Task;
     }
 
-    public bool Submit(string requestId, IReadOnlyDictionary<string, object?> values)
+    public bool TryClaim(string requestId, string claimantId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(claimantId);
+
+        if (!pendingEntries.TryGetValue(requestId, out var entry) || !entry.TryClaim(claimantId))
+        {
+            logger.LogDebug("用户决策请求 Claim 被忽略 {RequestId}", requestId);
+            return false;
+        }
+
+        logger.LogInformation("用户决策请求 Claim 成功 {RequestId}", requestId);
+        return true;
+    }
+
+    public bool Release(string requestId, string claimantId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(claimantId);
+
+        if (!pendingEntries.TryGetValue(requestId, out var entry) || !entry.Release(claimantId))
+        {
+            logger.LogDebug("用户决策请求 Claim 释放被忽略 {RequestId}", requestId);
+            return false;
+        }
+
+        logger.LogInformation("用户决策请求 Claim 已释放 {RequestId}", requestId);
+        return true;
+    }
+
+    public bool Submit(
+        string requestId,
+        string claimantId,
+        IReadOnlyDictionary<string, object?> values)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(claimantId);
         ArgumentNullException.ThrowIfNull(values);
 
-        if (!pendingEntries.TryGetValue(requestId, out var entry))
+        if (!pendingEntries.TryGetValue(requestId, out var entry) || !entry.TryBeginCompletion(claimantId))
         {
+            logger.LogWarning("用户决策提交未通过 Claim 校验 {RequestId}", requestId);
             return false;
         }
 
@@ -152,6 +191,7 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
         }
         catch (Exception exception)
         {
+            entry.EndCompletion();
             logger.LogWarning(
                 "用户决策提交快照失败 {RequestId} {ErrorType}",
                 requestId,
@@ -162,6 +202,7 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
         var validationErrors = UserDecisionValidator.ValidateSubmission(entry.Request, snapshot);
         if (validationErrors.Count > 0)
         {
+            entry.EndCompletion();
             logger.LogWarning(
                 "用户决策提交校验失败 {RequestId} {ErrorCount}",
                 requestId,
@@ -170,9 +211,10 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
         }
 
         var result = UserDecisionResult.Submit(snapshot);
-
         if (!pendingEntries.TryRemove(requestId, out var removed))
         {
+            entry.EndCompletion();
+            logger.LogDebug("用户决策提交已由并发操作完成 {RequestId}", requestId);
             return false;
         }
 
@@ -184,20 +226,27 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
         return true;
     }
 
-    public bool Cancel(string requestId, string reason)
+    public bool Cancel(string requestId, string claimantId, string reason)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(claimantId);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
 
-        if (!pendingEntries.TryRemove(requestId, out var entry))
+        if (!pendingEntries.TryGetValue(requestId, out var entry) || !entry.TryBeginCompletion(claimantId))
         {
+            logger.LogWarning("用户决策取消未通过 Claim 校验 {RequestId}", requestId);
             return false;
         }
 
-        CompleteEntry(entry, () => entry.Completion.TrySetResult(UserDecisionResult.Cancel(reason)));
-        logger.LogInformation(
-            "用户决策请求已取消 {RequestId}",
-            requestId);
+        if (!pendingEntries.TryRemove(requestId, out var removed))
+        {
+            entry.EndCompletion();
+            logger.LogDebug("用户决策取消已由并发操作完成 {RequestId}", requestId);
+            return false;
+        }
+
+        CompleteEntry(removed, () => removed.Completion.TrySetResult(UserDecisionResult.Cancel(reason)));
+        logger.LogInformation("用户决策请求已取消 {RequestId}", requestId);
         return true;
     }
 
@@ -323,12 +372,72 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
         private readonly object registrationGate = new();
         private CancellationTokenRegistration cancellationRegistration;
         private bool completed;
+        private bool completing;
 
         public string OwnerId { get; } = ownerId;
 
         public UserDecisionRequest Request { get; } = request;
 
+        private string? claimantId;
+
         public TaskCompletionSource<UserDecisionResult> Completion { get; } = completion;
+
+        public bool TryClaim(string candidate)
+        {
+            lock (registrationGate)
+            {
+                if (completed || claimantId is not null)
+                {
+                    return false;
+                }
+
+                claimantId = candidate;
+                return true;
+            }
+        }
+
+        public bool TryBeginCompletion(string candidate)
+        {
+            lock (registrationGate)
+            {
+                if (completed
+                    || completing
+                    || !string.Equals(claimantId, candidate, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                completing = true;
+                return true;
+            }
+        }
+
+        public void EndCompletion()
+        {
+            lock (registrationGate)
+            {
+                if (!completed)
+                {
+                    completing = false;
+                }
+            }
+        }
+
+        public bool Release(string candidate)
+        {
+            lock (registrationGate)
+            {
+                if (completed
+                    || completing
+                    || !string.Equals(claimantId, candidate, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+
+                claimantId = null;
+                return true;
+            }
+        }
 
         public void SetCancellationRegistration(CancellationTokenRegistration registration)
         {

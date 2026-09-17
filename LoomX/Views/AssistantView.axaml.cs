@@ -20,6 +20,7 @@ public partial class AssistantView : UserControl
     private bool following = true;
     private bool scrollingToBottom;
     private bool syncingMessageScrollBar;
+    private bool isAttached;
     private double lastOffsetY;
 
     public AssistantView()
@@ -35,8 +36,15 @@ public partial class AssistantView : UserControl
         };
         AttachedToVisualTree += (_, _) =>
         {
+            isAttached = true;
+            observedModel?.Activate();
             UpdateInputMaxHeight();
             Dispatcher.UIThread.Post(UpdateMessageScrollBar, DispatcherPriority.Loaded);
+        };
+        DetachedFromVisualTree += (_, _) =>
+        {
+            isAttached = false;
+            observedModel?.Deactivate();
         };
         DataContextChanged += (_, _) =>
         {
@@ -51,9 +59,23 @@ public partial class AssistantView : UserControl
 
     private void HookAutoScroll()
     {
-        if (observedModel is not null) observedModel.Messages.CollectionChanged -= OnMessagesChanged;
-        observedModel = DataContext as AssistantViewModel;
-        if (observedModel is not null) observedModel.Messages.CollectionChanged += OnMessagesChanged;
+        var nextModel = DataContext as AssistantViewModel;
+        if (!ReferenceEquals(observedModel, nextModel))
+        {
+            if (observedModel is not null)
+            {
+                observedModel.Messages.CollectionChanged -= OnMessagesChanged;
+                if (isAttached) observedModel.Deactivate();
+            }
+
+            observedModel = nextModel;
+            if (observedModel is not null)
+            {
+                observedModel.Messages.CollectionChanged += OnMessagesChanged;
+                if (isAttached) observedModel.Activate();
+            }
+        }
+
         following = true;
         ScrollToLatest();
     }

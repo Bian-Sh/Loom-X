@@ -458,6 +458,85 @@ public sealed class UserDecisionBrokerTests
         Assert.DoesNotContain(logger.States, state => state.Contains("owner-token", StringComparison.Ordinal));
     }
 
+
+    [Fact]
+    public async Task TryClaim_同一请求只有一个处理者且未Claim处理者不能完成或释放()
+    {
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        var request = await pending.Task;
+        using var start = new ManualResetEventSlim();
+
+        var first = Task.Run(() =>
+        {
+            start.Wait();
+            return broker.TryClaim(request.RequestId, "ui-first");
+        });
+        var second = Task.Run(() =>
+        {
+            start.Wait();
+            return broker.TryClaim(request.RequestId, "ui-second");
+        });
+
+        start.Set();
+        var claims = await Task.WhenAll(first, second);
+        Assert.Single(claims, claimed => claimed);
+
+        var winner = claims[0] ? "ui-first" : "ui-second";
+        var loser = claims[0] ? "ui-second" : "ui-first";
+        var values = new Dictionary<string, object?> { ["note"] = "完成" };
+
+        Assert.False(broker.Submit(request.RequestId, loser, values));
+        Assert.False(broker.Cancel(request.RequestId, loser, "未拥有请求"));
+        Assert.False(broker.Release(request.RequestId, loser));
+        Assert.True(broker.Release(request.RequestId, winner));
+        Assert.True(broker.TryClaim(request.RequestId, loser));
+        Assert.True(broker.Cancel(request.RequestId, loser, "测试结束"));
+        Assert.True((await task).Cancelled);
+    }
+
+    [Fact]
+    public async Task Submit进行中_不能释放Claim给其他处理者()
+    {
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        var request = await pending.Task;
+        Assert.True(broker.TryClaim(request.RequestId, "ui-first"));
+        var values = new BlockingEnumerationDictionary("note", "完成");
+
+        var submit = Task.Run(() => broker.Submit(request.RequestId, "ui-first", values));
+        await values.EnumerationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(broker.Release(request.RequestId, "ui-first"));
+        Assert.False(broker.TryClaim(request.RequestId, "ui-second"));
+        values.AllowEnumeration.TrySetResult();
+
+        Assert.True(await submit.WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal("完成", (await task.WaitAsync(TimeSpan.FromSeconds(5))).Values["note"]);
+    }
+
+    [Fact]
+    public async Task Claim日志_不包含处理者标识或用户内容()
+    {
+        const string claimantId = "Authorization=Bearer ui-secret 用户自由文本";
+        var logger = new RecordingLogger<UserDecisionBroker>();
+        var broker = new UserDecisionBroker(logger);
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        var request = await pending.Task;
+
+        Assert.True(broker.TryClaim(request.RequestId, claimantId));
+        Assert.True(broker.Cancel(request.RequestId, claimantId, "Secret 取消原因"));
+        await task;
+
+        Assert.DoesNotContain(logger.Messages, message => message.Contains(claimantId, StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.States, state => state.Contains(claimantId, StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Exceptions, exception => exception.Contains(claimantId, StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Messages, message => message.Contains("Secret 取消原因", StringComparison.Ordinal));
+    }
+
     private static UserDecisionBroker CreateBroker() =>
         new(NullLogger<UserDecisionBroker>.Instance);
 
@@ -495,6 +574,49 @@ public sealed class UserDecisionBrokerTests
                     isRequired: true,
                     maxLength: 100),
             ]);
+
+    private sealed class BlockingEnumerationDictionary(string key, object? value)
+        : IReadOnlyDictionary<string, object?>
+    {
+        public TaskCompletionSource EnumerationStarted { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowEnumeration { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public int Count => 1;
+
+        public IEnumerable<string> Keys => [key];
+
+        public IEnumerable<object?> Values => [value];
+
+        public object? this[string requestedKey] =>
+            string.Equals(requestedKey, key, StringComparison.Ordinal) ? value : throw new KeyNotFoundException();
+
+        public bool ContainsKey(string requestedKey) =>
+            string.Equals(requestedKey, key, StringComparison.Ordinal);
+
+        public bool TryGetValue(string requestedKey, out object? requestedValue)
+        {
+            if (ContainsKey(requestedKey))
+            {
+                requestedValue = value;
+                return true;
+            }
+
+            requestedValue = null;
+            return false;
+        }
+
+        public IEnumerator<KeyValuePair<string, object?>> GetEnumerator()
+        {
+            EnumerationStarted.TrySetResult();
+            AllowEnumeration.Task.GetAwaiter().GetResult();
+            yield return new KeyValuePair<string, object?>(key, value);
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 
     private sealed class SingleEnumerationDictionary(string key, object? value)
         : IReadOnlyDictionary<string, object?>

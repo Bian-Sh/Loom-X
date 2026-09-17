@@ -496,10 +496,20 @@ public sealed class AssistantServiceTests : IDisposable
             return inner.RequestAsync(ownerId, request, cancellationToken);
         }
 
-        public bool Submit(string requestId, IReadOnlyDictionary<string, object?> values) =>
-            inner.Submit(requestId, values);
+        public bool TryClaim(string requestId, string claimantId) =>
+            inner.TryClaim(requestId, claimantId);
 
-        public bool Cancel(string requestId, string reason) => inner.Cancel(requestId, reason);
+        public bool Release(string requestId, string claimantId) =>
+            inner.Release(requestId, claimantId);
+
+        public bool Submit(
+            string requestId,
+            string claimantId,
+            IReadOnlyDictionary<string, object?> values) =>
+            inner.Submit(requestId, claimantId, values);
+
+        public bool Cancel(string requestId, string claimantId, string reason) =>
+            inner.Cancel(requestId, claimantId, reason);
 
         public int CancelOwner(string ownerId, string reason)
         {

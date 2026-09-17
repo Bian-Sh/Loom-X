@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using LoomX.Assistant.UserDecisions;
+using LoomX.Localization;
 
 namespace LoomX.ViewModels;
 
@@ -97,7 +98,9 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
                 string.Equals(error.FieldId, field.Id, StringComparison.Ordinal))?.Message ?? string.Empty;
         }
 
-        ErrorSummary = errors.Count == 0 ? string.Empty : "请检查决策字段后重试。";
+        ErrorSummary = errors.Count == 0
+            ? string.Empty
+            : ResourceLookup.Resolve("assistant.decision.validation_failed");
         return errors.Count == 0;
     }
 }

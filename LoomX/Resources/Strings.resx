@@ -1635,4 +1635,5 @@
   <data name="assistant.error.upstream">
     <value>服务描述：{0}</value>
   </data>
+  <data name="assistant.decision.validation_failed"><value>请检查决策字段后重试。</value></data>
 </root>

@@ -1,4 +1,7 @@
-﻿using Xunit;
+﻿using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Xunit;
 using LoomX.Assistant;
 using LoomX.Assistant.UserDecisions;
 using LoomX.ViewModels;
@@ -366,6 +369,8 @@ public sealed class AssistantViewModelUserDecisionTests
                 return Task.FromResult<bool?>(true);
             });
 
+        viewModel.Activate();
+
         broker.Raise(CreatePending("submit-id", "问题正文 API Key Secret Authorization"));
         await broker.WaitForCompletionAsync();
 
@@ -395,6 +400,8 @@ public sealed class AssistantViewModelUserDecisionTests
             uiDispatcher: action => action(),
             showAskUserDialog: _ => Task.FromResult<bool?>(null));
 
+        viewModel.Activate();
+
         broker.Raise(CreatePending("cancel-id", "包含 Secret 的问题正文"));
         await broker.WaitForCompletionAsync();
 
@@ -411,10 +418,14 @@ public sealed class AssistantViewModelUserDecisionTests
     public async Task Deactivate_解除订阅并取消当前页面请求且重复完成安全收敛()
     {
         var broker = new RecordingUserDecisionBroker();
+        var toast = new ToastService();
+        var notifications = new List<ToastNotification>();
+        toast.Requested += (_, notification) => notifications.Add(notification);
         var dialogStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var dialogCompletion = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
         using var viewModel = new AssistantViewModel(
             new GatewayProcessService(),
+            toastService: toast,
             userDecisionBroker: broker,
             uiDispatcher: action => action(),
             showAskUserDialog: _ =>
@@ -422,6 +433,7 @@ public sealed class AssistantViewModelUserDecisionTests
                 dialogStarted.TrySetResult();
                 return dialogCompletion.Task;
             });
+        viewModel.Activate();
         Assert.Equal(1, broker.SubscriberCount);
 
         broker.Raise(CreatePending("pending-id", "待处理问题"));
@@ -434,6 +446,7 @@ public sealed class AssistantViewModelUserDecisionTests
         Assert.Equal(0, broker.SubscriberCount);
         Assert.Equal("pending-id", broker.CancelledRequestId);
         Assert.Null(broker.SubmittedRequestId);
+        Assert.DoesNotContain(notifications, notification => notification.Level == ToastLevel.Error);
 
         viewModel.Activate();
         Assert.Equal(1, broker.SubscriberCount);
@@ -459,6 +472,8 @@ public sealed class AssistantViewModelUserDecisionTests
                 return Task.FromResult<bool?>(true);
             });
 
+        viewModel.Activate();
+
         broker.Raise(CreatePending("stale-id", "API Key 问题正文"));
         await broker.WaitForCompletionAsync();
 
@@ -470,6 +485,115 @@ public sealed class AssistantViewModelUserDecisionTests
         Assert.DoesNotContain("Authorization", notification.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task 真实Broker_多个ViewModel只有一个Claim且未Claim实例停用不影响请求()
+    {
+        using var broker = new UserDecisionBroker(NullLogger<UserDecisionBroker>.Instance);
+        var dialogStarted = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogCompletion = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogCount = 0;
+
+        Task<bool?> ShowDialog(int index, AskUserDialogViewModel dialog)
+        {
+            Assert.IsType<AskUserTextFieldViewModel>(Assert.Single(dialog.Fields)).TextValue = $"处理者-{index}";
+            Interlocked.Increment(ref dialogCount);
+            dialogStarted.TrySetResult(index);
+            return dialogCompletion.Task;
+        }
+
+        using var first = new AssistantViewModel(
+            new GatewayProcessService(),
+            userDecisionBroker: broker,
+            uiDispatcher: action => action(),
+            showAskUserDialog: dialog => ShowDialog(1, dialog));
+        using var second = new AssistantViewModel(
+            new GatewayProcessService(),
+            userDecisionBroker: broker,
+            uiDispatcher: action => action(),
+            showAskUserDialog: dialog => ShowDialog(2, dialog));
+        first.Activate();
+        second.Activate();
+
+        var task = broker.RequestAsync("assistant-run", CreatePending("unused", "问题正文").Request, CancellationToken.None);
+        var owner = await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(1, Volatile.Read(ref dialogCount));
+
+        if (owner == 1) second.Deactivate(); else first.Deactivate();
+        Assert.False(task.IsCompleted);
+
+        dialogCompletion.TrySetResult(true);
+        var result = await task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.False(result.Cancelled);
+        Assert.Equal($"处理者-{owner}", result.Values["answer"]);
+        Assert.Equal(1, Volatile.Read(ref dialogCount));
+    }
+
+    [Fact]
+    public async Task 真实Broker_提交与Deactivate竞态只完成一次并收敛()
+    {
+        using var broker = new UserDecisionBroker(NullLogger<UserDecisionBroker>.Instance);
+        var dialogStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dialogCompletion = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            userDecisionBroker: broker,
+            uiDispatcher: action => action(),
+            showAskUserDialog: dialog =>
+            {
+                Assert.IsType<AskUserTextFieldViewModel>(Assert.Single(dialog.Fields)).TextValue = "完成";
+                dialogStarted.TrySetResult();
+                return dialogCompletion.Task;
+            });
+        viewModel.Activate();
+        var task = broker.RequestAsync("assistant-run", CreatePending("unused", "问题正文").Request, CancellationToken.None);
+        await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        using var start = new ManualResetEventSlim();
+
+        var deactivate = Task.Run(() =>
+        {
+            start.Wait();
+            viewModel.Deactivate();
+        });
+        var submit = Task.Run(() =>
+        {
+            start.Wait();
+            dialogCompletion.TrySetResult(true);
+        });
+
+        start.Set();
+        await Task.WhenAll(deactivate, submit);
+        var result = await task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(result.Cancelled || Equals(result.Values["answer"], "完成"));
+    }
+
+    [Fact]
+    public async Task 用户决策异常日志_记录安全异常对象且不泄露敏感内容()
+    {
+        const string sensitive = "Authorization Bearer API Key Secret 用户自由文本";
+        var loggerFactory = new RecordingLoggerFactory();
+        using var broker = new UserDecisionBroker(NullLogger<UserDecisionBroker>.Instance);
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            loggerFactory: loggerFactory,
+            userDecisionBroker: broker,
+            uiDispatcher: action => action(),
+            showAskUserDialog: _ => throw new InvalidOperationException(sensitive));
+        viewModel.Activate();
+
+        var result = await broker.RequestAsync(
+            "owner-sensitive-id",
+            CreatePending("unused", "安全问题").Request,
+            CancellationToken.None).WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.True(result.Cancelled);
+        Assert.Contains(loggerFactory.Entries, entry => entry.Level == LogLevel.Error && entry.Exception is not null);
+        var logText = string.Join("\n", loggerFactory.Entries.Select(entry => entry.Text));
+        Assert.DoesNotContain(sensitive, logText, StringComparison.Ordinal);
+        Assert.DoesNotContain("owner-sensitive-id", logText, StringComparison.Ordinal);
+    }
+
     private static PendingUserDecision CreatePending(string requestId, string question) => new(
         requestId,
         "owner-sensitive-id",
@@ -477,6 +601,46 @@ public sealed class AssistantViewModelUserDecisionTests
             "确认",
             question,
             [new UserDecisionField("answer", "回答", UserDecisionFieldType.Text, isRequired: true, defaultText: "默认值")]));
+
+
+    private sealed class RecordingLoggerFactory : ILoggerFactory
+    {
+        private readonly ConcurrentQueue<LogEntry> entries = new();
+
+        public IReadOnlyCollection<LogEntry> Entries => entries.ToArray();
+
+        public void AddProvider(ILoggerProvider provider) { }
+
+        public ILogger CreateLogger(string categoryName) => new RecordingLogger(entries);
+
+        public void Dispose() { }
+    }
+
+    private sealed class RecordingLogger(ConcurrentQueue<LogEntry> entries) : ILogger
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var stateText = state is IEnumerable<KeyValuePair<string, object?>> properties
+                ? string.Join(" | ", properties.Select(property => $"{property.Key}={property.Value}"))
+                : state?.ToString() ?? string.Empty;
+            entries.Enqueue(new LogEntry(
+                logLevel,
+                exception,
+                string.Join(" | ", formatter(state, exception), stateText, exception?.ToString() ?? string.Empty)));
+        }
+    }
+
+    private sealed record LogEntry(LogLevel Level, Exception? Exception, string Text);
+
 
     private sealed class RecordingUserDecisionBroker : IUserDecisionBroker
     {
@@ -506,16 +670,53 @@ public sealed class AssistantViewModelUserDecisionTests
         public Task<UserDecisionResult> RequestAsync(string ownerId, UserDecisionRequest request, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public bool Submit(string requestId, IReadOnlyDictionary<string, object?> values)
+        private string? claimantId;
+
+        public bool TryClaim(string requestId, string candidate)
         {
+            if (claimantId is not null)
+            {
+                return false;
+            }
+
+            claimantId = candidate;
+            return true;
+        }
+
+        public bool Release(string requestId, string candidate)
+        {
+            if (!string.Equals(claimantId, candidate, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            claimantId = null;
+            return true;
+        }
+
+        public bool Submit(
+            string requestId,
+            string candidate,
+            IReadOnlyDictionary<string, object?> values)
+        {
+            if (!string.Equals(claimantId, candidate, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             SubmittedRequestId = requestId;
             SubmittedValues = values;
             completion.TrySetResult();
             return SubmitResult;
         }
 
-        public bool Cancel(string requestId, string reason)
+        public bool Cancel(string requestId, string candidate, string reason)
         {
+            if (!string.Equals(claimantId, candidate, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
             CancelledRequestId = requestId;
             completion.TrySetResult();
             return true;

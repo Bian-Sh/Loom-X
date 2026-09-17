@@ -1,4 +1,5 @@
 ﻿using LoomX.Assistant.UserDecisions;
+using LoomX.Localization;
 using LoomX.ViewModels;
 using Xunit;
 
@@ -144,6 +145,28 @@ public sealed class AskUserDialogContractTests
         Assert.False(viewModel.TryBuildResult(out _));
         Assert.DoesNotContain(input, field.ErrorMessage, StringComparison.Ordinal);
         Assert.DoesNotContain("Secret", field.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ErrorSummary_使用当前Locale资源()
+    {
+        var previousCulture = LocaleService.CurrentCulture.Name;
+        try
+        {
+            LocaleService.SetCulture("en-US");
+            var viewModel = new AskUserDialogViewModel(CreatePending(new UserDecisionField(
+                "note",
+                "备注",
+                UserDecisionFieldType.Text,
+                isRequired: true)));
+
+            Assert.Equal(ResourceLookup.Resolve("assistant.decision.validation_failed"), viewModel.ErrorSummary);
+            Assert.DoesNotContain("请检查", viewModel.ErrorSummary, StringComparison.Ordinal);
+        }
+        finally
+        {
+            LocaleService.SetCulture(previousCulture);
+        }
     }
 
     [Fact]
