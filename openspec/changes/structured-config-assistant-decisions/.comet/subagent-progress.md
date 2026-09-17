@@ -4,8 +4,8 @@
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
 - Current task: Task 7
-- Stage: review
-- Fix round: 0
+- Stage: implementer
+- Fix round: 1
 
 ## Rulings
 - Task 1 同时向 `LoomX` 与 `LoomX.Tests` 添加 Tomlyn 2.10.1，以满足 OpenSpec 1.1。
@@ -31,3 +31,4 @@
 - Task 6 修复轮 2 复审结论：剩余 Header 边界 finding 已 addressed，修复 diff 无新增 Critical/Important breakage。
 - Task 6 计划 Step 2 与 Step 6 最小改名为“运行 AskUser 工具测试确认红灯”和“运行 AskUser 工具与会话恢复定向测试并提交”，确保 Comet task-checkoff 文本语义明确且全计划唯一。
 - Task 6 complete：`assistant.ask_user`、会话恢复、敏感边界、稳定 owner 与人工等待生命周期均通过两轮修复后的 thorough review；OpenSpec 4.3–4.4 已由协调者统一勾选。
+- Task 7 首轮审查接受 1 个 Critical、2 个 Important：Broker request ownership 必须原子且排他，未 claim 的 UI 不得取消他人请求；生产页面/主窗口必须接入激活、停用与释放；事件流程必须补齐安全结构化日志，进入修复轮 1。Minor 本地化同时纳入修复，避免新增硬编码用户文案。
