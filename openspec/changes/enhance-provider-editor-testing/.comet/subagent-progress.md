@@ -3,7 +3,7 @@
 - Change: enhance-provider-editor-testing
 - Plan: docs/superpowers/plans/2026-09-18-provider-editor-testing.md
 - Worktree: D:/AppData/Github/Loom-X/.worktrees/enhance-provider-editor-testing
-- Branch: feature/20260918/enhance-provider-editor-testing
+- Branch: feature/20260917/enhance-provider-editor-testing
 - Review mode: standard
 - TDD mode: tdd
 - Current task: 2 — 测试请求 DTO、普通请求与安全结果
