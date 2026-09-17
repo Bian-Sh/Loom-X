@@ -1,10 +1,10 @@
-# structured-config-assistant-decisions 整分支修复 wave 2 报告
+﻿# structured-config-assistant-decisions 整分支修复 wave 2 报告
 
 - 日期：2026-09-17
 - 分支：`codex/structured-config-assistant-decisions`
 - 起始 HEAD：`9e482dfca39fd8761be0682672362a8d30d57583`
 - 范围：仅关闭 `whole-branch-fix-1-review.md` 残留 Critical C1，不处理已关闭的 C2/I1/I2/I3/I4/M1
-- 约束：未修改数据库路径、计划/OpenSpec/Comet 状态、既有审查报告；未 publish、未 commit、未 push
+- 约束：未修改数据库路径、计划/OpenSpec/Comet 状态、既有审查报告；已从当前代码 HEAD 完成 standalone publish 验证；本会话未 commit、未 push
 
 ## 根因复现与数据流定位
 
@@ -160,7 +160,7 @@ git diff --check
 
 - `.superpowers/sdd/2026-09-16-structured-config-assistant-decisions/whole-branch-fix-2-report.md`
 
-没有修改数据库路径、OpenSpec/Comet 状态、既有审查报告、outputs 或其他 Session 产物。
+没有修改数据库路径、OpenSpec/Comet 状态、既有审查报告或其他 Session 产物；最终 standalone 验证仅新增本轮输出目录，未覆盖、删除或移动任何既有 `outputs`。
 
 ## 结论
 
@@ -172,3 +172,81 @@ git diff --check
 - 首次仅设置 RunConfiguration.MaxCpuCount=1 的全量测试：925/926，通过外仅 GatewayViewModelDeletionTests.ComboDeletePreservesBoundComboAsSelectedMissingOption 因共享集合被并行修改失败；该测试单独重跑 1/1 通过。
 - 使用 xUnit 串行 collection 配置重跑全量：926/926 通过，0 失败，0 跳过。
 - OpenSpec strict validate 与 git diff --check 通过。
+
+
+## 最终 Standalone 发布验证
+
+- 验证日期：`2026-09-17`
+- 当前代码 HEAD：`5708405aa18c64fd732a362dd7f0cd3ba5601b8a`
+- 输出目录：`D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1822-structured-config-assistant-decisions`
+- 发布前确认目标目录不存在；未覆盖、删除或移动任何既有 `outputs`。
+
+### 发布命令
+
+```powershell
+dotnet publish LoomX\LoomX.csproj -c Release -r win-x64 --self-contained true -o "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1822-structured-config-assistant-decisions" -p:SourceRevisionId=5708405aa18c64fd732a362dd7f0cd3ba5601b8a
+```
+
+发布成功；仅出现既有 NU1903、CS8618、CA2024 警告。
+
+### 版本与哈希
+
+- `LoomX.dll` ProductVersion：`0.12.6+5708405aa18c64fd732a362dd7f0cd3ba5601b8a`
+- `LoomX.exe` ProductVersion：`0.12.6+5708405aa18c64fd732a362dd7f0cd3ba5601b8a`
+- 两个 ProductVersion 均包含完整 HEAD：`True`
+- `LoomX.dll` SHA-256：`F799FB1E2CE8F886BE26A6A8E8EA6419F34CD1541228A30811162C2DB347B9D0`
+- `LoomX.exe` SHA-256：`E779B1EFB2B7D0C5D365A055C1BC415CEF410ADA9B2368600206C8F13ED7C3B3`
+
+### 启动与进程验证
+
+```powershell
+Start-Process -FilePath "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1822-structured-config-assistant-decisions\LoomX.exe" -ArgumentList "--allow-multiple-instances" -WorkingDirectory "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1822-structured-config-assistant-decisions" -WindowStyle Hidden -PassThru
+```
+
+- 启动时间：`2026-09-17 18:23:18.081 +08:00`
+- 本轮 PID：`14268`
+- 等待：`12` 秒
+- 等待后 PID `14268` 仍存活，`Responding=True`。
+- 实际 Path：`D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1822-structured-config-assistant-decisions\LoomX.exe`
+- 实际 Path 与绝对目标 exe 精确匹配：`True`。
+- 启动参数包含 `--allow-multiple-instances`。
+- 启动工作目录与输出目录一致。
+
+启动前 PID：
+
+- PID `28460`：`D:\AppData\Github\Loom-X\outputs\LoomX-win-x64-2026-09-17-activity-scrollbar-right\LoomX.exe`
+
+启动后 PID：
+
+- PID `28460`：既有实例，路径未变。
+- PID `14268`：本轮 standalone 实例。
+
+### 日志证据
+
+日志文件：`C:\Users\BianShanghai\AppData\Local\LoomX\logs\loomx-20260917.log`
+
+```text
+2026-09-17 18:23:19.157 +08:00 [WRN] LoomX.App 调试启动已允许多个桌面实例，进程 14268
+2026-09-17 18:23:19.190 +08:00 [INF] LoomX.App 桌面应用启动，进程 14268，用户 "BianShanghai"，进程路径 "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1822-structured-config-assistant-decisions\LoomX.exe"，基目录 "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1822-structured-config-assistant-decisions\"，启动工作目录 "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1822-structured-config-assistant-decisions"，规范化工作目录 "D:\AppData\Github\Loom-X - Copy\outputs\2026-09-17-1822-structured-config-assistant-decisions"
+2026-09-17 18:23:21.727 +08:00 [INF] LoomX.ViewModels.MainWindowViewModel 概览刷新完成 6 个 Provider、18 个模型、3 个 Endpoint、13 条路由，网关状态 Stopped，配置库 "C:\Users\BianShanghai\AppData\Local\LoomX\LoomX.db"，进程 14268
+```
+
+从启动前日志长度后的新增片段统计：
+
+- PID `14268` 的“调试启动已允许多个桌面实例”：`1` 条。
+- PID `14268` 的“桌面应用启动”：`1` 条。
+- PID `14268` 的“概览刷新完成”初始化证据：`1` 条。
+- “检测到已有 LoomX 桌面实例”：`0` 条。
+- “桌面应用自启动子进程失败”：`0` 条。
+
+### 停止与隔离验证
+
+- 停止前再次核对 PID `14268` 的 ExecutablePath 与本轮绝对 exe 精确匹配。
+- 仅执行 `Stop-Process -Id 14268`。
+- 停止时间：`2026-09-17 18:24:06.871 +08:00`。
+- 等待 `5` 秒后 PID `14268` 已消失。
+- 既有 PID `28460` 仍存活。
+- PID `28460` 停止前后路径均为 `D:\AppData\Github\Loom-X\outputs\LoomX-win-x64-2026-09-17-activity-scrollbar-right\LoomX.exe`，路径未变。
+- 其他既有 LoomX 实例未受影响。
+
+最终 standalone 产物已与代码 HEAD `5708405aa18c64fd732a362dd7f0cd3ba5601b8a` 完整绑定，启动、日志、初始化和停止隔离证据均通过。

@@ -4,7 +4,7 @@
 - Plan: docs/superpowers/plans/2026-09-16-structured-config-assistant-decisions.md
 - Review mode: thorough
 - Current task: Whole branch review
-- Stage: implementer
+- Stage: review
 - Fix round: 2
 
 ## Rulings
@@ -42,3 +42,4 @@
 - 整分支首轮审查接受 2 个 Critical、4 个 Important 与 1 个 Minor：工具参数安全投影、toml.get 内容/容器脱敏、事务 commit point、并发冲突、AskUser 无 claim 收敛、Schema/运行时一致性及 BOM 格式报告进入唯一修复 wave 1。
 - 整分支 fix wave 1 已实现并进入唯一 scoped re-review：2 Critical、4 Important、1 Minor 均有 TDD 回归，主会话复核 920/920；standalone 版本绑定代码 HEAD 2f0f315 并完成同 PID Path/日志验证。
 - 整分支 scoped re-review 关闭 C2/I1/I2/I3/I4/M1，但 C1 残留 1 个 Critical：handler 失败文本与未捕获异常仍可回流原始参数。该 finding 为 load-bearing，不接受偏差；突破“一次完整 fix wave”仅执行一次中央失败通道安全封口，不再扩展架构范围。
+- 整分支 residual C1 micro-fix 已实现并进入最终 scoped re-review：普通 handler 失败默认不可信、固定 SafeFail 显式可信、未捕获异常日志固定化、未知工具名隐藏；主会话串行全量 926/926，最终 standalone 版本绑定 5708405。
