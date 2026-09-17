@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
@@ -24,19 +25,58 @@ public enum ProviderTestStatus
     Cancelled,
 }
 
-public sealed record ProviderTestRequest(
-    string RequestId,
-    string ProviderId,
-    string ModelId,
-    string BaseUrl,
-    string ApiMode,
-    string EndpointFormat,
-    string? ApiKey,
-    IReadOnlyDictionary<string, string> Headers,
-    bool UseProxy,
-    string Prompt,
-    ProviderTestMode Mode,
-    int MaxDisplayCharacters);
+public sealed record ProviderTestRequest
+{
+    public ProviderTestRequest(
+        string RequestId,
+        string ProviderId,
+        string ModelId,
+        string BaseUrl,
+        string ApiMode,
+        string EndpointFormat,
+        string? ApiKey,
+        IReadOnlyDictionary<string, string> Headers,
+        bool UseProxy,
+        string Prompt,
+        ProviderTestMode Mode,
+        int MaxDisplayCharacters)
+    {
+        this.RequestId = RequestId;
+        this.ProviderId = ProviderId;
+        this.ModelId = ModelId;
+        this.BaseUrl = BaseUrl;
+        this.ApiMode = ApiMode;
+        this.EndpointFormat = EndpointFormat;
+        this.ApiKey = ApiKey;
+        this.Headers = CopyHeaders(Headers);
+        this.UseProxy = UseProxy;
+        this.Prompt = Prompt;
+        this.Mode = Mode;
+        this.MaxDisplayCharacters = MaxDisplayCharacters;
+    }
+
+    public string RequestId { get; init; }
+    public string ProviderId { get; init; }
+    public string ModelId { get; init; }
+    public string BaseUrl { get; init; }
+    public string ApiMode { get; init; }
+    public string EndpointFormat { get; init; }
+    public string? ApiKey { get; init; }
+    public IReadOnlyDictionary<string, string> Headers { get; }
+    public bool UseProxy { get; init; }
+    public string Prompt { get; init; }
+    public ProviderTestMode Mode { get; init; }
+    public int MaxDisplayCharacters { get; init; }
+
+    private static IReadOnlyDictionary<string, string> CopyHeaders(IReadOnlyDictionary<string, string> headers)
+    {
+        ArgumentNullException.ThrowIfNull(headers);
+        var copy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var header in headers)
+            copy[header.Key] = header.Value;
+        return new ReadOnlyDictionary<string, string>(copy);
+    }
+}
 
 public sealed record ProviderTestProgress(
     string RequestId,
@@ -166,7 +206,7 @@ public sealed class ProviderTestService : IProviderTestService
             {
                 responseText = ParseResponse(protocol, executionResult.Body);
             }
-            catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+            catch (Exception exception) when (exception is JsonException or InvalidProviderResponseException)
             {
                 return CreateFailureResult(
                     request,
@@ -391,19 +431,33 @@ public sealed class ProviderTestService : IProviderTestService
 
     private static string ParseResponse(string protocol, byte[] body)
     {
-        var root = JsonNode.Parse(body) ?? throw new JsonException("响应 JSON 为空。");
+        var root = JsonNode.Parse(body);
+        if (root is not JsonObject response)
+            throw new InvalidProviderResponseException();
+
         return protocol switch
         {
-            "anthropic" => ParseAnthropic(root),
-            "openai_responses" => ParseOpenAiResponses(root),
-            _ => ParseOpenAiChat(root),
+            "anthropic" => ParseAnthropic(response),
+            "openai_responses" => ParseOpenAiResponses(response),
+            _ => ParseOpenAiChat(response),
         };
     }
 
-    private static string ParseOpenAiChat(JsonNode root) =>
-        root["choices"]?[0]?["message"]?["content"]?.GetValue<string>() ?? "";
+    private static string ParseOpenAiChat(JsonObject root)
+    {
+        if (root["choices"] is not JsonArray { Count: > 0 } choices
+            || choices[0] is not JsonObject choice
+            || choice["message"] is not JsonObject message
+            || message["content"] is not JsonValue content
+            || !content.TryGetValue<string>(out var text))
+        {
+            throw new InvalidProviderResponseException();
+        }
 
-    private static string ParseOpenAiResponses(JsonNode root)
+        return text;
+    }
+
+    private static string ParseOpenAiResponses(JsonObject root)
     {
         if (root["output_text"] is JsonValue outputText
             && outputText.TryGetValue<string>(out var topLevelText))
@@ -411,24 +465,67 @@ public sealed class ProviderTestService : IProviderTestService
             return topLevelText;
         }
 
-        if (root["output"] is not JsonArray output)
-            return "";
+        if (root["output"] is not JsonArray { Count: > 0 } output)
+            throw new InvalidProviderResponseException();
 
         var builder = new StringBuilder();
+        var foundText = false;
         foreach (var item in output)
         {
-            if (item?["content"] is not JsonArray content)
+            if (item is not JsonObject outputItem)
+                throw new InvalidProviderResponseException();
+            if (outputItem["content"] is not JsonArray content)
                 continue;
 
             foreach (var contentItem in content)
-                builder.Append(contentItem?["text"]?.GetValue<string>() ?? "");
+            {
+                if (contentItem is not JsonObject contentObject)
+                    throw new InvalidProviderResponseException();
+                if (contentObject["text"] is null)
+                    continue;
+                if (contentObject["text"] is not JsonValue textValue
+                    || !textValue.TryGetValue<string>(out var text))
+                {
+                    throw new InvalidProviderResponseException();
+                }
+
+                builder.Append(text);
+                foundText = true;
+            }
         }
 
-        return builder.ToString();
+        return foundText ? builder.ToString() : throw new InvalidProviderResponseException();
     }
 
-    private static string ParseAnthropic(JsonNode root) =>
-        string.Concat(root["content"]?.AsArray().Select(item => item?["text"]?.GetValue<string>() ?? "") ?? []);
+    private static string ParseAnthropic(JsonObject root)
+    {
+        if (root["content"] is not JsonArray { Count: > 0 } content)
+            throw new InvalidProviderResponseException();
+
+        var builder = new StringBuilder();
+        var foundText = false;
+        foreach (var item in content)
+        {
+            if (item is not JsonObject contentItem)
+                throw new InvalidProviderResponseException();
+            if (contentItem["text"] is null)
+                continue;
+            if (contentItem["text"] is not JsonValue textValue
+                || !textValue.TryGetValue<string>(out var text))
+            {
+                throw new InvalidProviderResponseException();
+            }
+
+            builder.Append(text);
+            foundText = true;
+        }
+
+        return foundText ? builder.ToString() : throw new InvalidProviderResponseException();
+    }
+
+    private sealed class InvalidProviderResponseException : Exception
+    {
+    }
 
     private static (string Text, bool IsTruncated) Truncate(string text, int maxDisplayCharacters)
     {

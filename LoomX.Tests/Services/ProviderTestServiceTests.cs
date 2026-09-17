@@ -95,6 +95,53 @@ public sealed class ProviderTestServiceTests
         Assert.Equal("hello world", result.ResponseText);
     }
 
+    [Fact]
+    public async Task OpenAi自定义Authorization不能覆盖标准Bearer且不进入摘要或日志()
+    {
+        const string conflictValue = "Bearer custom-authorization-secret";
+        var pipeline = new CapturingPipeline(JsonResult("""{"choices":[{"message":{"content":"ok"}}]}"""));
+        var logger = new RecordingLogger<ProviderTestService>();
+        var service = new ProviderTestService(new HttpClient(new ThrowingHandler()), logger, pipeline);
+
+        var result = await service.ExecuteAsync(CreateRequest(
+            "openai",
+            "chat_completions",
+            new Dictionary<string, string> { ["Authorization"] = conflictValue }));
+
+        Assert.Equal("Bearer", pipeline.Authorization!.Scheme);
+        Assert.Equal("api-secret", pipeline.Authorization.Parameter);
+        Assert.Equal(1, result.Summary.CustomHeaderCount);
+        var observable = string.Join("\n", logger.Entries.Append(result.Summary.ToString()));
+        Assert.DoesNotContain(conflictValue, observable, StringComparison.Ordinal);
+        Assert.DoesNotContain("custom-authorization-secret", observable, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Anthropic自定义认证Header不能覆盖标准值且不进入摘要或日志()
+    {
+        const string conflictApiKey = "custom-anthropic-key-secret";
+        const string conflictVersion = "custom-anthropic-version-secret";
+        var pipeline = new CapturingPipeline(JsonResult("""{"content":[{"type":"text","text":"ok"}]}"""));
+        var logger = new RecordingLogger<ProviderTestService>();
+        var service = new ProviderTestService(new HttpClient(new ThrowingHandler()), logger, pipeline);
+
+        var result = await service.ExecuteAsync(CreateRequest(
+            "anthropic",
+            "messages",
+            new Dictionary<string, string>
+            {
+                ["x-api-key"] = conflictApiKey,
+                ["anthropic-version"] = conflictVersion,
+            }));
+
+        Assert.Equal("api-secret", pipeline.Headers["x-api-key"]);
+        Assert.Equal("2023-06-01", pipeline.Headers["anthropic-version"]);
+        Assert.Equal(2, result.Summary.CustomHeaderCount);
+        var observable = string.Join("\n", logger.Entries.Append(result.Summary.ToString()));
+        Assert.DoesNotContain(conflictApiKey, observable, StringComparison.Ordinal);
+        Assert.DoesNotContain(conflictVersion, observable, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized, "auth_failed", false)]
     [InlineData(HttpStatusCode.NotFound, "endpoint_error", false)]
@@ -132,6 +179,37 @@ public sealed class ProviderTestServiceTests
         Assert.DoesNotContain("sensitive-non-json-response", result.ToString(), StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("openai", "chat_completions", "{}")]
+    [InlineData("openai", "chat_completions", "{\"choices\":[]}")]
+    [InlineData("openai", "chat_completions", "{\"error\":{\"message\":\"sensitive-upstream-response\"}}")]
+    [InlineData("openai", "chat_completions", "{\"choices\":[{\"message\":{\"content\":123}}]}")]
+    [InlineData("openai", "responses", "{}")]
+    [InlineData("openai", "responses", "{\"output\":[]}")]
+    [InlineData("openai", "responses", "{\"error\":{\"message\":\"sensitive-upstream-response\"}}")]
+    [InlineData("openai", "responses", "{\"output\":[{\"content\":[{\"text\":123}]}]}")]
+    [InlineData("anthropic", "messages", "{}")]
+    [InlineData("anthropic", "messages", "{\"content\":[]}")]
+    [InlineData("anthropic", "messages", "{\"error\":{\"message\":\"sensitive-upstream-response\"}}")]
+    [InlineData("anthropic", "messages", "{\"content\":[{\"text\":123}]}")]
+    public async Task 合法Json但协议结构无效统一返回安全InvalidResponse(
+        string apiMode,
+        string endpointFormat,
+        string responseBody)
+    {
+        var pipeline = new CapturingPipeline(JsonResult(responseBody));
+        var logger = new RecordingLogger<ProviderTestService>();
+        var service = new ProviderTestService(new HttpClient(new ThrowingHandler()), logger, pipeline);
+
+        var result = await service.ExecuteAsync(CreateRequest(apiMode, endpointFormat));
+
+        Assert.Equal(ProviderTestStatus.Failed, result.Status);
+        Assert.Equal("invalid_response", result.ErrorCode);
+        Assert.Equal((int)HttpStatusCode.OK, result.StatusCode);
+        Assert.Empty(result.ResponseText);
+        var observable = string.Join("\n", logger.Entries.Append(result.ToString()));
+        Assert.DoesNotContain("sensitive-upstream-response", observable, StringComparison.Ordinal);
+    }
     [Fact]
     public async Task 超长普通响应按展示上限截断并报告进度()
     {
@@ -222,6 +300,28 @@ public sealed class ProviderTestServiceTests
         Assert.Equal(1, result.Summary.CustomHeaderCount);
     }
 
+    [Fact]
+    public async Task 请求Header在构造时复制且不受源字典后续修改影响()
+    {
+        var sourceHeaders = new Dictionary<string, string>
+        {
+            ["X-Snapshot"] = "original-value",
+        };
+        var request = CreateRequest("openai", "chat_completions", sourceHeaders);
+        sourceHeaders["X-Snapshot"] = "mutated-value";
+        sourceHeaders["X-Late"] = "late-value";
+        sourceHeaders.Clear();
+        var pipeline = new CapturingPipeline(JsonResult("""{"choices":[{"message":{"content":"ok"}}]}"""));
+        var service = CreateService(pipeline);
+
+        var result = await service.ExecuteAsync(request);
+
+        Assert.Equal("original-value", request.Headers["X-Snapshot"]);
+        Assert.Single(request.Headers);
+        Assert.Equal(1, result.Summary.CustomHeaderCount);
+        Assert.Equal("original-value", pipeline.Headers["X-Snapshot"]);
+        Assert.False(pipeline.Headers.ContainsKey("X-Late"));
+    }
     [Fact]
     public void 请求DTO使用不可变Record并支持安全快照复制()
     {
