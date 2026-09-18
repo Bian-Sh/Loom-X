@@ -7,7 +7,7 @@
 - Review mode: standard
 - TDD mode: tdd
 - Current task: 6 — 四 Tab UI、本地化与复制响应 Toast
-- Stage: checkpoint
+- Stage: complete
 - Base commit: 441cc35
 - Last verified baseline: 948/948 passed
 
@@ -43,3 +43,5 @@
 - Task 5 status commit: 5327909 记录提供商测试面板接入任务完成
 - Task 5 verification: ProvidersViewModel/ProviderEditorViewModelTests 28/28; ProviderEditorViewModelTests/ProviderHealthServiceTests/ProvidersViewModel 41/41
 - Task 5 result: complete; 覆盖 TestPanel 创建、Provider 切换取消、未保存内存配置快照、Dispose 取消和文化变化转发
+
+- Task 6 result: complete; 四 Tab UI、本地化资源、复制响应 Toast 和视图契约测试已完成；定向 38/38、相关回归 117/117。
