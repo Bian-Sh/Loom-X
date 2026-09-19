@@ -302,8 +302,8 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("providers.compat.responses.description", basic, StringComparison.Ordinal);
         Assert.Contains("providers.compat.anthropic.description", basic, StringComparison.Ordinal);
         Assert.Contains("SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
-        Assert.Contains("<Grid Margin=\"0,0,8,0\"><TextBox Text=\"{Binding SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
-        Assert.Contains("Padding=\"12,9,46,9\"/><Button HorizontalAlignment=\"Right\" Width=\"38\" Height=\"34\" Margin=\"0,0,4,0\"", basic, StringComparison.Ordinal);
+        Assert.Contains("<Grid ColumnDefinitions=\"*,42\" HorizontalAlignment=\"Stretch\"><TextBox Grid.ColumnSpan=\"2\" HorizontalAlignment=\"Stretch\" Text=\"{Binding SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
+        Assert.Contains("Padding=\"12,9,46,9\"/><Button Grid.Column=\"1\" HorizontalAlignment=\"Center\" Width=\"38\" Height=\"34\" Margin=\"0,0,4,0\"", basic, StringComparison.Ordinal);
         Assert.DoesNotContain("<Grid ColumnDefinitions=\"*,Auto\"><TextBox Text=\"{Binding SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
         Assert.DoesNotContain("<Button Grid.Column=\"1\" Width=\"38\" Height=\"34\" Margin=\"-42,0,4,0\"", basic, StringComparison.Ordinal);
         Assert.DoesNotContain("SelectedProvider.ApiKey", advanced, StringComparison.Ordinal);
@@ -435,7 +435,7 @@ public sealed class ProvidersViewContractTests
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
 
-        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0\"/><Setter Property=\"Padding\" Value=\"0,0,8,0\"/></Style>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0\"/><Setter Property=\"Padding\" Value=\"0,0,8,0\"/><Setter Property=\"HorizontalContentAlignment\" Value=\"Stretch\"/></Style>", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ScrollViewer.provider-tab-scroll /template/ ScrollBar#PART_VerticalScrollBar", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<TranslateTransform X=\"8\"/>", source, StringComparison.Ordinal);
         Assert.Contains("<Border Padding=\"18,16,0,0\"", source, StringComparison.Ordinal);
@@ -448,7 +448,7 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
-    public void RareDeleteActionsOnlyAppearWhenTheirOwnerIsHovered()
+    public void DeleteActionsRevealFromHitTestableOwnerRows()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
 
@@ -458,9 +458,23 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("Selector=\"Border.header-item:pointerover Button.header-delete\"><Setter Property=\"Opacity\" Value=\"1\"/><Setter Property=\"IsHitTestVisible\" Value=\"True\"/>", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.model-cell Button.model-delete\"><Setter Property=\"Opacity\" Value=\"0\"/><Setter Property=\"IsHitTestVisible\" Value=\"False\"/>", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.model-cell:pointerover Button.model-delete\"><Setter Property=\"Opacity\" Value=\"1\"/><Setter Property=\"IsHitTestVisible\" Value=\"True\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Border.model-cell\"><Setter Property=\"Background\" Value=\"Transparent\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"header-item\" Background=\"Transparent\"", source, StringComparison.Ordinal);
         Assert.Contains("Classes=\"icon-button provider-delete\"", source, StringComparison.Ordinal);
         Assert.Contains("Classes=\"icon-button header-delete\"", source, StringComparison.Ordinal);
         Assert.Contains("Classes=\"icon-button model-delete\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ApiKeyInputStretchesToTheContainerRightEdge()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var basicTab = ReadTab(source, "providers.tab.basic");
+
+        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0\"/><Setter Property=\"Padding\" Value=\"0,0,8,0\"/><Setter Property=\"HorizontalContentAlignment\" Value=\"Stretch\"/></Style>", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid ColumnDefinitions=\"*,42\" HorizontalAlignment=\"Stretch\">", basicTab, StringComparison.Ordinal);
+        Assert.Contains("<TextBox Grid.ColumnSpan=\"2\" HorizontalAlignment=\"Stretch\" Text=\"{Binding SelectedProvider.ApiKey", basicTab, StringComparison.Ordinal);
+        Assert.Contains("<Button Grid.Column=\"1\" HorizontalAlignment=\"Center\"", basicTab, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -475,7 +489,8 @@ public sealed class ProvidersViewContractTests
 
         Assert.Contains("HorizontalContentAlignment=\"Center\"", button, StringComparison.Ordinal);
         Assert.Contains("VerticalContentAlignment=\"Center\"", button, StringComparison.Ordinal);
-        Assert.Equal(2, button.Split("Width=\"18\" Height=\"18\" Stretch=\"Uniform\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"", StringSplitOptions.None).Length - 1);
+        Assert.Contains("<Viewbox Width=\"18\" Height=\"18\" Stretch=\"Uniform\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"><Panel Width=\"24\" Height=\"24\">", button, StringComparison.Ordinal);
+        Assert.Equal(2, button.Split("Width=\"24\" Height=\"24\" Stretch=\"None\"", StringSplitOptions.None).Length - 1);
     }
 
     [Fact]
