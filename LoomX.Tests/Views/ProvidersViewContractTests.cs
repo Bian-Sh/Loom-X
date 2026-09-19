@@ -411,11 +411,13 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
-    public void ProviderTabsAlignScrollbarsToRequestedGuide()
+    public void ProviderTabsKeepScrollbarsInNativeLayerAndInsetOnlyContent()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
 
-        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0\"/><Setter Property=\"Padding\" Value=\"0,0,8,0\"/></Style>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ScrollViewer.provider-tab-scroll /template/ ScrollBar#PART_VerticalScrollBar", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TranslateTransform X=\"8\"/>", source, StringComparison.Ordinal);
         Assert.Contains("<Border Padding=\"18,16,0,0\"", source, StringComparison.Ordinal);
         Assert.Contains("<Grid ColumnDefinitions=\"*\" Margin=\"0,0,18,0\">", source, StringComparison.Ordinal);
 
