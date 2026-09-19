@@ -27,10 +27,10 @@ public sealed class ProviderTestServiceTests
 
             data: [DONE]
 
-            data: {invalid-after-done}
+            data: {"choices":[],"usage":{"total_tokens":2}}
 
             """,
-            "not-json\n{\"choices\":[{\"delta\":{\"content\":\"你\"}}]}\n{\"choices\":[{\"delta\":{\"content\":\"好\"}}]}\n[DONE]",
+            "not-json\n{\"choices\":[{\"delta\":{\"content\":\"你\"}}]}\n{\"choices\":[{\"delta\":{\"content\":\"好\"}}]}\n[DONE]\n{\"choices\":[],\"usage\":{\"total_tokens\":2}}",
             "[DONE]"
         },
         {
@@ -49,11 +49,13 @@ public sealed class ProviderTestServiceTests
             event: response.completed
             data: {"type":"response.completed"}
 
-            event: response.output_text.delta
-            data: {invalid-after-completed}
+            event: response.usage
+            data: {"type":"response.usage","usage":{"total_tokens":2}}
+
+            data: [DONE]
 
             """,
-            "not-json\n{\"type\":\"response.output_text.delta\",\"delta\":\"你\"}\n{\"type\":\"response.output_text.delta\",\"delta\":\"好\"}\n{\"type\":\"response.completed\"}",
+            "not-json\n{\"type\":\"response.output_text.delta\",\"delta\":\"你\"}\n{\"type\":\"response.output_text.delta\",\"delta\":\"好\"}\n{\"type\":\"response.completed\"}\n{\"type\":\"response.usage\",\"usage\":{\"total_tokens\":2}}\n[DONE]",
             "response.completed"
         },
         {
@@ -72,11 +74,11 @@ public sealed class ProviderTestServiceTests
             event: message_stop
             data: {"type":"message_stop"}
 
-            event: content_block_delta
-            data: {invalid-after-stop}
+            event: message_delta
+            data: {"type":"message_delta","usage":{"output_tokens":2}}
 
             """,
-            "not-json\n{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"你\"}}\n{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"好\"}}\n{\"type\":\"message_stop\"}",
+            "not-json\n{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"你\"}}\n{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"好\"}}\n{\"type\":\"message_stop\"}\n{\"type\":\"message_delta\",\"usage\":{\"output_tokens\":2}}",
             "message_stop"
         },
     };
@@ -269,7 +271,7 @@ public sealed class ProviderTestServiceTests
 
     [Theory]
     [MemberData(nameof(流式协议样例))]
-    public async Task 三协议流式按顺序报告增量并由完成事件结束(
+    public async Task 三协议流式按顺序报告全部帧并读取到Eof(
         string apiMode,
         string endpointFormat,
         string sse,
@@ -327,10 +329,36 @@ public sealed class ProviderTestServiceTests
             }));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(expectedJsonl[..1], string.Concat(deltas));
-        Assert.Equal(expectedJsonl[..1], result.ResponseText);
+        var truncationMarker = "{\"type\":\"loomx.response.truncated\",\"max_characters\":1}";
+        Assert.Equal(expectedJsonl[..1] + "\n" + truncationMarker, string.Concat(deltas));
+        Assert.Equal(expectedJsonl[..1] + "\n" + truncationMarker, result.ResponseText);
+        Assert.Equal(1, result.ResponseText.Split(truncationMarker, StringSplitOptions.None).Length - 1);
         Assert.True(result.IsTruncated);
         Assert.Contains(true, truncationStates);
+    }
+
+    [Fact]
+    public async Task 取消流式读取时返回已接收Jsonl而不生成取消错误Json()
+    {
+        const string frame = "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"部分\"}\n\n";
+        using var cancellation = new CancellationTokenSource();
+        await using var stream = new BlockingAfterPrefixStream(frame);
+        var pipeline = CapturingPipeline.ForStreaming(stream);
+        var service = CreateService(pipeline);
+
+        var result = await service.ExecuteAsync(
+            CreateRequest("openai", "responses") with { Mode = ProviderTestMode.Streaming },
+            new InlineProgress<ProviderTestProgress>(item =>
+            {
+                if (!string.IsNullOrEmpty(item.TextDelta))
+                    cancellation.Cancel();
+            }),
+            cancellation.Token);
+
+        Assert.Equal(ProviderTestStatus.Cancelled, result.Status);
+        Assert.Equal("cancelled", result.ErrorCode);
+        Assert.Equal("{\"type\":\"response.output_text.delta\",\"delta\":\"部分\"}", result.ResponseText);
+        Assert.DoesNotContain("\"error\"", result.ResponseText, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -679,7 +707,7 @@ public sealed class ProviderTestServiceTests
             new InlineProgress<ProviderTestProgress>(progressItems.Add));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("12345", result.ResponseText);
+        Assert.Equal("12345\n{\"type\":\"loomx.response.truncated\",\"max_characters\":5}", result.ResponseText);
         Assert.True(result.IsTruncated);
         Assert.Collection(
             progressItems,
@@ -687,7 +715,7 @@ public sealed class ProviderTestServiceTests
             item =>
             {
                 Assert.Equal(ProviderTestStatus.Completed, item.Status);
-                Assert.Equal(5, item.AccumulatedCharacters);
+                Assert.Equal(result.ResponseText.Length, item.AccumulatedCharacters);
                 Assert.True(item.IsTruncated);
             });
     }
@@ -857,6 +885,9 @@ public sealed class ProviderTestServiceTests
         public static CapturingPipeline ForStreaming(string body) => new(_ =>
             Task.FromResult(CreateStreamingResult(body)));
 
+        public static CapturingPipeline ForStreaming(Stream body) => new(_ =>
+            Task.FromResult(CreateStreamingResult(body)));
+
         public Uri? RequestUri { get; private set; }
         public AuthenticationHeaderValue? Authorization { get; private set; }
         public Dictionary<string, string> Headers { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -906,14 +937,47 @@ public sealed class ProviderTestServiceTests
         }
 
         private static ProviderStreamingResult CreateStreamingResult(string body)
+            => CreateStreamingResult(new MemoryStream(Encoding.UTF8.GetBytes(body), writable: false));
+
+        private static ProviderStreamingResult CreateStreamingResult(Stream stream)
         {
-            var stream = new MemoryStream(Encoding.UTF8.GetBytes(body), writable: false);
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StreamContent(stream),
             };
             response.Content.Headers.ContentType = new MediaTypeHeaderValue("text/event-stream");
             return new ProviderStreamingResult(response, stream);
+        }
+    }
+
+    private sealed class BlockingAfterPrefixStream(string prefix) : Stream
+    {
+        private readonly byte[] bytes = Encoding.UTF8.GetBytes(prefix);
+        private int position;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => bytes.Length;
+        public override long Position { get => position; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            if (position < bytes.Length)
+            {
+                var count = Math.Min(buffer.Length, bytes.Length - position);
+                bytes.AsMemory(position, count).CopyTo(buffer);
+                position += count;
+                return count;
+            }
+
+            await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            return 0;
         }
     }
 

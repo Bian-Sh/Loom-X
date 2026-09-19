@@ -295,7 +295,7 @@ public sealed class ProviderTestService : IProviderTestService
                 protocol,
                 path,
                 responseText.Length);
-            var truncated = Truncate(responseText, request.MaxDisplayCharacters);
+            var truncated = TruncateWithMarker(responseText, request.MaxDisplayCharacters);
             return CreateSuccessResult(
                 request,
                 summary,
@@ -498,7 +498,6 @@ public sealed class ProviderTestService : IProviderTestService
         long responseBytes = 0;
         string? eventName = null;
         var dataLines = new List<string>();
-        var completed = false;
 
         using var reader = new StreamReader(
             executionResult.Body,
@@ -516,7 +515,7 @@ public sealed class ProviderTestService : IProviderTestService
                 {
                     if (dataLines.Count > 0)
                     {
-                        completed = ProcessStreamingFrame(
+                        _ = ProcessStreamingFrame(
                             protocol,
                             eventName,
                             string.Join('\n', dataLines),
@@ -531,8 +530,6 @@ public sealed class ProviderTestService : IProviderTestService
 
                     eventName = null;
                     dataLines.Clear();
-                    if (completed)
-                        break;
                     continue;
                 }
 
@@ -547,7 +544,7 @@ public sealed class ProviderTestService : IProviderTestService
                 }
             }
 
-            if (!completed && dataLines.Count > 0)
+            if (dataLines.Count > 0)
             {
                 _ = ProcessStreamingFrame(
                     protocol,
@@ -561,6 +558,22 @@ public sealed class ProviderTestService : IProviderTestService
                     builder,
                     ref isTruncated);
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return CreateFailureResult(
+                request,
+                summary,
+                progress,
+                startedAt,
+                "cancelled",
+                false,
+                statusCode,
+                executionResult.ContentType,
+                responseBytes,
+                status: ProviderTestStatus.Cancelled,
+                responseText: builder.ToString(),
+                isTruncated: isTruncated);
         }
         catch (Exception exception) when (exception is JsonException or InvalidProviderResponseException)
         {
@@ -616,9 +629,16 @@ public sealed class ProviderTestService : IProviderTestService
         var remaining = Math.Max(0, limit - builder.Length);
         var appendedLength = Math.Min(remaining, displayDelta.Length);
         var appended = appendedLength == 0 ? string.Empty : displayDelta[..appendedLength];
-        if (appendedLength < displayDelta.Length)
-            isTruncated = true;
         builder.Append(appended);
+        if (appendedLength < displayDelta.Length && !isTruncated)
+        {
+            isTruncated = true;
+            var markerDelta = builder.Length == 0
+                ? CreateTruncationMarker(limit)
+                : $"\n{CreateTruncationMarker(limit)}";
+            builder.Append(markerDelta);
+            appended += markerDelta;
+        }
 
         progress?.Report(new ProviderTestProgress(
             request.RequestId,
@@ -665,12 +685,12 @@ public sealed class ProviderTestService : IProviderTestService
             return default;
 
         var root = JsonNode.Parse(data) as JsonObject ?? throw new InvalidProviderResponseException();
-        if (root["choices"] is not JsonArray { Count: > 0 } choices
-            || choices[0] is not JsonObject choice
-            || choice["delta"] is not JsonObject delta)
-        {
+        if (root["choices"] is not JsonArray choices || choices.Count == 0)
+            return default;
+        if (choices[0] is not JsonObject choice)
             throw new InvalidProviderResponseException();
-        }
+        if (choice["delta"] is not JsonObject delta)
+            return default;
 
         if (delta["content"] is null)
             return default;
@@ -841,9 +861,11 @@ public sealed class ProviderTestService : IProviderTestService
                 errorCode);
         }
 
-        var displayedResponse = string.IsNullOrWhiteSpace(responseText)
-            ? CreateErrorResponse(errorCode, statusCode, errorDetail, request.MaxDisplayCharacters)
-            : responseText;
+        var displayedResponse = status == ProviderTestStatus.Cancelled
+            ? responseText ?? string.Empty
+            : string.IsNullOrWhiteSpace(responseText)
+                ? CreateErrorResponse(errorCode, statusCode, errorDetail, request.MaxDisplayCharacters)
+                : responseText;
         return new ProviderTestResult(
             request.RequestId,
             status,
@@ -1063,7 +1085,7 @@ public sealed class ProviderTestService : IProviderTestService
         {
         }
 
-        return Truncate(display, maxDisplayCharacters).Text;
+        return TruncateWithMarker(display, maxDisplayCharacters).Text;
     }
 
     private static async Task<string> ReadResponseTextAsync(Stream body, CancellationToken cancellationToken)
@@ -1110,6 +1132,22 @@ public sealed class ProviderTestService : IProviderTestService
         "internal_error" => "测试请求发生内部错误。",
         _ => "请求失败。",
     };
+    private static (string Text, bool IsTruncated) TruncateWithMarker(string text, int maxDisplayCharacters)
+    {
+        var truncated = Truncate(text, maxDisplayCharacters);
+        if (!truncated.IsTruncated) return truncated;
+
+        var separator = truncated.Text.Length == 0 ? string.Empty : "\n";
+        return ($"{truncated.Text}{separator}{CreateTruncationMarker(Math.Max(0, maxDisplayCharacters))}", true);
+    }
+
+    private static string CreateTruncationMarker(int maxDisplayCharacters)
+        => JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["type"] = "loomx.response.truncated",
+            ["max_characters"] = maxDisplayCharacters,
+        }, JsonlJsonOptions);
+
     private static (string Text, bool IsTruncated) Truncate(string text, int maxDisplayCharacters)
     {
         var limit = Math.Max(0, maxDisplayCharacters);

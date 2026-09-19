@@ -325,11 +325,13 @@ public sealed class ProvidersViewContractTests
         Assert.DoesNotContain("TestPanel.ClearCommand", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.ResponseText", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.RequestSummary", test, StringComparison.Ordinal);
-        Assert.Contains("IsIndeterminate=\"True\"", test, StringComparison.Ordinal);
+        Assert.Contains("providers.test.send", test, StringComparison.Ordinal);
+        Assert.Contains("providers.test.stop", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsIndeterminate=\"True\"", test, StringComparison.Ordinal);
         Assert.Contains("AcceptsReturn=\"False\"", test, StringComparison.Ordinal);
         Assert.Contains("IsReadOnly=\"True\"", test, StringComparison.Ordinal);
         Assert.DoesNotContain("providers.test.prompt.label", test, StringComparison.Ordinal);
-        Assert.DoesNotContain("TestPanel.StopCommand", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.StopCommand", test, StringComparison.Ordinal);
         Assert.DoesNotContain("TestPanel.RetryCommand", test, StringComparison.Ordinal);
         Assert.DoesNotContain("providers.test.copy", test, StringComparison.Ordinal);
         Assert.DoesNotContain("TestPanel.Summary.ProviderId", test, StringComparison.Ordinal);
@@ -338,18 +340,17 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
-    public void SendButtonRemainsMountedAndUsesDirectEnabledBinding()
+    public void SendAndStopButtonsShareInputAreaWithoutBufferingIndicator()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
         var test = ReadTab(source, "providers.tab.test");
-        var commandIndex = test.IndexOf("Command=\"{Binding TestPanel.SendCommand}\"", StringComparison.Ordinal);
-        Assert.True(commandIndex >= 0);
-        var buttonStart = test.LastIndexOf("<Button", commandIndex, StringComparison.Ordinal);
-        var buttonEnd = test.IndexOf(">", commandIndex, StringComparison.Ordinal);
-        var sendButton = test[buttonStart..buttonEnd];
 
-        Assert.Contains("IsEnabled=\"{Binding TestPanel.CanSend}\"", sendButton, StringComparison.Ordinal);
-        Assert.DoesNotContain("IsVisible=\"{Binding TestPanel.IsRunning", sendButton, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding TestPanel.SendCommand}\"", test, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding TestPanel.StopCommand}\"", test, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{l:Locale providers.test.send}\"", test, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{l:Locale providers.test.stop}\"", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsIndeterminate=\"True\"", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("M 4,4 L 24,12 L 4,20 L 8,12 Z", test, StringComparison.Ordinal);
     }
     [Fact]
     public void ResponseUsesSelectableReadonlyTextWithoutCopyHandler()
@@ -366,6 +367,12 @@ public sealed class ProvidersViewContractTests
         Assert.DoesNotContain("providers.test.response.title", view, StringComparison.Ordinal);
         Assert.DoesNotContain("providers.test.clear", view, StringComparison.Ordinal);
         Assert.DoesNotContain("CopyTestResponseButton_OnClick", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("<ContextMenu", view, StringComparison.Ordinal);
+        Assert.Contains("providers.test.response.copy", view, StringComparison.Ordinal);
+        Assert.Contains("providers.test.response.delete", view, StringComparison.Ordinal);
+        Assert.Contains("providers.test.response.selectAll", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.test.response.cut", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.test.response.paste", view, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -377,15 +384,24 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("Text=\"{l:Locale providers.test.response.empty}\"", test, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding TestPanel.HasResponseText, Converter={StaticResource ProviderBooleanNotConverter}}\"", test, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding TestPanel.HasResponseText}\"", test, StringComparison.Ordinal);
+        var responseStart = test.IndexOf("<TextBox x:Name=\"TestResponseTextBox\"", StringComparison.Ordinal);
+        var responseEnd = test.IndexOf('>', responseStart);
+        var responseTag = test[responseStart..responseEnd];
+        Assert.Contains("MaxHeight=\"320\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("TextWrapping=\"NoWrap\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer.HorizontalScrollBarVisibility=\"Auto\"", responseTag, StringComparison.Ordinal);
     }
     [Theory]
     [InlineData(Key.Delete, false, 6, 0, 6, true)]
     [InlineData(Key.Back, false, 6, 6, 0, true)]
-    [InlineData(Key.Delete, false, 6, 1, 6, false)]
+    [InlineData(Key.Delete, false, 6, 1, 4, true)]
+    [InlineData(Key.Back, false, 6, 4, 1, true)]
+    [InlineData(Key.Delete, false, 6, 3, 3, false)]
     [InlineData(Key.Delete, true, 6, 0, 6, false)]
     [InlineData(Key.Delete, false, 0, 0, 0, false)]
     [InlineData(Key.Enter, false, 6, 0, 6, false)]
-    public void Response仅在完成后全选并按删除键时清空(
+    public void Response在请求结束后允许删除任意非空选区(
         Key key,
         bool isRunning,
         int textLength,
@@ -393,7 +409,7 @@ public sealed class ProvidersViewContractTests
         int selectionEnd,
         bool expected)
     {
-        Assert.Equal(expected, ProvidersView.ShouldClearTestResponse(
+        Assert.Equal(expected, ProvidersView.ShouldDeleteTestResponseSelection(
             key,
             isRunning,
             textLength,

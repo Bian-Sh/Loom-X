@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
+using System.Text;
 using System.Text.Json;
 using System.Windows.Input;
 using LoomX.Services;
@@ -9,6 +10,9 @@ namespace LoomX.ViewModels;
 
 public sealed class ProviderTestPanelViewModel : NotifyViewModel
 {
+    private const int MaxDisplayCharacters = 1_000_000;
+    private const int MaxLivePreviewCharacters = 32_768;
+    private static readonly TimeSpan ProgressFlushInterval = TimeSpan.FromMilliseconds(75);
     private readonly IProviderTestService service;
     private readonly ObservableCollection<ModelEditorViewModel> testableModels = [];
     private readonly HashSet<ModelEditorViewModel> subscribedModels = [];
@@ -30,6 +34,7 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
         this.service = service ?? throw new ArgumentNullException(nameof(service));
         TestableModels = new ReadOnlyObservableCollection<ModelEditorViewModel>(testableModels);
         SendCommand = new AsyncCommand(SendAsync, () => CanSend);
+        StopCommand = new AsyncCommand(StopAsync, () => IsRunning);
     }
 
     public ReadOnlyObservableCollection<ModelEditorViewModel> TestableModels { get; }
@@ -80,6 +85,7 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
             if (!SetProperty(ref isRunning, value)) return;
             OnPropertyChanged(nameof(CanSend));
             ((AsyncCommand)SendCommand).RaiseCanExecuteChanged();
+            ((AsyncCommand)StopCommand).RaiseCanExecuteChanged();
         }
     }
 
@@ -87,6 +93,7 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
     public bool HasError { get => hasError; private set => SetProperty(ref hasError, value); }
     public bool CanSend => provider is not null && SelectedModel is { IsRealModel: true } model && testableModels.Contains(model) && !string.IsNullOrWhiteSpace(Prompt) && !IsRunning;
     public ICommand SendCommand { get; }
+    public ICommand StopCommand { get; }
 
     public void BindProvider(ProviderEditorViewModel? value)
     {
@@ -116,11 +123,19 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
 
     private async Task SendAsync() => await ExecuteAsync(BuildRequest());
 
+    private Task StopAsync()
+    {
+        if (IsRunning)
+            cancellation?.Cancel();
+        return Task.CompletedTask;
+    }
+
     private async Task ExecuteAsync(ProviderTestRequest request)
     {
         var version = ++requestVersion;
         cancellation?.Dispose();
         cancellation = new CancellationTokenSource();
+        var currentCancellation = cancellation;
         IsRunning = true;
         HasResult = false;
         HasError = false;
@@ -128,13 +143,16 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
         Summary = null;
         try
         {
-            var progress = new Progress<ProviderTestProgress>(item =>
+            var progress = new BufferedProviderTestProgress();
+            var executionTask = Task.Run(() => service.ExecuteAsync(request, progress, currentCancellation.Token));
+            while (!executionTask.IsCompleted)
             {
-                if (version != requestVersion) return;
-                if (!string.IsNullOrEmpty(item.TextDelta)) ResponseText += item.TextDelta;
-                if (item.Status is ProviderTestStatus.Failed or ProviderTestStatus.Cancelled) HasError = true;
-            });
-            var result = await service.ExecuteAsync(request, progress, cancellation.Token);
+                await Task.WhenAny(executionTask, Task.Delay(ProgressFlushInterval));
+                FlushProgress(progress, version);
+            }
+
+            var result = await executionTask;
+            FlushProgress(progress, version);
             if (version != requestVersion) return;
             Summary = result.Summary;
             ResponseText = result.ResponseText;
@@ -143,8 +161,28 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
         }
         finally
         {
-            if (version == requestVersion) IsRunning = false;
+            currentCancellation.Dispose();
+            if (version == requestVersion)
+            {
+                if (ReferenceEquals(cancellation, currentCancellation))
+                    cancellation = null;
+                IsRunning = false;
+            }
         }
+    }
+
+    private void FlushProgress(BufferedProviderTestProgress progress, long version)
+    {
+        var pending = progress.Drain();
+        if (version != requestVersion) return;
+        if (!string.IsNullOrEmpty(pending.TextDelta))
+        {
+            var remaining = Math.Max(0, MaxLivePreviewCharacters - ResponseText.Length);
+            if (remaining > 0)
+                ResponseText += pending.TextDelta[..Math.Min(remaining, pending.TextDelta.Length)];
+        }
+        if (pending.HasFailure)
+            HasError = true;
     }
 
     private ProviderTestRequest BuildRequest()
@@ -163,7 +201,7 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
             current.UseProxy,
             Prompt,
             SelectedMode,
-            12000);
+            MaxDisplayCharacters);
     }
 
     private void ProviderModelsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs args)
@@ -273,14 +311,27 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
     private void CancelPendingRequest()
     {
         ++requestVersion;
-        cancellation?.Cancel();
+        var pendingCancellation = cancellation;
+        cancellation = null;
+        pendingCancellation?.Cancel();
         IsRunning = false;
     }
 
-    internal bool ClearResponse()
+    internal bool DeleteResponseSelection(int selectionStart, int selectionEnd)
     {
-        if (IsRunning) return false;
-        Clear();
+        if (IsRunning || ResponseText.Length == 0) return false;
+
+        var start = Math.Clamp(Math.Min(selectionStart, selectionEnd), 0, ResponseText.Length);
+        var end = Math.Clamp(Math.Max(selectionStart, selectionEnd), 0, ResponseText.Length);
+        if (start == end) return false;
+
+        if (start == 0 && end == ResponseText.Length)
+        {
+            Clear();
+            return true;
+        }
+
+        ResponseText = ResponseText.Remove(start, end - start);
         return true;
     }
 
@@ -290,5 +341,34 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
         Summary = null;
         HasResult = false;
         HasError = false;
+    }
+    private sealed class BufferedProviderTestProgress : IProgress<ProviderTestProgress>
+    {
+        private readonly object gate = new();
+        private readonly StringBuilder pendingText = new();
+        private bool hasFailure;
+
+        public void Report(ProviderTestProgress value)
+        {
+            lock (gate)
+            {
+                if (!string.IsNullOrEmpty(value.TextDelta))
+                    pendingText.Append(value.TextDelta);
+                if (value.Status == ProviderTestStatus.Failed)
+                    hasFailure = true;
+            }
+        }
+
+        public (string TextDelta, bool HasFailure) Drain()
+        {
+            lock (gate)
+            {
+                var text = pendingText.ToString();
+                pendingText.Clear();
+                var failed = hasFailure;
+                hasFailure = false;
+                return (text, failed);
+            }
+        }
     }
 }

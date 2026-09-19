@@ -1653,6 +1653,10 @@
   <data name="providers.test.mode.streaming"><value>流式请求</value></data>
   <data name="providers.test.prompt.watermark"><value>输入测试提示词</value></data>
   <data name="providers.test.send"><value>发送</value></data>
+  <data name="providers.test.stop"><value>停止</value></data>
+  <data name="providers.test.response.copy"><value>复制</value></data>
+  <data name="providers.test.response.delete"><value>删除</value></data>
+  <data name="providers.test.response.selectAll"><value>全选</value></data>
   <data name="providers.delete.dialog.title"><value>提示</value></data>
   <data name="providers.delete.dialog.cancel"><value>取消</value></data>
   <data name="providers.delete.dialog.confirm"><value>删除</value></data>

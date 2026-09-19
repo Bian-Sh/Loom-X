@@ -10,6 +10,7 @@ using LoomX;
 using LoomX.ViewModels;
 using LoomX.Localization;
 using LoomX.Services;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 
@@ -54,13 +55,13 @@ public partial class ProvidersView : UserControl
             return;
 
         var textLength = TestResponseTextBox.Text?.Length ?? 0;
-        if (!ShouldClearTestResponse(
+        if (!ShouldDeleteTestResponseSelection(
                 e.Key,
                 viewModel.TestPanel.IsRunning,
                 textLength,
                 TestResponseTextBox.SelectionStart,
                 TestResponseTextBox.SelectionEnd)
-            || !viewModel.TestPanel.ClearResponse())
+            || !DeleteSelectedTestResponse(viewModel))
         {
             return;
         }
@@ -68,7 +69,7 @@ public partial class ProvidersView : UserControl
         e.Handled = true;
     }
 
-    internal static bool ShouldClearTestResponse(
+    internal static bool ShouldDeleteTestResponseSelection(
         Key key,
         bool isRunning,
         int textLength,
@@ -80,8 +81,49 @@ public partial class ProvidersView : UserControl
             || key is not (Key.Delete or Key.Back))
             return false;
 
-        return Math.Min(selectionStart, selectionEnd) == 0
-            && Math.Max(selectionStart, selectionEnd) == textLength;
+        var start = Math.Clamp(selectionStart, 0, textLength);
+        var end = Math.Clamp(selectionEnd, 0, textLength);
+        return start != end;
+    }
+
+    private void TestResponseContextMenu_OnOpening(object? sender, CancelEventArgs e)
+    {
+        var hasSelection = TestResponseTextBox.SelectionStart != TestResponseTextBox.SelectionEnd;
+        var canDelete = hasSelection
+            && DataContext is ProvidersViewModel viewModel
+            && !viewModel.TestPanel.IsRunning;
+        CopyTestResponseMenuItem.IsEnabled = hasSelection;
+        DeleteTestResponseMenuItem.IsEnabled = canDelete;
+        SelectAllTestResponseMenuItem.IsEnabled = !string.IsNullOrEmpty(TestResponseTextBox.Text);
+    }
+
+    private async void CopyTestResponseMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(TestResponseTextBox.SelectedText)) return;
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is not null)
+            await clipboard.SetTextAsync(TestResponseTextBox.SelectedText);
+    }
+
+    private void DeleteTestResponseMenuItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is ProvidersViewModel viewModel)
+            DeleteSelectedTestResponse(viewModel);
+    }
+
+    private void SelectAllTestResponseMenuItem_OnClick(object? sender, RoutedEventArgs e)
+        => TestResponseTextBox.SelectAll();
+
+    private bool DeleteSelectedTestResponse(ProvidersViewModel viewModel)
+    {
+        var selectionStart = TestResponseTextBox.SelectionStart;
+        var selectionEnd = TestResponseTextBox.SelectionEnd;
+        if (!viewModel.TestPanel.DeleteResponseSelection(selectionStart, selectionEnd)) return false;
+
+        var caret = Math.Min(selectionStart, selectionEnd);
+        TestResponseTextBox.SelectionStart = caret;
+        TestResponseTextBox.SelectionEnd = caret;
+        return true;
     }
 
     private void AddHeaderButton_OnClick(object? sender, RoutedEventArgs e)
