@@ -82,7 +82,11 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         _loc = localizer ?? LocalizerFactory.Create<MainWindowViewModel>();
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService, logger: this.loggerFactory.CreateLogger<ConsoleViewModel>());
         overviewViewModel = new OverviewViewModel(gatewayService, this.dataStore, this.loggerFactory.CreateLogger<MainWindowViewModel>());
-        providersViewModel = new ProvidersViewModel(this.dataStore, this.toastService, this.loggerFactory.CreateLogger<ProvidersViewModel>());
+        providersViewModel = new ProvidersViewModel(
+            this.dataStore,
+            this.toastService,
+            this.loggerFactory.CreateLogger<ProvidersViewModel>(),
+            providerTestLogger: this.loggerFactory.CreateLogger<ProviderTestService>());
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
         activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
         this.assistantViewModel = assistantViewModel ?? new AssistantViewModel(gatewayService, this.loggerFactory, this.toastService);
@@ -999,14 +1003,14 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         return models;
     }
 
-    public ProvidersViewModel(AppDataStore dataStore, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null, IStringLocalizer<ProvidersViewModel>? localizer = null, IProviderHealthService? healthService = null, IProviderTestService? providerTestService = null)
+    public ProvidersViewModel(AppDataStore dataStore, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null, IStringLocalizer<ProvidersViewModel>? localizer = null, IProviderHealthService? healthService = null, IProviderTestService? providerTestService = null, ILogger<ProviderTestService>? providerTestLogger = null)
     {
         this.dataStore = dataStore;
         this.toastService = toastService ?? new ToastService();
         this.logger = logger;
         _loc = localizer ?? LocalizerFactory.Create<ProvidersViewModel>();
         this.healthService = healthService ?? new ProviderHealthService(httpClient);
-        testPanel = new ProviderTestPanelViewModel(providerTestService ?? new ProviderTestService(httpClient));
+        testPanel = new ProviderTestPanelViewModel(providerTestService ?? new ProviderTestService(httpClient, providerTestLogger));
         Providers.CollectionChanged += ProvidersChanged;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;

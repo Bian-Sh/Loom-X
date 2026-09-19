@@ -52,12 +52,55 @@ public sealed class AnthropicProxyClientTests
         Assert.DoesNotContain("sensitive-upstream-response", message);
     }
 
+    [Fact]
+    public async Task BaseUrl已包含V1时真实路由保留重复版本段并记录警告()
+    {
+        var handler = new ResponseHandler(HttpStatusCode.OK, "{\"content\":[]}");
+        using var httpClient = new HttpClient(handler);
+        var logger = new RecordingLogger<AnthropicProxyClient>();
+        var client = new AnthropicProxyClient(httpClient, logger);
+        var model = new ResolvedModelConfig
+        {
+            ModelId = "claude-sonnet-4-5",
+            OllamaModelName = "claude-sonnet-4-5",
+            DisplayName = "Claude Sonnet",
+            ProviderId = "anthropic",
+            ApiModes = ["anthropic"],
+            BaseUrl = "https://api.anthropic.com/v1",
+            ApiKey = "secret",
+            AnthropicModel = "claude-sonnet-4-5"
+        };
+
+        await client.SendAsync(model, new AnthropicMessagesRequest
+        {
+            Model = model.ModelId,
+            Messages =
+            [
+                new AnthropicMessage
+                {
+                    Role = "user",
+                    Content = [new AnthropicContentBlock { Type = "text", Text = "hello" }]
+                }
+            ]
+        }, CancellationToken.None);
+
+        Assert.Equal("https://api.anthropic.com/v1/v1/messages", handler.RequestUri);
+        Assert.Contains(logger.Messages, message => message.Contains("重复版本段", StringComparison.Ordinal)
+            && message.Contains("/v1/v1/messages", StringComparison.Ordinal));
+        Assert.DoesNotContain(logger.Messages, message => message.Contains("secret", StringComparison.Ordinal));
+    }
+
     private sealed class ResponseHandler(HttpStatusCode statusCode, string responseBody) : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(statusCode)
+        public string? RequestUri { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestUri = request.RequestUri?.AbsoluteUri;
+            return Task.FromResult(new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(responseBody, Encoding.UTF8, "application/json")
             });
+        }
     }
 }

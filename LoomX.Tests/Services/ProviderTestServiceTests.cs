@@ -136,6 +136,75 @@ public sealed class ProviderTestServiceTests
     }
 
     [Fact]
+    public async Task Http失败展示格式化后的原始Json响应()
+    {
+        var pipeline = new CapturingPipeline(new ProviderExecutionResult(
+            HttpStatusCode.BadRequest,
+            "application/json",
+            new Dictionary<string, string[]>(),
+            Encoding.UTF8.GetBytes("{\"error\":{\"message\":\"bad request\",\"code\":\"invalid_input\"}}"),
+            false));
+        var service = CreateService(pipeline);
+
+        var result = await service.ExecuteAsync(CreateRequest("openai", "responses"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("request_rejected", result.ErrorCode);
+        Assert.Contains("\"message\": \"bad request\"", result.ResponseText, StringComparison.Ordinal);
+        Assert.Contains(Environment.NewLine, result.ResponseText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 无上游响应体的网络异常展示安全错误Json()
+    {
+        var pipeline = new CapturingPipeline(_ => throw new HttpRequestException("连接被拒绝"));
+        var service = CreateService(pipeline);
+
+        var result = await service.ExecuteAsync(CreateRequest("openai", "responses"));
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("network_error", result.ErrorCode);
+        Assert.Contains("\"code\": \"network_error\"", result.ResponseText, StringComparison.Ordinal);
+        Assert.Contains("连接被拒绝", result.ResponseText, StringComparison.Ordinal);
+        Assert.DoesNotContain("api-secret", result.ResponseText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 未预期异常转换为安全错误Json并写入错误日志()
+    {
+        var logger = new RecordingLogger<ProviderTestService>();
+        var pipeline = new CapturingPipeline(_ => throw new InvalidOperationException("内部执行故障"));
+        var service = new ProviderTestService(new HttpClient(new ThrowingHandler()), logger, pipeline);
+
+        var result = await service.ExecuteAsync(CreateRequest("openai", "responses"));
+
+        Assert.Equal(ProviderTestStatus.Failed, result.Status);
+        Assert.Equal("internal_error", result.ErrorCode);
+        Assert.Contains("\"code\": \"internal_error\"", result.ResponseText, StringComparison.Ordinal);
+        Assert.Contains("Provider 测试未处理异常", string.Join("\n", logger.Entries), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 普通请求生命周期写入结构化日志且不记录正文()
+    {
+        var logger = new RecordingLogger<ProviderTestService>();
+        var pipeline = new CapturingPipeline(JsonResult("{\"choices\":[{\"message\":{\"content\":\"sensitive-response\"}}]}"));
+        var service = new ProviderTestService(new HttpClient(new ThrowingHandler()), logger, pipeline);
+
+        await service.ExecuteAsync(CreateRequest("openai", "chat_completions") with { Prompt = "sensitive-prompt" });
+
+        var logs = string.Join("\n", logger.Entries);
+        Assert.Contains("Provider 测试准备", logs, StringComparison.Ordinal);
+        Assert.Contains("Provider 测试发送", logs, StringComparison.Ordinal);
+        Assert.Contains("Provider 测试收到响应", logs, StringComparison.Ordinal);
+        Assert.Contains("Provider 测试解析完成", logs, StringComparison.Ordinal);
+        Assert.Contains("Provider 测试完成", logs, StringComparison.Ordinal);
+        Assert.DoesNotContain("sensitive-prompt", logs, StringComparison.Ordinal);
+        Assert.DoesNotContain("sensitive-response", logs, StringComparison.Ordinal);
+        Assert.DoesNotContain("api-secret", logs, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OpenAiResponses普通请求构造Input并解析嵌套文本()
     {
         var pipeline = new CapturingPipeline(JsonResult(
@@ -174,13 +243,16 @@ public sealed class ProviderTestServiceTests
     {
         var pipeline = new CapturingPipeline(JsonResult(
             """{"content":[{"type":"text","text":"hello"},{"type":"text","text":" world"}]}"""));
-        var service = CreateService(pipeline);
+        var logger = new RecordingLogger<ProviderTestService>();
+        var service = new ProviderTestService(new HttpClient(new ThrowingHandler()), logger, pipeline);
 
         var result = await service.ExecuteAsync(CreateRequest(
             apiMode: "anthropic",
             endpointFormat: "messages"));
 
-        Assert.EndsWith("/v1/messages", pipeline.RequestUri!.AbsoluteUri, StringComparison.Ordinal);
+        Assert.Equal("https://provider.example/v1/v1/messages", pipeline.RequestUri!.AbsoluteUri);
+        Assert.Contains(logger.Entries, entry => entry.Contains("重复版本段", StringComparison.Ordinal)
+            && entry.Contains("/v1/v1/messages", StringComparison.Ordinal));
         Assert.Null(pipeline.Authorization);
         Assert.Equal("api-secret", pipeline.Headers["x-api-key"]);
         Assert.Equal("2023-06-01", pipeline.Headers["anthropic-version"]);
@@ -272,8 +344,7 @@ public sealed class ProviderTestServiceTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("invalid_json", result.ErrorCode);
-        Assert.Empty(result.ResponseText);
-        Assert.DoesNotContain("invalid-json", result.ToString(), StringComparison.Ordinal);
+        Assert.Contains("invalid-json", result.ResponseText, StringComparison.Ordinal);
         Assert.DoesNotContain("invalid-json", string.Join("\n", logger.Entries), StringComparison.Ordinal);
     }
 
@@ -512,12 +583,11 @@ public sealed class ProviderTestServiceTests
         Assert.Equal((int)statusCode, result.StatusCode);
         Assert.Equal(errorCode, result.ErrorCode);
         Assert.Equal(canRetry, result.CanRetry);
-        Assert.Empty(result.ResponseText);
-        Assert.DoesNotContain("sensitive-upstream-response", result.ToString(), StringComparison.Ordinal);
+        Assert.Contains("sensitive-upstream-response", result.ResponseText, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task 非Json成功响应返回协议错误且不暴露正文()
+    public async Task 非Json成功响应返回协议错误并展示原始正文()
     {
         var pipeline = new CapturingPipeline(Result(HttpStatusCode.OK, "sensitive-non-json-response", "text/plain"));
         var service = CreateService(pipeline);
@@ -527,8 +597,7 @@ public sealed class ProviderTestServiceTests
         Assert.Equal(ProviderTestStatus.Failed, result.Status);
         Assert.Equal("invalid_json", result.ErrorCode);
         Assert.False(result.CanRetry);
-        Assert.Empty(result.ResponseText);
-        Assert.DoesNotContain("sensitive-non-json-response", result.ToString(), StringComparison.Ordinal);
+        Assert.Equal("sensitive-non-json-response", result.ResponseText);
     }
 
     [Theory]
@@ -558,9 +627,10 @@ public sealed class ProviderTestServiceTests
         Assert.Equal(ProviderTestStatus.Failed, result.Status);
         Assert.Equal("invalid_response", result.ErrorCode);
         Assert.Equal((int)HttpStatusCode.OK, result.StatusCode);
-        Assert.Empty(result.ResponseText);
-        var observable = string.Join("\n", logger.Entries.Append(result.ToString()));
-        Assert.DoesNotContain("sensitive-upstream-response", observable, StringComparison.Ordinal);
+        Assert.NotEmpty(result.ResponseText);
+        if (responseBody.Contains("sensitive-upstream-response", StringComparison.Ordinal))
+            Assert.Contains("sensitive-upstream-response", result.ResponseText, StringComparison.Ordinal);
+        Assert.DoesNotContain("sensitive-upstream-response", string.Join("\n", logger.Entries), StringComparison.Ordinal);
     }
     [Fact]
     public async Task 超长普通响应按展示上限截断并报告进度()
@@ -624,7 +694,7 @@ public sealed class ProviderTestServiceTests
     }
 
     [Fact]
-    public async Task 日志和安全结果不包含请求及响应敏感信息()
+    public async Task 日志不包含请求及响应敏感信息但结果保留可见响应()
     {
         const string apiKey = "sensitive-api-key";
         const string headerValue = "sensitive-header-value";
@@ -643,12 +713,13 @@ public sealed class ProviderTestServiceTests
             apiKey,
             prompt));
 
-        var observable = string.Join("\n", logger.Entries.Append(result.ToString()));
+        var observable = string.Join("\n", logger.Entries);
         Assert.DoesNotContain(apiKey, observable, StringComparison.Ordinal);
         Assert.DoesNotContain(headerValue, observable, StringComparison.Ordinal);
         Assert.DoesNotContain(prompt, observable, StringComparison.Ordinal);
         Assert.DoesNotContain(responseBody, observable, StringComparison.Ordinal);
         Assert.DoesNotContain("Authorization", observable, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(responseBody, result.ResponseText, StringComparison.Ordinal);
         Assert.Equal(1, result.Summary.CustomHeaderCount);
     }
 

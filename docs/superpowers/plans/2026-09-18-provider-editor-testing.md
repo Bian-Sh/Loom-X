@@ -6,6 +6,8 @@ base-ref: 1aab9a75f9e698651f3797e57959c2cf47445a4b
 
 # Provider 编辑器与真实请求测试器实施计划
 
+> 2026-09-19 用户反馈调整：测试 Tab 不提供停止、重试或独立复制按钮；发送期间显示不可交互的动态等待状态；摘要仅展示当前页不可见的最终端点、代理、Header 数量与 CLI 身份并实时更新；失败响应展示原始上游内容或安全错误 JSON；完整生命周期通过注入的 ILogger 写入控制台。
+
 > **供代理执行者使用：** 必须按任务逐项执行；推荐使用 `subagent-driven-development`，也可使用 `executing-plans`。所有步骤使用复选框追踪。
 
 **目标：** 将 Provider 编辑器重构为“基础 / 高级 / 模型 / 测试”四个 Tab，并实现继承当前 Provider 配置的普通与流式真实模型请求测试器。
@@ -99,7 +101,7 @@ public sealed record ProviderCompatibilityOption(string Value, string ApiMode, s
 
 - [x] **步骤 4：写自动 ID 失败测试**
 
-覆盖：格式、当前集合冲突重试、名称和兼容类型变化不改 ID、已有 Provider 加载保持原值。
+覆盖：格式、当前集合冲突处理、名称和兼容类型变化不改 ID、已有 Provider 加载保持原值。
 
 - [x] **步骤 5：运行 ID 测试并确认红灯**
 
@@ -259,7 +261,7 @@ data: {"type":"message_stop"}
 
 **接口：**
 - 产出：`BindProvider(ProviderEditorViewModel?)`、`SendCommand`、`StopCommand`、`RetryCommand`、`ClearCommand`。
-- 产出：`SelectedModel`、`Prompt`、`SelectedMode`、`ResponseText`、`Summary`、`IsRunning`、`CanSend`、`HasResult`、`HasError`。
+- 产出：`SelectedModel`、`Prompt`、`SelectedMode`、`ResponseText`、实时 `RequestSummary`、`IsRunning`、`CanSend`、`HasResult`、`HasError`。
 
 - [x] **步骤 1：写默认状态失败测试**
 
@@ -267,7 +269,7 @@ data: {"type":"message_stop"}
 
 - [x] **步骤 2：写生命周期失败测试**
 
-使用可控制完成的假服务，覆盖发送、停止、重试、清空，以及切换 Provider 后旧请求被取消且晚到进度被忽略。
+使用可控制完成的假服务，覆盖发送、不可中止的动态等待、实时摘要、清空，以及切换 Provider 后旧请求在内部取消且晚到进度被忽略。
 
 - [x] **步骤 3：运行测试并确认红灯**
 
@@ -345,11 +347,11 @@ data: {"type":"message_stop"}
 
 **接口：**
 - 消费：`SelectedProvider.SelectedCompatibility` 和 `TestPanel.*`。
-- 产出：复制响应代码后置调用 `ToastService.Show`。
+- 产出：Response 使用只读可选择文本控件和系统原生右键复制，无独立复制代码后置。
 
 - [ ] **步骤 1：写 XAML 契约失败测试**
 
-断言：恰有基础/高级/模型/测试四个 Tab；XAML 不再绑定 `SelectedProvider.BusinessId`；API Key 位于基础 Tab；高级 Tab 包含代理/Header/CLI 且不含 `TestConnectionCommand`；测试 Tab 绑定模型、模式、Prompt、发送/停止/重试/复制/清空和 Response 元数据。
+断言：恰有基础/高级/模型/测试四个 Tab；XAML 不再绑定 `SelectedProvider.BusinessId`；API Key 位于基础 Tab；高级 Tab 包含代理/Header/CLI 且不含 `TestConnectionCommand`；测试 Tab 绑定模型、模式、单行 Prompt、实时摘要、内嵌发送等待、清空和可选择 Response。
 
 - [ ] **步骤 2：运行契约测试并确认红灯**
 
@@ -363,7 +365,7 @@ data: {"type":"message_stop"}
 
 - [ ] **步骤 4：新增测试 Tab**
 
-布局固定为请求配置、摘要条、深色终端式 Response 三段；所有颜色使用动态资源。进行中显示停止，完成/失败显示重试、复制和清空；无模型时显示本地化空态。
+布局固定为模型/模式、紧凑实时摘要、内嵌发送的单行输入框和 Response 面板；所有颜色使用动态资源。进行中发送按钮显示动态等待且不可操作；Response 仅保留清空并支持文本原生复制；无模型时显示本地化空态。
 
 - [ ] **步骤 5：实现复制反馈**
 
@@ -443,7 +445,7 @@ dotnet publish LoomX/LoomX.csproj -c Release -r win-x64 --self-contained false -
 
 - [ ] **步骤 3：使用 CUA 仅截取应用验证**
 
-后台验证：四个 Tab；三种兼容卡片；ID 不可见；API Key 在基础页；高级页无旧测试连接；选择模型；默认“每日一言”；普通/流式发送；停止；401/429 或可控错误展示；重试、复制、清空；透明主题下不根据截图颜色武断判定配色。
+后台验证：四个 Tab；三种兼容卡片；ID 不可见；API Key 在基础页；高级页无旧测试连接；选择模型；默认“每日一言”；普通/流式发送；动态等待；实时摘要；401/429 或可控错误原文展示；文本选择和清空；透明主题下不根据截图颜色武断判定配色。
 
 - [ ] **步骤 4：记录验证结果并提交交付元数据**
 

@@ -67,6 +67,48 @@ public sealed class AppDataStoreTests
     }
 
     [Fact]
+    public async Task ProviderRoundTripPreservesIdentitySecretProtocolAndHeaders()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            await store.InitializeAsync();
+
+            var created = await store.CreateProviderAsync(new ProviderInput(
+                "legacy-provider",
+                "旧协议 Provider",
+                "https://example.com/v1",
+                "openai",
+                true,
+                "secret-value",
+                false,
+                new Dictionary<string, string> { ["X-Test"] = "saved" },
+                UseProxy: true,
+                ModelListUrl: "https://example.com/v1/models",
+                EndpointFormat: "chat_completions"));
+
+            var loaded = (await configService.ListProvidersAsync()).Single(item => item.Id == created.Id);
+
+            Assert.Equal(created.Id, loaded.Id);
+            Assert.Equal("legacy-provider", loaded.BusinessId);
+            Assert.Equal("https://example.com/v1", loaded.BaseUrl);
+            Assert.Equal("openai", loaded.ApiMode);
+            Assert.Equal("chat_completions", loaded.EndpointFormat);
+            Assert.True(loaded.UseProxy);
+            Assert.True(loaded.HasApiKey);
+            Assert.Equal("secret-value", loaded.ApiKey);
+            Assert.Contains("\"X-Test\":\"saved\"", loaded.HeadersJson, StringComparison.Ordinal);
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
     public async Task InitializePublishesInitializationSnapshotEvent()
     {
         var directory = CreateDirectory();

@@ -46,6 +46,7 @@ public sealed class ProtocolPassthroughClient : IProtocolPassthroughClient
         try
         {
             using var upstreamRequest = BuildRequestMessage(httpContext, model, apiMode, upstreamPath, payload);
+            LogEndpointAnomaly(model, upstreamRequest.RequestUri);
             var result = await executionPipeline.ExecuteAsync(
                 httpClient,
                 upstreamRequest,
@@ -128,6 +129,7 @@ public sealed class ProtocolPassthroughClient : IProtocolPassthroughClient
         try
         {
             using var upstreamRequest = BuildRequestMessage(httpContext, model, apiMode, upstreamPath, payload);
+            LogEndpointAnomaly(model, upstreamRequest.RequestUri);
             var result = await executionPipeline.ExecuteAsync(
                 httpClient,
                 upstreamRequest,
@@ -172,6 +174,7 @@ public sealed class ProtocolPassthroughClient : IProtocolPassthroughClient
         {
             var responsesRequest = OpenAiResponsesBridge.CreateResponsesRequest(payload);
             using var upstreamRequest = BuildRequestMessage(httpContext, model, "openai", "/responses", responsesRequest);
+            LogEndpointAnomaly(model, upstreamRequest.RequestUri);
             var result = await executionPipeline.ExecuteAsync(
                 httpClient,
                 upstreamRequest,
@@ -283,9 +286,22 @@ public sealed class ProtocolPassthroughClient : IProtocolPassthroughClient
         }
     }
 
+    private void LogEndpointAnomaly(ResolvedModelConfig model, Uri? endpoint)
+    {
+        if (!ProviderRouteEndpointResolver.HasRepeatedVersionSegment(endpoint)) return;
+        logger.LogWarning(
+            "Provider 真实路由上游地址存在重复版本段 {ProviderId}/{ModelId} {EndpointPath}",
+            model.ProviderId,
+            model.ModelId,
+            endpoint!.AbsolutePath);
+    }
+
     private static HttpRequestMessage BuildRequestMessage<TRequest>(HttpContext httpContext, ResolvedModelConfig model, string apiMode, string upstreamPath, TRequest payload)
     {
-        var upstreamUri = $"{model.BaseUrl.TrimEnd('/')}{upstreamPath}{httpContext.Request.QueryString}";
+        var upstreamUri = ProviderRouteEndpointResolver.Resolve(
+            model.BaseUrl,
+            upstreamPath,
+            httpContext.Request.QueryString.Value);
         var upstreamRequest = new HttpRequestMessage(new HttpMethod(httpContext.Request.Method), upstreamUri);
 
         if (payload is not null)

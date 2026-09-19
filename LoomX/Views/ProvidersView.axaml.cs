@@ -64,27 +64,6 @@ public partial class ProvidersView : UserControl
             viewModel.SelectedProvider?.ToggleApiKeyVisibility();
     }
 
-    private async void CopyTestResponseButton_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not ProvidersViewModel viewModel) return;
-        var response = viewModel.TestPanel.ResponseText;
-        if (string.IsNullOrWhiteSpace(response)) return;
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel?.Clipboard is null) return;
-
-        try
-        {
-            await topLevel.Clipboard.SetTextAsync(response);
-            if (topLevel is MainWindow owner)
-                owner.ToastService.Show(ResourceLookup.Resolve("providers.test.copy.success"), ToastLevel.Success);
-        }
-        catch
-        {
-            if (topLevel is MainWindow owner)
-                owner.ToastService.Show(ResourceLookup.Resolve("providers.test.copy.failure"), ToastLevel.Error);
-        }
-    }
-
     private void CliIdentityMenuButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not ProvidersViewModel viewModel) return;

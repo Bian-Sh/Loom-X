@@ -26,6 +26,7 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
         try
         {
             using var message = BuildRequestMessage(model, request);
+            LogEndpointAnomaly(model, message.RequestUri);
             using var response = await httpClient.SendAsync(message, cancellationToken);
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
@@ -102,6 +103,7 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
         try
         {
             var message = BuildRequestMessage(model, request);
+            LogEndpointAnomaly(model, message.RequestUri);
             var response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             var path = message.RequestUri?.AbsolutePath ?? "/v1/messages";
             var contentType = response.Content.Headers.ContentType?.ToString() ?? "text/event-stream";
@@ -160,9 +162,21 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
         }
     }
 
+    private void LogEndpointAnomaly(ResolvedModelConfig model, Uri? endpoint)
+    {
+        if (!ProviderRouteEndpointResolver.HasRepeatedVersionSegment(endpoint)) return;
+        logger.LogWarning(
+            "Anthropic 真实路由上游地址存在重复版本段 {ProviderId}/{ModelId} {EndpointPath}",
+            model.ProviderId,
+            model.ModelId,
+            endpoint!.AbsolutePath);
+    }
+
     private static HttpRequestMessage BuildRequestMessage(ResolvedModelConfig model, AnthropicMessagesRequest request)
     {
-        var message = new HttpRequestMessage(HttpMethod.Post, $"{model.BaseUrl}/v1/messages");
+        var message = new HttpRequestMessage(
+            HttpMethod.Post,
+            ProviderRouteEndpointResolver.Resolve(model.BaseUrl, "/v1/messages"));
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         message.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("text/event-stream"));
         message.Headers.Add("x-api-key", model.ApiKey);

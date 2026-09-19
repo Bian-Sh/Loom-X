@@ -53,7 +53,7 @@ canonical_spec: openspec
 - `ProviderTestResult`：请求 ID、状态、HTTP 状态码、内容类型、耗时、响应字节数、响应文本、错误代码和重试建议。
 - `ProviderTestSummary`：协议、实际路径、代理摘要、CLI 摘要和 Header 数量；不包含任何敏感值。
 
-普通请求使用 `ExecuteAsync`；流式请求使用 `ExecuteStreamingAsync`。URL 语义与现有生产客户端一致：OpenAI Base URL 末尾追加 `/chat/completions` 或 `/responses`，Anthropic 末尾追加 `/v1/messages`。构造前统一移除 Base URL 尾部斜杠，避免重复分隔符。
+普通请求使用 `ExecuteAsync`；流式请求使用 `ExecuteStreamingAsync`。URL 语义与现有生产客户端保持结构级关联：`ProviderTestService`、`ProtocolPassthroughClient` 和 `AnthropicProxyClient` 共用 `ProviderRouteEndpointResolver`，OpenAI Base URL 末尾追加 `/chat/completions` 或 `/responses`，Anthropic 末尾追加 `/v1/messages`，仅统一移除 Base URL 尾部斜杠。测试模块不得自行消除真实路由会产生的重复版本段；如配置形成 `/v1/v1/`，摘要与请求原样展示，并在测试和真实路由日志中记录安全 Warning。
 
 ### 2.4 协议载荷与响应解析
 
@@ -61,13 +61,13 @@ canonical_spec: openspec
 - OpenAI Responses：`model`、`input`、`stream`；普通响应按 `output_text` 或 `output[].content[].text` 提取，流式读取 `response.output_text.delta`，完成事件为 `response.completed` 或 `[DONE]`。
 - Anthropic Messages：`model`、`max_tokens`、单条 user message、`stream`；普通响应拼接 `content[].text`，流式读取 `content_block_delta.delta.text`，完成事件为 `message_stop`。
 
-非 2xx 响应仍读取受限长度的安全错误摘要用于 UI，但日志只记录状态码、内容类型、字节数和耗时。JSON 或 SSE 无法解析时返回协议错误，不抛出未处理异常。普通和流式累计文本均使用同一截断器，默认上限由常量固定；达到上限后停止追加 UI 文本但继续正确释放响应资源。
+非 2xx 响应读取受限长度的原始上游内容用于 UI，但日志只记录状态码、内容类型、字节数和耗时。JSON 只进行缩进格式化；JSON 或 SSE 无法解析时保留原始内容并返回协议错误，不抛出未处理异常。普通和流式累计文本均使用同一截断器，默认上限由常量固定；达到上限后停止追加 UI 文本但继续正确释放响应资源。
 
 ### 2.5 代理与 HttpClient 生命周期
 
 测试服务通过可注入的代理设置读取器取得全局代理模式、主机、端口、用户名和仅驻留内存的密码。`ProviderEditorViewModel.UseProxy` 为 false 或全局模式为 `direct` 时走直连；`system` 使用系统默认代理；`custom` 创建带 `WebProxy` 的 `HttpClientHandler`。自定义代理无效时返回配置错误，不静默改为直连。
 
-直连客户端可由服务构造时注入以便测试复用；自定义代理客户端按单次执行创建并随请求释放，避免缓存包含旧凭据的 Handler。超时由链接 Token 和服务默认超时共同控制，用户停止只映射为“已取消”。
+直连客户端可由服务构造时注入以便测试复用；自定义代理客户端按单次执行创建并随请求释放，避免缓存包含旧凭据的 Handler。超时由链接 Token 和服务默认超时共同控制；界面不提供停止入口，切换 Provider 或释放页面时仍通过内部取消令牌终止旧请求。
 
 ## 3. 测试面板 ViewModel
 
@@ -75,8 +75,8 @@ canonical_spec: openspec
 
 - 当前 Provider 引用和可选择模型列表。
 - 默认 Prompt“每日一言”、常规/流式模式、选中模型。
-- `IsRunning`、阶段、响应文本、请求摘要、HTTP 元数据、错误与截断状态。
-- 发送、停止、重试、清空命令；复制由 View 代码后置调用剪贴板并通过 `ToastService` 提示。
+- `IsRunning`、响应文本、实时请求摘要、HTTP 元数据、错误与截断状态。
+- 发送与清空命令；执行中发送按钮变为不可交互的动态等待状态，不提供停止或重试命令。响应由只读可选择文本控件展示并使用系统原生复制。
 
 绑定 Provider 时默认选择第一个启用的真实模型；没有启用模型时可展示禁用模型但发送不可用，并显示“先同步或添加模型”。切换 Provider 时先取消旧 `CancellationTokenSource`，再清空旧请求 ID、结果、错误和摘要，防止晚到增量写入新上下文。发送时从 Provider 和模型创建不可变快照，因此自动保存并不是测试前置条件；用户在内存中刚修改的 Base URL、API Key、Header、代理和兼容类型立即生效。
 
@@ -97,13 +97,13 @@ canonical_spec: openspec
 3. **模型**：保持现有内容和绑定。
 4. **测试**：上方请求配置，中部安全摘要，下方终端式 Response 面板。
 
-测试 Tab 使用现有 `Surface*Brush`、`BorderBrush`、`AccentBrush`、状态色资源，不根据透明主题截图硬编码颜色。发送时按钮切换为停止；完成或失败后显示重试、复制和清空。响应面板显示用户可见正文和安全元数据，不显示密钥及 Header 值。
+测试 Tab 使用现有 `Surface*Brush`、`BorderBrush`、`AccentBrush`、状态色资源，不根据透明主题截图硬编码颜色。发送按钮嵌入单行输入框，执行中显示不可交互的动态等待状态；Response 使用只读可选择文本，仅保留清空操作。请求摘要与选择控件整合，只展示当前测试页不可见的最终端点、代理、Header 数量和 CLI 身份。
 
 ## 6. 日志与错误处理
 
-服务在开始、完成、取消和失败边界写结构化日志：Provider、Model、协议、路径、模式、代理状态、状态码、内容类型、字节数和耗时。异常对象作为日志首参数。禁止记录 Prompt、响应正文、流式片段、API Key、Authorization、自定义 Header 值和代理密码。
+服务使用注入的 `ILogger<ProviderTestService>` 在准备、发送、收到响应、解析完成、完成、取消和失败边界写结构化日志，使桌面控制台能够观察完整生命周期。字段仅包括 Provider、Model、协议、路径、模式、代理状态、状态码、内容类型、字节数和耗时；异常对象作为日志首参数。测试或真实路由检测到相邻重复版本段时记录 Warning，并且只记录安全的 `AbsolutePath`。禁止记录 Prompt、响应正文、流式片段、API Key、Authorization、自定义 Header 值和代理密码。
 
-错误分类至少覆盖：配置无效、无模型、401/403、404/405、429、5xx、超时、用户取消、网络失败、非 JSON 普通响应和无效 SSE。UI 使用本地化安全摘要；可重试错误保留最近一次不可变请求快照，重试不会重新使用旧 Provider 的可变状态。
+错误分类至少覆盖：配置无效、无模型、401/403、404/405、429、5xx、超时、内部取消、网络失败、非 JSON 普通响应和无效 SSE。非 2xx 或协议错误在 UI 保留受限原始响应，JSON 仅格式化；无响应体异常生成安全错误 JSON。
 
 ## 7. 测试与验证
 
@@ -111,11 +111,11 @@ canonical_spec: openspec
 
 1. `ProviderCompatibilityOptionTests` 和 `ProviderEditorViewModelTests` 固定映射、旧值回显、自动 ID 与稳定性。
 2. `ProviderTestServiceTests` 使用假 Handler/执行管线覆盖三协议普通与流式载荷、鉴权、Header、路径、代理、取消、错误、截断和敏感日志。
-3. `ProviderTestPanelViewModelTests` 覆盖默认模型、默认 Prompt、命令状态、切换取消、重试和清空。
+3. `ProviderTestPanelViewModelTests` 覆盖默认模型、默认 Prompt、实时摘要、不可停止等待、切换内部取消和清空。
 4. `ProvidersViewContractTests` 固定四 Tab、隐藏 ID、API Key 位置、高级 Tab 范围及测试绑定。
 5. 本地化资源覆盖 zh-CN、en-US、zh-TW；沿用现有硬编码检查。
 6. 运行定向测试、完整测试、Release 构建和 OpenSpec 严格验证。
-7. 使用 CUA 后台启动发布包，验证四 Tab、三兼容类型、普通/流式、取消、错误、复制和清空；发布到 `outputs/<可读时间>` 并按进程 Path 校验启动文件。
+7. 使用 CUA 后台启动发布包，验证四 Tab、三兼容类型、普通/流式、动态等待、实时摘要、错误原文、文本选择和清空；发布到 `outputs/<可读时间>` 并按进程 Path 校验启动文件。
 
 ## 8. 主要文件变更
 
@@ -123,7 +123,7 @@ canonical_spec: openspec
 - `LoomX/ViewModels/ProviderTestPanelViewModel.cs`：新增测试交互状态与命令。
 - `LoomX/ViewModels/ProviderCompatibilityOption.cs`：新增协议映射。
 - `LoomX/Services/ProviderTestService.cs`：新增请求构造、发送、解析、代理和安全结果模型。
-- `LoomX/Views/ProvidersView.axaml(.cs)`：四 Tab、测试 UI 和复制反馈。
+- `LoomX/Views/ProvidersView.axaml(.cs)`：四 Tab、紧凑测试 UI 和原生文本选择。
 - `LoomX/Resources/Strings*.resx`：新增和调整文案。
 - `LoomX.Tests`：新增服务、ViewModel、映射、安全日志与视图契约测试。
 

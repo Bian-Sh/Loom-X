@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Text.Json;
 using System.Windows.Input;
 using LoomX.Services;
@@ -13,11 +13,11 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
     private ProviderTestMode selectedMode = ProviderTestMode.Regular;
     private string prompt = "每日一言";
     private string responseText = "";
+    private string requestSummary = "";
     private ProviderTestSummary? summary;
     private bool isRunning;
     private bool hasResult;
     private bool hasError;
-    private ProviderTestRequest? lastRequest;
     private CancellationTokenSource? cancellation;
     private long requestVersion;
 
@@ -25,39 +25,78 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
     {
         this.service = service ?? throw new ArgumentNullException(nameof(service));
         SendCommand = new AsyncCommand(SendAsync, () => CanSend);
-        StopCommand = new DelegateCommand(Stop);
-        RetryCommand = new AsyncCommand(RetryAsync, () => lastRequest is not null && !IsRunning);
         ClearCommand = new DelegateCommand(Clear);
     }
 
-    public ModelEditorViewModel? SelectedModel { get => selectedModel; set { if (!SetProperty(ref selectedModel, value)) return; OnPropertyChanged(nameof(CanSend)); ((AsyncCommand)SendCommand).RaiseCanExecuteChanged(); } }
+    public ModelEditorViewModel? SelectedModel
+    {
+        get => selectedModel;
+        set
+        {
+            if (!SetProperty(ref selectedModel, value)) return;
+            OnPropertyChanged(nameof(CanSend));
+            ((AsyncCommand)SendCommand).RaiseCanExecuteChanged();
+        }
+    }
+
     public ProviderTestMode SelectedMode { get => selectedMode; set => SetProperty(ref selectedMode, value); }
-    public string Prompt { get => prompt; set { if (!SetProperty(ref prompt, value ?? "")) return; OnPropertyChanged(nameof(CanSend)); ((AsyncCommand)SendCommand).RaiseCanExecuteChanged(); } }
+
+    public string Prompt
+    {
+        get => prompt;
+        set
+        {
+            if (!SetProperty(ref prompt, value ?? "")) return;
+            OnPropertyChanged(nameof(CanSend));
+            ((AsyncCommand)SendCommand).RaiseCanExecuteChanged();
+        }
+    }
+
     public string ResponseText { get => responseText; private set => SetProperty(ref responseText, value); }
+    public string RequestSummary { get => requestSummary; private set => SetProperty(ref requestSummary, value); }
     public ProviderTestSummary? Summary { get => summary; private set => SetProperty(ref summary, value); }
-    public bool IsRunning { get => isRunning; private set { if (!SetProperty(ref isRunning, value)) return; OnPropertyChanged(nameof(CanSend)); ((AsyncCommand)SendCommand).RaiseCanExecuteChanged(); ((AsyncCommand)RetryCommand).RaiseCanExecuteChanged(); } }
+
+    public bool IsRunning
+    {
+        get => isRunning;
+        private set
+        {
+            if (!SetProperty(ref isRunning, value)) return;
+            OnPropertyChanged(nameof(CanSend));
+            ((AsyncCommand)SendCommand).RaiseCanExecuteChanged();
+        }
+    }
+
     public bool HasResult { get => hasResult; private set => SetProperty(ref hasResult, value); }
     public bool HasError { get => hasError; private set => SetProperty(ref hasError, value); }
     public bool CanSend => provider is not null && SelectedModel is { Enabled: true, IsRealModel: true } && !string.IsNullOrWhiteSpace(Prompt) && !IsRunning;
     public ICommand SendCommand { get; }
-    public ICommand StopCommand { get; }
-    public ICommand RetryCommand { get; }
     public ICommand ClearCommand { get; }
 
     public void BindProvider(ProviderEditorViewModel? value)
     {
-        Stop();
+        CancelPendingRequest();
+        if (provider is not null)
+            provider.PropertyChanged -= ProviderOnPropertyChanged;
+
         provider = value;
+        if (provider is not null)
+            provider.PropertyChanged += ProviderOnPropertyChanged;
+
         SelectedModel = provider?.Models.FirstOrDefault(model => model.IsRealModel && model.Enabled);
         Clear();
+        RefreshRequestSummary();
         OnPropertyChanged(nameof(CanSend));
         ((AsyncCommand)SendCommand).RaiseCanExecuteChanged();
     }
 
-    public void RefreshLocalization() => OnPropertyChanged(nameof(Prompt));
+    public void RefreshLocalization()
+    {
+        OnPropertyChanged(nameof(Prompt));
+        RefreshRequestSummary();
+    }
 
     private async Task SendAsync() => await ExecuteAsync(BuildRequest());
-    private async Task RetryAsync() { if (lastRequest is not null) await ExecuteAsync(lastRequest); }
 
     private async Task ExecuteAsync(ProviderTestRequest request)
     {
@@ -69,7 +108,6 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
         HasError = false;
         ResponseText = "";
         Summary = null;
-        lastRequest = request;
         try
         {
             var progress = new Progress<ProviderTestProgress>(item =>
@@ -83,7 +121,7 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
             Summary = result.Summary;
             ResponseText = result.ResponseText;
             HasError = result.Status == ProviderTestStatus.Failed;
-            HasResult = result.Status == ProviderTestStatus.Completed;
+            HasResult = result.Status is ProviderTestStatus.Completed or ProviderTestStatus.Failed;
         }
         finally
         {
@@ -95,20 +133,70 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
     {
         var current = provider ?? throw new InvalidOperationException("未绑定提供商。");
         var model = SelectedModel ?? throw new InvalidOperationException("未选择模型。");
-        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(current.HeadersJson))
-            {
-                var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(current.HeadersJson);
-                if (parsed is not null) headers = parsed;
-            }
-        }
-        catch (JsonException) { }
-        return new ProviderTestRequest(Guid.NewGuid().ToString("N"), current.BusinessId, model.ModelId, current.BaseUrl, current.ApiMode, current.EndpointFormat, current.ApiKey, headers, current.UseProxy, Prompt, SelectedMode, 12000);
+        return new ProviderTestRequest(
+            Guid.NewGuid().ToString("N"),
+            current.BusinessId,
+            model.ModelId,
+            current.BaseUrl,
+            current.ApiMode,
+            current.EndpointFormat,
+            current.ApiKey,
+            ParseHeaders(current.HeadersJson),
+            current.UseProxy,
+            Prompt,
+            SelectedMode,
+            12000);
     }
 
-    private void Stop()
+    private void ProviderOnPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName is nameof(ProviderEditorViewModel.BaseUrl)
+            or nameof(ProviderEditorViewModel.ApiMode)
+            or nameof(ProviderEditorViewModel.EndpointFormat)
+            or nameof(ProviderEditorViewModel.UseProxy)
+            or nameof(ProviderEditorViewModel.HeadersJson)
+            or nameof(ProviderEditorViewModel.CurrentCliIdentitySummary))
+        {
+            RefreshRequestSummary();
+        }
+    }
+
+    private void RefreshRequestSummary()
+    {
+        if (provider is null)
+        {
+            RequestSummary = "";
+            return;
+        }
+
+        var endpoint = $"POST {ProviderTestService.ResolveEndpoint(provider.BaseUrl, provider.ApiMode, provider.EndpointFormat)}";
+        var parts = new List<string>
+        {
+            endpoint,
+            provider.UseProxy ? "proxy" : "direct",
+            $"{ParseHeaders(provider.HeadersJson).Count} Headers",
+        };
+        if (provider.CurrentCliIdentity is not null)
+            parts.Add(provider.CurrentCliIdentitySummary);
+        RequestSummary = string.Join(" · ", parts);
+    }
+
+    private static Dictionary<string, string> ParseHeaders(string? headersJson)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(headersJson))
+                return JsonSerializer.Deserialize<Dictionary<string, string>>(headersJson)
+                    ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        }
+        catch (JsonException)
+        {
+        }
+
+        return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void CancelPendingRequest()
     {
         ++requestVersion;
         cancellation?.Cancel();

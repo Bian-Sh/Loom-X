@@ -303,28 +303,39 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("TestPanel.SelectedMode", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.Prompt", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.SendCommand", test, StringComparison.Ordinal);
-        Assert.Contains("TestPanel.StopCommand", test, StringComparison.Ordinal);
-        Assert.Contains("TestPanel.RetryCommand", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.ClearCommand", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.ResponseText", test, StringComparison.Ordinal);
-        Assert.Contains("TestPanel.Summary", test, StringComparison.Ordinal);
-        Assert.Contains("TestPanel.HasError", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.RequestSummary", test, StringComparison.Ordinal);
+        Assert.Contains("IsIndeterminate=\"True\"", test, StringComparison.Ordinal);
+        Assert.Contains("AcceptsReturn=\"False\"", test, StringComparison.Ordinal);
+        Assert.Contains("IsReadOnly=\"True\"", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.test.prompt.label", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestPanel.StopCommand", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestPanel.RetryCommand", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.test.copy", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestPanel.Summary.ProviderId", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestPanel.Summary.ModelId", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestPanel.Summary.RequestId", test, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void CopyResponseUsesClipboardAndSafeToastFeedback()
+    public void ResponseUsesSelectableReadonlyTextWithoutCopyHandler()
     {
-        var source = ReadDesktopFile("Views", "ProvidersView.axaml.cs");
-        var start = source.IndexOf("private async void CopyTestResponseButton_OnClick", StringComparison.Ordinal);
-        var end = source.IndexOf("private void CliIdentityMenuButton_OnClick", start, StringComparison.Ordinal);
-        Assert.True(start >= 0 && end > start);
-        var copyHandler = source[start..end];
-        Assert.Contains("TestPanel.ResponseText", copyHandler, StringComparison.Ordinal);
-        Assert.Contains("Clipboard", copyHandler, StringComparison.Ordinal);
-        Assert.Contains("ToastService", copyHandler, StringComparison.Ordinal);
-        Assert.Contains("ToastLevel.Success", copyHandler, StringComparison.Ordinal);
-        Assert.DoesNotContain("ApiKey", copyHandler, StringComparison.Ordinal);
-        Assert.DoesNotContain("HeadersJson", copyHandler, StringComparison.Ordinal);
+        var view = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var codeBehind = ReadDesktopFile("Views", "ProvidersView.axaml.cs");
+
+        Assert.Contains("Text=\"{Binding TestPanel.ResponseText}\"", view, StringComparison.Ordinal);
+        Assert.Contains("IsReadOnly=\"True\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("CopyTestResponseButton_OnClick", codeBehind, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindowInjectsProviderTestLoggerIntoConsoleLifecycle()
+    {
+        var source = ReadDesktopFile("ViewModels", "MainWindowViewModel.cs");
+
+        Assert.Contains("CreateLogger<ProviderTestService>()", source, StringComparison.Ordinal);
+        Assert.Contains("providerTestLogger", source, StringComparison.Ordinal);
     }
 
     private static string ReadTab(string source, string headerKey)

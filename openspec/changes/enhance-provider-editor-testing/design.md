@@ -35,13 +35,13 @@ Provider 页面当前由 `ProvidersView.axaml` 与 `ProvidersViewModel`/`Provide
 ### 4. 新增专用测试服务并复用发送管线
 新增 `IProviderTestService`/`ProviderTestService` 与协议无关的测试请求、进度和结果 DTO。服务按兼容类型构造 OpenAI Chat、OpenAI Responses 或 Anthropic Messages 请求，应用 API Key、自定义 Header 与 CLI 身份，并通过与真实 Provider 请求一致的执行管线发送。代理客户端由全局代理设置与 Provider `UseProxy` 共同决定，禁止仅在摘要中声称使用代理却仍通过固定直连 HttpClient 发送。
 
-测试服务负责协议响应解析与流式事件归一化，ViewModel 只消费文本增量和最终元数据。替代方案是让 ViewModel 直接使用 HttpClient，但会重复协议实现、难以单测并容易泄露敏感字段。
+测试服务负责协议响应解析和流式事件归一化；最终端点必须由 `ProviderRouteEndpointResolver` 与真实 OpenAI/Anthropic 路由共用同一套拼接实现，测试模块不得单独归一化或修正 URL。若当前配置按真实路由会形成 `/v1/v1/` 等重复版本段，测试摘要和实际请求必须原样反映，并由测试服务与真实路由写入不含敏感信息的 Warning 日志。ViewModel 只消费文本增量和最终元数据。替代方案是让 ViewModel 直接使用 HttpClient，但会重复协议实现、难以单测并容易泄露敏感字段。
 
 ### 5. 受控的响应展示
-测试器允许在 UI 中显示响应正文，但普通和流式累计文本都设置字符上限；超过上限后停止向 UI 追加并标记截断，同时仍正确结束或取消底层请求。日志只记录安全元数据。复制操作仅复制用户主动可见的响应内容，并通过 `ToastService` 反馈。
+测试器允许在 UI 中显示响应正文，但普通和流式累计文本都设置字符上限；超过上限后停止向 UI 追加并标记截断，同时仍正确结束或取消底层请求。非 2xx、无效 JSON 和协议结构错误保留受限长度的原始上游内容，JSON 只进行缩进格式化；没有响应体的异常生成安全错误 JSON。日志只记录安全元数据，响应使用只读可选择文本和系统原生复制能力。
 
 ### 6. UI 使用四 Tab 与终端式结果面板
-基础 Tab 使用三张可选兼容卡片，包含名称、Base URL 和 API Key；高级 Tab 保留代理、自定义 Header 与 CLI 身份；模型 Tab 原样保留；测试 Tab 使用上方请求表单、中部配置摘要、下方深色响应面板。执行时发送按钮切换为停止，完成后提供重试、复制和清空操作。所有颜色使用现有动态资源，透明主题下不依据截图硬编码颜色。
+基础 Tab 使用三张可选兼容卡片，包含名称、Base URL 和 API Key；高级 Tab 保留代理、自定义 Header 与 CLI 身份；模型 Tab 原样保留；测试 Tab 使用模型与模式选择、实时安全摘要、单行输入框和 Response 面板。摘要只展示最终端点、代理、Header 数量与 CLI 身份，不重复 Provider、模型、模式或请求 ID。发送按钮嵌入输入框，执行时显示不可交互的动态等待状态；页面不提供停止、重试或复制按钮，仅保留清空与文本原生复制。所有颜色使用现有动态资源，透明主题下不依据截图硬编码颜色。
 
 ## Risks / Trade-offs
 

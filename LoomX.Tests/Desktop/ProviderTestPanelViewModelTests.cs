@@ -29,6 +29,62 @@ public sealed class ProviderTestPanelViewModelTests
     }
 
     [Fact]
+    public void 绑定Provider后立即生成请求摘要并随隐藏配置实时更新()
+    {
+        var provider = new ProviderEditorViewModel
+        {
+            BusinessId = "provider-hidden",
+            BaseUrl = "https://example.com/v1",
+            ApiMode = "openai",
+            EndpointFormat = "responses",
+            UseProxy = false,
+        };
+        var firstModel = new ModelEditorViewModel { ModelId = "model-one", Enabled = true };
+        var secondModel = new ModelEditorViewModel { ModelId = "model-two", Enabled = true };
+        provider.Models.Add(firstModel);
+        provider.Models.Add(secondModel);
+        provider.AddHeader();
+        provider.Headers[0].Name = "X-Test";
+        provider.Headers[0].Value = "value";
+        var panel = new ProviderTestPanelViewModel(new StubProviderTestService());
+
+        panel.BindProvider(provider);
+
+        Assert.Contains("POST https://example.com/v1/responses", panel.RequestSummary, StringComparison.Ordinal);
+        Assert.Contains("direct", panel.RequestSummary, StringComparison.Ordinal);
+        Assert.Contains("1 Header", panel.RequestSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("provider-hidden", panel.RequestSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("model-one", panel.RequestSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Regular", panel.RequestSummary, StringComparison.Ordinal);
+
+        panel.SelectedModel = secondModel;
+        panel.SelectedMode = ProviderTestMode.Streaming;
+        Assert.DoesNotContain("model-two", panel.RequestSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Streaming", panel.RequestSummary, StringComparison.Ordinal);
+
+        provider.BaseUrl = "https://changed.example/api";
+        provider.EndpointFormat = "chat_completions";
+        provider.UseProxy = true;
+
+        Assert.Contains("POST https://changed.example/api/chat/completions", panel.RequestSummary, StringComparison.Ordinal);
+        Assert.Contains("proxy", panel.RequestSummary, StringComparison.Ordinal);
+        Assert.DoesNotContain("direct", panel.RequestSummary, StringComparison.Ordinal);
+
+        provider.ApiMode = "anthropic";
+        provider.BaseUrl = "https://changed.example/v1";
+        Assert.Contains("POST https://changed.example/v1/v1/messages", panel.RequestSummary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 面板不公开停止和重试命令()
+    {
+        var properties = typeof(ProviderTestPanelViewModel).GetProperties().Select(property => property.Name).ToArray();
+
+        Assert.DoesNotContain("StopCommand", properties);
+        Assert.DoesNotContain("RetryCommand", properties);
+    }
+
+    [Fact]
     public async Task 清空和发送生命周期()
     {
         var service = new StubProviderTestService();

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
@@ -129,6 +130,11 @@ public sealed class ProviderTestService : IProviderTestService
 {
     private const string AnthropicVersion = "2023-06-01";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions DisplayJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     private readonly HttpClient httpClient;
     private readonly ILogger<ProviderTestService> logger;
@@ -174,6 +180,15 @@ public sealed class ProviderTestService : IProviderTestService
 
 
         var startedAt = Stopwatch.GetTimestamp();
+        logger.LogInformation(
+            "Provider 测试准备 {ProviderId}/{ModelId} {Protocol} {Path} {Mode} {RequestedProxy} {CustomHeaderCount}",
+            request.ProviderId,
+            request.ModelId,
+            protocol,
+            path,
+            request.Mode,
+            request.UseProxy,
+            request.Headers.Count);
         progress?.Report(new ProviderTestProgress(request.RequestId, ProviderTestStatus.Sending));
 
         try
@@ -183,7 +198,8 @@ public sealed class ProviderTestService : IProviderTestService
             {
                 UseProxy = proxySelection.UseProxy,
                 ProxySummary = proxySelection.Mode,
-            };            logger.LogInformation(
+            };
+            logger.LogInformation(
                 "Provider 测试开始 {ProviderId}/{ModelId} {Protocol} {Path} {Mode} {UseProxy}",
                 request.ProviderId,
                 request.ModelId,
@@ -193,6 +209,15 @@ public sealed class ProviderTestService : IProviderTestService
                 summary.UseProxy);
             using var clientLease = CreateHttpClientLease(proxySelection);
             using var httpRequest = BuildRequest(request, protocol, path);
+            LogEndpointAnomaly(request, httpRequest.RequestUri);
+            logger.LogInformation(
+                "Provider 测试发送 {ProviderId}/{ModelId} {Protocol} {Path} {Mode} {UseProxy}",
+                request.ProviderId,
+                request.ModelId,
+                protocol,
+                path,
+                request.Mode,
+                summary.UseProxy);
             if (request.Mode == ProviderTestMode.Streaming)
             {
                 return await ExecuteStreamingRequestAsync(
@@ -212,6 +237,15 @@ public sealed class ProviderTestService : IProviderTestService
                 httpRequest,
                 new ProviderExecutionContext(request.ProviderId, request.ModelId, request.ApiMode, path),
                 cancellationToken);
+            logger.LogInformation(
+                "Provider 测试收到响应 {ProviderId}/{ModelId} {Protocol} {Path} {StatusCode} {ContentType} {ResponseBytes}B",
+                request.ProviderId,
+                request.ModelId,
+                protocol,
+                path,
+                (int)executionResult.StatusCode,
+                executionResult.ContentType,
+                executionResult.Body.LongLength);
 
             if (!executionResult.IsSuccess)
             {
@@ -225,7 +259,8 @@ public sealed class ProviderTestService : IProviderTestService
                     failure.CanRetry,
                     (int)executionResult.StatusCode,
                     executionResult.ContentType,
-                    executionResult.Body.LongLength);
+                    executionResult.Body.LongLength,
+                    responseText: FormatResponseBody(executionResult.Body, request.MaxDisplayCharacters));
             }
 
             string responseText;
@@ -235,6 +270,7 @@ public sealed class ProviderTestService : IProviderTestService
             }
             catch (Exception exception) when (exception is JsonException or InvalidProviderResponseException)
             {
+                logger.LogWarning(exception, "Provider 测试解析失败 {ProviderId}/{ModelId} {Protocol} {Path}", request.ProviderId, request.ModelId, protocol, path);
                 return CreateFailureResult(
                     request,
                     summary,
@@ -244,9 +280,17 @@ public sealed class ProviderTestService : IProviderTestService
                     false,
                     (int)executionResult.StatusCode,
                     executionResult.ContentType,
-                    executionResult.Body.LongLength);
+                    executionResult.Body.LongLength,
+                    responseText: FormatResponseBody(executionResult.Body, request.MaxDisplayCharacters));
             }
 
+            logger.LogInformation(
+                "Provider 测试解析完成 {ProviderId}/{ModelId} {Protocol} {Path} {Characters}",
+                request.ProviderId,
+                request.ModelId,
+                protocol,
+                path,
+                responseText.Length);
             var truncated = Truncate(responseText, request.MaxDisplayCharacters);
             return CreateSuccessResult(
                 request,
@@ -259,18 +303,21 @@ public sealed class ProviderTestService : IProviderTestService
                 executionResult.ContentType,
                 executionResult.Body.LongLength);
         }
-        catch (InvalidProxyConfigurationException)
+        catch (InvalidProxyConfigurationException exception)
         {
+            logger.LogWarning(exception, "Provider 测试代理配置无效 {ProviderId}/{ModelId} {Protocol} {Path}", request.ProviderId, request.ModelId, protocol, path);
             return CreateFailureResult(
                 request,
                 summary,
                 progress,
                 startedAt,
                 "invalid_proxy_configuration",
-                false);
+                false,
+                errorDetail: "代理配置无效。");
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException exception) when (cancellationToken.IsCancellationRequested)
         {
+            logger.LogInformation(exception, "Provider 测试取消 {ProviderId}/{ModelId} {Protocol} {Path}", request.ProviderId, request.ModelId, protocol, path);
             return CreateFailureResult(
                 request,
                 summary,
@@ -280,35 +327,53 @@ public sealed class ProviderTestService : IProviderTestService
                 false,
                 status: ProviderTestStatus.Cancelled);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException exception)
         {
+            logger.LogWarning(exception, "Provider 测试超时 {ProviderId}/{ModelId} {Protocol} {Path}", request.ProviderId, request.ModelId, protocol, path);
             return CreateFailureResult(
                 request,
                 summary,
                 progress,
                 startedAt,
                 "timeout",
-                true);
+                true,
+                errorDetail: "请求超时。");
         }
-        catch (UriFormatException)
+        catch (UriFormatException exception)
         {
+            logger.LogWarning(exception, "Provider 测试 URL 无效 {ProviderId}/{ModelId} {Protocol} {Path}", request.ProviderId, request.ModelId, protocol, path);
             return CreateFailureResult(
                 request,
                 summary,
                 progress,
                 startedAt,
                 "invalid_url",
-                false);
+                false,
+                errorDetail: exception.Message);
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException exception)
         {
+            logger.LogWarning(exception, "Provider 测试网络异常 {ProviderId}/{ModelId} {Protocol} {Path}", request.ProviderId, request.ModelId, protocol, path);
             return CreateFailureResult(
                 request,
                 summary,
                 progress,
                 startedAt,
                 "network_error",
-                true);
+                true,
+                errorDetail: exception.Message);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Provider 测试未处理异常 {ProviderId}/{ModelId} {Protocol} {Path}", request.ProviderId, request.ModelId, protocol, path);
+            return CreateFailureResult(
+                request,
+                summary,
+                progress,
+                startedAt,
+                "internal_error",
+                false,
+                errorDetail: "测试请求发生内部错误。");
         }
     }
 
@@ -399,8 +464,17 @@ public sealed class ProviderTestService : IProviderTestService
             cancellationToken);
 
         var statusCode = (int)executionResult.StatusCode;
+        logger.LogInformation(
+            "Provider 测试收到响应 {ProviderId}/{ModelId} {Protocol} {Path} {StatusCode} {ContentType}",
+            request.ProviderId,
+            request.ModelId,
+            protocol,
+            path,
+            statusCode,
+            executionResult.ContentType);
         if (!executionResult.IsSuccess)
         {
+            var rawResponse = await ReadResponseTextAsync(executionResult.Body, cancellationToken);
             var failure = MapHttpFailure(executionResult.StatusCode);
             return CreateFailureResult(
                 request,
@@ -410,7 +484,9 @@ public sealed class ProviderTestService : IProviderTestService
                 failure.ErrorCode,
                 failure.CanRetry,
                 statusCode,
-                executionResult.ContentType);
+                executionResult.ContentType,
+                Encoding.UTF8.GetByteCount(rawResponse),
+                responseText: FormatResponseText(rawResponse, request.MaxDisplayCharacters));
         }
 
         var builder = new StringBuilder();
@@ -484,6 +560,7 @@ public sealed class ProviderTestService : IProviderTestService
         }
         catch (Exception exception) when (exception is JsonException or InvalidProviderResponseException)
         {
+            logger.LogWarning(exception, "Provider 测试流式解析失败 {ProviderId}/{ModelId} {Protocol} {Path}", request.ProviderId, request.ModelId, protocol, path);
             return CreateFailureResult(
                 request,
                 summary,
@@ -493,9 +570,17 @@ public sealed class ProviderTestService : IProviderTestService
                 false,
                 statusCode,
                 executionResult.ContentType,
-                responseBytes);
+                responseBytes,
+                responseText: FormatResponseText(string.Join('\n', dataLines), request.MaxDisplayCharacters));
         }
 
+        logger.LogInformation(
+            "Provider 测试解析完成 {ProviderId}/{ModelId} {Protocol} {Path} {Characters}",
+            request.ProviderId,
+            request.ModelId,
+            protocol,
+            path,
+            builder.Length);
         return CreateSuccessResult(
             request,
             summary,
@@ -700,7 +785,9 @@ public sealed class ProviderTestService : IProviderTestService
         int? statusCode = null,
         string? contentType = null,
         long responseBytes = 0,
-        ProviderTestStatus status = ProviderTestStatus.Failed)
+        ProviderTestStatus status = ProviderTestStatus.Failed,
+        string? responseText = null,
+        string? errorDetail = null)
     {
         var elapsedMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
         progress?.Report(new ProviderTestProgress(
@@ -737,6 +824,9 @@ public sealed class ProviderTestService : IProviderTestService
                 errorCode);
         }
 
+        var displayedResponse = string.IsNullOrWhiteSpace(responseText)
+            ? CreateErrorResponse(errorCode, statusCode, errorDetail, request.MaxDisplayCharacters)
+            : responseText;
         return new ProviderTestResult(
             request.RequestId,
             status,
@@ -745,6 +835,7 @@ public sealed class ProviderTestService : IProviderTestService
             contentType,
             elapsedMs,
             responseBytes,
+            ResponseText: displayedResponse,
             ErrorCode: errorCode,
             CanRetry: canRetry);
     }
@@ -760,7 +851,7 @@ public sealed class ProviderTestService : IProviderTestService
     };
     private static HttpRequestMessage BuildRequest(ProviderTestRequest request, string protocol, string path)
     {
-        var endpoint = new Uri(request.BaseUrl.TrimEnd('/') + path, UriKind.Absolute);
+        var endpoint = ProviderRouteEndpointResolver.Resolve(request.BaseUrl, path);
         object body = protocol switch
         {
             "anthropic" => new
@@ -820,6 +911,26 @@ public sealed class ProviderTestService : IProviderTestService
         "openai_responses" => "/responses",
         _ => "/chat/completions",
     };
+
+    internal static string ResolveEndpoint(string baseUrl, string apiMode, string endpointFormat)
+    {
+        var protocol = string.Equals(apiMode, "anthropic", StringComparison.OrdinalIgnoreCase)
+            ? "anthropic"
+            : string.Equals(endpointFormat, "responses", StringComparison.OrdinalIgnoreCase)
+                ? "openai_responses"
+                : "openai_chat";
+        return ProviderRouteEndpointResolver.Resolve(baseUrl, ResolvePath(protocol)).AbsoluteUri;
+    }
+
+    private void LogEndpointAnomaly(ProviderTestRequest request, Uri? endpoint)
+    {
+        if (!ProviderRouteEndpointResolver.HasRepeatedVersionSegment(endpoint)) return;
+        logger.LogWarning(
+            "Provider 测试上游地址存在重复版本段 {ProviderId}/{ModelId} {EndpointPath}",
+            request.ProviderId,
+            request.ModelId,
+            endpoint!.AbsolutePath);
+    }
 
     private static string ParseResponse(string protocol, byte[] body)
     {
@@ -919,6 +1030,68 @@ public sealed class ProviderTestService : IProviderTestService
     {
     }
 
+    private static string FormatResponseBody(byte[] body, int maxDisplayCharacters)
+        => FormatResponseText(Encoding.UTF8.GetString(body), maxDisplayCharacters);
+
+    private static string FormatResponseText(string text, int maxDisplayCharacters)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        var display = text;
+        try
+        {
+            display = JsonNode.Parse(text)?.ToJsonString(DisplayJsonOptions) ?? text;
+        }
+        catch (JsonException)
+        {
+        }
+
+        return Truncate(display, maxDisplayCharacters).Text;
+    }
+
+    private static async Task<string> ReadResponseTextAsync(Stream body, CancellationToken cancellationToken)
+    {
+        using var reader = new StreamReader(
+            body,
+            Encoding.UTF8,
+            detectEncodingFromByteOrderMarks: true,
+            bufferSize: 1024,
+            leaveOpen: true);
+        return await reader.ReadToEndAsync(cancellationToken);
+    }
+
+    private static string CreateErrorResponse(
+        string errorCode,
+        int? statusCode,
+        string? detail,
+        int maxDisplayCharacters)
+    {
+        var error = new JsonObject
+        {
+            ["code"] = errorCode,
+            ["message"] = string.IsNullOrWhiteSpace(detail) ? ErrorMessage(errorCode) : detail,
+        };
+        if (statusCode is not null)
+            error["status_code"] = statusCode.Value;
+        return FormatResponseText(new JsonObject { ["error"] = error }.ToJsonString(DisplayJsonOptions), maxDisplayCharacters);
+    }
+
+    private static string ErrorMessage(string errorCode) => errorCode switch
+    {
+        "auth_failed" => "上游鉴权失败。",
+        "endpoint_error" => "上游端点不可用。",
+        "timeout" => "请求超时。",
+        "rate_limited" => "上游触发限流。",
+        "upstream_error" => "上游服务异常。",
+        "request_rejected" => "上游拒绝了请求。",
+        "invalid_json" => "上游返回的内容不是有效 JSON。",
+        "invalid_response" => "上游响应结构与当前协议不匹配。",
+        "invalid_proxy_configuration" => "代理配置无效。",
+        "invalid_url" => "请求地址无效。",
+        "network_error" => "网络请求失败。",
+        "cancelled" => "请求已取消。",
+        "internal_error" => "测试请求发生内部错误。",
+        _ => "请求失败。",
+    };
     private static (string Text, bool IsTruncated) Truncate(string text, int maxDisplayCharacters)
     {
         var limit = Math.Max(0, maxDisplayCharacters);
