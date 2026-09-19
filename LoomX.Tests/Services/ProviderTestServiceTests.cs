@@ -11,7 +11,7 @@ namespace LoomX.Tests.Services;
 
 public sealed class ProviderTestServiceTests
 {
-    public static TheoryData<string, string, string, string> 流式协议样例 => new()
+    public static TheoryData<string, string, string, string, string> 流式协议样例 => new()
     {
         {
             "openai",
@@ -30,6 +30,7 @@ public sealed class ProviderTestServiceTests
             data: {invalid-after-done}
 
             """,
+            "not-json\n{\"choices\":[{\"delta\":{\"content\":\"你\"}}]}\n{\"choices\":[{\"delta\":{\"content\":\"好\"}}]}\n[DONE]",
             "[DONE]"
         },
         {
@@ -52,6 +53,7 @@ public sealed class ProviderTestServiceTests
             data: {invalid-after-completed}
 
             """,
+            "not-json\n{\"type\":\"response.output_text.delta\",\"delta\":\"你\"}\n{\"type\":\"response.output_text.delta\",\"delta\":\"好\"}\n{\"type\":\"response.completed\"}",
             "response.completed"
         },
         {
@@ -74,6 +76,7 @@ public sealed class ProviderTestServiceTests
             data: {invalid-after-stop}
 
             """,
+            "not-json\n{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"你\"}}\n{\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"好\"}}\n{\"type\":\"message_stop\"}",
             "message_stop"
         },
     };
@@ -270,6 +273,7 @@ public sealed class ProviderTestServiceTests
         string apiMode,
         string endpointFormat,
         string sse,
+        string expectedJsonl,
         string completionMarker)
     {
         var pipeline = CapturingPipeline.ForStreaming(sse);
@@ -287,8 +291,8 @@ public sealed class ProviderTestServiceTests
             }));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(new[] { "你", "好" }, deltas);
-        Assert.Equal("你好", result.ResponseText);
+        Assert.Equal(expectedJsonl, string.Concat(deltas));
+        Assert.Equal(expectedJsonl, result.ResponseText);
         Assert.False(result.IsTruncated);
         Assert.Equal(ProviderTestStatus.Completed, statuses[^1]);
         Assert.True(pipeline.UsedStreaming);
@@ -296,7 +300,7 @@ public sealed class ProviderTestServiceTests
 
         var body = JsonNode.Parse(pipeline.Body!)!;
         Assert.True(body["stream"]!.GetValue<bool>());
-        Assert.DoesNotContain(completionMarker, result.ResponseText, StringComparison.Ordinal);
+        Assert.Contains(completionMarker, result.ResponseText, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -305,6 +309,7 @@ public sealed class ProviderTestServiceTests
         string apiMode,
         string endpointFormat,
         string sse,
+        string expectedJsonl,
         string _)
     {
         var pipeline = CapturingPipeline.ForStreaming(sse);
@@ -322,8 +327,8 @@ public sealed class ProviderTestServiceTests
             }));
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(new[] { "你" }, deltas);
-        Assert.Equal("你", result.ResponseText);
+        Assert.Equal(expectedJsonl[..1], string.Concat(deltas));
+        Assert.Equal(expectedJsonl[..1], result.ResponseText);
         Assert.True(result.IsTruncated);
         Assert.Contains(true, truncationStates);
     }
@@ -346,6 +351,36 @@ public sealed class ProviderTestServiceTests
         Assert.Equal("invalid_json", result.ErrorCode);
         Assert.Contains("invalid-json", result.ResponseText, StringComparison.Ordinal);
         Assert.DoesNotContain("invalid-json", string.Join("\n", logger.Entries), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 流式解析失败保留此前收到的Jsonl和当前原始行()
+    {
+        const string sse = """
+            event: response.output_text.delta
+            data: {"type":"response.output_text.delta","delta":"你"}
+
+            event: response.output_text.delta
+            data: {invalid-json}
+
+            """;
+        var pipeline = CapturingPipeline.ForStreaming(sse);
+        var service = CreateService(pipeline);
+        var deltas = new List<string>();
+
+        var result = await service.ExecuteAsync(
+            CreateRequest("openai", "responses") with { Mode = ProviderTestMode.Streaming },
+            new InlineProgress<ProviderTestProgress>(item =>
+            {
+                if (item.TextDelta.Length > 0)
+                    deltas.Add(item.TextDelta);
+            }));
+
+        const string expected = "{\"type\":\"response.output_text.delta\",\"delta\":\"你\"}\n{invalid-json}";
+        Assert.False(result.IsSuccess);
+        Assert.Equal("invalid_json", result.ErrorCode);
+        Assert.Equal(expected, string.Concat(deltas));
+        Assert.Equal(expected, result.ResponseText);
     }
 
     [Fact]

@@ -13,7 +13,7 @@
 
 #### Scenario: 发送流式请求
 - **WHEN** 用户选择流式模式并发送请求
-- **THEN** 系统持续追加可显示的文本片段，并在流结束后展示完整结果
+- **THEN** 系统按接收顺序持续追加所有 SSE `data:` payload；有效 JSON 压缩为保留 Unicode 的单行 JSONL，非 JSON 与 `[DONE]` 原样保留，完成事件也包含在最终结果中
 
 #### Scenario: 请求执行中
 - **WHEN** 请求已经发送且尚未成功、失败或超时
@@ -46,11 +46,19 @@
 - **THEN** 测试请求通过有效代理设置发送并携带对应 CLI 身份请求头，摘要显示代理与 CLI 安全信息
 
 ### Requirement: 测试器提供紧凑的执行状态与可诊断响应
-测试 Tab MUST 使用单行输入框并将发送按钮嵌入输入框右侧。Response MUST 使用只读、可选择文本控件，支持系统右键菜单和键盘复制，但 MUST NOT 提供独立复制按钮。用户 MAY 清空当前结果。
+测试 Tab MUST 使用单行输入框并将发送按钮嵌入输入框右侧。Response MUST 不展示独立标题，直接使用只读、可选择文本控件占满结果面板，并支持系统右键菜单和键盘复制。页面 MUST NOT 提供独立复制或可见清空按钮。请求结束后，用户全选 Response 全部内容并按 Delete 或 Backspace 时 MUST 清空结果；部分选择、空内容或请求执行中 MUST NOT 清空。
 
-#### Scenario: 请求成功
-- **WHEN** 上游返回符合当前协议的成功响应
+#### Scenario: 普通请求成功
+- **WHEN** 上游返回符合当前协议的非流式成功响应
 - **THEN** Response 展示解析后的模型文本
+
+#### Scenario: 流式请求成功
+- **WHEN** 上游返回流式成功响应
+- **THEN** Response 依次展示全部 SSE `data:` payload 的 JSONL/原始行，并保留 usage、完成事件和 `[DONE]` 等非文本 delta 数据
+
+#### Scenario: 全选清空响应
+- **WHEN** 请求已结束且用户全选 Response 全部内容后按 Delete 或 Backspace
+- **THEN** 系统清空当前响应和结果状态；部分选择或请求执行中不执行清空
 
 #### Scenario: HTTP 或协议响应失败
 - **WHEN** 上游返回非 2xx、无效 JSON、与当前协议不匹配的结构或流式错误事件

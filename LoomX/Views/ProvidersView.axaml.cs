@@ -41,9 +41,47 @@ public partial class ProvidersView : UserControl
     public ProvidersView()
     {
         InitializeComponent();
+        AddHandler(InputElement.KeyDownEvent, TestResponseTextBox_OnKeyDown, RoutingStrategies.Tunnel, true);
         AddHandler(InputElement.PointerMovedEvent, ModelDrag_OnPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
         AddHandler(InputElement.PointerReleasedEvent, ModelDrag_OnPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
         AddHandler(InputElement.PointerCaptureLostEvent, ModelDrag_OnPointerCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
+    }
+
+    private void TestResponseTextBox_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (!ReferenceEquals(e.Source, TestResponseTextBox)
+            || DataContext is not ProvidersViewModel viewModel)
+            return;
+
+        var textLength = TestResponseTextBox.Text?.Length ?? 0;
+        if (!ShouldClearTestResponse(
+                e.Key,
+                viewModel.TestPanel.IsRunning,
+                textLength,
+                TestResponseTextBox.SelectionStart,
+                TestResponseTextBox.SelectionEnd)
+            || !viewModel.TestPanel.ClearResponse())
+        {
+            return;
+        }
+
+        e.Handled = true;
+    }
+
+    internal static bool ShouldClearTestResponse(
+        Key key,
+        bool isRunning,
+        int textLength,
+        int selectionStart,
+        int selectionEnd)
+    {
+        if (isRunning
+            || textLength == 0
+            || key is not (Key.Delete or Key.Back))
+            return false;
+
+        return Math.Min(selectionStart, selectionEnd) == 0
+            && Math.Max(selectionStart, selectionEnd) == textLength;
     }
 
     private void AddHeaderButton_OnClick(object? sender, RoutedEventArgs e)

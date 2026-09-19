@@ -1653,8 +1653,6 @@
   <data name="providers.test.mode.streaming"><value>流式请求</value></data>
   <data name="providers.test.prompt.watermark"><value>输入测试提示词</value></data>
   <data name="providers.test.send"><value>发送</value></data>
-  <data name="providers.test.clear"><value>清空</value></data>
-  <data name="providers.test.response.title"><value>Response</value></data>
   <data name="providers.delete.dialog.title"><value>提示</value></data>
   <data name="providers.delete.dialog.cancel"><value>取消</value></data>
   <data name="providers.delete.dialog.confirm"><value>删除</value></data>

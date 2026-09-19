@@ -135,6 +135,10 @@ public sealed class ProviderTestService : IProviderTestService
         WriteIndented = true,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
+    private static readonly JsonSerializerOptions JsonlJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     private readonly HttpClient httpClient;
     private readonly ILogger<ProviderTestService> logger;
@@ -571,7 +575,8 @@ public sealed class ProviderTestService : IProviderTestService
                 statusCode,
                 executionResult.ContentType,
                 responseBytes,
-                responseText: FormatResponseText(string.Join('\n', dataLines), request.MaxDisplayCharacters));
+                responseText: builder.ToString(),
+                isTruncated: isTruncated);
         }
 
         logger.LogInformation(
@@ -605,17 +610,13 @@ public sealed class ProviderTestService : IProviderTestService
         StringBuilder builder,
         ref bool isTruncated)
     {
-        var frame = ParseStreamingFrame(protocol, eventName, data);
-        if (frame.IsCompleted)
-            return true;
-        if (string.IsNullOrEmpty(frame.TextDelta))
-            return false;
-
+        var payload = FormatStreamingPayload(data);
+        var displayDelta = builder.Length == 0 ? payload : $"\n{payload}";
         var limit = Math.Max(0, request.MaxDisplayCharacters);
         var remaining = Math.Max(0, limit - builder.Length);
-        var appendedLength = Math.Min(remaining, frame.TextDelta.Length);
-        var appended = appendedLength == 0 ? string.Empty : frame.TextDelta[..appendedLength];
-        if (appendedLength < frame.TextDelta.Length)
+        var appendedLength = Math.Min(remaining, displayDelta.Length);
+        var appended = appendedLength == 0 ? string.Empty : displayDelta[..appendedLength];
+        if (appendedLength < displayDelta.Length)
             isTruncated = true;
         builder.Append(appended);
 
@@ -628,7 +629,21 @@ public sealed class ProviderTestService : IProviderTestService
             statusCode,
             contentType,
             responseBytes));
-        return false;
+
+        return ParseStreamingFrame(protocol, eventName, data).IsCompleted;
+    }
+
+    private static string FormatStreamingPayload(string data)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(data);
+            return JsonSerializer.Serialize(document.RootElement, JsonlJsonOptions);
+        }
+        catch (JsonException)
+        {
+            return data;
+        }
     }
 
     private static StreamingFrame ParseStreamingFrame(string protocol, string? eventName, string data)
@@ -787,12 +802,14 @@ public sealed class ProviderTestService : IProviderTestService
         long responseBytes = 0,
         ProviderTestStatus status = ProviderTestStatus.Failed,
         string? responseText = null,
-        string? errorDetail = null)
+        string? errorDetail = null,
+        bool isTruncated = false)
     {
         var elapsedMs = (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
         progress?.Report(new ProviderTestProgress(
             request.RequestId,
             status,
+            IsTruncated: isTruncated,
             StatusCode: statusCode,
             ContentType: contentType,
             ResponseBytes: responseBytes));
@@ -836,6 +853,7 @@ public sealed class ProviderTestService : IProviderTestService
             elapsedMs,
             responseBytes,
             ResponseText: displayedResponse,
+            IsTruncated: isTruncated,
             ErrorCode: errorCode,
             CanRetry: canRetry);
     }

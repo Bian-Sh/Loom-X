@@ -178,7 +178,7 @@ public sealed class ProviderTestPanelViewModelTests
         await service.Completed.Task;
         Assert.True(panel.HasResult);
         Assert.Equal("答复", panel.ResponseText);
-        panel.ClearCommand.Execute(null);
+        Assert.True(panel.ClearResponse());
         Assert.Empty(panel.ResponseText);
         Assert.False(panel.HasResult);
     }

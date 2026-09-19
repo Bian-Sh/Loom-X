@@ -1,4 +1,6 @@
 using System.IO;
+using Avalonia.Input;
+using LoomX.Views;
 using Xunit;
 
 namespace LoomX.Tests.Views;
@@ -307,7 +309,7 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("TestPanel.SelectedMode", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.Prompt", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.SendCommand", test, StringComparison.Ordinal);
-        Assert.Contains("TestPanel.ClearCommand", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestPanel.ClearCommand", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.ResponseText", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.RequestSummary", test, StringComparison.Ordinal);
         Assert.Contains("IsIndeterminate=\"True\"", test, StringComparison.Ordinal);
@@ -344,7 +346,36 @@ public sealed class ProvidersViewContractTests
 
         Assert.Contains("Text=\"{Binding TestPanel.ResponseText}\"", view, StringComparison.Ordinal);
         Assert.Contains("IsReadOnly=\"True\"", view, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TestResponseTextBox\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("KeyDown=\"TestResponseTextBox_OnKeyDown\"", view, StringComparison.Ordinal);
+        Assert.Contains("AddHandler(InputElement.KeyDownEvent, TestResponseTextBox_OnKeyDown, RoutingStrategies.Tunnel, true)", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("ReferenceEquals(e.Source, TestResponseTextBox)", codeBehind, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.test.response.title", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.test.clear", view, StringComparison.Ordinal);
         Assert.DoesNotContain("CopyTestResponseButton_OnClick", codeBehind, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(Key.Delete, false, 6, 0, 6, true)]
+    [InlineData(Key.Back, false, 6, 6, 0, true)]
+    [InlineData(Key.Delete, false, 6, 1, 6, false)]
+    [InlineData(Key.Delete, true, 6, 0, 6, false)]
+    [InlineData(Key.Delete, false, 0, 0, 0, false)]
+    [InlineData(Key.Enter, false, 6, 0, 6, false)]
+    public void Response仅在完成后全选并按删除键时清空(
+        Key key,
+        bool isRunning,
+        int textLength,
+        int selectionStart,
+        int selectionEnd,
+        bool expected)
+    {
+        Assert.Equal(expected, ProvidersView.ShouldClearTestResponse(
+            key,
+            isRunning,
+            textLength,
+            selectionStart,
+            selectionEnd));
     }
 
     [Fact]

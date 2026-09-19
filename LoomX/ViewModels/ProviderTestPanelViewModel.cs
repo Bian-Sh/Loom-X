@@ -30,7 +30,6 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
         this.service = service ?? throw new ArgumentNullException(nameof(service));
         TestableModels = new ReadOnlyObservableCollection<ModelEditorViewModel>(testableModels);
         SendCommand = new AsyncCommand(SendAsync, () => CanSend);
-        ClearCommand = new DelegateCommand(Clear);
     }
 
     public ReadOnlyObservableCollection<ModelEditorViewModel> TestableModels { get; }
@@ -79,7 +78,6 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
     public bool HasError { get => hasError; private set => SetProperty(ref hasError, value); }
     public bool CanSend => provider is not null && SelectedModel is { IsRealModel: true } model && testableModels.Contains(model) && !string.IsNullOrWhiteSpace(Prompt) && !IsRunning;
     public ICommand SendCommand { get; }
-    public ICommand ClearCommand { get; }
 
     public void BindProvider(ProviderEditorViewModel? value)
     {
@@ -268,6 +266,13 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
         ++requestVersion;
         cancellation?.Cancel();
         IsRunning = false;
+    }
+
+    internal bool ClearResponse()
+    {
+        if (IsRunning) return false;
+        Clear();
+        return true;
     }
 
     private void Clear()

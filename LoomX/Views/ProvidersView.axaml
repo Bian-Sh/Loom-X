@@ -221,10 +221,7 @@
                           </Grid>
                         </Border>
                         <Border Grid.Row="1" Classes="panel" Padding="14" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}">
-                          <Grid RowDefinitions="Auto,*" RowSpacing="8">
-                            <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{l:Locale providers.test.response.title}" FontWeight="SemiBold"/><Button Grid.Column="1" Content="{l:Locale providers.test.clear}" Classes="small-button" Command="{Binding TestPanel.ClearCommand}" IsEnabled="{Binding TestPanel.IsRunning, Converter={StaticResource ProviderBooleanNotConverter}}"/></Grid>
-                            <TextBox Grid.Row="1" Text="{Binding TestPanel.ResponseText}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Background="Transparent" BorderThickness="0" Padding="0" MinHeight="150" VerticalContentAlignment="Top" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
-                          </Grid>
+                          <TextBox x:Name="TestResponseTextBox" Text="{Binding TestPanel.ResponseText}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Background="Transparent" BorderThickness="0" Padding="0" MinHeight="150" VerticalContentAlignment="Top" ScrollViewer.VerticalScrollBarVisibility="Auto"/>
                         </Border>
                       </Grid>
                     </ScrollViewer>

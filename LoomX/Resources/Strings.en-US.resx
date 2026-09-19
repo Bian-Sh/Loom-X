@@ -557,8 +557,6 @@
   <data name="providers.test.mode.streaming"><value>Streaming request</value></data>
   <data name="providers.test.prompt.watermark"><value>Enter a test prompt</value></data>
   <data name="providers.test.send"><value>Send</value></data>
-  <data name="providers.test.clear"><value>Clear</value></data>
-  <data name="providers.test.response.title"><value>Response</value></data>
   <data name="providers.delete.dialog.title"><value>Confirm</value></data>
   <data name="providers.delete.dialog.cancel"><value>Cancel</value></data>
   <data name="providers.delete.dialog.confirm"><value>Delete</value></data>
