@@ -1486,4 +1486,35 @@
     <value>服務描述：{0}</value>
   </data>
   <data name="assistant.decision.validation_failed"><value>請檢查決策欄位後再試一次。</value></data>
+  <data name="providers.tab.advanced"><value>進階</value></data>
+  <data name="providers.tab.test"><value>測試</value></data>
+  <data name="providers.advanced.header"><value>代理與請求增強</value></data>
+  <data name="providers.compatibility.label"><value>介面相容類型</value></data>
+  <data name="providers.compat.chat.title"><value>OpenAI Chat-compatible</value></data>
+  <data name="providers.compat.chat.description"><value>使用 /chat/completions</value></data>
+  <data name="providers.compat.responses.title"><value>OpenAI Responses-compatible</value></data>
+  <data name="providers.compat.responses.description"><value>使用 /responses</value></data>
+  <data name="providers.compat.anthropic.title"><value>Anthropic Messages-compatible</value></data>
+  <data name="providers.compat.anthropic.description"><value>使用 /messages</value></data>
+  <data name="providers.apikey.label"><value>API Key</value></data>
+  <data name="providers.test.model.label"><value>測試模型</value></data>
+  <data name="providers.test.mode.label"><value>測試模式</value></data>
+  <data name="providers.test.mode.regular"><value>一般請求</value></data>
+  <data name="providers.test.mode.streaming"><value>串流請求</value></data>
+  <data name="providers.test.prompt.label"><value>傳送內容</value></data>
+  <data name="providers.test.prompt.watermark"><value>輸入測試提示詞</value></data>
+  <data name="providers.test.send"><value>傳送</value></data>
+  <data name="providers.test.stop"><value>停止</value></data>
+  <data name="providers.test.retry"><value>重試</value></data>
+  <data name="providers.test.clear"><value>清除</value></data>
+  <data name="providers.test.summary.title"><value>請求摘要</value></data>
+  <data name="providers.test.response.title"><value>Response</value></data>
+  <data name="providers.test.copy"><value>複製回應</value></data>
+  <data name="providers.test.copy.success"><value>回應已複製</value></data>
+  <data name="providers.test.copy.failure"><value>複製回應失敗</value></data>
+  <data name="providers.delete.dialog.title"><value>提示</value></data>
+  <data name="providers.delete.dialog.cancel"><value>取消</value></data>
+  <data name="providers.delete.dialog.confirm"><value>刪除</value></data>
+  <data name="providers.delete.dialog.message"><value>確定刪除 Provider「{0}」嗎？</value></data>
+  <data name="providers.test.model.empty"><value>目前 Provider 沒有可測試模型</value></data>
 </root>

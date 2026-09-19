@@ -38,7 +38,7 @@ base-ref: 1aab9a75f9e698651f3797e57959c2cf47445a4b
 
 ---
 
-### 任务 1：兼容类型映射与自动 Provider ID
+### Task 1: 兼容类型映射与自动 Provider ID
 
 **文件：**
 - 新建：`LoomX/ViewModels/ProviderCompatibilityOption.cs`
@@ -50,7 +50,7 @@ base-ref: 1aab9a75f9e698651f3797e57959c2cf47445a4b
 - 产出：`ProviderCompatibilityOption.All`、`FromFields(string apiMode, string endpointFormat)`、`ApplyTo(ProviderEditorViewModel provider)`。
 - 产出：`ProvidersViewModel.GenerateProviderBusinessId(IEnumerable<ProviderEditorViewModel>)`，返回 `provider-xxxxxxxx`。
 
-- [ ] **步骤 1：写兼容映射失败测试**
+- [x] **步骤 1：写兼容映射失败测试**
 
 `ProviderCompatibilityOptionTests` 至少固定以下断言：
 
@@ -75,13 +75,13 @@ public void 应用兼容类型不会修改ProviderId()
 }
 ```
 
-- [ ] **步骤 2：运行映射测试并确认红灯**
+- [x] **步骤 2：运行映射测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderCompatibilityOptionTests`
 
 预期：编译失败，提示 `ProviderCompatibilityOption` 不存在。
 
-- [ ] **步骤 3：实现最小映射类型**
+- [x] **步骤 3：实现最小映射类型**
 
 实现三个静态选项和旧值回退：
 
@@ -97,17 +97,17 @@ public sealed record ProviderCompatibilityOption(string Value, string ApiMode, s
 
 在 `ProviderEditorViewModel` 暴露 `SelectedCompatibility`，setter 调用 `ApplyTo`，`ApiMode/EndpointFormat` 变化时通知该属性。
 
-- [ ] **步骤 4：写自动 ID 失败测试**
+- [x] **步骤 4：写自动 ID 失败测试**
 
 覆盖：格式、当前集合冲突重试、名称和兼容类型变化不改 ID、已有 Provider 加载保持原值。
 
-- [ ] **步骤 5：运行 ID 测试并确认红灯**
+- [x] **步骤 5：运行 ID 测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~ProviderEditorViewModelTests|FullyQualifiedName~ProviderCompatibilityOptionTests"`
 
 预期：新建 Provider 的 `BusinessId` 为空或生成器不存在。
 
-- [ ] **步骤 6：实现 ID 生成并改造 NewProvider**
+- [x] **步骤 6：实现 ID 生成并改造 NewProvider**
 
 `NewProvider` 创建时设置：
 
@@ -119,7 +119,7 @@ EndpointFormat = "responses"
 
 生成器循环使用 `Guid.NewGuid().ToString("N")[..8]`，按 `OrdinalIgnoreCase` 检查冲突。
 
-- [ ] **步骤 7：运行测试并提交**
+- [x] **步骤 7：运行测试并提交**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~ProviderCompatibilityOptionTests|FullyQualifiedName~ProviderEditorViewModelTests"`
 
@@ -129,7 +129,7 @@ EndpointFormat = "responses"
 
 ---
 
-### 任务 2：测试请求 DTO、普通请求与安全结果
+### Task 2: 测试请求 DTO、普通请求与安全结果
 
 **文件：**
 - 新建：`LoomX/Services/ProviderTestService.cs`
@@ -140,7 +140,7 @@ EndpointFormat = "responses"
 - 产出：`IProviderTestService.ExecuteAsync(ProviderTestRequest, IProgress<ProviderTestProgress>?, CancellationToken)`。
 - 消费：`IProviderExecutionPipeline.ExecuteAsync/ExecuteStreamingAsync`。
 
-- [ ] **步骤 1：写三协议普通请求失败测试**
+- [x] **步骤 1：写三协议普通请求失败测试**
 
 使用捕获请求的假 `IProviderExecutionPipeline`，分别断言：
 
@@ -149,13 +149,13 @@ EndpointFormat = "responses"
 - Anthropic URL 以 `/v1/messages` 结束，body 含 `messages/max_tokens/stream=false`，使用 `x-api-key` 与 `anthropic-version`。
 - 自定义 Header 被发送，但 `ProviderTestSummary` 只保存数量。
 
-- [ ] **步骤 2：运行测试并确认红灯**
+- [x] **步骤 2：运行测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestServiceTests`
 
 预期：编译失败，测试服务和 DTO 不存在。
 
-- [ ] **步骤 3：实现请求构造和普通响应解析**
+- [x] **步骤 3：实现请求构造和普通响应解析**
 
 `ProviderTestRequest` 使用不可变 record，并包含 `RequestId`、Provider/Model、Base URL、协议字段、API Key、Header、`UseProxy`、Prompt、模式和展示上限。普通解析最少支持：
 
@@ -166,15 +166,15 @@ private static string ParseAnthropic(JsonNode root) => string.Concat(root["conte
 
 Responses 同时支持顶层 `output_text` 与 `output[].content[].text`。
 
-- [ ] **步骤 4：写错误、截断与日志安全失败测试**
+- [x] **步骤 4：写错误、截断与日志安全失败测试**
 
 覆盖 401、404、429、5xx、非 JSON、超长正文、超时和用户取消。使用内存 Logger 断言日志不含测试 API Key、Header 值、Prompt 和响应正文。
 
-- [ ] **步骤 5：实现安全错误分类和截断**
+- [x] **步骤 5：实现安全错误分类和截断**
 
 错误结果只保存受限 UI 摘要；日志模板仅使用 Provider、Model、协议、路径、状态码、内容类型、字节数、代理状态和耗时。`OperationCanceledException` 根据调用方 Token 区分“用户取消”和“超时”。
 
-- [ ] **步骤 6：运行测试并提交**
+- [x] **步骤 6：运行测试并提交**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestServiceTests`
 
@@ -184,7 +184,7 @@ Responses 同时支持顶层 `output_text` 与 `output[].content[].text`。
 
 ---
 
-### 任务 3：流式解析、代理与 CLI 身份
+### Task 3: 流式解析、代理与 CLI 身份
 
 **文件：**
 - 修改：`LoomX/Services/ProviderTestService.cs`
@@ -196,7 +196,7 @@ Responses 同时支持顶层 `output_text` 与 `output[].content[].text`。
 - 产出：可注入的代理设置读取器和 HttpClient 创建器，测试中无需真实网络。
 - 消费：`CliIdentityService.DetectCliIdentity/DetectCliVersion`。
 
-- [ ] **步骤 1：写流式失败测试**
+- [x] **步骤 1：写流式失败测试**
 
 为三协议提供内存 SSE：
 
@@ -223,25 +223,25 @@ data: {"type":"message_stop"}
 
 断言进度回调按顺序收到文本、最终结果为完整文本、超过上限标记 `IsTruncated`。
 
-- [ ] **步骤 2：运行流式测试并确认红灯**
+- [x] **步骤 2：运行流式测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~ProviderTestServiceTests&Name~流式"`
 
 预期：FAIL，尚未调用 `ExecuteStreamingAsync` 或未解析增量。
 
-- [ ] **步骤 3：实现 SSE 帧读取和协议分派**
+- [x] **步骤 3：实现 SSE 帧读取和协议分派**
 
 使用逐行读取器累计 `event:` 和多行 `data:`，空行提交一帧；`[DONE]` 结束 OpenAI 流。解析器只返回文本增量，未知事件忽略，无效 JSON 返回协议错误。
 
-- [ ] **步骤 4：写代理与 CLI 失败测试**
+- [x] **步骤 4：写代理与 CLI 失败测试**
 
 断言：`UseProxy=false` 直连；system/custom 模式创建正确 Handler；无效 custom 配置返回配置错误且不静默直连；CLI Header 实际进入请求；摘要只显示身份名、版本和 Header 数量。
 
-- [ ] **步骤 5：实现代理租约和 CLI 摘要**
+- [x] **步骤 5：实现代理租约和 CLI 摘要**
 
 自定义代理客户端按请求创建并释放；系统代理设置 `UseProxy=true` 且不显式赋值 `Proxy`。调用 `CliIdentityService` 从最终 Header 字典检测身份与版本。代理密码只存在局部变量，不写日志和结果。
 
-- [ ] **步骤 6：运行测试并提交**
+- [x] **步骤 6：运行测试并提交**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestServiceTests`
 
@@ -251,7 +251,7 @@ data: {"type":"message_stop"}
 
 ---
 
-### 任务 4：测试面板 ViewModel
+### Task 4: 测试面板 ViewModel
 
 **文件：**
 - 新建：`LoomX/ViewModels/ProviderTestPanelViewModel.cs`
@@ -261,29 +261,29 @@ data: {"type":"message_stop"}
 - 产出：`BindProvider(ProviderEditorViewModel?)`、`SendCommand`、`StopCommand`、`RetryCommand`、`ClearCommand`。
 - 产出：`SelectedModel`、`Prompt`、`SelectedMode`、`ResponseText`、`Summary`、`IsRunning`、`CanSend`、`HasResult`、`HasError`。
 
-- [ ] **步骤 1：写默认状态失败测试**
+- [x] **步骤 1：写默认状态失败测试**
 
 断言默认 Prompt 为“每日一言”，默认模式为常规，第一个启用真实模型被选中；只有禁用模型或无模型时 `CanSend=false`。
 
-- [ ] **步骤 2：写生命周期失败测试**
+- [x] **步骤 2：写生命周期失败测试**
 
 使用可控制完成的假服务，覆盖发送、停止、重试、清空，以及切换 Provider 后旧请求被取消且晚到进度被忽略。
 
-- [ ] **步骤 3：运行测试并确认红灯**
+- [x] **步骤 3：运行测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestPanelViewModelTests`
 
 预期：编译失败，ViewModel 不存在。
 
-- [ ] **步骤 4：实现最小 ViewModel**
+- [x] **步骤 4：实现最小 ViewModel**
 
 每次发送递增 `requestVersion`；进度回调捕获版本号并在 UI Dispatcher 上批量追加。`Retry` 保存上次不可变 `ProviderTestRequest`，不得重新读取已切换 Provider。
 
-- [ ] **步骤 5：补齐命令状态与本地化刷新**
+- [x] **步骤 5：补齐命令状态与本地化刷新**
 
 所有影响 `CanExecute` 的属性变化后调用 `RaiseCanExecuteChanged`；`RefreshLocalization` 仅刷新资源派生文本，不修改响应正文。
 
-- [ ] **步骤 6：运行测试并提交**
+- [x] **步骤 6：运行测试并提交**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProviderTestPanelViewModelTests`
 
@@ -293,7 +293,7 @@ data: {"type":"message_stop"}
 
 ---
 
-### 任务 5：接入 ProvidersViewModel 并移除旧连接测试块
+### Task 5: 接入 ProvidersViewModel 并移除旧连接测试块
 
 **文件：**
 - 修改：`LoomX/ViewModels/MainWindowViewModel.cs`
@@ -332,7 +332,7 @@ data: {"type":"message_stop"}
 
 ---
 
-### 任务 6：四 Tab UI 与本地化
+### Task 6: 四 Tab UI 与本地化
 
 **文件：**
 - 修改：`LoomX/Views/ProvidersView.axaml`
@@ -381,7 +381,7 @@ data: {"type":"message_stop"}
 
 ---
 
-### 任务 7：定向回归、完整构建与 OpenSpec 同步
+### Task 7: 定向回归、完整构建与 OpenSpec 同步
 
 **文件：**
 - 修改：`openspec/changes/enhance-provider-editor-testing/tasks.md`
@@ -402,8 +402,8 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~Provider
 运行：
 
 ```powershell
-dotnet test LoomX.sln -c Release
-dotnet build LoomX.sln -c Release --no-restore
+dotnet test LoomX.slnx -c Release
+dotnet build LoomX.slnx -c Release --no-restore
 ```
 
 预期：退出码 0；不以终端中文显示异常推断源文件编码损坏。
@@ -420,7 +420,7 @@ dotnet build LoomX.sln -c Release --no-restore
 
 ---
 
-### 任务 8：CUA 验证与发布包
+### Task 8: CUA 验证与发布包
 
 **文件：**
 - 新建：`outputs/<YYYY-MM-DD_HH-mm-ss>/` 发布目录。
