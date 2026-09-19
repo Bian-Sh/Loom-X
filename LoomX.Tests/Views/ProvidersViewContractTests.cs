@@ -302,6 +302,10 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("providers.compat.responses.description", basic, StringComparison.Ordinal);
         Assert.Contains("providers.compat.anthropic.description", basic, StringComparison.Ordinal);
         Assert.Contains("SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
+        Assert.Contains("<Grid Margin=\"0,0,8,0\"><TextBox Text=\"{Binding SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
+        Assert.Contains("Padding=\"12,9,46,9\"/><Button HorizontalAlignment=\"Right\" Width=\"38\" Height=\"34\" Margin=\"0,0,4,0\"", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Grid ColumnDefinitions=\"*,Auto\"><TextBox Text=\"{Binding SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Button Grid.Column=\"1\" Width=\"38\" Height=\"34\" Margin=\"-42,0,4,0\"", basic, StringComparison.Ordinal);
         Assert.DoesNotContain("SelectedProvider.ApiKey", advanced, StringComparison.Ordinal);
     }
 
@@ -427,11 +431,13 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
-    public void ProviderTabsAlignScrollbarsToRequestedGuide()
+    public void ProviderTabsKeepScrollbarsInNativeLayerAndInsetOnlyContent()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
 
-        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0\"/><Setter Property=\"Padding\" Value=\"0,0,8,0\"/></Style>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ScrollViewer.provider-tab-scroll /template/ ScrollBar#PART_VerticalScrollBar", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<TranslateTransform X=\"8\"/>", source, StringComparison.Ordinal);
         Assert.Contains("<Border Padding=\"18,16,0,0\"", source, StringComparison.Ordinal);
         Assert.Contains("<Grid ColumnDefinitions=\"*\" Margin=\"0,0,18,0\">", source, StringComparison.Ordinal);
 

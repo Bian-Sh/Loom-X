@@ -1,13 +1,14 @@
 ## Why
 
-Provider 右侧详情面板四个 Tab 的主纵向滚动条需要统一对齐到用户截图标出的红色参考线。先前额外增加的 8px 页面补偿使滚动条过度向左，未落在目标位置。
+Provider 右侧详情面板四个 Tab 的主纵向滚动条需要位于用户截图标出的红色参考线，同时表单内容区域右边缘必须保持原位。此前通过修改外层 Margin 或把模板 ScrollBar 平移出父级边界，分别造成内容跟随移动或潜在裁剪/遮盖问题。
 
 ## What Changes
 
-- 为 Provider 右侧详情面板四个 Tab 的外层 `ScrollViewer` 保留统一样式标记。
-- 移除额外的 8px 右侧 Margin，让主纵向滚动条使用 `TabControl` 模板自身的右侧内缩并对齐截图参考线。
+- 四个 Tab 的外层 `ScrollViewer` 保持完整宽度，使原生纵向 ScrollBar 留在模板自身层级和目标位置。
+- 通过 `ScrollViewer.Padding="0,0,8,0"` 只把 ScrollContent 向左保留 8px，不移动 ScrollBar。
 - 保持左侧 Provider 目录和测试响应文本框的嵌套滚动条不变。
-- 更新视图契约测试，防止各 Tab 的滚动条定位再次分化。
+- 修正基础 Tab 的 API Key 输入框，使其右边缘与显示名称、Base URL 输入框一致，同时保留眼睛按钮覆盖布局。
+- 更新契约测试，锁定“原生滚动条层级 + 仅内容内缩”的布局。
 
 ## Capabilities
 
@@ -17,7 +18,7 @@ Provider 右侧详情面板四个 Tab 的主纵向滚动条需要统一对齐到
 
 ### Modified Capabilities
 
-- `provider-panel`: 增加右侧详情 Tab 主纵向滚动条统一对齐用户指定参考线的布局要求。
+- `provider-panel`: 右侧详情 Tab 的内容边界保持原位，主纵向滚动条在原生模板层级对齐用户指定参考线。
 
 ## Impact
 

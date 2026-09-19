@@ -1,13 +1,14 @@
 ## Context
 
-Provider 详情区由外层 `Border`、标题和 `TabControl` 组成，四个 Tab 分别拥有外层 `ScrollViewer`。用户截图显示，先前为追求 20px 数值而增加的 8px 页面补偿使滚动条落在红色参考线左侧；目标位置实际是 `TabControl` 模板默认内容边界。
+Avalonia Fluent `ScrollViewer` 模板把 `PART_ScrollContentPresenter` 与 `PART_VerticalScrollBar` 作为同一模板网格中的独立子控件，并把 `ScrollViewer.Padding` 只绑定给内容呈现器。用户要求内容右边缘保持原位，只让滚动条处于红线位置。
 
 ## Goals / Non-Goals
 
 **Goals:**
-- 四个详情 Tab 的主纵向滚动条共用同一定位规则。
-- 滚动条对齐用户截图标出的红色参考线。
-- 保持标题、表单内容和嵌套响应文本框的既有交互。
+- 四个详情 Tab 的表单内容右边缘保持 20px inset。
+- 主纵向滚动条保持在 ScrollViewer 原生模板层级，右侧 inset 为 12px。
+- 不使用把 ScrollBar 平移出父级边界的方案，避免裁剪、遮盖和命中层级问题。
+- API Key 输入框与同组普通输入框保持相同的 20px 右侧 inset。
 
 **Non-Goals:**
 - 不调整左侧 Provider 目录滚动条。
@@ -16,16 +17,28 @@ Provider 详情区由外层 `Border`、标题和 `TabControl` 组成，四个 Ta
 
 ## Decisions
 
-1. 保持详情内容外层 `Border` 的右侧 Padding 为 0，并给标题区域保留 18px 右边距，使 `TabControl` 的可用区域右边缘与详情面板右边缘一致。
-2. 四个 Tab 的外层 `ScrollViewer` 继续共用 `provider-tab-scroll` class，但页面局部样式改为 `Margin="0"`。不再叠加 8px 右侧 Margin，直接使用 Avalonia `TabControl` 模板自身的内容内缩，使滚动条向右移动到截图红线位置。
-3. 视图契约测试断言共享样式的 Margin 为 0、四个 class 使用点以及详情容器右侧 Padding，避免后续只修改部分 Tab或再次叠加页面边距。
+1. `ScrollViewer.provider-tab-scroll` 使用 `Margin="0"`，让控件本身和模板内原生 ScrollBar 占据完整 Tab 内容宽度；滚动条因此位于用户红线处。
+2. 同一 style 设置 `Padding="0,0,8,0"`。Avalonia Fluent 模板只把该 Padding 传给 `PART_ScrollContentPresenter`，所以内容右边缘向左保留 8px，而 `PART_VerticalScrollBar` 不受影响。
+3. 不对模板内 ScrollBar 使用 `RenderTransform` 或额外 ZIndex。滚动条保持原生兄弟层级和模板裁剪范围，避免平移到父级边界外后被遮盖。
+4. 契约测试断言 Margin=0、Padding 右侧=8，并禁止模板 ScrollBar TranslateTransform。
+5. API Key 行改为单层 Grid 覆盖布局：TextBox 占据行宽，眼睛按钮右对齐覆盖；Grid 增加 8px 右 Margin，抵消长密钥文本在 ScrollViewer 内容测量中产生的额外 8px 横向扩展。
 
 ## Root Cause
 
-- 截图中现有滚动条位于约 `x=548..553`，红色参考线位于约 `x=559..564`。
-- 先前新增的 8 DIP 右侧 Margin 在当前显示缩放下对应约 10 个物理像素，正是滚动条与参考线之间的主要偏差。
-- 因此根因是重复补偿：`TabControl` 已有模板内缩，页面又额外增加了 8px。
+- 第一版用外层右 Margin 8px，内容和滚动条一起向左。
+- 第二版把 Margin 清零，内容和滚动条一起向右。
+- 中间尝试只平移模板 ScrollBar，但它离开自身布局边界，存在用户指出的层级遮盖风险。
+- 最终方案利用模板既有的内容/滚动条分层：ScrollViewer 保持全宽，Padding 只作用于 ScrollContent。
+- API Key 行原先通过 `*,Auto` 两列配合负 Margin 叠放按钮；实机 UIA 还显示长密钥文本让该行占到 ScrollViewer 右边缘，比相邻输入框多 8px。改为覆盖布局并为该行显式保留 8px 右 Margin 后，三个输入框右边缘一致。
+
+## Verification Geometry
+
+- `TabRight = 1407`。
+- `ScrollViewerRight = 1395`，原生 ScrollBar inset 为 12px。
+- `ContentControlRight = 1387`，ScrollContent inset 保持 20px。
+- API Key、显示名称和 Base URL 输入框的 UIA Right 均一致。
 
 ## Risks / Trade-offs
 
-- [`TabControl` 默认模板变化影响位置] → 契约测试锁定页面不再额外补偿，并使用重新发布后的桌面端界面复核。
+- [模板 Padding 绑定变化] → 契约测试、Release 构建和最终包实机几何读数共同覆盖。
+- [不同 Tab 内容结构差异] → 四个 Tab 共用同一 ScrollViewer class，不对子内容分别定位。

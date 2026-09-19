@@ -1,17 +1,32 @@
 ## 1. 契约测试
 
-- [x] 1.1 在 `ProvidersViewContractTests` 中增加四个详情 Tab 共用滚动条定位样式的失败测试，并确认测试因样式尚未实现而失败。
+- [x] 1.1 增加四个详情 Tab 共用滚动条定位样式的契约测试。
 
-## 2. 页面实现
+## 2. 初始页面实现
 
-- [x] 2.1 调整 `ProvidersView.axaml` 的详情容器右侧布局，为四个外层 `ScrollViewer` 应用统一 class。
+- [x] 2.1 为四个外层 `ScrollViewer` 应用统一 class。
 
-## 3. 截图校准
+## 3. 第一轮截图校准
 
-- [x] 3.1 根据用户截图确认额外 8px Margin 是滚动条偏左的根因。
-- [x] 3.2 先更新契约测试并确认 RED，再将共享样式改为 `Margin="0"` 并确认 GREEN。
+- [x] 3.1 根据截图发现原 8px 整体 Margin 使滚动条偏左。
+- [x] 3.2 将整体 Margin 改为 0，并完成自动化与实机验证。
 
-## 4. 验证与交付
+## 4. 第二轮需求纠正
 
-- [x] 4.1 运行 Provider 页面测试、完整测试、Release 构建和 OpenSpec 严格校验。
-- [x] 4.2 重新发布到带可读时间戳的 `outputs` 目录并验证桌面端界面。
+- [x] 4.1 根据用户反馈确认不能移动 ScrollContent，只能移动 ScrollBar。
+- [x] 4.2 先验证“保留内容 Margin、平移模板 ScrollBar”的方案，并识别其父级边界外渲染风险。
+- [x] 4.3 根据用户的层级遮盖提示，改为让 ScrollViewer 保持全宽，并使用右侧 Padding 仅内缩 ScrollContent。
+- [x] 4.4 更新契约测试：要求 `Margin="0"`、`Padding="0,0,8,0"`，并禁止模板 ScrollBar TranslateTransform。
+- [x] 4.5 确认目标契约测试 RED → GREEN，桌面项目 Release 构建通过。
+- [x] 4.6 发布隔离验证包，确认 ScrollViewer/原生滚动条 inset 为 12px，内容控件 inset 为 20px。
+
+## 5. 最终验证与交付
+
+- [x] 5.1 运行 Provider 页面测试、完整测试、Release 构建和 OpenSpec 严格校验。
+- [x] 5.2 提交修正并生成基于最终提交的发布包。
+
+## 6. API Key 输入框边界修正
+
+- [x] 6.1 通过 UIA 复现 API Key 输入框比显示名称、Base URL 多延伸 8px。
+- [x] 6.2 按 RED → GREEN 更新契约测试，并将 API Key 行改为按钮覆盖布局与 8px 右侧保留。
+- [x] 6.3 重新发布验证包，确认三个输入框的 UIA Right 一致。
