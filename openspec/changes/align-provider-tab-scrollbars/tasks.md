@@ -4,9 +4,10 @@
 
 ## 2. 页面实现
 
-- [ ] 2.1 调整 `ProvidersView.axaml` 的详情容器右侧布局，为四个外层 `ScrollViewer` 应用统一 class 和 20px 右侧留白，并确认相关契约测试通过。
+- [x] 2.1 调整 `ProvidersView.axaml` 的详情容器右侧布局，为四个外层 `ScrollViewer` 应用统一 class 和 20px 右侧留白，并确认相关契约测试通过。
 
 ## 3. 验证与交付
 
 - [ ] 3.1 运行相关测试、完整测试与 Release 构建，重新发布到带可读时间戳的 `outputs` 目录并验证桌面端界面。
+
 
