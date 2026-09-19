@@ -275,21 +275,24 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
 
     private void RefreshRequestSummary()
     {
-        if (provider is null)
+        var current = provider;
+        if (current is null)
         {
             RequestSummary = "";
             return;
         }
 
-        var endpoint = $"POST {ProviderTestService.ResolveEndpoint(provider.BaseUrl, provider.ApiMode, provider.EndpointFormat)}";
+        var endpoint = Uri.TryCreate(current.BaseUrl.Trim(), UriKind.Absolute, out _)
+            ? $"POST {ProviderTestService.ResolveEndpoint(current.BaseUrl, current.ApiMode, current.EndpointFormat)}"
+            : "POST";
         var parts = new List<string>
         {
             endpoint,
-            provider.UseProxy ? "proxy" : "direct",
-            $"{ParseHeaders(provider.HeadersJson).Count} Headers",
+            current.UseProxy ? "proxy" : "direct",
+            $"{ParseHeaders(current.HeadersJson).Count} Headers",
         };
-        if (provider.CurrentCliIdentity is not null)
-            parts.Add(provider.CurrentCliIdentitySummary);
+        if (current.CurrentCliIdentity is not null)
+            parts.Add(current.CurrentCliIdentitySummary);
         RequestSummary = string.Join(" · ", parts);
     }
 

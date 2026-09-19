@@ -89,6 +89,23 @@ public sealed class ProviderTestPanelViewModelTests
     }
 
     [Fact]
+    public void 绑定空BaseUrl的Provider时请求摘要安全降级()
+    {
+        var provider = new ProviderEditorViewModel
+        {
+            BusinessId = "provider-new",
+            BaseUrl = "",
+            ApiMode = "openai",
+            EndpointFormat = "responses",
+        };
+        var panel = new ProviderTestPanelViewModel(new StubProviderTestService());
+
+        panel.BindProvider(provider);
+
+        Assert.Equal("POST · direct · 0 Headers", panel.RequestSummary);
+    }
+
+    [Fact]
     public void 绑定Provider后立即生成请求摘要并随隐藏配置实时更新()
     {
         var provider = new ProviderEditorViewModel
