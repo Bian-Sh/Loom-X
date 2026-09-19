@@ -43,8 +43,16 @@
 - TDD RED：新增契约测试在样式未实现时按预期失败。
 - TDD GREEN：目标契约测试通过。
 - Provider 页面契约测试：29/29 通过。
-- Release 全量测试：1040/1040 通过，0 失败。
-- Release 构建：0 错误，存在 2 个既有 `NU1903` 依赖漏洞警告。
+- 合并后 Release 全量串行测试：1042/1042 通过，0 失败，0 跳过（`RunConfiguration.MaxCpuCount=1`）。
+- 合并后 Release 构建：0 错误，存在 2 个既有 `NU1903` 依赖漏洞警告。
 - OpenSpec 严格校验：通过，0 issue。
-- 最终发布目录：`outputs/20260920-013007`。
+- 功能分支实机验证发布目录：`outputs/20260920-013007`。
+- 合并后 `master` 最终发布目录：`outputs/20260920-015224`；仅包含一个 `LoomX.exe`。
+- 合并后 `LoomX.exe` 版本：`0.12.6+496d4e7a89b5726edf7d26734cf133fe3aeea5df`；SHA-256：`B12690A87B97262751B4FEFD8AF3C869BBA74B1602271DC7395BE70C583E2B16`。
 - 最终页面截图：`outputs/20260920-013007/provider-scrollbar-verification.png`。
+
+
+## 分支处理
+
+- 用户选择本地合并，功能分支已合并到 `master`，合并提交为 `496d4e7`。
+- 当前仅完成本地合并，未推送到远端。
