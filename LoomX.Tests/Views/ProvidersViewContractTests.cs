@@ -472,6 +472,10 @@ public sealed class ProvidersViewContractTests
         var basicTab = ReadTab(source, "providers.tab.basic");
 
         Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0\"/><Setter Property=\"Padding\" Value=\"0,0,8,0\"/><Setter Property=\"HorizontalContentAlignment\" Value=\"Stretch\"/></Style>", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid RowDefinitions=\"Auto,Auto,Auto,Auto,Auto\" RowSpacing=\"14\" Margin=\"0,16,0,18\">", basicTab, StringComparison.Ordinal);
+        Assert.Contains("<StackPanel Grid.Row=\"3\" Spacing=\"5\">", basicTab, StringComparison.Ordinal);
+        Assert.Contains("<StackPanel Grid.Row=\"4\" Spacing=\"5\" HorizontalAlignment=\"Stretch\">", basicTab, StringComparison.Ordinal);
+        Assert.DoesNotContain("<StackPanel Spacing=\"14\" Margin=\"0,16,0,18\">", basicTab, StringComparison.Ordinal);
         Assert.Contains("<Grid ColumnDefinitions=\"*,42\" HorizontalAlignment=\"Stretch\">", basicTab, StringComparison.Ordinal);
         Assert.Contains("<TextBox Grid.ColumnSpan=\"2\" HorizontalAlignment=\"Stretch\" Text=\"{Binding SelectedProvider.ApiKey", basicTab, StringComparison.Ordinal);
         Assert.Contains("<Button Grid.Column=\"1\" HorizontalAlignment=\"Center\"", basicTab, StringComparison.Ordinal);
