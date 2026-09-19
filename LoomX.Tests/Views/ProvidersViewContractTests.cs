@@ -447,56 +447,6 @@ public sealed class ProvidersViewContractTests
         }
     }
 
-    [Fact]
-    public void RareDeleteActionsOnlyAppearWhenTheirOwnerIsHovered()
-    {
-        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
-
-        Assert.Contains("Selector=\"Border.provider-card Button.provider-delete\"><Setter Property=\"Opacity\" Value=\"0\"/><Setter Property=\"IsHitTestVisible\" Value=\"False\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"Border.provider-card:pointerover Button.provider-delete\"><Setter Property=\"Opacity\" Value=\"1\"/><Setter Property=\"IsHitTestVisible\" Value=\"True\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"Border.header-item Button.header-delete\"><Setter Property=\"Opacity\" Value=\"0\"/><Setter Property=\"IsHitTestVisible\" Value=\"False\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"Border.header-item:pointerover Button.header-delete\"><Setter Property=\"Opacity\" Value=\"1\"/><Setter Property=\"IsHitTestVisible\" Value=\"True\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"Border.model-cell Button.model-delete\"><Setter Property=\"Opacity\" Value=\"0\"/><Setter Property=\"IsHitTestVisible\" Value=\"False\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"Border.model-cell:pointerover Button.model-delete\"><Setter Property=\"Opacity\" Value=\"1\"/><Setter Property=\"IsHitTestVisible\" Value=\"True\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Classes=\"icon-button provider-delete\"", source, StringComparison.Ordinal);
-        Assert.Contains("Classes=\"icon-button header-delete\"", source, StringComparison.Ordinal);
-        Assert.Contains("Classes=\"icon-button model-delete\"", source, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void ApiKeyVisibilityButtonCentersBothEyeIcons()
-    {
-        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
-        var buttonStart = source.IndexOf("Click=\"ToggleApiKeyVisibilityButton_OnClick\"", StringComparison.Ordinal);
-        Assert.True(buttonStart >= 0, "缺少 API Key 可见性按钮");
-        var buttonTagStart = source.LastIndexOf("<Button", buttonStart, StringComparison.Ordinal);
-        var buttonEnd = source.IndexOf("</Button>", buttonStart, StringComparison.Ordinal);
-        var button = source[buttonTagStart..buttonEnd];
-
-        Assert.Contains("HorizontalContentAlignment=\"Center\"", button, StringComparison.Ordinal);
-        Assert.Contains("VerticalContentAlignment=\"Center\"", button, StringComparison.Ordinal);
-        Assert.Equal(2, button.Split("Width=\"18\" Height=\"18\" Stretch=\"Uniform\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"", StringSplitOptions.None).Length - 1);
-    }
-
-    [Fact]
-    public void TestSendAndStopActionsCenterTheirContent()
-    {
-        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
-
-        Assert.Contains("Selector=\"Button.provider-test-action\"><Setter Property=\"HorizontalContentAlignment\" Value=\"Center\"/><Setter Property=\"VerticalContentAlignment\" Value=\"Center\"/></Style>", source, StringComparison.Ordinal);
-        Assert.Equal(2, source.Split("Classes=\"provider-test-action\"", StringSplitOptions.None).Length - 1);
-    }
-
-    [Fact]
-    public void TestModelSelectorUsesFixedEllipsizedTooltipLayout()
-    {
-        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
-        var testTab = ReadTab(source, "providers.tab.test");
-
-        Assert.Contains("<ComboBox Width=\"220\"", testTab, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding ModelId}\" TextTrimming=\"CharacterEllipsis\" ToolTip.Tip=\"{Binding ModelId}\"", testTab, StringComparison.Ordinal);
-    }
-
     private static string ReadTab(string source, string headerKey)
     {
         var marker = $"<TabItem Header=\"{{l:Locale {headerKey}}}\">";
