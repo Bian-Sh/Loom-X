@@ -1,10 +1,13 @@
-using System.Net.Http;
+﻿using System.Net.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using LoomX;
 using LoomX.Activity;
+using LoomX.Assistant.Browser;
+using LoomX.Logging;
+using Serilog;
 
 namespace LoomX.Services;
 
@@ -26,6 +29,9 @@ public sealed class GatewayProcessService : IDisposable
     private ActivityStore? activityStore;
     private RequestTelemetryHub? telemetryHub;
     private GatewayStateHub? stateHub;
+    private ILoggerFactory? browserLoggerFactory;
+    private BrowserBridge? browserBridge;
+    private BrowserBridgeLeaseManager? browserBridgeLeaseManager;
 
     public GatewayState State { get; private set; } = GatewayState.Stopped;
     public string? Error { get; private set; }
@@ -42,7 +48,8 @@ public sealed class GatewayProcessService : IDisposable
             if (await CheckHealthCoreAsync(endpoint, cancellationToken)) return;
 
             SetState(GatewayState.Starting, null);
-            app ??= await LoomXHost.CreateAsync(cancellationToken);
+            EnsureBrowserRuntime();
+            app ??= await LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager, cancellationToken);
             activityStore ??= app.Services.GetRequiredService<ActivityStore>();
             telemetryHub ??= app.Services.GetRequiredService<RequestTelemetryHub>();
             activityStore.ActivityEnqueued -= OnActivityEnqueued;
@@ -87,7 +94,8 @@ public sealed class GatewayProcessService : IDisposable
         try
         {
             if (app is not null) return;
-            app = await LoomXHost.CreateAsync(cancellationToken);
+            EnsureBrowserRuntime();
+            app = await LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager, cancellationToken);
             try
             {
                 app.Services.GetRequiredService<LoomX.Assistant.AssistantPreferencesStore>().MigrateLegacyIfNeeded();
@@ -96,7 +104,7 @@ public sealed class GatewayProcessService : IDisposable
             {
                 // 偏好迁移失败不阻止助手使用，正常启动时仍会再次尝试。
                 app.Services.GetRequiredService<ILogger<GatewayProcessService>>()
-                    .LogWarning(exception, "小助手偏好旧版 JSON 迁移检查失败");
+                    .LogWarning(exception, "AI 助手偏好旧版 JSON 迁移检查失败");
             }
         }
         finally
@@ -105,6 +113,20 @@ public sealed class GatewayProcessService : IDisposable
         }
     }
 
+    private void EnsureBrowserRuntime()
+    {
+        if (browserBridge is not null) return;
+
+        LoggingBootstrap.Configure();
+        browserLoggerFactory ??= Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
+            builder.AddSerilog(dispose: false));
+        browserBridge ??= new BrowserBridge(
+            17831,
+            browserLoggerFactory.CreateLogger<BrowserBridge>());
+        browserBridgeLeaseManager ??= new BrowserBridgeLeaseManager(
+            browserBridge,
+            browserLoggerFactory.CreateLogger<BrowserBridgeLeaseManager>());
+    }
     public async Task<bool> CheckHealthAsync(string endpoint, CancellationToken cancellationToken = default)
     {
         await lifecycleLock.WaitAsync(cancellationToken);
@@ -182,12 +204,23 @@ public sealed class GatewayProcessService : IDisposable
         {
             if (activityStore is not null) activityStore.ActivityEnqueued -= OnActivityEnqueued;
             if (telemetryHub is not null) telemetryHub.Published -= OnTelemetryPublished;
-            app.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            // IDisposable 无法 await。正常退出路径会先走 StopAsync（释放后置空 app），
+            // 这里只兜异常路径，因此加超时保护，避免网关停摆时把进程退出永久卡住。
+            if (!app.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5)))
+            {
+                State = GatewayState.Failed;
+                Error = "网关容器释放超时，已放弃等待。";
+            }
             activityStore = null;
             telemetryHub = null;
             app = null;
             appStarted = false;
         }
+        browserBridge?.Dispose();
+        browserBridge = null;
+        browserBridgeLeaseManager = null;
+        browserLoggerFactory?.Dispose();
+        browserLoggerFactory = null;
         httpClient.Dispose();
         lifecycleLock.Dispose();
     }

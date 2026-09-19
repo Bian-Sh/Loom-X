@@ -1,4 +1,4 @@
-using Xunit;
+﻿using Xunit;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -19,7 +19,7 @@ public sealed class BrowserBridgeTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         bridge = new BrowserBridge(port, NullLogger<BrowserBridge>.Instance);
-        bridge.Start();
+        await bridge.StartAsync();
         extension = new ClientWebSocket();
         using (var connectTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10)))
         {
@@ -47,6 +47,73 @@ public sealed class BrowserBridgeTests : IAsyncLifetime
         bridge.Dispose();
     }
 
+    [Fact]
+    public async Task Start_重复调用保持幂等()
+    {
+        var field = typeof(BrowserBridge).GetField("listenTask", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        var originalTask = field.GetValue(bridge);
+
+        await bridge.StartAsync();
+
+        Assert.Same(originalTask, field.GetValue(bridge));
+    }
+
+    [Fact]
+    public async Task 健康探针_监听时返回NoContent()
+    {
+        using var client = new HttpClient();
+
+        using var response = await client.GetAsync($"http://127.0.0.1:{port}/loomx-browser/");
+
+        Assert.Equal(System.Net.HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Stop后允许在同一端口重新启动()
+    {
+        await bridge.StopAsync();
+        Assert.False(bridge.IsListening);
+        Assert.False(bridge.IsExtensionConnected);
+
+        await bridge.StartAsync();
+        Assert.True(bridge.IsListening);
+
+        using var reconnected = new ClientWebSocket();
+        await reconnected.ConnectAsync(new Uri($"ws://127.0.0.1:{port}/loomx-browser/"), CancellationToken.None);
+        await SendAsync(new JsonObject
+        {
+            ["method"] = "Bridge.hello",
+            ["params"] = new JsonObject { ["protocol"] = 1, ["extension"] = "reconnected" },
+        }, reconnected);
+        await WaitForAsync(() => bridge.IsExtensionConnected);
+    }
+
+    [Fact]
+    public async Task Hello目标快照会恢复服务端目标表()
+    {
+        await SendAsync(new JsonObject
+        {
+            ["method"] = "Bridge.hello",
+            ["params"] = new JsonObject
+            {
+                ["protocol"] = 1,
+                ["extension"] = "test",
+                ["targets"] = new JsonArray(new JsonObject
+                {
+                    ["targetId"] = "target-9",
+                    ["sessionId"] = "session-9",
+                    ["tabId"] = 9,
+                    ["url"] = "https://example.com/restore",
+                    ["title"] = "恢复目标",
+                }),
+            },
+        });
+
+        await WaitForAsync(() => bridge.Targets.Any(item => item.TargetId == "target-9"));
+        var target = Assert.Single(bridge.Targets, item => item.TargetId == "target-9");
+        Assert.Equal("session-9", target.SessionId);
+    }
     [Fact]
     public async Task Hello_RegistersExtensionConnection()
     {

@@ -1,0 +1,14 @@
+{
+  "change": "unify-input-focus-material",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "f8dfdf7a32d7a082bd944d696e7ad9033317a702df658e956cff7e44238762db",
+  "files": [
+    { "path": "openspec/changes/unify-input-focus-material/proposal.md", "sha256": "aaa65e096c7cbbac54927b7e307a5537c06245652352680768a97d69b97fd911" },
+    { "path": "openspec/changes/unify-input-focus-material/design.md", "sha256": "a2b85fcdb865a559b00d16be882941549d28448710fe212e42cee8c2f8087ae4" },
+    { "path": "openspec/changes/unify-input-focus-material/tasks.md", "sha256": "9d4363b6c42787afc45c4442be46b909ac0615b6ba7ec9e7f04ea8070a35a6a6" },
+    { "path": "openspec/changes/unify-input-focus-material/specs/app-input-material/spec.md", "sha256": "6309f0e0e620c588d98701d76385dc7c2dacab43418917b82d75ec3824032672" }
+  ]
+}

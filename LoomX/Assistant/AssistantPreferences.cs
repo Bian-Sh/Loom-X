@@ -89,7 +89,7 @@ public sealed class AssistantPreferencesStore
             }
             catch (Exception exception) when (IsRecoverable(exception))
             {
-                logger?.LogWarning(exception, "小助手偏好读取失败，使用默认值");
+                logger?.LogWarning(exception, "AI 助手偏好读取失败，使用默认值");
                 return new AssistantPreferences();
             }
         }
@@ -147,11 +147,11 @@ public sealed class AssistantPreferencesStore
                 };
                 Save(legacy);
                 File.Delete(legacyPath);
-                logger?.LogInformation("小助手偏好已从旧版 JSON 迁入配置库");
+                logger?.LogInformation("AI 助手偏好已从旧版 JSON 迁入配置库");
             }
             catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
             {
-                logger?.LogWarning(exception, "小助手偏好旧版 JSON 迁移失败，保留原文件");
+                logger?.LogWarning(exception, "AI 助手偏好旧版 JSON 迁移失败，保留原文件");
             }
         }
     }

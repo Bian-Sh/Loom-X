@@ -1,5 +1,6 @@
-﻿using System.Net;
+using System.Net;
 using System.IO.Compression;
+using System.IO.Pipelines;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -26,6 +27,8 @@ public sealed class OpenAiCompatibleModelClientTests
             this.body = body;
         }
 
+        public string? RetryAfter { get; init; }
+
         public HttpRequestMessage? LastRequest { get; private set; }
         public string? LastRequestBody { get; private set; }
 
@@ -33,11 +36,25 @@ public sealed class OpenAiCompatibleModelClientTests
         {
             LastRequest = request;
             LastRequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
-            return new HttpResponseMessage(statusCode)
+            var response = new HttpResponseMessage(statusCode)
             {
                 Content = new StringContent(body, Encoding.UTF8, "text/event-stream"),
             };
+            if (RetryAfter is not null) response.Headers.TryAddWithoutValidation("Retry-After", RetryAfter);
+            return response;
         }
+    }
+
+    [Theory]
+    [InlineData("12", 12)]
+    [InlineData("无效", null)]
+    public async Task 错误响应保留合法重试等待提示(string header, int? expectedSeconds)
+    {
+        using var http = new HttpClient(new FakeHttpHandler(HttpStatusCode.TooManyRequests, "") { RetryAfter = header });
+        var client = new OpenAiCompatibleModelClient(http, "https://example.invalid/v1", "测试模型");
+        var exception = await Assert.ThrowsAsync<ModelClientException>(() => CollectAsync(
+            client.StreamAsync(new ModelRequest([ChatMessage.User("测试")], []), CancellationToken.None)));
+        Assert.Equal(expectedSeconds, exception.RetryAfter?.TotalSeconds);
     }
 
     private static ToolDefinition CreateTool() => new()
@@ -373,6 +390,7 @@ public sealed class OpenAiCompatibleModelClientTests
             Description = "读取 Endpoint 的无副作用验收工具。",
             ParametersSchema = JsonNode.Parse(
                 """{"type":"object","properties":{"key":{"type":"string"}},"required":["key"]}""")!,
+            SafeArgumentsProjector = arguments => arguments?.DeepClone(),
             Handler = (arguments, _) =>
             {
                 executionCount++;
@@ -407,8 +425,8 @@ public sealed class OpenAiCompatibleModelClientTests
         var persistedCall = assistantToolMessage!["tool_calls"]![0]!;
         Assert.Equal("call_lifecycle", persistedCall["id"]!.GetValue<string>());
         Assert.Equal(
-            """{"key": "openai"}""",
-            persistedCall["function"]!["arguments"]!.GetValue<string>());
+            "openai",
+            JsonNode.Parse(persistedCall["function"]!["arguments"]!.GetValue<string>())!["key"]!.GetValue<string>());
         var toolResultMessage = messages.Single(message => message?["role"]?.GetValue<string>() == "tool");
         Assert.Equal("call_lifecycle", toolResultMessage!["tool_call_id"]!.GetValue<string>());
         Assert.Equal("生命周期验收通过", session.Messages[^1].Content);
@@ -532,18 +550,124 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
-    public async Task StreamAsync_FlushesToolCallWhenConnectionClosesWithoutDoneMarker()
+    public async Task StreamAsync_ConnectionClosesWithoutDoneMarker_RejectsIncompleteStep()
     {
         const string sse = """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_eof","function":{"name":"mock.list_providers","arguments":"{}"}}]},"finish_reason":null}]}""";
         var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
         var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
 
-        var events = await CollectAsync(client.StreamAsync(
-            new ModelRequest([ChatMessage.User("查询")], [CreateTool()]),
-            CancellationToken.None));
+        await Assert.ThrowsAsync<ModelClientException>(async () => await CollectAsync(client.StreamAsync(
+            new ModelRequest([ChatMessage.User("查询")], [CreateTool()]), CancellationToken.None)));
+    }
 
-        Assert.Equal("call_eof", Assert.IsType<ModelToolCallEvent>(events[0]).ToolCall.Id);
-        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[1]).FinishReason);
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task StreamAsync_DeliversDeltaBeforeCompletion_AndCancelsPendingRead(bool responses, bool reasoning)
+    {
+        var pipe = new Pipe();
+        using var client = new HttpClient(new PipeResponseHandler(pipe.Reader.AsStream()));
+        var model = new OpenAiCompatibleModelClient(client, "https://api.example/v1", "test-model",
+            endpointFormat: responses ? "responses" : "chat_completions");
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await using var events = model.StreamAsync(
+            new ModelRequest([ChatMessage.User("查询")], []), cancellation.Token).GetAsyncEnumerator();
+
+        var first = events.MoveNextAsync().AsTask();
+        var frame = responses
+            ? reasoning
+                ? "event: response.reasoning_text.delta\ndata: {\"type\":\"response.reasoning_text.delta\",\"delta\":\"原始思考\"}\n\n"
+                : "event: response.output_text.delta\ndata: {\"type\":\"response.output_text.delta\",\"delta\":\"首段文本\"}\n\n"
+            : reasoning
+                ? "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"原始思考\"},\"finish_reason\":null}]}\n\n"
+                : "data: {\"choices\":[{\"delta\":{\"content\":\"首段文本\"},\"finish_reason\":null}]}\n\n";
+        await pipe.Writer.WriteAsync(Encoding.UTF8.GetBytes(frame));
+        Assert.True(await first.WaitAsync(TimeSpan.FromSeconds(2)));
+        if (reasoning) Assert.Equal("原始思考", Assert.IsType<ReasoningDeltaEvent>(events.Current).Text);
+        else Assert.Equal("首段文本", Assert.IsType<TextDeltaEvent>(events.Current).Text);
+
+        var pending = events.MoveNextAsync().AsTask();
+        Assert.False(pending.IsCompleted);
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+        await pipe.Writer.CompleteAsync();
+    }
+
+    [Fact]
+    public async Task StreamAsync_ResponsesReasoningSummary_RemainsDistinctFromRaw()
+    {
+        const string sse = """
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","delta":"原文"}
+
+            event: response.reasoning_summary_text.delta
+            data: {"type":"response.reasoning_summary_text.delta","delta":"摘要"}
+
+            event: response.output_text.delta
+            data: {"type":"response.output_text.delta","delta":"答案"}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{}}
+
+            """;
+        var model = new OpenAiCompatibleModelClient(
+            new HttpClient(new FakeHttpHandler(HttpStatusCode.OK, sse)), "https://api.example/v1", "test-model",
+            endpointFormat: "responses");
+
+        var events = await CollectAsync(model.StreamAsync(new ModelRequest([ChatMessage.User("查询")], []), CancellationToken.None));
+
+        Assert.False(Assert.IsType<ReasoningDeltaEvent>(events[0]).IsSummary);
+        Assert.True(Assert.IsType<ReasoningDeltaEvent>(events[1]).IsSummary);
+        Assert.Equal("答案", Assert.IsType<TextDeltaEvent>(events[2]).Text);
+    }
+
+    [Fact]
+    public async Task StreamAsync_ResponsesCompletedWithoutAnswer_RejectsEmptyStep()
+    {
+        const string sse = """
+            event: response.reasoning_text.delta
+            data: {"type":"response.reasoning_text.delta","delta":"原文"}
+
+            event: response.completed
+            data: {"type":"response.completed","response":{"output":[]}}
+
+            """;
+        var model = new OpenAiCompatibleModelClient(
+            new HttpClient(new FakeHttpHandler(HttpStatusCode.OK, sse)), "https://api.example/v1", "test-model",
+            endpointFormat: "responses");
+
+        await Assert.ThrowsAsync<ModelClientException>(async () => await CollectAsync(model.StreamAsync(
+            new ModelRequest([ChatMessage.User("查询")], []), CancellationToken.None)));
+    }
+
+    [Fact]
+    public async Task StreamAsync_ResponsesJson_PreservesReasoningProvenance()
+    {
+        const string body = """
+            {"output":[
+              {"type":"reasoning","content":[{"type":"reasoning_text","text":"原文"}],"summary":[{"type":"summary_text","text":"摘要"}]},
+              {"type":"message","content":[{"type":"output_text","text":"答案"}]}
+            ]}
+            """;
+        var model = new OpenAiCompatibleModelClient(
+            new HttpClient(new FakeHttpHandler(HttpStatusCode.OK, body)), "https://api.example/v1", "test-model",
+            endpointFormat: "responses");
+        var events = await CollectAsync(model.StreamAsync(new ModelRequest([ChatMessage.User("查询")], []), CancellationToken.None));
+
+        Assert.Equal("原文", Assert.IsType<ReasoningDeltaEvent>(events[0]).Text);
+        Assert.True(Assert.IsType<ReasoningDeltaEvent>(events[1]).IsSummary);
+        Assert.Equal("答案", Assert.IsType<TextDeltaEvent>(events[2]).Text);
+    }
+
+    private sealed class PipeResponseHandler(Stream stream) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(stream),
+            });
     }
 
     [Fact]
@@ -1048,6 +1172,22 @@ public sealed class OpenAiCompatibleModelClientTests
         private DateTimeOffset lastCompletedAt = DateTimeOffset.MinValue;
 
         public int RequestCount { get; private set; }
+
+        public async Task<ProviderStreamingResult> ExecuteStreamingAsync(
+            HttpClient httpClient, HttpRequestMessage request, ProviderExecutionContext context, CancellationToken cancellationToken)
+        {
+            await gate.WaitAsync(cancellationToken);
+            try
+            {
+                var remaining = minimumInterval - (DateTimeOffset.UtcNow - lastCompletedAt);
+                if (remaining > TimeSpan.Zero) await Task.Delay(remaining, cancellationToken);
+                RequestCount++;
+                var result = await inner.ExecuteStreamingAsync(httpClient, request, context, cancellationToken);
+                lastCompletedAt = DateTimeOffset.UtcNow;
+                return result;
+            }
+            finally { gate.Release(); }
+        }
 
         public async Task<ProviderExecutionResult> ExecuteAsync(
             HttpClient httpClient,

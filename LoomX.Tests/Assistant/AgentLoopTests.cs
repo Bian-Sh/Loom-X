@@ -1,4 +1,8 @@
 using LoomX.Assistant;
+using LoomX.Assistant.UserDecisions;
+using LoomX.Services;
+using LoomX.ViewModels;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -7,7 +11,9 @@ namespace LoomX.Tests.Assistant;
 public sealed class AgentLoopTests
 {
     private static AgentLoop CreateLoop(IModelClient modelClient, ToolRegistry? registry = null) =>
-        new(modelClient, registry ?? new ToolRegistry(), NullLogger<AgentLoop>.Instance);
+        new(modelClient, registry ?? new ToolRegistry(), NullLogger<AgentLoop>.Instance,
+            failureFormatter: ModelErrorFormatter.FormatException,
+            maxStepsFormatter: ModelErrorFormatter.FormatMaxStepsExceeded);
 
     private static async Task<List<AgentEvent>> CollectAsync(
         IAsyncEnumerable<AgentEvent> events,
@@ -93,7 +99,7 @@ public sealed class AgentLoopTests
         Assert.False(completed.Success);
         var toolMessage = session.Messages[2];
         Assert.Contains("工具执行失败", toolMessage.Content);
-        Assert.Contains("模拟工具故障", toolMessage.Content);
+        Assert.DoesNotContain("模拟工具故障", toolMessage.Content, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -220,6 +226,30 @@ public sealed class AgentLoopTests
     }
 
     [Fact]
+    public async Task ReasoningAndStageText_RetainOrderedBlocksAcrossToolStep()
+    {
+        var registry = new ToolRegistry();
+        registry.Register(MockTools.CreateListProvidersTool());
+        var client = new ScriptedModelClient(
+            [new ReasoningDeltaEvent("原文"), new ReasoningDeltaEvent("摘要", true),
+                new TextDeltaEvent("先检查"), new ModelToolCallEvent(new ToolCall("c1", "mock.list_providers", "{}")),
+                new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("最终回复"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        var events = await CollectAsync(CreateLoop(client, registry).RunAsync(session, "查询"));
+
+        Assert.Equal(2, events.Count(item => item.Kind == AgentEventKind.StepStarted));
+        Assert.Equal("原文", session.Messages[1].Blocks[0].Text);
+        Assert.False(session.Messages[1].Blocks[0].IsSummary);
+        Assert.True(session.Messages[1].Blocks[1].IsSummary);
+        Assert.Equal("先检查", session.Messages[1].Blocks[2].Text);
+        Assert.Equal(ChatContentKind.ToolCall, session.Messages[1].Blocks[3].Kind);
+        Assert.Equal("最终回复", session.Messages[^1].Content);
+        Assert.Equal(AgentEventKind.TaskCompleted, events[^1].Kind);
+    }
+
+    [Fact]
     public async Task ModelWithoutCompletionEvent_FailsInsteadOfCompletingSilently()
     {
         var modelClient = new ScriptedModelClient([new TextDeltaEvent("不完整响应")]);
@@ -341,4 +371,265 @@ public sealed class AgentLoopTests
         // 第二轮请求应携带第一轮完整历史（用户1 + 助手1 + 用户2）
         Assert.Equal(3, modelClient.Requests[1].Messages.Count);
     }
+
+    [Fact]
+    public async Task UnknownTool_原始参数不进入Session事件或下一轮ModelRequest()
+    {
+        const string fullPath = @"C:\Users\Alice\private\config.toml";
+        const string secret = "unknown-tool-private-value";
+        var raw = $$"""{"path":"{{fullPath.Replace("\\", "\\\\")}}","value":"{{secret}}"}""";
+        var modelClient = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("unknown-1", "unknown.tool", raw)), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已处理。"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        var events = await CollectAsync(CreateLoop(modelClient).RunAsync(session, "执行未知工具"));
+
+        var stored = Assert.Single(session.Messages, message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson;
+        var completedMessage = Assert.Single(events, item => item.Kind == AgentEventKind.MessageCompleted && item.Message?.ToolCalls.Count > 0)
+            .Message!.ToolCalls[0].ArgumentsJson;
+        var nextRequest = modelClient.Requests[1].Messages.Single(message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson;
+        foreach (var safe in new[] { stored, completedMessage, nextRequest })
+        {
+            Assert.DoesNotContain(fullPath, safe, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain(secret, safe, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task SafeArgumentsProjector异常时安全失败但Handler仍收到原始参数()
+    {
+        const string secret = "projection-failure-secret";
+        string? handled = null;
+        var registry = new ToolRegistry();
+        registry.Register(new ToolDefinition
+        {
+            Name = "mock.projector_failure",
+            Description = "投影失败测试",
+            ParametersSchema = System.Text.Json.Nodes.JsonNode.Parse("""{"type":"object"}""")!,
+            SafeArgumentsProjector = _ => throw new ApplicationException("projection failed"),
+            Handler = (arguments, _) =>
+            {
+                handled = arguments?["value"]?.GetValue<string>();
+                return Task.FromResult(ToolResult.Ok("{}"));
+            },
+        });
+        var model = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("call-projector", "mock.projector_failure", $$"""{"value":"{{secret}}"}""")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("完成"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        await CollectAsync(CreateLoop(model, registry).RunAsync(session, "执行"));
+
+        Assert.Equal(secret, handled);
+        Assert.DoesNotContain(secret, session.Messages.Single(message => message.ToolCalls.Count > 0).ToolCalls[0].ArgumentsJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Handler返回普通失败_中央边界覆盖Session事件UiJsonl和下一轮请求()
+    {
+        const string secret = "private-header-value";
+        var registry = new ToolRegistry();
+        registry.Register(new ToolDefinition
+        {
+            Name = "mock.unsafe_failure",
+            Description = "返回不可信失败文本",
+            ParametersSchema = System.Text.Json.Nodes.JsonNode.Parse("""{"type":"object"}""")!,
+            Handler = (_, _) => Task.FromResult(ToolResult.Fail(secret)),
+        });
+        var modelClient = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("unsafe-failure-1", "mock.unsafe_failure", "{}")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已处理。"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        var events = await CollectAsync(CreateLoop(modelClient, registry).RunAsync(session, "执行失败工具"));
+
+        using var viewModel = new AssistantViewModel(new GatewayProcessService());
+        foreach (var agentEvent in events)
+        {
+            viewModel.Project(agentEvent);
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), $"loomx-tool-result-safety-{Guid.NewGuid():N}");
+        try
+        {
+            var store = new AssistantSessionStore(root);
+            await store.SaveAsync(session);
+            var jsonl = await File.ReadAllTextAsync(Path.Combine(root, session.Id + ".jsonl"));
+            var exposed = session.Messages.Select(message => message.Content)
+                .Concat(events.Select(agentEvent => agentEvent.Detail))
+                .Concat(events.Select(agentEvent => agentEvent.Message?.Content))
+                .Concat(modelClient.Requests.SelectMany(request => request.Messages).Select(message => message.Content))
+                .Append(string.Join("\n", viewModel.Messages.Select(message => message.ItemsText)))
+                .Append(jsonl);
+
+            AssertNoPrivateData(exposed, secret);
+            Assert.Contains("工具执行失败", session.Messages.Single(message => message.Role == ChatRole.Tool).Content);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Handler抛出含敏感内容异常_日志与所有安全出口只保留异常类型()
+    {
+        const string secret = "private-header-value";
+        const string fullPath = @"C:\Users\Alice\private\config.toml";
+        var registry = new ToolRegistry();
+        registry.Register(new ToolDefinition
+        {
+            Name = "mock.private_exception",
+            Description = "抛出包含敏感内容的异常",
+            ParametersSchema = System.Text.Json.Nodes.JsonNode.Parse("""{"type":"object"}""")!,
+            Handler = (_, _) =>
+            {
+                var exception = new PrivateHandlerException($"{secret} at {fullPath}", new InvalidOperationException(secret));
+                exception.Data["private"] = fullPath;
+                throw exception;
+            },
+        });
+        var logger = new DetailedRecordingLogger<AgentLoop>();
+        var modelClient = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("private-exception-1", "mock.private_exception", "{}")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已处理。"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+        var loop = new AgentLoop(modelClient, registry, logger,
+            failureFormatter: ModelErrorFormatter.FormatException,
+            maxStepsFormatter: ModelErrorFormatter.FormatMaxStepsExceeded);
+
+        var events = await CollectAsync(loop.RunAsync(session, "执行异常工具"));
+
+        AssertNoPrivateData(
+            session.Messages.Select(message => message.Content)
+                .Concat(events.Select(agentEvent => agentEvent.Detail))
+                .Concat(events.Select(agentEvent => agentEvent.Message?.Content))
+                .Concat(modelClient.Requests.SelectMany(request => request.Messages).Select(message => message.Content)),
+            secret,
+            fullPath);
+        var error = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.NotNull(error.Exception);
+        Assert.IsNotType<PrivateHandlerException>(error.Exception);
+        AssertNoPrivateData([error.Message, error.StateText, error.Exception!.ToString()], secret, fullPath);
+        Assert.Contains(nameof(PrivateHandlerException), error.StateText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 未注册工具名含敏感内容_所有安全出口使用固定名称且保持CallId配对()
+    {
+        const string secret = "private-header-value";
+        const string rawToolName = "unknown.private-header-value";
+        const string safeToolName = "unknown.tool";
+        var logger = new DetailedRecordingLogger<AgentLoop>();
+        var modelClient = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("unknown-secret-1", rawToolName, "{}")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已处理。"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+        var loop = new AgentLoop(modelClient, new ToolRegistry(), logger,
+            failureFormatter: ModelErrorFormatter.FormatException,
+            maxStepsFormatter: ModelErrorFormatter.FormatMaxStepsExceeded);
+
+        var events = await CollectAsync(loop.RunAsync(session, "执行未知工具"));
+
+        var storedCall = Assert.Single(session.Messages.Single(message => message.ToolCalls.Count > 0).ToolCalls);
+        var toolMessage = session.Messages.Single(message => message.Role == ChatRole.Tool);
+        var started = Assert.Single(events, item => item.Kind == AgentEventKind.ToolCallStarted);
+        var completed = Assert.Single(events, item => item.Kind == AgentEventKind.ToolCallCompleted);
+        var nextRequestCall = Assert.Single(modelClient.Requests[1].Messages.Single(message => message.ToolCalls.Count > 0).ToolCalls);
+        Assert.All(new[] { storedCall.Name, toolMessage.ToolName, started.ToolName, completed.ToolName, nextRequestCall.Name },
+            name => Assert.Equal(safeToolName, name));
+        Assert.All(new[] { storedCall.Id, toolMessage.ToolCallId, started.ToolCallId, completed.ToolCallId, nextRequestCall.Id },
+            id => Assert.Equal("unknown-secret-1", id));
+        using var viewModel = new AssistantViewModel(new GatewayProcessService());
+        foreach (var agentEvent in events)
+        {
+            viewModel.Project(agentEvent);
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), $"loomx-unknown-tool-safety-{Guid.NewGuid():N}");
+        try
+        {
+            var store = new AssistantSessionStore(root);
+            await store.SaveAsync(session);
+            var jsonl = await File.ReadAllTextAsync(Path.Combine(root, session.Id + ".jsonl"));
+            AssertNoPrivateData(
+                session.Messages.Select(message => message.Content)
+                    .Concat(events.Select(agentEvent => agentEvent.Detail))
+                    .Concat(events.Select(agentEvent => agentEvent.Message?.Content))
+                    .Concat(modelClient.Requests.SelectMany(request => request.Messages).Select(message => message.Content))
+                    .Append(string.Join("\n", viewModel.Messages.Select(message => message.ItemsText)))
+                    .Append(string.Join("\n", logger.Entries.Select(entry => $"{entry.Message} | {entry.StateText} | {entry.Exception}")))
+                    .Append(jsonl),
+                secret,
+                rawToolName);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task 固定结构化安全失败_经过中央边界仍保留Toml与AskUser错误码()
+    {
+        var tomlRegistry = TomlToolsTestSupport.CreateRegistry(new RecordingTomlDocumentService
+        {
+            ReadHandler = (_, _) => throw new InvalidOperationException("内部异常不得回显"),
+        });
+        Assert.True(tomlRegistry.TryGet("toml.read", out var tomlTool));
+        using var broker = new UserDecisionBroker(NullLogger<UserDecisionBroker>.Instance);
+        var registry = new ToolRegistry();
+        registry.Register(tomlTool!);
+        AssistantTools.RegisterAll(registry, broker);
+        var modelClient = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("toml-failure", "toml.read", "{\"path\":\"config.toml\"}")), new ModelCompletedEvent("tool_calls")],
+            [new ModelToolCallEvent(new ToolCall("ask-failure", "assistant.ask_user", "{}")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已处理。"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        await CollectAsync(CreateLoop(modelClient, registry).RunAsync(session, "执行结构化失败工具"));
+
+        var results = session.Messages.Where(message => message.Role == ChatRole.Tool).Select(message => message.Content ?? string.Empty).ToArray();
+        Assert.Contains(results, content => content.Contains("toml_operation_failed", StringComparison.Ordinal));
+        Assert.Contains(results, content => content.Contains("invalid_request", StringComparison.Ordinal));
+    }
+
+    private static void AssertNoPrivateData(IEnumerable<string?> values, params string[] privateValues)
+    {
+        foreach (var value in values.Where(value => value is not null))
+        {
+            foreach (var privateValue in privateValues)
+            {
+                Assert.DoesNotContain(privateValue, value!, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+    }
+
+    private sealed class PrivateHandlerException(string message, Exception innerException) : Exception(message, innerException);
+
+    private sealed class DetailedRecordingLogger<T> : ILogger<T>
+    {
+        public List<RecordedLogEntry> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var stateText = state is IEnumerable<KeyValuePair<string, object?>> properties
+                ? string.Join(" | ", properties.Select(property => $"{property.Key}={property.Value}"))
+                : state?.ToString() ?? string.Empty;
+            Entries.Add(new RecordedLogEntry(logLevel, exception, formatter(state, exception), stateText));
+        }
+    }
+
+    private sealed record RecordedLogEntry(LogLevel Level, Exception? Exception, string Message, string StateText);
+
 }

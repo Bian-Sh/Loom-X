@@ -16,13 +16,23 @@ public interface IActivityStore
 public sealed class ActivityStore(ILogger<ActivityStore> logger) : BackgroundService, IActivityStore
 {
     private const int MaxRows = 50_000;
+    private const int BatchSize = 32;
     private static readonly TimeSpan MaxAge = TimeSpan.FromDays(7);
+    /// <summary>
+    /// 静默期兜底刷新间隔：只按条数触发会导致低流量时事件长期滞留在内存中不落盘。
+    /// </summary>
+    private static readonly TimeSpan FlushDelay = TimeSpan.FromSeconds(1);
+    /// <summary>
+    /// 清理节流窗口：每批写入都做一次全表 prune 会在数据量接近上限时拖慢整个写入循环。
+    /// </summary>
+    private static readonly TimeSpan PruneInterval = TimeSpan.FromMinutes(1);
     private readonly Channel<ActivityEventInput> queue = Channel.CreateBounded<ActivityEventInput>(new BoundedChannelOptions(2048)
     {
         FullMode = BoundedChannelFullMode.DropOldest,
         SingleReader = true,
         SingleWriter = false
     });
+    private DateTimeOffset lastPrunedAt = DateTimeOffset.MinValue;
 
     public event EventHandler<ActivityEventInput>? ActivityEnqueued;
 
@@ -73,15 +83,34 @@ public sealed class ActivityStore(ILogger<ActivityStore> logger) : BackgroundSer
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await using (var db = CreateContext()) await ActivityDatabase.InitializeAsync(db, stoppingToken);
-        var pending = new List<ActivityEventInput>(64);
+        var pending = new List<ActivityEventInput>(BatchSize);
+        var nextFlushAt = DateTime.UtcNow + FlushDelay;
         try
         {
-            await foreach (var input in queue.Reader.ReadAllAsync(stoppingToken))
+            while (!stoppingToken.IsCancellationRequested)
             {
-                pending.Add(input);
-                if (pending.Count < 32) continue;
+                using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+                timeoutSource.CancelAfter(FlushDelay);
+                try
+                {
+                    var input = await queue.Reader.ReadAsync(timeoutSource.Token);
+                    pending.Add(input);
+                }
+                catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+                {
+                    // 刷新窗口到期，落盘已在下方统一处理。
+                }
+
+                if (pending.Count < BatchSize && DateTime.UtcNow < nextFlushAt) continue;
+                if (pending.Count == 0)
+                {
+                    nextFlushAt = DateTime.UtcNow + FlushDelay;
+                    continue;
+                }
+
                 await PersistAsync(pending, stoppingToken);
                 pending.Clear();
+                nextFlushAt = DateTime.UtcNow + FlushDelay;
             }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -115,6 +144,20 @@ public sealed class ActivityStore(ILogger<ActivityStore> logger) : BackgroundSer
                 ErrorType = input.ErrorType
             });
             await db.SaveChangesAsync(cancellationToken);
+            await PruneAsync(db, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "活动记录写入失败 {Count}", inputs.Count);
+        }
+    }
+
+    private async Task PruneAsync(ActivityDbContext db, CancellationToken cancellationToken)
+    {
+        if (DateTimeOffset.UtcNow - lastPrunedAt < PruneInterval) return;
+        lastPrunedAt = DateTimeOffset.UtcNow;
+        try
+        {
             var cutoff = DateTimeOffset.UtcNow - MaxAge;
             await db.Events.Where(item => item.CreatedAt < cutoff).ExecuteDeleteAsync(cancellationToken);
             var overflow = await db.Events.OrderByDescending(item => item.Id).Skip(MaxRows).Select(item => item.Id).ToListAsync(cancellationToken);
@@ -122,7 +165,7 @@ public sealed class ActivityStore(ILogger<ActivityStore> logger) : BackgroundSer
         }
         catch (Exception exception)
         {
-            logger.LogError(exception, "活动记录写入失败 {Count}", inputs.Count);
+            logger.LogWarning(exception, "活动记录清理失败，等待下一轮");
         }
     }
 

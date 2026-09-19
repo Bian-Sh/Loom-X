@@ -1,14 +1,34 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
+using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using LoomX;
 using LoomX.ViewModels;
+using LoomX.Localization;
+using LoomX.Services;
 using System.Diagnostics;
+using System.Globalization;
 
 namespace LoomX.Views;
+public sealed class ProviderCompatibilityMatchConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => Equals(value, parameter);
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is true ? parameter! : BindingOperations.DoNothing;
+}
+
+public sealed class ProviderBooleanNotConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is not bool boolean || !boolean;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => BindingOperations.DoNothing;
+}
+
 public partial class ProvidersView : UserControl
 {
     private ItemsControl? modelDragItemsControl;
@@ -44,6 +64,27 @@ public partial class ProvidersView : UserControl
             viewModel.SelectedProvider?.ToggleApiKeyVisibility();
     }
 
+    private async void CopyTestResponseButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not ProvidersViewModel viewModel) return;
+        var response = viewModel.TestPanel.ResponseText;
+        if (string.IsNullOrWhiteSpace(response)) return;
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.Clipboard is null) return;
+
+        try
+        {
+            await topLevel.Clipboard.SetTextAsync(response);
+            if (topLevel is MainWindow owner)
+                owner.ToastService.Show(ResourceLookup.Resolve("providers.test.copy.success"), ToastLevel.Success);
+        }
+        catch
+        {
+            if (topLevel is MainWindow owner)
+                owner.ToastService.Show(ResourceLookup.Resolve("providers.test.copy.failure"), ToastLevel.Error);
+        }
+    }
+
     private void CliIdentityMenuButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is not ProvidersViewModel viewModel) return;
@@ -69,20 +110,20 @@ public partial class ProvidersView : UserControl
 
         var dialog = new GlassDialogWindow
         {
-            Title = "提示",
+            Title = ResourceLookup.Resolve("providers.delete.dialog.title"),
             Width = 420,
             Height = 220,
             CanResize = false,
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
-        var cancelButton = new Button { Content = "取消", MinWidth = 76, Classes = { "dialog-action" } };
-        var deleteButton = new Button { Content = "删除", MinWidth = 76, Classes = { "dialog-action", "dialog-danger" } };
+        var cancelButton = new Button { Content = ResourceLookup.Resolve("providers.delete.dialog.cancel"), MinWidth = 76, Classes = { "dialog-action" } };
+        var deleteButton = new Button { Content = ResourceLookup.Resolve("providers.delete.dialog.confirm"), MinWidth = 76, Classes = { "dialog-action", "dialog-danger" } };
         var buttons = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center, Spacing = 12 };
         buttons.Children.Add(cancelButton);
         buttons.Children.Add(deleteButton);
         dialog.DialogContent = new TextBlock
         {
-            Text = $"确定删除 Provider“{provider.DisplayName}”吗？",
+            Text = string.Format(CultureInfo.CurrentCulture, ResourceLookup.Resolve("providers.delete.dialog.message"), provider.DisplayName),
             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
             TextAlignment = Avalonia.Media.TextAlignment.Center,
             MaxWidth = 340,

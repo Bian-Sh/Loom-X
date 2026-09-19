@@ -66,4 +66,46 @@ public sealed class SkillStoreTests : IDisposable
     {
         Assert.Null(new SkillStore(rootDirectory).Load("clients", "codex"));
     }
+
+    [Theory]
+    [InlineData("codex")]
+    [InlineData("claude-code")]
+    public void InstallDirectory_ClientSkill_DeclaresResearchChannelsAndChallengeHandoff(string skillName)
+    {
+        var document = SkillStore.ForInstallDirectory().Load("clients", skillName);
+
+        Assert.NotNull(document);
+        var content = document.Content;
+        var nativeIndex = content.IndexOf("优先使用模型原生或已有的官方资料能力", StringComparison.Ordinal);
+        var browserIndex = content.IndexOf("其次使用 Browser Bridge", StringComparison.Ordinal);
+        var askUserIndex = content.IndexOf("没有可用资料通道时", StringComparison.Ordinal);
+
+        Assert.True(nativeIndex >= 0 && nativeIndex < browserIndex && browserIndex < askUserIndex);
+        Assert.Contains("browser.open", content);
+        Assert.Contains("browser.read", content);
+        Assert.Contains("browser.wait", content);
+        Assert.Contains("登录", content);
+        Assert.Contains("CAPTCHA", content);
+        Assert.Contains("Cloudflare", content);
+        Assert.Contains("JS challenge", content);
+        Assert.Contains("立即暂停并交还用户", content);
+        Assert.Contains("禁止绕过网站安全机制", content);
+        AssertNoSearchSecretConfiguration(content);
+    }
+
+    private static void AssertNoSearchSecretConfiguration(string content)
+    {
+        foreach (var forbidden in new[]
+        {
+            "SEARCH_API_KEY",
+            "SERPAPI_API_KEY",
+            "TAVILY_API_KEY",
+            "BRAVE_SEARCH_API_KEY",
+            "BING_SEARCH_API_KEY",
+            "GOOGLE_SEARCH_API_KEY",
+        })
+        {
+            Assert.DoesNotContain(forbidden, content, StringComparison.OrdinalIgnoreCase);
+        }
+    }
 }

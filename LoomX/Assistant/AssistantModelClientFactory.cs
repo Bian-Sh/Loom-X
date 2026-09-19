@@ -105,7 +105,7 @@ public class AssistantModelClientFactory
             ProviderBusinessId = providerBusinessId,
             ModelId = modelId,
         });
-        logger.LogInformation("小助手模型已指定 {ProviderId}/{ModelId}", providerBusinessId, modelId);
+        logger.LogInformation("AI 助手模型已指定 {ProviderId}/{ModelId}", providerBusinessId, modelId);
     }
 
     /// <summary>清除指定模型偏好；下一次创建客户端时会重新使用可用列表首项作为初始值。</summary>
@@ -116,7 +116,7 @@ public class AssistantModelClientFactory
             ProviderBusinessId = null,
             ModelId = null,
         });
-        logger.LogInformation("小助手模型偏好已清除");
+        logger.LogInformation("AI 助手模型偏好已清除");
     }
 
     /// <summary>构建助手模型客户端；无可用模型时返回 null（调用方应给出明确错误而非假装可用）。</summary>
@@ -125,12 +125,12 @@ public class AssistantModelClientFactory
         var selection = await SelectModelAsync(cancellationToken);
         if (selection is null)
         {
-            logger.LogWarning("小助手无可用模型（需要启用中的 openai 兼容 Provider 与模型）");
+            logger.LogWarning("AI 助手无可用模型（需要启用中的 openai 兼容 Provider 与模型）");
             return null;
         }
 
         logger.LogInformation(
-            "小助手模型已选定 {ProviderId}/{ModelId} 走代理 {UseProxy}",
+            "AI 助手模型已选定 {ProviderId}/{ModelId} 走代理 {UseProxy}",
             selection.Provider.BusinessId,
             selection.Model.ModelId,
             selection.Provider.UseProxy);
@@ -170,7 +170,7 @@ public class AssistantModelClientFactory
                 return CreateSelection(provider, model);
             }
 
-            logger.LogWarning("小助手指定模型失效，不自动切换 {ProviderId}/{ModelId}", preferredProvider, preferredModel);
+            logger.LogWarning("AI 助手指定模型失效，不自动切换 {ProviderId}/{ModelId}", preferredProvider, preferredModel);
             return null;
         }
 
@@ -185,7 +185,7 @@ public class AssistantModelClientFactory
                 ProviderBusinessId = provider.BusinessId,
                 ModelId = model.ModelId,
             });
-            logger.LogInformation("小助手首次使用默认模型 {ProviderId}/{ModelId}", provider.BusinessId, model.ModelId);
+            logger.LogInformation("AI 助手首次使用默认模型 {ProviderId}/{ModelId}", provider.BusinessId, model.ModelId);
             return initialSelection;
         }
 
@@ -271,7 +271,7 @@ public class AssistantModelClientFactory
                 || proxyUri.Scheme is not ("http" or "https")
                 || settings.ProxyPort is < 1 or > 65535)
             {
-                logger.LogWarning("小助手自定义代理配置无效，本次直连");
+                logger.LogWarning("AI 助手自定义代理配置无效，本次直连");
                 return httpClientFactory.CreateClient("loomx-assistant");
             }
 

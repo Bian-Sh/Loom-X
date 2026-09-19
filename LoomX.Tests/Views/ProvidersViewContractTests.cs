@@ -141,9 +141,13 @@ public sealed class ProvidersViewContractTests
         var source = File.ReadAllText(path);
 
         Assert.Contains("private bool suppressConfigurationRefresh;", source, StringComparison.Ordinal);
-        Assert.Contains("if (suppressConfigurationRefresh) return;", source, StringComparison.Ordinal);
         Assert.Contains("suppressConfigurationRefresh = true;", source, StringComparison.Ordinal);
         Assert.Contains("finally { suppressConfigurationRefresh = false; }", source, StringComparison.Ordinal);
+        // 本机保存事件必须携带 LocalSave 来源，Providers 页据此跳过列表重建，编辑中的实例原地保留。
+        Assert.Contains("if (args.Source == ConfigurationChangeSource.LocalSave) return;", source, StringComparison.Ordinal);
+        Assert.Contains("private void MergeProviders(IReadOnlyList<ProviderResponse> responses)", source, StringComparison.Ordinal);
+        Assert.Contains("Providers.RemoveAt(index);", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Providers.Add(ProviderEditorViewModel.FromResponse(provider));", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -152,7 +156,7 @@ public sealed class ProvidersViewContractTests
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
         var source = File.ReadAllText(path);
 
-        Assert.Contains("public bool HasUnsavedChanges => Id == Guid.Empty || isDirty;", source, StringComparison.Ordinal);
+        Assert.Contains("public bool HasUnsavedChanges => Id == Guid.Empty || isDirty || editRevision != savedEditRevision;", source, StringComparison.Ordinal);
         Assert.Contains("if (!provider.HasUnsavedChanges) return;", source, StringComparison.Ordinal);
         Assert.Contains("if (!model.HasUnsavedChanges) return;", source, StringComparison.Ordinal);
     }
@@ -176,9 +180,15 @@ public sealed class ProvidersViewContractTests
         Assert.DoesNotContain("ModelEditorToggle_OnClick", codeBehindSource, StringComparison.Ordinal);
         Assert.Contains("provider.PropertyChanged += ProviderChanged;", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("model.PropertyChanged += ModelChanged;", viewModelSource, StringComparison.Ordinal);
-        Assert.Contains("Task.Delay(TimeSpan.FromMilliseconds(350), cancellationToken)", viewModelSource, StringComparison.Ordinal);
-        Assert.Contains("QueueProviderAutoSave(provider)", viewModelSource, StringComparison.Ordinal);
-        Assert.Contains("QueueModelAutoSave(provider, model)", viewModelSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("DebouncedAutoSaver", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("private readonly SemaphoreSlim providerSaveLock", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("private readonly SemaphoreSlim modelSaveLock", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("_ = SaveProviderAsync(provider);", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("_ = SaveModelAsync(provider, model, enabledOnly", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("dataStore.UpdateModelEnabledAsync(model.Id, model.Enabled)", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("ProviderEditorViewModel.IsPersistedProperty(args.PropertyName)", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("ModelEditorViewModel.IsPersistedProperty(args.PropertyName)", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("UpdateSourceTrigger=PropertyChanged", viewSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -249,6 +259,82 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("IsVisible=\"{Binding IsHealthError}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding IsHealthWarning}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding IsHealthChecking}\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProviderEditorUsesFourLocalizedTabsAndRemovesLegacyConnectionBlock()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        Assert.Equal(4, source.Split("<TabItem Header=", StringSplitOptions.None).Length - 1);
+        Assert.Contains("providers.tab.basic", source, StringComparison.Ordinal);
+        Assert.Contains("providers.tab.advanced", source, StringComparison.Ordinal);
+        Assert.Contains("providers.tab.models", source, StringComparison.Ordinal);
+        Assert.Contains("providers.tab.test", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.tab.request", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestConnectionCommand", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.connection.test", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BasicTabUsesCompatibilityCardsHidesProviderIdAndOwnsApiKey()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var basic = ReadTab(source, "providers.tab.basic");
+        var advanced = ReadTab(source, "providers.tab.advanced");
+        Assert.DoesNotContain("SelectedProvider.BusinessId", basic, StringComparison.Ordinal);
+        Assert.Contains("SelectedProvider.SelectedCompatibility", basic, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.chat.title", basic, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.responses.title", basic, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.anthropic.title", basic, StringComparison.Ordinal);
+        Assert.Contains("SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectedProvider.ApiKey", advanced, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdvancedAndTestTabsExposeSafeConfigurationAndTestBindings()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var advanced = ReadTab(source, "providers.tab.advanced");
+        var test = ReadTab(source, "providers.tab.test");
+        Assert.Contains("SelectedProvider.UseProxy", advanced, StringComparison.Ordinal);
+        Assert.Contains("SelectedProvider.Headers", advanced, StringComparison.Ordinal);
+        Assert.Contains("SelectedProvider.CliIdentities", advanced, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.SelectedModel", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.SelectedMode", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.Prompt", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.SendCommand", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.StopCommand", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.RetryCommand", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.ClearCommand", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.ResponseText", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.Summary", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.HasError", test, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CopyResponseUsesClipboardAndSafeToastFeedback()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml.cs");
+        var start = source.IndexOf("private async void CopyTestResponseButton_OnClick", StringComparison.Ordinal);
+        var end = source.IndexOf("private void CliIdentityMenuButton_OnClick", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var copyHandler = source[start..end];
+        Assert.Contains("TestPanel.ResponseText", copyHandler, StringComparison.Ordinal);
+        Assert.Contains("Clipboard", copyHandler, StringComparison.Ordinal);
+        Assert.Contains("ToastService", copyHandler, StringComparison.Ordinal);
+        Assert.Contains("ToastLevel.Success", copyHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("ApiKey", copyHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("HeadersJson", copyHandler, StringComparison.Ordinal);
+    }
+
+    private static string ReadTab(string source, string headerKey)
+    {
+        var marker = $"<TabItem Header=\"{{l:Locale {headerKey}}}\">";
+        var start = source.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"缺少 Tab：{headerKey}");
+        var end = source.IndexOf("</TabItem>", start, StringComparison.Ordinal);
+        Assert.True(end >= 0, $"Tab 未闭合：{headerKey}");
+        return source[start..end];
     }
 
     private static string ReadDesktopFile(params string[] segments)

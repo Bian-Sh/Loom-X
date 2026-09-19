@@ -1,4 +1,4 @@
-using System.Text.Encodings.Web;
+﻿using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using LoomX.Configuration;
@@ -69,10 +69,10 @@ public static class LoomXTools
                 var modelClient = await modelClientFactory(cancellationToken);
                 if (modelClient is null)
                 {
-                    return ToolResult.Fail(new JsonObject
+                    return ToolResult.SafeFail(new JsonObject
                     {
                         ["error"] = "assistant_model_not_configured",
-                        ["message"] = "小助手模型尚未配置，无法调起诊断工人。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。",
+                        ["message"] = "AI 助手模型尚未配置，无法调起诊断工人。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。",
                     }.ToJsonString(OutputJsonOptions));
                 }
 
@@ -173,13 +173,14 @@ public static class LoomXTools
         registry.Register(new ToolDefinition
         {
             Name = "loomx.create_provider",
-            Description = "创建 Provider。api_key 只会加密存入本地（DPAPI），不会回显。",
+            Description = "创建 Provider。api_key 只会加密存入本地（DPAPI），不会回显；可用 api_key_secret_ref 引用浏览器收割的 Key。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{
                   "business_id":{"type":"string"},"display_name":{"type":"string"},
                   "base_url":{"type":"string","description":"HTTP/HTTPS 绝对地址"},
                   "api_mode":{"type":"string","enum":["openai","anthropic","ollama"]},
                   "enabled":{"type":"boolean"},"api_key":{"type":"string"},
+                  "api_key_secret_ref":{"type":"string","description":"secret://browser/... 形式的引用"},
                   "use_proxy":{"type":"boolean"},"model_list_url":{"type":"string"},
                   "endpoint_format":{"type":"string","enum":["responses","chat_completions"]},
                   "headers":{"type":"object","description":"自定义请求头"}
@@ -492,7 +493,7 @@ public static class LoomXTools
             Description = "创建自定义 Endpoint。当前版本 Endpoint 为系统预置，调用会返回说明。",
             ParametersSchema = Schema("""{"type":"object","properties":{"key":{"type":"string"}}}"""),
             RiskLevel = ToolRiskLevel.Write,
-            Handler = (_, _) => Task.FromResult(ToolResult.Fail(
+            Handler = (_, _) => Task.FromResult(ToolResult.SafeFail(
                 "LoomX Endpoint 为系统预置（ollama/openai/azure），不支持创建自定义 Endpoint。可用 loomx.update_endpoint 启停、调整 Reasoning Effort 或 Combo 绑定。")),
         });
 
@@ -538,7 +539,7 @@ public static class LoomXTools
             Description = "删除 Endpoint。当前版本 Endpoint 为系统预置，调用会返回说明。",
             ParametersSchema = Schema("""{"type":"object","properties":{"key":{"type":"string"}}}"""),
             RiskLevel = ToolRiskLevel.Destructive,
-            Handler = (_, _) => Task.FromResult(ToolResult.Fail(
+            Handler = (_, _) => Task.FromResult(ToolResult.SafeFail(
                 "LoomX Endpoint 为系统预置（ollama/openai/azure），不可删除。如需停用请用 loomx.update_endpoint 将 enabled 设为 false。")),
         });
     }
@@ -677,6 +678,7 @@ public static class LoomXTools
         ["id"] = JsonValue.Create(combo.Id),
         ["name"] = combo.Name,
         ["enabled"] = combo.Enabled,
+        ["is_deleted"] = combo.IsDeleted,
         ["sort_order"] = combo.SortOrder,
         ["routes"] = new JsonArray(combo.Routes.Select(route => (JsonNode?)ToSafeJson(route)).ToArray()),
         ["endpoints"] = new JsonArray(combo.Endpoints.Select(endpoint => (JsonNode?)new JsonObject
@@ -770,8 +772,8 @@ public static class LoomXTools
     {
         var providers = await configuration.ListProvidersAsync(cancellationToken);
         return Guid.TryParse(idOrBusinessId, out var id)
-            ? providers.FirstOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException($"Provider '{idOrBusinessId}' 不存在。")
-            : providers.FirstOrDefault(item => string.Equals(item.BusinessId, idOrBusinessId, StringComparison.OrdinalIgnoreCase)) ?? throw new KeyNotFoundException($"Provider '{idOrBusinessId}' 不存在。");
+            ? providers.FirstOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("Provider 不存在。")
+            : providers.FirstOrDefault(item => string.Equals(item.BusinessId, idOrBusinessId, StringComparison.OrdinalIgnoreCase)) ?? throw new KeyNotFoundException("Provider 不存在。");
     }
 
     private static async Task<ModelResponse> FindModelAsync(ConfigurationManagementService configuration, Guid id, CancellationToken cancellationToken)
@@ -785,15 +787,15 @@ public static class LoomXTools
     {
         var combos = await configuration.ListGatewayCombosAsync(cancellationToken);
         return Guid.TryParse(idOrName, out var id)
-            ? combos.FirstOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException($"Combo '{idOrName}' 不存在。")
-            : combos.FirstOrDefault(item => string.Equals(item.Name, idOrName, StringComparison.OrdinalIgnoreCase)) ?? throw new KeyNotFoundException($"Combo '{idOrName}' 不存在。");
+            ? combos.FirstOrDefault(item => item.Id == id) ?? throw new KeyNotFoundException("Combo 不存在。")
+            : combos.FirstOrDefault(item => string.Equals(item.Name, idOrName, StringComparison.OrdinalIgnoreCase)) ?? throw new KeyNotFoundException("Combo 不存在。");
     }
 
     private static async Task<GatewayEndpointResponse> FindEndpointAsync(ConfigurationManagementService configuration, string key, CancellationToken cancellationToken)
     {
         var endpoints = await configuration.ListGatewayEndpointsAsync(cancellationToken);
         return endpoints.FirstOrDefault(item => string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase))
-            ?? throw new KeyNotFoundException($"Endpoint '{key}' 不存在。");
+            ?? throw new KeyNotFoundException("Endpoint 不存在。");
     }
 
     private static ToolResult Ok(JsonObject json) => ToolResult.Ok(json.ToJsonString(OutputJsonOptions));
@@ -808,7 +810,7 @@ public static class LoomXTools
         }
         catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException or InvalidOperationException or JsonException or FormatException)
         {
-            return ToolResult.Fail(exception.Message);
+            return SafeGuardFailure(exception);
         }
     }
 
@@ -820,9 +822,17 @@ public static class LoomXTools
         }
         catch (Exception exception) when (exception is KeyNotFoundException or ArgumentException or InvalidOperationException or JsonException or FormatException)
         {
-            return ToolResult.Fail(exception.Message);
+            return SafeGuardFailure(exception);
         }
     }
+
+    private static ToolResult SafeGuardFailure(Exception exception) => exception switch
+    {
+        KeyNotFoundException => ToolResult.SafeFail("请求的资源不存在。"),
+        ArgumentException or JsonException or FormatException => ToolResult.SafeFail("缺少必填参数或工具参数无效。"),
+        InvalidOperationException => ToolResult.SafeFail("当前操作无法完成，请检查关联模型或配置状态。"),
+        _ => ToolResult.SafeFail("工具执行失败。"),
+    };
 
     private static string RequireString(JsonNode? args, string name) =>
         GetString(args, name) ?? throw new ArgumentException($"缺少必填参数 '{name}'。");

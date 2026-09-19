@@ -1,5 +1,7 @@
 using System.IO;
+using System.Globalization;
 using LoomX.Configuration;
+using LoomX.Localization;
 using LoomX.ViewModels;
 using Xunit;
 
@@ -118,6 +120,17 @@ public sealed class GatewayViewContractTests
     }
 
     [Fact]
+    public void ComboNameUpdatesSourceBeforeEditCompletedSave()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+        var codeBehindSource = ReadDesktopFile("Views", "GatewayView.axaml.cs");
+
+        Assert.Contains("Text=\"{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", source, StringComparison.Ordinal);
+        Assert.Contains("LostFocus=\"ComboName_OnLostFocus\"", source, StringComparison.Ordinal);
+        Assert.Contains("await viewModel.SaveComboChangesAsync(combo)", codeBehindSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GatewaySeparatesEndpointBindingsFromGlobalComboEditor()
     {
         var source = ReadDesktopFile("Views", "GatewayView.axaml");
@@ -231,6 +244,43 @@ public sealed class GatewayViewContractTests
         Assert.Equal("共享模型、备用模型", openAi.SelectedComboSummary);
         Assert.Equal(["minimal", "low", "medium", "high"], ollama.ReasoningEffortOptions);
         Assert.Equal("high", ollama.ReasoningEffort);
+    }
+
+    [Fact]
+    public void MissingCombosAreHiddenOnlyFromTheRightEditorPanel()
+    {
+        var source = ReadDesktopFile("Views", "GatewayView.axaml");
+        var comboId = Guid.NewGuid();
+        var missingCombo = GatewayComboEditorViewModel.FromResponse(new GatewayComboResponse(comboId, "历史组合", true, 0, [], [], true));
+        var endpoint = GatewayEndpointEditorViewModel.FromResponse(
+            new GatewayEndpointResponse("openai", "OpenAI", "/openai", true, [new GatewayEndpointComboResponse(comboId, "历史组合", true, true, 0, true)]),
+            "http://127.0.0.1:11434",
+            [missingCombo]);
+
+        Assert.Contains("ClipToBounds=\"True\" IsVisible=\"{Binding !IsDeleted}\"", source, StringComparison.Ordinal);
+        Assert.Contains("<CheckBox Tag=\"{Binding}\" IsChecked=\"{Binding IsSelected, Mode=OneWay}\" Click=\"EndpointComboOption_OnClick\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<CheckBox Tag=\"{Binding}\" IsVisible=\"{Binding !IsDeleted}\"", source, StringComparison.Ordinal);
+        var leftOption = Assert.Single(endpoint.ComboOptions);
+        Assert.True(leftOption.IsDeleted);
+        Assert.True(leftOption.IsSelected);
+    }
+
+    [Fact]
+    public void ComboPickerStatusLabelsAreLocalizedAndDeletedItemsRemainInteractive()
+    {
+        Assert.Equal("停用", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("zh-CN")));
+        Assert.Equal("Disabled", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("en-US")));
+        Assert.Equal("無効", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("ja-JP")));
+        Assert.Equal("停用", ResourceLookup.Resolve("gateway.combo.disabled", new CultureInfo("zh-TW")));
+        Assert.Equal("不存在", ResourceLookup.Resolve("gateway.combo.missing", new CultureInfo("zh-CN")));
+        Assert.Equal("Missing", ResourceLookup.Resolve("gateway.combo.missing", new CultureInfo("en-US")));
+        Assert.Equal("存在しません", ResourceLookup.Resolve("gateway.combo.missing", new CultureInfo("ja-JP")));
+        Assert.Equal("不存在", ResourceLookup.Resolve("gateway.combo.missing", new CultureInfo("zh-TW")));
+
+        var gatewaySource = ReadDesktopFile("Views", "GatewayView.axaml");
+        Assert.DoesNotContain("IsEnabled=\"{Binding !IsDeleted}\"", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"combo-missing\"", gatewaySource, StringComparison.Ordinal);
+        Assert.Contains("DangerBrush", gatewaySource, StringComparison.Ordinal);
     }
 
     [Fact]

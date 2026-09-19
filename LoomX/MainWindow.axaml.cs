@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -7,6 +8,10 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.Logging;
 using LoomX.Services;
+using LoomX.ViewModels;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 
 namespace LoomX;
 public partial class MainWindow : Window
@@ -17,6 +22,16 @@ public partial class MainWindow : Window
     private readonly ILogger<MainWindow> logger;
     private readonly DispatcherTimer toastTimer;
     private readonly WindowAppearanceCoordinator appearanceCoordinator;
+    private MainWindowViewModel? navigationViewModel;
+    private readonly DispatcherTimer navigationSelectionAnimationTimer;
+    private readonly TranslateTransform navigationSelectionIndicatorTransform = new();
+    private readonly TranslateTransform navigationSelectionOutlineTransform = new();
+    private Stopwatch? navigationSelectionAnimationStopwatch;
+    private double navigationSelectionOffset;
+    private double navigationSelectionAnimationFrom;
+    private double navigationSelectionAnimationTarget;
+    private const double NavigationSelectionAnimationDurationMs = 200;
+    private static readonly CubicEaseOut NavigationSelectionEasing = new();
 
     public ToastService ToastService => toastService;
     internal WindowAppearanceCoordinator AppearanceCoordinator => appearanceCoordinator;
@@ -28,10 +43,17 @@ public partial class MainWindow : Window
         this.toastService = toastService;
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MainWindow>.Instance;
         InitializeComponent();
+        navigationSelectionIndicator.RenderTransform = navigationSelectionIndicatorTransform;
+        navigationSelectionOutline.RenderTransform = navigationSelectionOutlineTransform;
+        navigationSelectionAnimationTimer = new DispatcherTimer(
+            TimeSpan.FromMilliseconds(8),
+            DispatcherPriority.Render,
+            NavigationSelectionAnimationTimer_OnTick);
         appearanceCoordinator = new WindowAppearanceCoordinator(this);
         TransparencyLevelHint = BuildTransparencyLevels("acrylic");
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerMovedEvent, Window_OnPointerMoved, RoutingStrategies.Tunnel);
+        DataContextChanged += MainWindow_OnDataContextChanged;
         toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
         toastTimer.Tick += (_, _) =>
         {
@@ -39,7 +61,108 @@ public partial class MainWindow : Window
             toastBorder.IsVisible = false;
         };
         toastService.Requested += ToastServiceOnRequested;
-        Closed += (_, _) => toastService.Requested -= ToastServiceOnRequested;
+        Closed += (_, _) =>
+        {
+            toastService.Requested -= ToastServiceOnRequested;
+            DetachNavigationViewModel();
+        };
+    }
+
+    private void MainWindow_OnDataContextChanged(object? sender, EventArgs e)
+    {
+        AttachNavigationViewModel(DataContext as MainWindowViewModel);
+    }
+
+    private void AttachNavigationViewModel(MainWindowViewModel? viewModel)
+    {
+        if (ReferenceEquals(navigationViewModel, viewModel))
+        {
+            if (viewModel is not null) SetNavigationSelectionOffset(viewModel.SelectedNavigationOffset);
+            return;
+        }
+
+        DetachNavigationViewModel();
+        navigationViewModel = viewModel;
+        if (navigationViewModel is null) return;
+
+        navigationViewModel.PropertyChanged += NavigationViewModel_OnPropertyChanged;
+        // 首次绑定时直接定位默认概览，后续切换才进入动画，避免首帧从未布局状态硬切。
+        SetNavigationSelectionOffset(navigationViewModel.SelectedNavigationOffset);
+    }
+
+    private void DetachNavigationViewModel()
+    {
+        if (navigationViewModel is not null)
+            navigationViewModel.PropertyChanged -= NavigationViewModel_OnPropertyChanged;
+        navigationViewModel = null;
+        navigationSelectionAnimationTimer.Stop();
+        navigationSelectionAnimationStopwatch = null;
+    }
+
+    private void NavigationViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.SelectedNavigationOffset) && sender is MainWindowViewModel viewModel)
+        {
+            var targetOffset = viewModel.SelectedNavigationOffset;
+            // 等待当前导航命令完成页面通知，避免首次创建页面阻塞动画的首帧。
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (ReferenceEquals(navigationViewModel, viewModel)) AnimateNavigationSelection(targetOffset);
+            }, DispatcherPriority.Background);
+        }
+    }
+
+    private void SetNavigationSelectionOffset(double offset)
+    {
+        navigationSelectionOffset = offset;
+        // 复用变换对象，只更新 Y 属性，减少动画过程中的分配和渲染树重建。
+        navigationSelectionIndicatorTransform.Y = offset;
+        navigationSelectionOutlineTransform.Y = offset;
+    }
+
+    private void AnimateNavigationSelection(double targetOffset)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => AnimateNavigationSelection(targetOffset));
+            return;
+        }
+
+        navigationSelectionAnimationTimer.Stop();
+        navigationSelectionAnimationStopwatch = null;
+        var fromOffset = navigationSelectionOffset;
+        if (Math.Abs(fromOffset - targetOffset) < 0.01)
+        {
+            SetNavigationSelectionOffset(targetOffset);
+            return;
+        }
+
+        navigationSelectionAnimationFrom = fromOffset;
+        navigationSelectionAnimationTarget = targetOffset;
+        navigationSelectionAnimationStopwatch = Stopwatch.StartNew();
+        navigationSelectionAnimationTimer.Start();
+    }
+
+    private void NavigationSelectionAnimationTimer_OnTick(object? sender, EventArgs e)
+    {
+        if (navigationSelectionAnimationStopwatch is null)
+        {
+            navigationSelectionAnimationTimer.Stop();
+            return;
+        }
+
+        var progress = navigationSelectionAnimationStopwatch.Elapsed.TotalMilliseconds / NavigationSelectionAnimationDurationMs;
+        if (progress >= 1)
+        {
+            SetNavigationSelectionOffset(navigationSelectionAnimationTarget);
+            navigationSelectionAnimationTimer.Stop();
+            navigationSelectionAnimationStopwatch = null;
+            return;
+        }
+
+        // Cubic ease-out 让选中框立即跟手移动，并在目标卡片前自然减速。
+        var eased = NavigationSelectionEasing.Ease(progress);
+        SetNavigationSelectionOffset(navigationSelectionAnimationFrom + ((navigationSelectionAnimationTarget - navigationSelectionAnimationFrom) * eased));
     }
 
     private void ToastServiceOnRequested(object? sender, ToastNotification notification)
@@ -149,17 +272,33 @@ public partial class MainWindow : Window
 
     private void ToggleWindowState() => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
+    internal void ActivateFromSecondaryLaunch()
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(ActivateFromSecondaryLaunch);
+            return;
+        }
+
+        if (WindowState == WindowState.Minimized)
+            WindowState = WindowState.Normal;
+        Show();
+        Activate();
+        var nativeActivated = !OperatingSystem.IsWindows() || NativeWindowActivation.TryBringToFront(this);
+        logger.LogInformation("重复启动请求已激活主窗口 {NativeActivated} {ProcessId}", nativeActivated, Environment.ProcessId);
+    }
+
     public void ApplyAppearance(bool enabled, int opacity, int blurAmount, string algorithm)
     {
         // 算法选择已固定为 Acrylic；保留参数仅兼容旧版调用方和配置数据。
         algorithm = "acrylic";
-        logger.LogInformation("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
+        logger.LogDebug("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
         opacity = Math.Clamp(opacity, 0, 100);
         blurAmount = Math.Clamp(blurAmount, 0, 64);
         appearanceCoordinator.Apply(enabled, opacity, blurAmount, algorithm);
         // 保留主窗口入口的显式材质赋值，兼容现有外观契约和运行时诊断。
         TransparencyLevelHint = BuildTransparencyLevels(algorithm);
-        logger.LogInformation(
+        logger.LogDebug(
             "透明外观应用完成 {Enabled} {Opacity} {BlurAmount} {Algorithm} {WindowBackgroundType} {GlassType} {ActualTransparencyLevel}",
             enabled,
             appearanceCoordinator.Current.Opacity,
@@ -202,6 +341,61 @@ public partial class MainWindow : Window
     internal static SolidColorBrush CreateOpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
         ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
         : new SolidColorBrush(Color.FromArgb(255, 230, 240, 243));
+}
+
+internal static class NativeWindowActivation
+{
+    internal static bool TryBringToFront(Window window)
+    {
+        var handle = window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        if (handle == IntPtr.Zero) return false;
+
+        ShowWindow(handle, ShowWindowRestore);
+        SetWindowPos(handle, HwndTopmost, 0, 0, 0, 0, SetWindowPosNoMove | SetWindowPosNoSize | SetWindowPosShowWindow);
+        SetWindowPos(handle, HwndNotTopmost, 0, 0, 0, 0, SetWindowPosNoMove | SetWindowPosNoSize | SetWindowPosShowWindow);
+        BringWindowToTop(handle);
+        var activated = SetForegroundWindow(handle) && GetForegroundWindow() == handle;
+        if (!activated)
+            FlashWindow(handle, true);
+        return activated;
+    }
+
+    private static readonly IntPtr HwndTopmost = new(-1);
+    private static readonly IntPtr HwndNotTopmost = new(-2);
+    private const int ShowWindowRestore = 9;
+    private const uint SetWindowPosNoSize = 0x0001;
+    private const uint SetWindowPosNoMove = 0x0002;
+    private const uint SetWindowPosShowWindow = 0x0040;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ShowWindow(IntPtr handle, int command);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool BringWindowToTop(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool FlashWindow(IntPtr handle, [MarshalAs(UnmanagedType.Bool)] bool invert);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetWindowPos(
+        IntPtr handle,
+        IntPtr insertAfter,
+        int x,
+        int y,
+        int width,
+        int height,
+        uint flags);
 }
 
 internal static class AppearanceBrushUpdater

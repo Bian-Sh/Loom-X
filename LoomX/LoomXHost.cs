@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
@@ -20,18 +20,17 @@ namespace LoomX;
 
 public static class LoomXHost
 {
-    public static async Task<WebApplication> CreateAsync(CancellationToken cancellationToken = default)
+    public static Task<WebApplication> CreateAsync(CancellationToken cancellationToken = default) =>
+        CreateAsync(null, null, cancellationToken);
+
+    internal static async Task<WebApplication> CreateAsync(
+        Assistant.Browser.BrowserBridge? browserBridge,
+        Assistant.Browser.BrowserBridgeLeaseManager? browserBridgeLeaseManager,
+        CancellationToken cancellationToken = default)
     {
         AppDataPaths.EnsureCreated();
 
         LoggingBootstrap.Configure();
-        using (var migrationLoggerFactory = LoggerFactory.Create(builder => builder.AddSerilog(dispose: false)))
-        {
-            var migration = new ApplicationDataMigration(
-                migrationLoggerFactory.CreateLogger<ApplicationDataMigration>());
-            await migration.EnsureMigratedAsync(cancellationToken);
-        }
-
         var databasePath = AppDataPaths.DatabasePath;
         var builder = WebApplication.CreateBuilder(Array.Empty<string>());
         builder.Host.UseSerilog();
@@ -48,6 +47,7 @@ public static class LoomXHost
         builder.Services.AddDbContextFactory<ConfigurationDbContext>(options => options.UseSqlite(CreateConnectionString(databasePath)));
         builder.Services.AddSingleton<IDatabaseConfigurationProvider>(startupConfiguration);
         builder.Services.AddSingleton<ConfigurationManagementService>();
+        builder.Services.AddSingleton<Assistant.Configuration.ITomlDocumentService, Assistant.Configuration.TomlDocumentService>();
         builder.Services.AddSingleton<IAnthropicRequestFactory, AnthropicRequestFactory>();
         builder.Services.AddSingleton<IAnthropicResponseMapper, AnthropicResponseMapper>();
         builder.Services.AddSingleton<IProviderExecutionPipeline, ProviderExecutionPipeline>();
@@ -73,12 +73,30 @@ public static class LoomXHost
         builder.Services.AddSingleton<Assistant.NetworkProbe>();
         builder.Services.AddSingleton<Assistant.DiagnosticSubagent>();
         builder.Services.AddSingleton<Assistant.AssistantModelClientFactory>();
-        builder.Services.AddSingleton(services => new Assistant.Browser.BrowserBridge(
-            port: 17831,
-            services.GetRequiredService<ILogger<Assistant.Browser.BrowserBridge>>()));
+        builder.Services.AddSingleton<Assistant.UserDecisions.IUserDecisionBroker, Assistant.UserDecisions.UserDecisionBroker>();
+        if (browserBridge is null)
+        {
+            builder.Services.AddSingleton(services => new Assistant.Browser.BrowserBridge(
+                port: 17831,
+                services.GetRequiredService<ILogger<Assistant.Browser.BrowserBridge>>()));
+        }
+        else
+        {
+            builder.Services.AddSingleton(browserBridge);
+        }
+
         builder.Services.AddSingleton<Assistant.Browser.IBrowserBridge>(services =>
             services.GetRequiredService<Assistant.Browser.BrowserBridge>());
-        builder.Services.AddHostedService<Assistant.Browser.BrowserBridgeHost>();
+        builder.Services.AddSingleton<Assistant.Browser.IBrowserBridgeLifecycle>(services =>
+            services.GetRequiredService<Assistant.Browser.BrowserBridge>());
+        if (browserBridgeLeaseManager is null)
+        {
+            builder.Services.AddSingleton<Assistant.Browser.BrowserBridgeLeaseManager>();
+        }
+        else
+        {
+            builder.Services.AddSingleton(browserBridgeLeaseManager);
+        }
         builder.Services.AddSingleton(services =>
         {
             var registry = new Assistant.ToolRegistry();
@@ -93,7 +111,14 @@ public static class LoomXHost
             Assistant.Browser.BrowserTools.RegisterAll(
                 registry,
                 services.GetRequiredService<Assistant.Browser.IBrowserBridge>(),
-                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>());
+                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>(),
+                services.GetRequiredService<Assistant.Browser.BrowserBridgeLeaseManager>());
+            Assistant.TomlTools.RegisterAll(
+                registry,
+                services.GetRequiredService<Assistant.Configuration.ITomlDocumentService>());
+            Assistant.AssistantTools.RegisterAll(
+                registry,
+                services.GetRequiredService<Assistant.UserDecisions.IUserDecisionBroker>());
             Assistant.LoomXTools.RegisterDiagnosticTool(
                 registry,
                 services.GetRequiredService<Assistant.DiagnosticSubagent>(),
@@ -204,7 +229,7 @@ public static class LoomXHost
             }
             catch (Exception exception)
             {
-                logger.LogWarning(exception, "小助手偏好旧版 JSON 迁移检查失败");
+                logger.LogWarning(exception, "AI 助手偏好旧版 JSON 迁移检查失败");
             }
         });
     }

@@ -120,6 +120,19 @@ public sealed class ConfigSnapshotService : IDisposable
     public Task DeleteProviderAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteProviderAsync(id, token); return true; }, cancellationToken);
     public Task<ModelResponse> CreateModelAsync(Guid providerId, ModelInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateModelAsync(providerId, input, token), cancellationToken);
     public Task<ModelResponse> UpdateModelAsync(Guid id, ModelInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateModelAsync(id, input, token), cancellationToken);
+    internal async Task UpdateModelEnabledAsync(Guid id, bool enabled, CancellationToken cancellationToken = default)
+    {
+        var initializationLock = ConfigurationDatabase.AcquireInitializationLock();
+        try
+        {
+            await using var db = CreateContext();
+            var affected = await db.Models.Where(model => model.Id == id)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(model => model.Enabled, enabled), cancellationToken);
+            if (affected == 0) throw new KeyNotFoundException("模型不存在。");
+            logger?.LogInformation("模型启用状态更新完成 {ModelId} {Enabled}", id, enabled);
+        }
+        finally { initializationLock.Dispose(); }
+    }
     public Task<IReadOnlyList<ModelResponse>> UpdateModelOrderAsync(Guid providerId, ModelOrderInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateModelOrderAsync(providerId, input, token), cancellationToken);
     public Task DeleteModelAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteModelAsync(id, token); return true; }, cancellationToken);
     public async Task<IReadOnlyList<GatewayModelSourceResponse>> ListEnabledGatewayModelsAsync(CancellationToken cancellationToken = default)
@@ -134,6 +147,7 @@ public sealed class ConfigSnapshotService : IDisposable
             .Select(model => new GatewayModelSourceResponse(model.Id, model.DisplayName, model.Provider.DisplayName))
             .ToArrayAsync(cancellationToken);
     }
+    public Task<IReadOnlyList<GatewayRouteResponse>> ListRoutesForModelAsync(Guid modelId, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.ListRoutesForModelAsync(modelId, token), cancellationToken);
     public Task<IReadOnlyList<GatewayEndpointResponse>> ListGatewayEndpointsAsync(CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.ListGatewayEndpointsAsync(token), cancellationToken);
     public Task<IReadOnlyList<GatewayComboResponse>> ListGatewayCombosAsync(CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.ListGatewayCombosAsync(token), cancellationToken);
     public Task<GatewayEndpointResponse> SetGatewayEndpointEnabledAsync(string key, bool enabled, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.SetGatewayEndpointEnabledAsync(key, enabled, token), cancellationToken);
@@ -156,8 +170,8 @@ public sealed class ConfigSnapshotService : IDisposable
         {
             await using var db = CreateContext();
             var provider = new DatabaseConfigurationProvider(db, CreateProviderLogger());
-            await provider.ReloadAsync(cancellationToken);
-            var service = new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider);
+            // 桌面保存完成后由 AppDataStore 做局部快照与运行时投影更新；管理写入不再预先读取整套配置。
+            var service = new ConfigurationManagementService(new DesktopDbContextFactory(CreateOptions()), provider, reloadProviderAfterWrite: false);
             var result = await operation(service, cancellationToken);
             return result;
         }

@@ -1,6 +1,7 @@
+using System.Collections.Concurrent;
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.Sqlite;
-using System.Data.Common;
 
 namespace LoomX.Configuration;
 
@@ -72,6 +73,7 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.Property(item => item.Id).HasConversion<string>();
             entity.HasIndex(item => item.Name).IsUnique();
             entity.Property(item => item.Name).HasMaxLength(256).IsRequired().UseCollation("NOCASE");
+            entity.Property(item => item.IsDeleted).HasDefaultValue(false);
             entity.HasMany(item => item.Routes).WithOne(item => item.Combo).HasForeignKey(item => item.ComboId).OnDelete(DeleteBehavior.Cascade);
             entity.HasMany(item => item.EndpointBindings).WithOne(item => item.Combo).HasForeignKey(item => item.ComboId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -216,6 +218,7 @@ public sealed class GatewayComboEntity
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public bool Enabled { get; set; } = true;
+    public bool IsDeleted { get; set; }
     public int SortOrder { get; set; }
     public List<GatewayRouteEntity> Routes { get; set; } = [];
     public List<GatewayEndpointComboBindingEntity> EndpointBindings { get; set; } = [];
@@ -244,6 +247,14 @@ public sealed class GatewayRouteEntity
 
 public static class ConfigurationDatabase
 {
+    private static readonly ConcurrentDictionary<string, byte> CompletedInitializations = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// 供测试使用：清空"本进程已完整初始化"缓存，使后续调用重新执行完整初始化流程。
+    /// 运行时不应调用，否则会退回每次均做全量 schema 校验与 GUID 归一化的慢路径。
+    /// </summary>
+    public static void ResetInitializationCache() => CompletedInitializations.Clear();
+
     public static IDisposable AcquireInitializationLock()
     {
         AppDataPaths.EnsureCreated();
@@ -266,9 +277,49 @@ public static class ConfigurationDatabase
         }
     }
 
+    /// <summary>
+    /// 与 <see cref="AcquireInitializationLock"/> 语义相同，但等待期间异步退避，
+    /// 不会像 Thread.Sleep 那样长期占用线程池线程。随机抖动用于缓解多进程惊群。
+    /// </summary>
+    public static async Task<IDisposable> AcquireInitializationLockAsync(CancellationToken cancellationToken = default)
+    {
+        AppDataPaths.EnsureCreated();
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(AppDataPaths.ConfigurationInitializationLockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
+            }
+            catch (IOException) when (DateTime.UtcNow < deadline) { }
+            catch (UnauthorizedAccessException) when (DateTime.UtcNow < deadline) { }
+            if (DateTime.UtcNow >= deadline) throw new TimeoutException("配置库初始化锁等待超时。");
+            await Task.Delay(Random.Shared.Next(15, 45), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// 连接字符串级别的初始化键。不同 SQLite 文件各自独立，测试使用临时路径互不影响。
+    /// </summary>
+    internal static string ResolveInitializationKey(ConfigurationDbContext dbContext) =>
+        dbContext.Database.GetDbConnection().ConnectionString;
+
     public static async Task InitializeAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken = default)
     {
-        using var initializationLock = AcquireInitializationLock();
+        var initializationKey = ResolveInitializationKey(dbContext);
+        if (CompletedInitializations.ContainsKey(initializationKey)) return;
+
+        using var initializationLock = await AcquireInitializationLockAsync(cancellationToken);
+        // 双检：等待锁期间可能已有其它线程完成了同一个库的初始化。
+        if (CompletedInitializations.ContainsKey(initializationKey)) return;
+
+        await InitializeCoreAsync(dbContext, cancellationToken);
+        CompletedInitializations[initializationKey] = 0;
+    }
+
+    private static async Task InitializeCoreAsync(ConfigurationDbContext dbContext, CancellationToken cancellationToken)
+    {
         await dbContext.Database.EnsureCreatedAsync(cancellationToken);
         if (!await IsSchemaReadyAsync(dbContext, cancellationToken))
         {
@@ -366,7 +417,7 @@ public static class ConfigurationDatabase
                     "Id", "ProviderId", "ModelId", "DisplayName", "ConfigId", "Family", "BaseUrl", "ProtectedApiKey", "ApiMode",
                     "ContextLength", "MaxTokens", "Vision", "Temperature", "TopP", "HeadersJson", "ExtraJson", "OwnedBy", "RemoteFamily", "RemoteContextLength", "RemoteMaxTokens", "RemoteVision", "Enabled", "SortOrder")
                 || !await HasColumnsAsync(connection, "GatewayEndpoints", cancellationToken, "Key", "DisplayName", "PublicPath", "Enabled", "ProtectedApiKey", "ReasoningEffort")
-                || !await HasColumnsAsync(connection, "GatewayCombos", cancellationToken, "Id", "Name", "Enabled", "SortOrder")
+                || !await HasColumnsAsync(connection, "GatewayCombos", cancellationToken, "Id", "Name", "Enabled", "IsDeleted", "SortOrder")
                 || await HasColumnAsync(connection, "GatewayCombos", "EndpointKey", cancellationToken)
                 || !await HasColumnsAsync(connection, "GatewayEndpointComboBindings", cancellationToken, "EndpointKey", "ComboId", "Enabled", "SortOrder")
                 || !await HasColumnsAsync(connection, "GatewayRoutes", cancellationToken, "Id", "ComboId", "ModelId", "Enabled", "SortOrder")
@@ -533,6 +584,13 @@ public static class ConfigurationDatabase
             }
         }
         await EnsureGatewaySchemaAsync(dbContext, cancellationToken);
+        try
+        {
+            await dbContext.Database.ExecuteSqlRawAsync("ALTER TABLE GatewayCombos ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0", cancellationToken);
+        }
+        catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
+        }
         await dbContext.Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS AssistantPreferences (
                 Id INTEGER NOT NULL CONSTRAINT PK_AssistantPreferences PRIMARY KEY,
@@ -608,6 +666,7 @@ public static class ConfigurationDatabase
                         Id TEXT NOT NULL CONSTRAINT PK_GatewayCombos PRIMARY KEY,
                         Name TEXT NOT NULL COLLATE NOCASE,
                         Enabled INTEGER NOT NULL,
+                        IsDeleted INTEGER NOT NULL DEFAULT 0,
                         SortOrder INTEGER NOT NULL,
                         CONSTRAINT UQ_GatewayCombos_Name UNIQUE (Name)
                     )
@@ -639,7 +698,7 @@ public static class ConfigurationDatabase
                 foreach (var combo in migratedCombos)
                 {
                     await ExecuteNonQueryAsync(connection, transaction,
-                        "INSERT INTO GatewayCombos__new (Id, Name, Enabled, SortOrder) VALUES ($id, $name, $enabled, $sortOrder)",
+                        "INSERT INTO GatewayCombos__new (Id, Name, Enabled, IsDeleted, SortOrder) VALUES ($id, $name, $enabled, 0, $sortOrder)",
                         cancellationToken,
                         ("$id", combo.Id.ToString()), ("$name", combo.Name), ("$enabled", combo.Enabled ? 1 : 0), ("$sortOrder", combo.SortOrder));
 

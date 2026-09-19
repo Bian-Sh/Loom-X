@@ -1,7 +1,8 @@
-using Xunit;
+﻿using Xunit;
 using System.Text.Json.Nodes;
 using LoomX.Assistant;
 using LoomX.Assistant.Browser;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace LoomX.Tests.Assistant;
 
@@ -10,17 +11,20 @@ public sealed class BrowserToolsTests
     private readonly FakeBrowserBridge bridge = new();
     private readonly BrowserSecretVault vault = new();
     private readonly ToolRegistry registry = new();
+    private readonly BrowserBridgeLeaseManager leaseManager;
 
     public BrowserToolsTests()
     {
-        BrowserTools.RegisterAll(registry, bridge, vault);
+        leaseManager = new BrowserBridgeLeaseManager(bridge, NullLogger<BrowserBridgeLeaseManager>.Instance);
+        BrowserTools.RegisterAll(registry, bridge, vault, leaseManager);
     }
 
     [Fact]
-    public void Registers_NineBrowserTools()
+    public void Registers_ElevenBrowserTools()
     {
         var expected = new[]
         {
+            "browser.bridge_start", "browser.bridge_stop",
             "browser.tabs", "browser.open", "browser.read", "browser.click",
             "browser.type", "browser.wait", "browser.screenshot", "browser.network", "browser.close",
         };
@@ -30,6 +34,42 @@ public sealed class BrowserToolsTests
         }
     }
 
+    [Fact]
+    public async Task BridgeStart_等待Extension重连后再返回状态()
+    {
+        bridge.IsExtensionConnected = false;
+        var reconnect = Task.Run(async () =>
+        {
+            await Task.Delay(100);
+            bridge.IsExtensionConnected = true;
+        });
+
+        var result = await InvokeAsync("browser.bridge_start", """{"assistant_session_id":"assistant-wait"}""");
+        await reconnect;
+
+        Assert.True(result.Success, result.Content);
+        Assert.Contains("\"extension_connected\":true", result.Content, StringComparison.Ordinal);
+        var tool = registry.All.Single(item => item.Name == "browser.bridge_start");
+        Assert.True(tool.Timeout > TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task Bridge工具按AssistantSessionId申请和释放租约()
+    {
+        var start = await InvokeAsync("browser.bridge_start", """{"assistant_session_id":"assistant-a"}""");
+
+        Assert.True(start.Success, start.Content);
+        Assert.True(bridge.IsListening);
+        Assert.Equal(1, bridge.StartCount);
+        Assert.Contains("\"lease_count\":1", start.Content, StringComparison.Ordinal);
+
+        var stop = await InvokeAsync("browser.bridge_stop", """{"assistant_session_id":"assistant-a"}""");
+
+        Assert.True(stop.Success, stop.Content);
+        Assert.False(bridge.IsListening);
+        Assert.Equal(1, bridge.StopCount);
+        Assert.Contains("\"lease_count\":0", stop.Content, StringComparison.Ordinal);
+    }
     [Fact]
     public async Task Tabs_ListsOnlyAutomationTargets()
     {
@@ -69,23 +109,24 @@ public sealed class BrowserToolsTests
     }
 
     [Fact]
-    public async Task Read_HarvestsSecretsBeforeReturning()
+    public async Task Read_从正文收割Secret并返回安全引用()
     {
+        const string secret = "sk-livekey0123456789abcdef";
         bridge.NextResult = new JsonObject
         {
-            ["content"] = "令牌：sk-livekey0123456789abcdef 已创建",
-            ["api_key"] = "sk-livekey0123456789abcdef",
+            ["content"] = $"令牌：{secret} 已创建，备用：{secret}",
         };
 
         var result = await InvokeAsync("browser.read", """{"session_id":"session-1"}""");
 
         Assert.True(result.Success);
-        // content 字段中的 Key 不做全文扫描（键名不匹配不收割），api_key 字段必须被收割
-        Assert.DoesNotContain("\"api_key\":\"sk-", result.Content);
-        Assert.Contains("secret://browser/", result.Content);
-        var reference = JsonNode.Parse(result.Content)!["api_key"]!["secret_ref"]!.GetValue<string>();
+        Assert.DoesNotContain(secret, result.Content, StringComparison.Ordinal);
+        Assert.Contains("[API Key 已安全收割]", result.Content, StringComparison.Ordinal);
+        var json = JsonNode.Parse(result.Content)!.AsObject();
+        var harvested = Assert.IsType<JsonArray>(json["harvested_secrets"]);
+        var reference = Assert.Single(harvested)!["secret_ref"]!.GetValue<string>();
         Assert.True(vault.TryResolve(reference, out var resolved));
-        Assert.Equal("sk-livekey0123456789abcdef", resolved);
+        Assert.Equal(secret, resolved);
     }
 
     [Fact]
@@ -118,6 +159,7 @@ public sealed class BrowserToolsTests
         var result = await InvokeAsync("browser.read", """{"session_id":"session-x"}""");
 
         Assert.False(result.Success);
+        Assert.True(result.FailureContentIsSafe);
         Assert.Contains("unknown_session", result.Content);
     }
 
@@ -129,6 +171,7 @@ public sealed class BrowserToolsTests
         var result = await InvokeAsync("browser.open", """{"url":"https://example.com"}""");
 
         Assert.False(result.Success);
+        Assert.True(result.FailureContentIsSafe);
         Assert.Contains("browser_bridge_offline", result.Content);
     }
 
@@ -150,13 +193,30 @@ public sealed class BrowserToolsTests
         return await tool.Handler(argumentsJson is null ? null : JsonNode.Parse(argumentsJson), CancellationToken.None);
     }
 
-    private sealed class FakeBrowserBridge : IBrowserBridge
+    private sealed class FakeBrowserBridge : IBrowserBridge, IBrowserBridgeLifecycle
     {
         public List<BrowserTargetInfo> TargetList { get; } = new();
         public JsonNode NextResult { get; set; } = new JsonObject();
         public Exception? NextError { get; set; }
         public List<(string Method, JsonNode? Params)> Sent { get; } = new();
 
+        public bool IsListening { get; private set; }
+        public int StartCount { get; private set; }
+        public int StopCount { get; private set; }
+
+        public Task StartAsync(CancellationToken cancellationToken = default)
+        {
+            StartCount++;
+            IsListening = true;
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken = default)
+        {
+            StopCount++;
+            IsListening = false;
+            return Task.CompletedTask;
+        }
         public bool IsExtensionConnected { get; set; } = true;
 
         public IReadOnlyCollection<BrowserTargetInfo> Targets => TargetList;

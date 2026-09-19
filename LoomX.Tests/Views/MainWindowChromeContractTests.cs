@@ -37,6 +37,33 @@ public sealed class MainWindowChromeContractTests
         Assert.Contains("FontSize=\"26\"", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void 侧栏底部仅显示实际版本与实时网关状态点()
+    {
+        var source = ReadDesktopFile("MainWindow.axaml");
+        var footerStart = source.IndexOf("x:Name=\"sidebarRuntimeStatus\"", StringComparison.Ordinal);
+        var footerEnd = footerStart >= 0 ? source.IndexOf("</Border>", footerStart, StringComparison.Ordinal) : -1;
+
+        Assert.True(footerStart >= 0 && footerEnd > footerStart, "找不到侧栏运行状态区域。");
+        var footer = source[footerStart..footerEnd];
+
+        Assert.Contains("Text=\"{Binding VersionLabel}\"", footer, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{Binding GatewayStatusText}\"", footer, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"{Binding GatewayStatusText}\"", footer, StringComparison.Ordinal);
+        Assert.Contains("Fill=\"{DynamicResource SuccessBrush}\" IsVisible=\"{Binding IsGatewayRunning}\"", footer, StringComparison.Ordinal);
+        Assert.Contains("Fill=\"{DynamicResource WarningBrush}\" IsVisible=\"{Binding IsGatewayTransitioning}\"", footer, StringComparison.Ordinal);
+        Assert.Contains("Fill=\"{DynamicResource DangerBrush}\" IsVisible=\"{Binding IsGatewayFailed}\"", footer, StringComparison.Ordinal);
+        Assert.Contains("Fill=\"{DynamicResource TextTertiaryBrush}\" IsVisible=\"{Binding IsGatewayStopped}\"", footer, StringComparison.Ordinal);
+        Assert.DoesNotContain("sidebar.service", footer, StringComparison.Ordinal);
+        Assert.DoesNotContain("sidebar.version", footer, StringComparison.Ordinal);
+
+        var viewModelSource = ReadDesktopFile("ViewModels", "MainWindowViewModel.cs");
+        Assert.Contains("public string VersionLabel => AppVersion.Label;", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("gatewayService.StateChanged += OnGatewayStateChanged", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("gatewayService.StateChanged -= OnGatewayStateChanged", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(GatewayStatusText))", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(IsGatewayTransitioning))", viewModelSource, StringComparison.Ordinal);
+    }
     private static string ReadDesktopFile(params string[] segments)
     {
         var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);

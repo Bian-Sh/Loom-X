@@ -185,6 +185,9 @@ public sealed class ConfigSnapshotServiceTests
                 await command.ExecuteNonQueryAsync();
             }
 
+            // 手工改成大写 GUID 后，需让初始化缓存失效才能重新执行 GUID 归一化。
+            ConfigurationDatabase.ResetInitializationCache();
+
             using var reloadedService = new ConfigSnapshotService(path);
             var updatedCombo = await reloadedService.UpdateGatewayComboAsync(comboId, new GatewayComboInput("mixed-case-combo-updated", false, 1));
             Assert.Equal("mixed-case-combo-updated", updatedCombo.Name);

@@ -1,0 +1,6 @@
+{
+  "openspec_proposal": "openspec/changes/enhance-assistant-message-interactions/proposal.md",
+  "openspec_design": "openspec/changes/enhance-assistant-message-interactions/design.md",
+  "openspec_tasks": "openspec/changes/enhance-assistant-message-interactions/tasks.md",
+  "openspec_delta_spec": "openspec/changes/enhance-assistant-message-interactions/specs/assistant-message-interaction/spec.md"
+}

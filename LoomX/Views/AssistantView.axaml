@@ -3,172 +3,710 @@
              xmlns:md="using:LiveMarkdown.Avalonia"
              xmlns:conv="using:Avalonia.Data.Converters"
              xmlns:vm="using:LoomX.ViewModels"
+             xmlns:views="using:LoomX.Views"
              xmlns:l="using:LoomX.Localization"
-             x:Class="LoomX.Views.AssistantView">
+             x:Class="LoomX.Views.AssistantView"
+             FontFamily="Segoe UI, Microsoft YaHei UI, Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Arial, sans-serif">
   <UserControl.Styles>
-    <Style Selector="Button.icon"><Setter Property="Width" Value="28"/><Setter Property="Height" Value="28"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="7"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
-    <Style Selector="ComboBox.toolbar"><Setter Property="Height" Value="30"/><Setter Property="FontSize" Value="12"/></Style>
-    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
-  </UserControl.Styles>
-  <Grid RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
+    <!-- Markdown 容器只承载普通文字字体；Emoji 由 AssistantMarkdownTypography 拆成独立 Run，
+         避免页面切换后 Skia 回退缓存把彩色字形退化为单色。 -->
+    <Style Selector="md|MarkdownTextBlock">
+      <Setter Property="FontFamily" Value="Segoe UI, Microsoft YaHei UI, Arial, sans-serif"/>
+    </Style>
+    <Style Selector="ScrollViewer#MessageScroll">
+      <Setter Property="Margin" Value="0,0,0,-7"/>
+    </Style>
+    <Style Selector="RepeatButton.chat-scroll-line Path">
+      <Setter Property="Opacity" Value="0.45"/>
+    </Style>
+    <Style Selector="RepeatButton.chat-scroll-line:pointerover Path">
+      <Setter Property="Opacity" Value="0.8"/>
+    </Style>
+    <Style Selector="RepeatButton.chat-scroll-line:pressed Path">
+      <Setter Property="Opacity" Value="1"/>
+    </Style>
+    <Style Selector="Grid.approval-visible > ScrollViewer#MessageScroll">
+      <Setter Property="Margin" Value="0"/>
+    </Style>
+    <!-- 图标按钮：30×30 圆形圆角，无边框，hover 才出底 -->
+    <Style Selector="Button.icon">
+      <Setter Property="Width" Value="30"/>
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.icon:pointerover">
+      <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}"/>
+    </Style>
 
-    <!-- 顶部：历史会话（项内右侧回收站删除）+ 新会话 -->
-    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-      <ComboBox Grid.Column="0"
-                ItemsSource="{Binding Sessions}"
-                SelectedItem="{Binding SelectedSession}"
-                PlaceholderText="{l:Locale assistant.history.placeholder}">
-        <ComboBox.ItemTemplate>
-          <DataTemplate>
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" MinWidth="220">
-              <TextBlock Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-              <Button Grid.Column="1" Classes="icon" Tag="{Binding}" Click="DeleteHistoryItem_OnClick"
-                      ToolTip.Tip="{l:Locale assistant.history.delete.tooltip}"
-                      AutomationProperties.Name="{l:Locale assistant.history.delete.tooltip}">
-                <Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="13" Height="13"/>
-              </Button>
-            </Grid>
-          </DataTemplate>
-        </ComboBox.ItemTemplate>
-      </ComboBox>
-      <Button Grid.Column="1" Content="{l:Locale assistant.new_session}" Command="{Binding NewSessionCommand}" Margin="8,0,0,0" />
+    <!-- 过程区只保留文字与淡竖线；所有交互状态均透明，箭头仅在划入时出现。 -->
+    <Style Selector="Button.process">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0,2"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+      <Setter Property="FocusAdorner" Value="{x:Null}"/>
+    </Style>
+    <Style Selector="Button.process:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+    </Style>
+    <Style Selector="Button.process:pressed">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.process /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.process:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.process:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0,2"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+      <Setter Property="FocusAdorner" Value="{x:Null}"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pressed">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:checked">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process:checked:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.process Path.process-arrow">
+      <Setter Property="Opacity" Value="0"/>
+    </Style>
+    <Style Selector="Button.process:pointerover Path.process-arrow">
+      <Setter Property="Opacity" Value="1"/>
+    </Style>
+    <Style Selector="ToggleButton.process Path.process-arrow">
+      <Setter Property="Opacity" Value="0"/>
+    </Style>
+    <Style Selector="ToggleButton.process:pointerover Path.process-arrow">
+      <Setter Property="Opacity" Value="1"/>
+    </Style>
+
+    <!-- 工具参数/结果是低存在感的探索入口：没有背景、选中态和箭头。 -->
+    <Style Selector="ToggleButton.process-detail">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0,1"/>
+      <Setter Property="HorizontalAlignment" Value="Left"/>
+      <Setter Property="HorizontalContentAlignment" Value="Left"/>
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+      <Setter Property="FocusAdorner" Value="{x:Null}"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:checked">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:checked:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ToggleButton.process-detail:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+
+    <!-- 消息悬浮操作区（时间 / 复制） -->
+    <Style Selector="StackPanel.msg-body StackPanel.msg-actions"><Setter Property="Opacity" Value="0"/></Style>
+    <Style Selector="StackPanel.msg-body:pointerover StackPanel.msg-actions"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="StackPanel.msg-body:focus-within StackPanel.msg-actions"><Setter Property="Opacity" Value="1"/></Style>
+
+    <!-- 跳至最新消息：胶囊按钮 -->
+    <Style Selector="Button.pill">
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="999"/>
+      <Setter Property="Padding" Value="12,6"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+    </Style>
+
+    <Style Selector="ComboBox.toolbar">
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="FontSize" Value="12"/>
+    </Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
+
+    <!-- 输入框背景复用全局 input-embedded；局部样式只保留复合容器需要的光标、选区和零内框。 -->
+    <Style Selector="TextBox.composer-input">
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
+      <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoftBrush}"/>
+      <Setter Property="SelectionForegroundBrush" Value="{DynamicResource TextPrimaryBrush}"/>
+      <Setter Property="FocusAdorner" Value="{x:Null}"/>
+    </Style>
+    <Style Selector="TextBox.composer-input /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="TextBox.composer-input:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="TextBox.composer-input:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <!-- 输入卡：唯一的外层描边。常态极淡；聚焦只把色相挪到品牌色、保持 1px，不抢内容。
+         注意：描边必须写在 Style 里而不是元素上 —— 元素上的 BorderBrush 是 LocalValue，
+         优先级高于 Style，会让下面的 .focused 永远失效。 -->
+    <Style Selector="Border.input-card">
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+    <Style Selector="Border.input-card.focused">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderSoftBrush}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- 历史会话项：删除按钮默认不显示，划入该项才显示 -->
+    <Style Selector="Grid.session-row Button.session-delete"><Setter Property="Opacity" Value="0"/></Style>
+    <Style Selector="Grid.session-row:pointerover Button.session-delete"><Setter Property="Opacity" Value="1"/></Style>
+    <Style Selector="Button.session-row-button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
+    </Style>
+
+    <!-- 权限沉浸进输入卡；模型选择器保留低对比度常态表面，避免仅在划入时才产生“落回工具栏”的错觉。 -->
+    <Style Selector="ComboBox.bare">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="2,0"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Height" Value="24"/>
+    </Style>
+    <Style Selector="ComboBox.bare:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+    <Style Selector="ComboBox.bare:focus">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.bare">
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="BorderBrush" Value="Transparent"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="4,0"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="CornerRadius" Value="7"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.bare:pointerover">
+      <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}"/>
+    </Style>
+
+    <!-- 模型弹层使用更紧凑的行高，增加单屏可见模型数量。 -->
+    <Style Selector="TextBox.model-search">
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="Padding" Value="8,5"/>
+    </Style>
+    <Style Selector="Button.model-provider">
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="Padding" Value="8,6"/>
+      <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+    <Style Selector="Button.model-option">
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="Padding" Value="10,5"/>
+      <Setter Property="CornerRadius" Value="8"/>
+    </Style>
+
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,*,Auto,Auto">
+
+    <!-- 标题区：会话名居中（右侧图标不参与居中计算），右侧只放图标 -->
+    <Grid Grid.Row="0" x:Name="AssistantHeader" Height="22" Margin="0,0,32,0" ClipToBounds="False">
+      <TextBlock Text="{Binding CurrentSessionTitle}"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"
+                 MaxWidth="480"
+                 FontSize="13"
+                 FontWeight="SemiBold"
+                 TextTrimming="CharacterEllipsis"
+                 TextWrapping="NoWrap"/>
+      <!-- 保持时钟按钮原位，使用助手视图预留的右侧空间让新会话按钮在上一轮反馈基线上继续右移 8px。 -->
+      <Grid x:Name="HeaderActions" ColumnDefinitions="22,18,22" Width="62" Margin="0,0,-16,0" Panel.ZIndex="5"
+            HorizontalAlignment="Right" VerticalAlignment="Center">
+        <Button Grid.Column="0" x:Name="historyButton" Classes="icon" Width="22" Height="22" CornerRadius="7"
+                Click="HistoryButton_OnClick"
+                ToolTip.Tip="{l:Locale assistant.history.list.tooltip}"
+                AutomationProperties.Name="{l:Locale assistant.history.list.tooltip}">
+          <Path Classes="icon-glyph"
+                Data="M 12,3 A 9,9 0 1 0 12,21 A 9,9 0 1 0 12,3 M 12,7.5 V 12.3 L 15.6,14.3"
+                Width="14" Height="14"/>
+        </Button>
+        <Button Grid.Column="2" x:Name="newSessionButton" Classes="icon" Width="22" Height="22" CornerRadius="7" Command="{Binding NewSessionCommand}"
+                ToolTip.Tip="{l:Locale assistant.session.new}"
+                AutomationProperties.Name="{l:Locale assistant.session.new}">
+          <Path Classes="icon-glyph" Data="M 16,4 V 28 M 4,16 H 28" Width="14" Height="14"/>
+        </Button>
+      </Grid>
     </Grid>
 
-    <!-- 消息流 -->
-    <ScrollViewer Grid.Row="1" x:Name="MessageScroll">
-      <ItemsControl ItemsSource="{Binding Messages}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <Grid Margin="0,4">
+    <!-- 消息流：不画外框，消息直接铺在页面上 -->
+    <Grid Grid.Row="1" x:Name="ChatRegion" ColumnDefinitions="*,Auto" Margin="0,10,32,0"
+          Classes.approval-visible="{Binding PendingApproval, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+      <ScrollViewer Grid.Column="0" x:Name="MessageScroll" Classes="chat-scroll" Padding="0,2"
+                    VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+        <!-- 末尾保留重叠量与少量呼吸空间，避免像素取整后正文贴进输入卡。 -->
+        <StackPanel>
 
-              <!-- 状态/工具消息 -->
-              <TextBlock IsVisible="{Binding IsStatus}"
-                         Text="{Binding Text}"
-                         FontSize="12"
-                         Opacity="0.65"
-                         TextWrapping="Wrap"
-                         Margin="4,0" />
+            <ItemsControl ItemsSource="{Binding Messages}" HorizontalAlignment="Stretch">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid>
 
-              <!-- 用户消息：右对齐气泡 -->
-              <Border IsVisible="{Binding IsUser}"
-                      HorizontalAlignment="Right"
-                      MaxWidth="560"
-                      Padding="10,8"
-                      CornerRadius="10"
-                      Background="{DynamicResource AccentSoftBrush}"
-                      BorderBrush="{DynamicResource AccentBrush}"
-                      BorderThickness="1">
-                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" />
-              </Border>
+                    <!-- 状态行 -->
+                    <TextBlock IsVisible="{Binding IsStatus}"
+                               Text="{Binding Text}"
+                               FontSize="11"
+                               Foreground="{DynamicResource TextTertiaryBrush}"
+                               TextWrapping="Wrap"
+                               HorizontalAlignment="Left"
+                               Margin="0,2"/>
 
-              <!-- 助手消息：Markdown 实时渲染 -->
-              <Border IsVisible="{Binding IsAssistantMessage}"
-                      HorizontalAlignment="Left"
-                      MaxWidth="640"
-                      Padding="10,8"
-                      CornerRadius="10"
-                      Background="{DynamicResource SurfaceBrush}"
-                      BorderBrush="{DynamicResource BorderBrush}"
-                      BorderThickness="1">
-                <md:MarkdownRenderer MarkdownBuilder="{Binding Markdown}" />
-              </Border>
+                    <!-- 过程块：整轮思考与工具调用的父级 foldout，与最终正文同层级。 -->
+                    <Grid IsVisible="{Binding IsProcess}" ColumnDefinitions="Auto,Auto" ColumnSpacing="8"
+                          HorizontalAlignment="Left" Margin="0,2">
+                      <Border Grid.Column="0" Width="2" CornerRadius="1" Margin="0,3"
+                              Background="{DynamicResource SurfaceMutedBrush}" VerticalAlignment="Stretch"/>
+                      <StackPanel Grid.Column="1">
+                        <Button Classes="process" Tag="{Binding}" Click="ToggleProcess_OnClick"
+                                IsEnabled="{Binding CanExpand}"
+                                AutomationProperties.Name="{Binding ProcessStatusText}">
+                          <Grid ColumnDefinitions="Auto,14" ColumnSpacing="6">
+                            <TextBlock Text="{Binding ProcessStatusText}" VerticalAlignment="Center"/>
+                            <Path Grid.Column="1" Classes="icon-glyph process-arrow" Data="M 11,7 L 19,16 L 11,25" Width="12" Height="12"
+                                  Stroke="#CCFFFFFF"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  RenderTransformOrigin="50%,50%">
+                              <Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform>
+                            </Path>
+                          </Grid>
+                        </Button>
 
-            </Grid>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-    </ScrollViewer>
+                        <!-- 父级展开后显示子 foldout；子项折叠时标题跟随最新内容。 -->
+                        <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding IsExpanded}" Margin="0,4,4,2">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <StackPanel Margin="0,0,0,6">
+                                <ToggleButton Classes="process" IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                                              AutomationProperties.Name="{Binding HeaderText}">
+                                  <Grid ColumnDefinitions="Auto,14" ColumnSpacing="6">
+                                    <TextBlock Text="{Binding HeaderText}" TextTrimming="CharacterEllipsis"
+                                               MaxWidth="520" VerticalAlignment="Center"/>
+                                    <Path Grid.Column="1" Classes="icon-glyph process-arrow" Data="M 11,7 L 19,16 L 11,25"
+                                          Width="12" Height="12" Stroke="#CCFFFFFF"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          RenderTransformOrigin="50%,50%">
+                                      <Path.RenderTransform>
+                                        <RotateTransform Angle="{Binding ExpandIconAngle}"/>
+                                      </Path.RenderTransform>
+                                    </Path>
+                                  </Grid>
+                                </ToggleButton>
+                                <TextBlock Text="{Binding Text}" IsVisible="{Binding IsContentVisible}"
+                                            FontSize="12" LineHeight="19" Margin="0,3,0,0"
+                                            TextWrapping="Wrap" MaxWidth="560"
+                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                                <ItemsControl ItemsSource="{Binding ToolCalls}" IsVisible="{Binding IsExpanded}"
+                                              Margin="10,3,0,0">
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                      <StackPanel Margin="0,0,0,5">
+                                        <ToggleButton Classes="process-detail"
+                                                      IsChecked="{Binding IsCallExpanded, Mode=TwoWay}"
+                                                      AutomationProperties.Name="{Binding CallHeaderText}">
+                                          <TextBlock Text="{Binding CallHeaderText}" TextWrapping="NoWrap"
+                                                     TextTrimming="CharacterEllipsis" MaxWidth="520"/>
+                                        </ToggleButton>
+                                        <TextBlock Text="{Binding CallDetailText}" IsVisible="{Binding IsCallExpanded}"
+                                                   Margin="8,2,0,3" MaxWidth="540" FontSize="11" LineHeight="17"
+                                                   TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"/>
+
+                                        <ToggleButton Classes="process-detail" IsVisible="{Binding HasCompletion}"
+                                                      IsChecked="{Binding IsResultExpanded, Mode=TwoWay}"
+                                                      AutomationProperties.Name="{Binding CompletionHeaderText}">
+                                          <TextBlock Text="{Binding CompletionHeaderText}" TextWrapping="NoWrap"
+                                                     TextTrimming="CharacterEllipsis" MaxWidth="520"/>
+                                        </ToggleButton>
+                                        <TextBlock Text="{Binding ResultDetailText}" IsVisible="{Binding IsResultExpanded}"
+                                                   Margin="8,2,0,0" MaxWidth="540" FontSize="11" LineHeight="17"
+                                                   TextWrapping="Wrap" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                      </StackPanel>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Grid>
+
+                    <!-- 终态异常消息：淡红阅读表面，普通正文，不提供手动重试或忽略。 -->
+                    <Border IsVisible="{Binding IsError}" HorizontalAlignment="Left" MaxWidth="640" Margin="0,6"
+                            Padding="12,10" CornerRadius="18,18,18,6"
+                            Background="{DynamicResource DangerSoftBrush}"
+                            BorderBrush="{DynamicResource DangerMessageBorderBrush}" BorderThickness="1">
+                      <SelectableTextBlock Text="{Binding Text}" FontSize="14" FontWeight="Normal" LineHeight="22"
+                                 Foreground="{DynamicResource DangerMessageTextBrush}" TextWrapping="Wrap"/>
+                    </Border>
+
+                    <!-- 用户消息：右对齐气泡 -->
+                    <StackPanel Classes="msg-body" IsVisible="{Binding IsUser}" HorizontalAlignment="Right"
+                                MaxWidth="560" Margin="0,6">
+                      <Border Padding="12,10" CornerRadius="18,18,6,18" Background="{DynamicResource AccentSoftBrush}">
+                        <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="14" LineHeight="22"/>
+                      </Border>
+                      <StackPanel Classes="msg-actions" Orientation="Horizontal" HorizontalAlignment="Right"
+                                  Spacing="4" Height="24" Margin="0,2,4,0">
+                        <TextBlock Text="{Binding DisplayTime}" Classes="muted" FontSize="10" VerticalAlignment="Center"/>
+                        <Button Classes="icon" Tag="{Binding}" Click="CopyMessage_OnClick" Width="24" Height="24"
+                                ToolTip.Tip="{l:Locale assistant.copy.tooltip}"
+                                AutomationProperties.Name="{l:Locale assistant.copy.tooltip}">
+                          <Path Classes="icon-glyph" Data="M 9,8 H 20 V 23 H 9 Z M 5,18 H 4 V 4 H 16 V 8" Width="13" Height="13"/>
+                        </Button>
+                      </StackPanel>
+                    </StackPanel>
+
+                    <!-- 助手消息：Markdown 实时渲染 -->
+                    <StackPanel Classes="msg-body" IsVisible="{Binding IsAssistantMessage}" HorizontalAlignment="Left"
+                                MaxWidth="640" Margin="0,6">
+                      <Border Padding="12,10" CornerRadius="18,18,18,6" Background="{DynamicResource SurfaceBrush}"
+                              BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                        <md:MarkdownRenderer MarkdownBuilder="{Binding Markdown}" />
+                      </Border>
+                      <StackPanel Classes="msg-actions" Orientation="Horizontal" Spacing="4" Height="24" Margin="4,2,0,0">
+                        <TextBlock Text="{Binding DisplayTime}" Classes="muted" FontSize="10" VerticalAlignment="Center"/>
+                        <Button Classes="icon" Tag="{Binding}" Click="CopyMessage_OnClick" Width="24" Height="24"
+                                ToolTip.Tip="{l:Locale assistant.copy.tooltip}"
+                                AutomationProperties.Name="{l:Locale assistant.copy.tooltip}">
+                          <Path Classes="icon-glyph" Data="M 9,8 H 20 V 23 H 9 Z M 5,18 H 4 V 4 H 16 V 8" Width="13" Height="13"/>
+                        </Button>
+                      </StackPanel>
+                    </StackPanel>
+
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 运行态：跟在流式输出末尾，位置随内容走 -->
+            <StackPanel IsVisible="{Binding IsRunning}" Orientation="Horizontal" Spacing="8"
+                        HorizontalAlignment="Left" Margin="0,10,0,2">
+              <ProgressBar IsIndeterminate="True" Width="46" Height="3" MinHeight="0"
+                           VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+              <TextBlock Text="{Binding StatusText}" FontSize="12" Classes="muted" VerticalAlignment="Center"
+                         IsVisible="{Binding StatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}"/>
+            </StackPanel>
+
+          <Border Height="14" IsHitTestVisible="False"/>
+        </StackPanel>
+      </ScrollViewer>
+
+      <!-- 空态：铺在 chat 区域上层而不是滚动内容里，才能在整个聊天区真正垂直 + 水平居中 -->
+      <StackPanel Grid.Column="0" IsVisible="{Binding HasNoMessages}" Spacing="10"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Path Classes="icon-glyph"
+              Data="M 6,9 C 6,7.3 8.2,6 11,6 H 21 C 23.8,6 26,7.3 26,9 V 17 C 26,18.7 23.8,20 21,20 H 15 L 10.5,24 V 20 C 7.9,19.7 6,18.5 6,17 Z M 12,11 H 20 M 12,14.5 H 17"
+              Width="36" Height="36" Stroke="{DynamicResource TextTertiaryBrush}"
+              HorizontalAlignment="Center"/>
+        <TextBlock Text="{l:Locale assistant.empty.title}" FontSize="15" FontWeight="SemiBold"
+                   HorizontalAlignment="Center" TextAlignment="Center"/>
+        <TextBlock Text="{l:Locale assistant.empty.description}" Classes="muted" FontSize="12"
+                   TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300" HorizontalAlignment="Center"/>
+      </StackPanel>
+
+      <!-- 网页式中键自动滚动锚点：固定在启动位置，箭头强调当前滚动方向。 -->
+      <Canvas Grid.Column="0" x:Name="MessageAutoScrollOverlay" IsHitTestVisible="False" ZIndex="8">
+        <Border x:Name="MessageAutoScrollAnchor" Width="32" Height="32" IsVisible="False"
+                CornerRadius="16" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                BoxShadow="0 3 10 0 #40000000">
+          <Grid>
+            <Path x:Name="MessageAutoScrollUpGlyph" Data="M 4,6 L 8,2 L 12,6 Z"
+                  Width="16" Height="8" Margin="0,4,0,0"
+                  HorizontalAlignment="Center" VerticalAlignment="Top"
+                  Fill="{DynamicResource TextSecondaryBrush}"/>
+            <Ellipse Width="4" Height="4" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Fill="{DynamicResource TextTertiaryBrush}"/>
+            <Path x:Name="MessageAutoScrollDownGlyph" Data="M 4,2 L 8,6 L 12,2 Z"
+                  Width="16" Height="8" Margin="0,0,0,4"
+                  HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                  Fill="{DynamicResource TextSecondaryBrush}"/>
+          </Grid>
+        </Border>
+      </Canvas>
+      <Button Grid.Column="0" x:Name="JumpButton" Classes="pill" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Margin="0,0,8,11" IsVisible="False" Click="JumpButton_OnClick"
+                ToolTip.Tip="{l:Locale assistant.jump.tooltip}"
+                AutomationProperties.Name="{l:Locale assistant.jump.tooltip}">
+          <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <Path Classes="icon-glyph" Data="M 16,5 V 24 M 9,18 L 16,25 L 23,18" Width="13" Height="13"
+                  Stroke="{DynamicResource AccentBrush}"/>
+            <TextBlock Text="{l:Locale assistant.jump.tooltip}" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+    </Grid>
+
+    <!-- 贴边滚动轨：上端贴标题下沿，下端抵达应用右下角，中段保留原生滚动交互。 -->
+    <Grid Grid.Row="0" Grid.RowSpan="4" x:Name="MessageScrollRail" RowDefinitions="12,*,12"
+          Width="12" Margin="0,22,2,0" HorizontalAlignment="Right" ZIndex="4" IsVisible="False">
+      <RepeatButton Grid.Row="0" x:Name="MessageScrollLineUpButton" Classes="chat-scroll-line"
+                    Theme="{StaticResource ChatScrollButtonTheme}" Click="MessageScrollLineUp_OnClick">
+        <Path x:Name="MessageScrollUpGlyph" Data="M 2,8 L 6,4 L 10,8 Z" Width="12" Height="12"
+              Fill="{DynamicResource TextTertiaryBrush}"/>
+      </RepeatButton>
+      <ScrollBar Grid.Row="1" x:Name="MessageScrollBar" Orientation="Vertical"
+                 Width="12" Theme="{StaticResource ChatScrollBarTheme}"
+                 AllowAutoHide="False"/>
+      <RepeatButton Grid.Row="2" x:Name="MessageScrollLineDownButton" Classes="chat-scroll-line"
+                    Theme="{StaticResource ChatScrollButtonTheme}" Click="MessageScrollLineDown_OnClick">
+        <Path x:Name="MessageScrollDownGlyph" Data="M 2,4 L 6,8 L 10,4 Z" Width="12" Height="12"
+              Fill="{DynamicResource TextTertiaryBrush}"/>
+      </RepeatButton>
+    </Grid>
 
     <!-- 逐条批准：待批准的修改操作卡片 -->
-    <Border Grid.Row="2"
+    <Border Grid.Row="2" ZIndex="1" Margin="0,0,32,0"
             IsVisible="{Binding PendingApproval, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
             Background="{DynamicResource WarningSoftBrush}"
             BorderBrush="{DynamicResource WarningBorderBrush}"
             BorderThickness="1"
-            CornerRadius="10"
-            Padding="12,10">
+            CornerRadius="14"
+            Padding="14,12">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" DataContext="{Binding PendingApproval}">
         <StackPanel Spacing="4">
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
-            <TextBlock Text="{l:Locale assistant.approval.title}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-            <TextBlock Grid.Column="1" Text="{Binding ToolName}" FontFamily="Consolas" FontSize="12" VerticalAlignment="Center"/>
-          </Grid>
-          <TextBlock Text="{Binding ArgumentsSummary}" Classes="muted" FontSize="11" FontFamily="Consolas" TextWrapping="Wrap" MaxHeight="60"
-                     IsVisible="{Binding HasArguments}"/>
+          <TextBlock Text="{l:Locale assistant.approval.title}" FontWeight="SemiBold" FontSize="13"/>
+          <TextBlock Text="{Binding ToolName}" FontFamily="Consolas" FontSize="12" Classes="muted"/>
+          <Border Background="{DynamicResource SurfaceBrush}" CornerRadius="8" Padding="8,6"
+                  IsVisible="{Binding HasArguments}">
+            <TextBlock Text="{Binding ArgumentsSummary}" FontSize="11" FontFamily="Consolas" Classes="muted"
+                       TextWrapping="Wrap" MaxHeight="60"/>
+          </Border>
         </StackPanel>
-        <Button Grid.Column="1" Content="{l:Locale assistant.approval.approve}" Command="{Binding ApproveCommand}" VerticalAlignment="Center"/>
-        <Button Grid.Column="2" Content="{l:Locale assistant.approval.reject}" Command="{Binding RejectCommand}" VerticalAlignment="Center"/>
+        <Button Grid.Column="1" Command="{Binding RejectCommand}" VerticalAlignment="Center"
+                Height="34" Padding="14,0" CornerRadius="11" BorderThickness="1"
+                Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource WarningBorderBrush}"
+                ToolTip.Tip="{l:Locale assistant.approval.reject}"
+                AutomationProperties.Name="{l:Locale assistant.approval.reject}">
+          <TextBlock Text="{l:Locale assistant.approval.reject}"/>
+        </Button>
+        <Button Grid.Column="2" Command="{Binding ApproveCommand}" VerticalAlignment="Center"
+                Height="34" Padding="14,0" CornerRadius="11" BorderThickness="0"
+                Background="{DynamicResource SuccessBrush}" Foreground="White"
+                ToolTip.Tip="{l:Locale assistant.approval.approve}"
+                AutomationProperties.Name="{l:Locale assistant.approval.approve}">
+          <TextBlock Text="{l:Locale assistant.approval.approve}"/>
+        </Button>
       </Grid>
     </Border>
 
-    <!-- 输入区：上输入框 + 下工具栏（权限 / 模型 / 发送） -->
-    <Grid Grid.Row="3" RowDefinitions="Auto,Auto">
-      <TextBlock Grid.Row="0" Text="{Binding StatusText}" FontSize="12" Opacity="0.65" Margin="2,0,0,4"
-                 IsVisible="{Binding StatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
-      <Border Grid.Row="1"
-              Background="{DynamicResource SurfaceBrush}"
-              BorderBrush="{DynamicResource BorderBrush}"
-              BorderThickness="1"
-              CornerRadius="10"
-              ClipToBounds="True">
-        <Grid RowDefinitions="Auto,Auto">
-          <TextBox Grid.Row="0"
-                   Text="{Binding InputText}"
-                   Watermark="{l:Locale assistant.input.watermark}"
-                   AcceptsReturn="False"
-                   BorderThickness="0"
-                   Background="Transparent"
-                   KeyDown="OnInputKeyDown" />
-          <Border Grid.Row="1" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="6,0,6,4">
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-            <!-- 修改权限 -->
-            <ComboBox Grid.Column="0" Classes="toolbar"
-                      ItemsSource="{Binding PermissionModeOptions}"
-                      SelectedItem="{Binding SelectedPermissionMode, Mode=TwoWay}"
-                      VerticalAlignment="Center"/>
-            <!-- 模型指定（foldout 弹层，只走 Provider 模型） -->
-            <Button Grid.Column="1" x:Name="modelPickerButton"
-                    HorizontalContentAlignment="Stretch" HorizontalAlignment="Right"
-                    Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-                    Padding="8,4" MinWidth="180" MaxWidth="320"
-                    Click="ModelPicker_OnClick"
-                    ToolTip.Tip="{l:Locale assistant.model.select.tooltip}"
-                    AutomationProperties.Name="{l:Locale assistant.model.select.tooltip}">
-              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-                <TextBlock Text="{Binding SelectedModelSummary}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
-                <PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="12" Height="12" VerticalAlignment="Center"/>
-              </Grid>
-            </Button>
-            <Button Grid.Column="2"
-                    Content="{l:Locale assistant.send}"
-                    Command="{Binding SendCommand}"
-                    IsVisible="{Binding !IsRunning}" />
-            <Button Grid.Column="2"
-                    Content="{l:Locale assistant.cancel}"
-                    Command="{Binding CancelCommand}"
-                    IsVisible="{Binding IsRunning}" />
+    <!-- 输入区：上输入框 + 下功能区（权限 / 模型 / 发送）。整张卡一个外框，内部控件不再各自描边 -->
+    <Border Grid.Row="3" ZIndex="1" x:Name="inputCard" Classes="input-card" Margin="0,0,32,20"
+            Background="{DynamicResource SurfaceBrush}"
+            CornerRadius="14"
+            ClipToBounds="True">
+      <Grid RowDefinitions="Auto,Auto">
+        <!-- 背景复用全局嵌入式输入材质，内部描边由 composer-input 清除，整卡描边归 input-card。 -->
+        <TextBox Grid.Row="0" x:Name="inputTextBox" Classes="composer-input input-embedded"
+                 Text="{Binding InputText}"
+                 Watermark="{l:Locale assistant.input.watermark}"
+                 AcceptsReturn="True"
+                 TextWrapping="Wrap"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 MinHeight="40"
+                 Padding="12,10"
+                 GotFocus="InputTextBox_OnGotFocus"
+                 LostFocus="InputTextBox_OnLostFocus"/>
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="8,0,8,6">
+          <!-- 修改权限：沉浸在功能区里，没有自己的背景 -->
+          <ComboBox Grid.Column="0" Classes="bare"
+                    ItemsSource="{Binding PermissionModeOptions}"
+                    SelectedItem="{Binding SelectedPermissionMode, Mode=TwoWay}"
+                    VerticalAlignment="Center"/>
+          <!-- 模型指定（foldout 弹层，只走 Provider 模型） -->
+          <Button Grid.Column="1" x:Name="modelPickerButton" Classes="bare"
+                  HorizontalContentAlignment="Stretch" HorizontalAlignment="Right"
+                  MinWidth="160" MaxWidth="320"
+                  Click="ModelPicker_OnClick"
+                  ToolTip.Tip="{l:Locale assistant.model.select.tooltip}"
+                  AutomationProperties.Name="{l:Locale assistant.model.select.tooltip}">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+              <TextBlock Text="{Binding SelectedModelSummary}" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+              <PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="11" Height="11" VerticalAlignment="Center"/>
             </Grid>
-          </Border>
+          </Button>
+          <!-- 发送 / 取消：主色圆形按钮，一屏唯一主动作 -->
+          <Button Grid.Column="2" x:Name="sendButton" Width="28" Height="28" CornerRadius="14" Padding="0"
+                  Background="{DynamicResource AccentBrush}" BorderThickness="0" Margin="6,0,0,0"
+                  MinHeight="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  Command="{Binding SendCommand}" IsVisible="{Binding !IsRunning}"
+                  ToolTip.Tip="{l:Locale assistant.send}" AutomationProperties.Name="{l:Locale assistant.send}">
+            <Path Classes="icon-glyph" Data="M 21,3 L 10.5,13.5 M 21,3 L 14.5,21 L 10.5,13.5 M 10.5,13.5 L 3,10.2 L 21,3"
+                  Width="14" Height="14" Stroke="White"/>
+          </Button>
+          <Button Grid.Column="2" Width="28" Height="28" CornerRadius="14" Padding="0"
+                  Background="{DynamicResource WarningBrush}" BorderThickness="0" Margin="6,0,0,0"
+                  MinHeight="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  Command="{Binding CancelCommand}" IsVisible="{Binding IsRunning}"
+                  ToolTip.Tip="{l:Locale assistant.cancel}" AutomationProperties.Name="{l:Locale assistant.cancel}">
+            <Path Classes="icon-glyph" Data="M 9,9 H 23 V 23 H 9 Z" Width="12" Height="12" Stroke="White"/>
+          </Button>
         </Grid>
-      </Border>
-    </Grid>
+      </Grid>
+    </Border>
 
-    <!-- 模型选择弹层：与网关 model combo 添加子项同款 foldout UI -->
+    <!-- 历史会话使用平台 Popup：可浮出主窗口边界，同时不参与应用窗口激活切换。 -->
+    <Popup x:Name="historyPopup"
+           PlacementTarget="{Binding #historyButton}"
+           Placement="AnchorAndGravity"
+           PlacementAnchor="Bottom"
+           PlacementGravity="Bottom"
+           PlacementConstraintAdjustment="SlideX,FlipY"
+           VerticalOffset="6"
+           IsLightDismissEnabled="True"
+           ShouldUseOverlayLayer="False"
+           IsOpen="{Binding IsHistoryOpen, Mode=TwoWay}"
+           Opened="HistoryPopup_OnOpened">
+      <Grid x:Name="historyPopupRoot" Width="320" RowDefinitions="Auto,Auto">
+        <Border x:Name="historyPopupPanel" Grid.Row="1"
+                Background="{DynamicResource PopupBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1"
+                CornerRadius="14" ClipToBounds="True">
+          <views:AssistantHistoryPanel/>
+        </Border>
+        <Path x:Name="historyPopupArrow" Grid.Row="0"
+              Width="14" Height="9"
+              HorizontalAlignment="Left" VerticalAlignment="Top"
+              Fill="{DynamicResource PopupBackgroundBrush}"
+              Stroke="{DynamicResource BorderStrongBrush}" StrokeThickness="1" StrokeLineCap="Round"
+              Data="M 0.7,8.5 L 7,1 L 13.3,8.5"/>
+      </Grid>
+    </Popup>
+
+    <!-- 模型选择弹层：与网关 foldout 同款 -->
     <Popup x:Name="modelPopup" PlacementTarget="{Binding #modelPickerButton}" Placement="Top" IsLightDismissEnabled="True"
            IsOpen="{Binding IsModelPickerOpen, Mode=TwoWay}" HorizontalOffset="0" VerticalOffset="-5">
-      <Border Width="360" MaxHeight="420" Background="{DynamicResource PopupBackgroundBrush}"
-              BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="8" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
-          <TextBox x:Name="modelSearch" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
+      <Border Width="256" MaxHeight="360" Background="{DynamicResource PopupBackgroundBrush}"
+              BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="6" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*,Auto" RowSpacing="6">
+          <TextBox x:Name="modelSearch" Classes="model-search input-transparent" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="2">
+            <StackPanel Spacing="1">
               <ItemsControl ItemsSource="{Binding ModelGroups}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate DataType="{x:Type vm:AssistantModelGroupViewModel}">
-                    <StackPanel Spacing="2" Margin="0,0,0,6">
-                      <Button Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
-                              Background="{DynamicResource SurfaceSubtleBrush}" BorderThickness="0" Padding="10,9">
-                        <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="8">
+                    <StackPanel Spacing="1" Margin="0,0,0,4">
+                      <Button Classes="model-provider" Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
+                              Background="{DynamicResource SurfaceSubtleBrush}" BorderThickness="0">
+                        <Grid ColumnDefinitions="14,*,Auto" ColumnSpacing="6">
                           <Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="14" Height="14" Stroke="{DynamicResource TextSecondaryBrush}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%">
                             <Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform>
@@ -180,10 +718,10 @@
                       <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding IsExpanded}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate DataType="{x:Type vm:AssistantModelOptionViewModel}">
-                            <Button Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
-                                    Background="Transparent" BorderThickness="0" Margin="22,0,0,0" Padding="12,8">
-                              <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12">
-                                <TextBlock Text="{Binding DisplayName}"/>
+                            <Button Classes="model-option" Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
+                                    Background="Transparent" BorderThickness="0" Margin="18,0,0,0" ToolTip.Tip="{Binding DisplayName}">
+                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                <TextBlock Text="{Binding DisplayName}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                                 <Path Grid.Column="1" Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15"
                                       Stroke="{DynamicResource SuccessBrush}" IsVisible="{Binding IsSelected}"/>
                               </Grid>
@@ -200,10 +738,10 @@
             </StackPanel>
           </ScrollViewer>
           <!-- 思考等级 -->
-          <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0">
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+          <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,6,0,0">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
               <TextBlock Text="{l:Locale assistant.reasoning.label}" Classes="muted" FontSize="12" VerticalAlignment="Center"/>
-              <ComboBox Grid.Column="1" Classes="toolbar" HorizontalAlignment="Right" MinWidth="120"
+              <ComboBox Grid.Column="1" Classes="toolbar" HorizontalAlignment="Right" MinWidth="110"
                         ItemsSource="{Binding ReasoningEffortOptions}"
                         SelectedItem="{Binding SelectedReasoningEffort, Mode=TwoWay}"/>
             </Grid>

@@ -2,7 +2,9 @@
 
 ## Purpose
 TBD - created by archiving change gateway-panel-interaction-polish. Update Purpose after archive.
+
 ## Requirements
+
 ### Requirement: Endpoint 面板使用非选择型展示容器
 
 网关页面左侧 Endpoint 面板 SHALL 使用不产生整行选中、悬浮或点击语义的展示容器；Endpoint 内部明确的按钮、开关、组合选择器和下拉框 SHALL 继续保持各自交互。
@@ -21,3 +23,12 @@ TBD - created by archiving change gateway-panel-interaction-polish. Update Purpo
 - **WHEN** 用户打开网关页面
 - **THEN** 左右面板按约 60/40 分配空间，右侧删除按钮显示 Provider cell 同款垃圾桶图标，API Key 刷新按钮常驻且不呈纯黑
 
+### Requirement: 不存在的模型组合按使用场景差异化展示
+
+网关页面 SHALL 在右侧模型组合编辑面板隐藏已不存在的 Combo，同时在左侧 Endpoint 的 flags 组合下拉框中保留已绑定但不存在的 Combo，以便用户识别并调整历史绑定。
+
+#### Scenario: 查看包含不存在组合的网关页面
+
+- **WHEN** 配置中保留一个已软删除且仍被 Endpoint 绑定的 Combo
+- **THEN** 右侧模型组合编辑面板不显示该 Combo
+- **AND** 左侧对应 Endpoint 的 flags 组合下拉框继续显示该 Combo，并标记为“不存在”

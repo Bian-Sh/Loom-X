@@ -1,6 +1,7 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Localization;
 using LoomX;
+using LoomX.Assistant;
 using LoomX.Localization;
 using LoomX.Logging;
 using LoomX.Services;
@@ -28,10 +30,15 @@ public partial class App : Application
     private ILoggerFactory? loggerFactory;
     private Mutex? singleInstanceMutex;
     private Mutex? shellBootstrapMutex;
+    private InstanceActivationServer? instanceActivationServer;
     private bool ownsShellBootstrapMutex;
     private bool allowMultipleInstances;
     public ILoggerFactory? LoggerFactory => loggerFactory;
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AssistantMarkdownTypography.Configure();
+        AvaloniaXamlLoader.Load(this);
+    }
     public override void OnFrameworkInitializationCompleted()
     {
         DeleteBootstrapShortcutFromArguments();
@@ -78,7 +85,7 @@ public partial class App : Application
                             {
                                 LoggingBootstrap.Configure();
                                 loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
-                                loggerFactory.CreateLogger<App>().LogWarning(exception, "桌面应用自启动子进程失败，继续当前进程 {ProcessId}", Environment.ProcessId);
+                                loggerFactory.CreateLogger<App>().LogDebug(exception, "桌面应用自启动子进程失败，继续当前进程 {ProcessId}", Environment.ProcessId);
                             }
                         }
                     }
@@ -97,7 +104,12 @@ public partial class App : Application
                     singleInstanceMutex = null;
                     LoggingBootstrap.Configure();
                     loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder => builder.AddSerilog(dispose: false));
-                    loggerFactory.CreateLogger<App>().LogWarning("检测到已有 LoomX 桌面实例，当前进程退出以避免并发读取配置库，进程 {ProcessId}", Environment.ProcessId);
+                    var activationLogger = loggerFactory.CreateLogger<App>();
+                    var activationSent = InstanceActivationClient.TryActivateExistingInstance();
+                    activationLogger.LogWarning(
+                        "检测到已有 LoomX 桌面实例，激活请求{ActivationResult}，当前进程退出以避免并发读取配置库，进程 {ProcessId}",
+                        activationSent ? "已发送" : "发送失败",
+                        Environment.ProcessId);
                     Environment.Exit(0);
                     return;
                 }
@@ -111,13 +123,24 @@ public partial class App : Application
             if (allowMultipleInstances)
                 startupLogger.LogWarning("调试启动已允许多个桌面实例，进程 {ProcessId}", Environment.ProcessId);
             startupLogger.LogInformation("桌面应用启动，进程 {ProcessId}，用户 {UserName}，进程路径 {ProcessPath}，基目录 {BaseDirectory}，启动工作目录 {LauncherWorkingDirectory}，规范化工作目录 {CurrentDirectory}", Environment.ProcessId, Environment.UserName, Environment.ProcessPath, AppContext.BaseDirectory, launcherWorkingDirectory, Environment.CurrentDirectory);
-            var migration = new ApplicationDataMigration(loggerFactory.CreateLogger<ApplicationDataMigration>());
-            migration.EnsureMigratedAsync().GetAwaiter().GetResult();
+            MainWindow? mainWindow = null;
+            var activationPending = false;
+            if (!allowMultipleInstances)
+            {
+                instanceActivationServer = new InstanceActivationServer(loggerFactory.CreateLogger<InstanceActivationServer>());
+                instanceActivationServer.Start(() => Dispatcher.UIThread.Post(() =>
+                {
+                    if (mainWindow is { } window)
+                        window.ActivateFromSecondaryLaunch();
+                    else
+                        activationPending = true;
+                }));
+            }
             var configService = new ConfigSnapshotService(loggerFactory.CreateLogger<ConfigSnapshotService>());
             gatewayService = new GatewayProcessService();
             var toastService = new ToastService();
             dataStore = new AppDataStore(configService, gatewayService, loggerFactory.CreateLogger<AppDataStore>());
-            var mainWindow = new MainWindow(toastService, loggerFactory.CreateLogger<MainWindow>());
+            mainWindow = new MainWindow(toastService, loggerFactory.CreateLogger<MainWindow>());
             mainWindow.DataContext = new MainWindowViewModel(
                 gatewayService,
                 toastService,
@@ -127,9 +150,18 @@ public partial class App : Application
                 dataStore,
                 LocalizerFactory.Create<MainWindowViewModel>());
             desktop.MainWindow = mainWindow;
+            if (activationPending)
+                mainWindow.ActivateFromSecondaryLaunch();
             desktop.Exit += async (_, _) =>
             {
+                if (instanceActivationServer is not null)
+                {
+                    await instanceActivationServer.DisposeAsync();
+                    instanceActivationServer = null;
+                }
                 await gatewayService.StopAsync();
+                gatewayService.Dispose();
+                gatewayService = null;
                 if (mainWindow.DataContext is MainWindowViewModel viewModel) viewModel.Dispose();
                 dataStore?.Dispose();
                 dataStore = null;

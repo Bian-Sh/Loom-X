@@ -370,3 +370,9 @@ FodyWeavers.xsd
 /OllamaHub.Desktop/graphify-out
 /LoomX/graphify-out
 /.workbuddy
+/.tmp-install
+/.local
+
+# Codex 隔离工作区
+/.worktrees/
+/.zcode

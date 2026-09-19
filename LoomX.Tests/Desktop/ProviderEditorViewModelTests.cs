@@ -8,6 +8,64 @@ namespace LoomX.Tests.Desktop;
 public sealed class ProviderEditorViewModelTests
 {
     [Fact]
+    public void GenerateProviderBusinessId_返回固定格式()
+    {
+        var businessId = ProvidersViewModel.GenerateProviderBusinessId([]);
+
+        Assert.Matches("^provider-[0-9a-f]{8}$", businessId);
+    }
+
+    [Fact]
+    public void GenerateProviderBusinessId_当前集合冲突时忽略大小写重试()
+    {
+        var providers = new[]
+        {
+            new ProviderEditorViewModel { BusinessId = "provider-DEADBEEF" }
+        };
+        var suffixes = new Queue<string>(["deadbeef", "cafebabe"]);
+
+        var businessId = ProvidersViewModel.GenerateProviderBusinessId(providers, suffixes.Dequeue);
+
+        Assert.Equal("provider-cafebabe", businessId);
+        Assert.Empty(suffixes);
+    }
+
+    [Fact]
+    public void ProviderBusinessId_名称和兼容类型变化后保持不变()
+    {
+        var provider = new ProviderEditorViewModel
+        {
+            BusinessId = "provider-1234abcd",
+            DisplayName = "初始名称"
+        };
+
+        provider.DisplayName = "新名称";
+        provider.SelectedCompatibility = ProviderCompatibilityOption.AnthropicMessages;
+
+        Assert.Equal("provider-1234abcd", provider.BusinessId);
+    }
+
+    [Fact]
+    public void FromResponse_保留已有ProviderId()
+    {
+        var response = new ProviderResponse(
+            Guid.NewGuid(),
+            "legacy-provider-id",
+            "已有 Provider",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []);
+
+        var provider = ProviderEditorViewModel.FromResponse(response);
+
+        Assert.Equal("legacy-provider-id", provider.BusinessId);
+    }
+    [Fact]
     public void ExplicitModelListUrlPreservesTrailingSlashForSync()
     {
         var provider = new ProviderEditorViewModel { ModelListUrl = "https://www.baidu.com/" };
@@ -116,6 +174,121 @@ public sealed class ProviderEditorViewModelTests
         Assert.False(viewModel.HasUnsavedChanges);
         viewModel.DisplayName = "已修改";
         Assert.True(viewModel.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public void ApplySaveResult_BackfillsIdentityWithoutRewritingEditedText()
+    {
+        var viewModel = new ProviderEditorViewModel();
+        viewModel.DisplayName = "草稿名称";
+        viewModel.BaseUrl = "https://draft.example.com/";
+        viewModel.AddHeader();
+        viewModel.Headers[0].Name = "X-Draft";
+        viewModel.Headers[0].Value = "draft";
+        Assert.True(viewModel.HasUnsavedChanges);
+
+        var id = Guid.NewGuid();
+        viewModel.ApplySaveResult(new ProviderResponse(
+            id,
+            "provider",
+            "规范化名称",
+            "https://normalized.example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []));
+
+        Assert.Equal(id, viewModel.Id);
+        Assert.False(viewModel.HasUnsavedChanges);
+        Assert.Equal("草稿名称", viewModel.DisplayName);
+        Assert.Equal("https://draft.example.com/", viewModel.BaseUrl);
+        Assert.Single(viewModel.Headers);
+        Assert.Equal("X-Draft", viewModel.Headers[0].Name);
+        Assert.Equal("draft", viewModel.Headers[0].Value);
+    }
+
+    [Fact]
+    public void ApiKeyEditIsIncludedBeforePropertyChangedSubscribersSave()
+    {
+        var viewModel = ProviderEditorViewModel.FromResponse(new ProviderResponse(
+            Guid.NewGuid(),
+            "provider",
+            "Provider",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []));
+        ProviderInput? inputAtNotification = null;
+        viewModel.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(viewModel.ApiKey)) inputAtNotification = viewModel.ToInput();
+        };
+
+        viewModel.ApiKey = "new-secret";
+
+        Assert.NotNull(inputAtNotification);
+        Assert.Equal("new-secret", inputAtNotification!.ApiKey);
+    }
+
+    [Fact]
+    public void OlderSaveResultDoesNotClearNewerEditRevision()
+    {
+        var viewModel = ProviderEditorViewModel.FromResponse(new ProviderResponse(
+            Guid.NewGuid(),
+            "provider",
+            "Provider",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []));
+
+        viewModel.DisplayName = "第一版";
+        var firstRevision = viewModel.EditRevision;
+        viewModel.DisplayName = "第二版";
+        var secondRevision = viewModel.EditRevision;
+
+        viewModel.ApplySaveResult(new ProviderResponse(
+            viewModel.Id,
+            "provider",
+            "第一版",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []), firstRevision);
+
+        Assert.True(secondRevision > firstRevision);
+        Assert.True(viewModel.HasUnsavedChanges);
+        Assert.Equal("第二版", viewModel.DisplayName);
+
+        viewModel.ApplySaveResult(new ProviderResponse(
+            viewModel.Id,
+            "provider",
+            "第二版",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []), secondRevision);
+
+        Assert.False(viewModel.HasUnsavedChanges);
     }
 
     [Theory]
@@ -229,5 +402,32 @@ public sealed class ProviderEditorViewModelTests
         Assert.False(viewModel.HasUnsavedChanges);
         viewModel.Enabled = false;
         Assert.True(viewModel.HasUnsavedChanges);
+    }
+
+    [Fact]
+    public void ModelLocalizationRefreshDoesNotCreateUnsavedChanges()
+    {
+        var viewModel = ModelEditorViewModel.FromResponse(new ModelResponse(
+            Guid.NewGuid(),
+            "provider",
+            "model",
+            "模型",
+            null,
+            "unknown",
+            null,
+            null,
+            128000,
+            4096,
+            false,
+            null,
+            null,
+            true,
+            false,
+            "{}",
+            "{}"));
+
+        viewModel.RefreshLocalization();
+
+        Assert.False(viewModel.HasUnsavedChanges);
     }
 }

@@ -13,6 +13,10 @@
   <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#E0F2F7F8" />
   <SolidColorBrush x:Key="BorderBrush" Color="#8094A6AB" />
   <SolidColorBrush x:Key="BorderStrongBrush" Color="#A0A5B9BD" />
+  <!-- 极淡描边：给组合输入区这类“只勾个轮廓、不抢内容”的容器用。 -->
+  <SolidColorBrush x:Key="BorderSoftBrush" Color="#4D94A6AB" />
+  <!-- 聚焦态极淡描边：色相取自品牌色，透明度压到与 BorderSoftBrush 同量级，只作“被选中”的暗示。 -->
+  <SolidColorBrush x:Key="AccentBorderSoftBrush" Color="#66287C83" />
 
   <!-- 语义色：用于状态、选中态和日志级别，不参与大面积背景。 -->
   <SolidColorBrush x:Key="TextPrimaryBrush" Color="#172126" />
@@ -29,6 +33,10 @@
   <SolidColorBrush x:Key="DangerBrush" Color="#A94E59" />
   <SolidColorBrush x:Key="DangerSoftBrush" Color="#FBE8EC" />
   <SolidColorBrush x:Key="DangerBorderBrush" Color="#E2B5BE" />
+  <!-- 异常消息使用独立阅读表面；中性正文颜色暂供预览，后续只需调整 token。 -->
+  <SolidColorBrush x:Key="DangerMessageSurfaceBrush" Color="#D9F8E8EB" />
+  <SolidColorBrush x:Key="DangerMessageBorderBrush" Color="#80C9949E" />
+  <SolidColorBrush x:Key="DangerMessageTextBrush" Color="#303639" />
   <!-- Windows 标题栏关闭按钮使用系统语义红，避免悬停态与普通危险操作混淆。 -->
   <SolidColorBrush x:Key="WindowCloseHoverBrush" Color="#E81123" />
   <SolidColorBrush x:Key="WindowClosePressedBrush" Color="#C50F1F" />

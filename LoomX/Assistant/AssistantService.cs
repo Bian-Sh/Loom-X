@@ -1,3 +1,5 @@
+﻿using LoomX.Assistant.UserDecisions;
+using LoomX.Assistant.Browser;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
@@ -13,48 +15,65 @@ public sealed record ToolApprovalRequest(string ToolCallId, string ToolName, str
 public sealed class AssistantService
 {
     private const string SystemPrompt = """
-        你是 LoomX 内置的小助手，帮助用户配置与诊断 LoomX（AI 网关/路由器）。
+        你是 LoomX 内置的 AI 助手，帮助用户配置与诊断 LoomX（AI 网关/路由器）。
         规则：
         1. 配置类操作遵循：读取 → 备份 → 修改 → 验证 → 测试，不要跳步。
         2. 涉及中转站/Provider/模型概念时先用 skill.list / skill.load 加载对应 Skill 再行动。
         3. API Key 永远以 secret_ref 形式出现是正常的，不要向用户索要明文，也不要试图拼出明文。
-        4. 登录、CAPTCHA、2FA、高风险不可逆操作时才打断用户；正常步骤不要逐步询问。
+        4. 高风险不可逆操作时打断用户；正常步骤不要逐步询问。
         5. 回答使用中文，简洁直接，配置结果用要点列出。
+        6. 资料顺序：优先使用模型原生或已有的官方资料能力；其次用 Browser Bridge 的 browser.open、browser.read、browser.wait 读取用户授权页面；无可用通道时用 assistant.ask_user 请求用户提供资料或结论。
+        7. 遇到登录、CAPTCHA、Cloudflare 或 JS challenge，立即暂停并交还用户；禁止绕过网站安全机制。
         """;
 
     private readonly AssistantModelClientFactory modelClientFactory;
     private readonly ToolRegistry toolRegistry;
     private readonly AssistantSessionStore sessionStore;
     private readonly AssistantPreferencesStore? preferencesStore;
+    private readonly IUserDecisionBroker userDecisionBroker;
+    private readonly BrowserBridgeLeaseManager? browserBridgeLeaseManager;
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantService> logger;
     private readonly SemaphoreSlim runLock = new(1, 1);
 
     private CancellationTokenSource? currentRun;
+    private string? currentRunOwnerId;
 
     public AssistantService(
         AssistantModelClientFactory modelClientFactory,
         ToolRegistry toolRegistry,
         AssistantSessionStore sessionStore,
         ILoggerFactory loggerFactory,
-        AssistantPreferencesStore? preferencesStore = null)
+        AssistantPreferencesStore? preferencesStore,
+        IUserDecisionBroker userDecisionBroker,
+        BrowserBridgeLeaseManager? browserBridgeLeaseManager = null)
     {
         this.modelClientFactory = modelClientFactory;
         this.toolRegistry = toolRegistry;
         this.sessionStore = sessionStore;
         this.loggerFactory = loggerFactory;
         this.preferencesStore = preferencesStore;
+        this.userDecisionBroker = userDecisionBroker;
+        this.browserBridgeLeaseManager = browserBridgeLeaseManager;
         logger = loggerFactory.CreateLogger<AssistantService>();
+        CurrentSession = CreateSession();
     }
 
-    public AgentSession CurrentSession { get; private set; } = new(new AgentSessionOptions
-    {
-        MaxSteps = 16,
-        SystemPrompt = SystemPrompt,
-    });
+    public AgentSession CurrentSession { get; private set; }
 
     public bool IsRunning => CurrentSession.State == AgentSessionState.Running;
 
+    private static AgentSession CreateSession()
+    {
+        var session = new AgentSession(new AgentSessionOptions { MaxSteps = 16 });
+        session.ApplySystemPrompt(BuildSystemPrompt(session.Id));
+        return session;
+    }
+
+    private static string BuildSystemPrompt(string assistantSessionId) => $"""
+        {SystemPrompt}
+        8. 当前 Assistant Session ID：{assistantSessionId}。需要浏览器时先调用 browser.bridge_start，并把此 ID 作为 assistant_session_id；完成本 Session 的全部浏览器操作后主动调用 browser.bridge_stop 释放同一 ID。不得使用或释放其他 Session ID。新建、切换、离开或关闭 Session UI 不会自动释放租约；删除 Session 仅清理意外残留。
+        """;
     /// <summary>助手模型是否可用（安全摘要，不含 Key）。</summary>
     public async Task<AssistantModelInfo?> DescribeModelAsync(CancellationToken cancellationToken = default) =>
         await modelClientFactory.DescribeAsync(cancellationToken);
@@ -100,11 +119,8 @@ public sealed class AssistantService
     /// <summary>新建空会话并设为当前。</summary>
     public AgentSession NewSession()
     {
-        CurrentSession = new AgentSession(new AgentSessionOptions
-        {
-            MaxSteps = 16,
-            SystemPrompt = SystemPrompt,
-        });
+        Cancel();
+        CurrentSession = CreateSession();
         return CurrentSession;
     }
 
@@ -113,14 +129,101 @@ public sealed class AssistantService
     {
         var session = await sessionStore.LoadAsync(sessionId, cancellationToken);
         if (session is null) return false;
+        session.ApplySystemPrompt(BuildSystemPrompt(session.Id));
         CurrentSession = session;
         return true;
     }
 
-    public void DeleteSession(string sessionId) => sessionStore.Delete(sessionId);
+    /// <summary>删除会话；租约释放仅作为意外残留的被动兜底。</summary>
+    public async Task DeleteSessionAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        if (browserBridgeLeaseManager is not null)
+        {
+            try
+            {
+                await browserBridgeLeaseManager.ReleaseAsync(sessionId, cancellationToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogWarning(exception, "删除 AI 助手会话时清理 Browser Bridge 残留租约失败 {SessionId}", sessionId);
+            }
+        }
 
-    /// <summary>取消当前运行。</summary>
-    public void Cancel() => currentRun?.Cancel();
+        sessionStore.Delete(sessionId);
+    }
+
+    /// <summary>重命名历史会话（空值表示回到自动标题）。</summary>
+    public Task RenameSessionAsync(string sessionId, string? title, CancellationToken cancellationToken = default) =>
+        sessionStore.SetTitleAsync(sessionId, title, cancellationToken);
+
+    /// <summary>取消当前运行及其等待中的用户决策。</summary>
+    public void Cancel()
+    {
+        var ownerId = currentRunOwnerId;
+        currentRun?.Cancel();
+        if (ownerId is not null)
+        {
+            userDecisionBroker.CancelOwner(ownerId, "assistant_run_cancelled");
+        }
+    }
+
+    /// <summary>
+    /// 用助手模型给当前会话起一个短标题（≤ 20 字）。
+    /// 只在会话还没有自定义/摘要标题时调用；失败一律静默（标题是锦上添花，不该打扰用户）。
+    /// </summary>
+    public async Task<string?> TrySummarizeTitleAsync(CancellationToken cancellationToken = default)
+    {
+        var sessionId = CurrentSession.Id;
+        var firstUser = CurrentSession.Messages.FirstOrDefault(item => item.Role == ChatRole.User)?.Content;
+        var firstAnswer = CurrentSession.Messages.FirstOrDefault(item => item.Role == ChatRole.Assistant)?.Content;
+        if (string.IsNullOrWhiteSpace(firstUser) || string.IsNullOrWhiteSpace(firstAnswer)) return null;
+
+        var modelClient = await modelClientFactory.TryCreateAsync(cancellationToken);
+        if (modelClient is null) return null;
+
+        var prompt = $"""
+            给下面这段对话起一个中文标题，要求：不超过 20 个字、只输出标题本身、不要引号和标点结尾、不要复述用户原话。
+
+            用户：{Trim(firstUser, 400)}
+            助手：{Trim(firstAnswer, 400)}
+            """;
+
+        var request = new ModelRequest(
+            [new ChatMessage(ChatRole.User, prompt)],
+            Array.Empty<ToolDefinition>());
+
+        var builder = new System.Text.StringBuilder();
+        await foreach (var streamEvent in modelClient.StreamAsync(request, cancellationToken))
+        {
+            if (streamEvent is TextDeltaEvent delta) builder.Append(delta.Text);
+            else if (streamEvent is ModelCompletedEvent) break;
+        }
+
+        var title = NormalizeTitle(builder.ToString());
+        if (string.IsNullOrEmpty(title)) return null;
+
+        // 用捕获的 sessionId 写回：await 期间用户可能切了会话
+        await sessionStore.SetTitleAsync(sessionId, title, cancellationToken);
+        logger.LogInformation("已为会话 {SessionId} 生成摘要标题", sessionId);
+        return title;
+    }
+
+    private static string Trim(string text, int maxLength)
+    {
+        var flat = text.Replace('\n', ' ').Replace('\r', ' ').Trim();
+        return flat.Length <= maxLength ? flat : flat[..maxLength] + "…";
+    }
+
+    /// <summary>模型输出可能带引号、前缀或整段复述，这里只取第一行并裁到 20 字。</summary>
+    internal static string? NormalizeTitle(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var line = raw.Split('\n', '\r').FirstOrDefault(item => item.Trim().Length > 0);
+        if (line is null) return null;
+        var title = line.Trim().Trim('"', '\'', '“', '”', '《', '》', '。', '：', ':', ' ');
+        if (title.Length == 0) return null;
+        return title.Length <= 20 ? title : title[..20];
+    }
 
     private ToolApprovalGate BuildApprovalGate() => async (toolCall, tool, cancellationToken) =>
     {
@@ -152,46 +255,82 @@ public sealed class AssistantService
         ArgumentException.ThrowIfNullOrWhiteSpace(userMessage);
         if (!runLock.Wait(0))
         {
-            throw new InvalidOperationException("小助手正在运行中，请先等待或取消。");
+            throw new InvalidOperationException("AI 助手正在运行中，请先等待或取消。");
         }
 
         try
         {
             if (IsRunning)
             {
-                throw new InvalidOperationException("小助手正在运行中，请先等待或取消。");
+                throw new InvalidOperationException("AI 助手正在运行中，请先等待或取消。");
             }
 
-            var modelClient = await modelClientFactory.TryCreateAsync(cancellationToken);
-            if (modelClient is null)
-            {
-                throw new InvalidOperationException("小助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
-            }
+            var runSession = CurrentSession;
+            var ownerId = Guid.NewGuid().ToString("N");
+            using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            currentRun = runCancellation;
+            currentRunOwnerId = ownerId;
+            var persistenceBlocked = false;
 
-            currentRun = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             try
             {
+                var modelClient = await modelClientFactory.TryCreateAsync(runCancellation.Token);
+                if (modelClient is null)
+                {
+                    throw new InvalidOperationException("AI 助手模型未配置。请在 LoomX 中启用一个 openai 兼容的 Provider 与模型。");
+                }
+
                 var approvalGate = PermissionMode == AssistantPermissionMode.AskEachTime
                     ? BuildApprovalGate()
                     : null;
-                var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate);
-                await foreach (var agentEvent in loop.RunAsync(CurrentSession, userMessage, currentRun.Token))
+                var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate,
+                    ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded);
+                await using var enumerator = loop
+                    .RunAsync(runSession, userMessage, runCancellation.Token)
+                    .GetAsyncEnumerator(runCancellation.Token);
+                while (true)
                 {
+                    AgentEvent agentEvent;
+                    using (AssistantTools.BeginRun(ownerId))
+                    {
+                        if (!await enumerator.MoveNextAsync())
+                        {
+                            break;
+                        }
+
+                        agentEvent = enumerator.Current;
+                    }
+
+                    if (agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta or AgentEventKind.MessageCompleted))
+                        runSession.RecordActivity(agentEvent);
+                    if (!persistenceBlocked && agentEvent.Kind is not (AgentEventKind.TextDelta or AgentEventKind.ReasoningDelta))
+                    {
+                        var failedToSave = false;
+                        try { await sessionStore.SaveAsync(runSession, CancellationToken.None); }
+                        catch (Exception exception)
+                        {
+                            persistenceBlocked = true;
+                            failedToSave = true;
+                            logger.LogError(exception, "AI 助手会话无法继续保存 {SessionId}", runSession.Id);
+                        }
+                        if (failedToSave) yield return AgentEvent.Create(runSession.Id, AgentEventKind.PersistenceFailed);
+                    }
                     yield return agentEvent;
                 }
             }
             finally
             {
-                currentRun.Dispose();
+                userDecisionBroker.CancelOwner(ownerId, "assistant_run_cancelled");
                 currentRun = null;
+                currentRunOwnerId = null;
 
                 try
                 {
-                    await sessionStore.SaveAsync(CurrentSession, cancellationToken);
+                    if (!persistenceBlocked) await sessionStore.SaveAsync(runSession, CancellationToken.None);
                 }
                 catch (Exception exception)
                 {
-                    logger.LogError(exception, "小助手会话保存失败 {SessionId}", CurrentSession.Id);
+                    logger.LogError(exception, "AI 助手会话保存失败 {SessionId}", runSession.Id);
                 }
             }
         }

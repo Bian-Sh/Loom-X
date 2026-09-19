@@ -1,0 +1,15 @@
+{
+  "change": "structured-config-assistant-decisions",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "c817bb5814bab0e9fef8e3d5c6074ffe7d650102e7719638c1c79fcaa3a24313",
+  "files": [
+    { "path": "openspec/changes/structured-config-assistant-decisions/proposal.md", "sha256": "9b50cc1a65d213ba4f265bb583405b5dad0ffd4642f50b63ce47fec9b261f13b" },
+    { "path": "openspec/changes/structured-config-assistant-decisions/design.md", "sha256": "353137ec414ba4dbb3df109d89a2d745fd962b482ea13a381a248399f4f24f57" },
+    { "path": "openspec/changes/structured-config-assistant-decisions/tasks.md", "sha256": "49561b2884cffb463a6573c581b2808c86f5be5e6d3907973543d2d9358e8357" },
+    { "path": "openspec/changes/structured-config-assistant-decisions/specs/assistant-user-decisions/spec.md", "sha256": "7d14b2908edd62ae959b79ea7a8576049595436b01dcf066070cc11429154d2e" },
+    { "path": "openspec/changes/structured-config-assistant-decisions/specs/structured-toml-editing/spec.md", "sha256": "ea72128cd9944ff0b5b6c1821b1c97b5fc72a25258c5b8354d11d8d6354b96ff" }
+  ]
+}

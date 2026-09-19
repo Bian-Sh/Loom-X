@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using LoomX.Configuration;
@@ -53,53 +53,107 @@ public sealed class BrowserSecretVault
 /// </summary>
 public static partial class BrowserSecretHarvester
 {
+    private const string RedactedPlaceholder = "[API Key 已安全收割]";
+
     public static JsonNode Harvest(JsonNode result, BrowserSecretVault vault)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(vault);
         var clone = result.DeepClone();
-        HarvestNode(clone, vault, parentKey: null);
+        var harvested = new List<JsonObject>();
+        HarvestNode(clone, vault, harvested);
+        if (clone is JsonObject root && harvested.Count > 0)
+        {
+            root["harvested_secrets"] = new JsonArray(harvested.Select(item => (JsonNode)item).ToArray());
+        }
+
         return clone;
     }
 
-    private static void HarvestNode(JsonNode node, BrowserSecretVault vault, string? parentKey)
+    private static void HarvestNode(JsonNode node, BrowserSecretVault vault, ICollection<JsonObject> harvested)
     {
         switch (node)
         {
             case JsonObject jsonObject:
                 foreach (var pair in jsonObject.ToArray())
                 {
-                    if (pair.Value is JsonValue value && value.TryGetValue<string>(out var text) && LooksSecretKey(pair.Key) && LooksSecretValue(text))
+                    if (pair.Value is JsonValue value && value.TryGetValue<string>(out var text))
                     {
-                        var reference = vault.Store(ExtractSecret(text)!, pair.Key);
-                        jsonObject[pair.Key] = SecretBoundary.Describe(true, reference);
+                        if (LooksSecretKey(pair.Key) && LooksSecretValue(text))
+                        {
+                            var reference = vault.Store(ExtractSecret(text)!, pair.Key);
+                            jsonObject[pair.Key] = SecretBoundary.Describe(true, reference);
+                            continue;
+                        }
+
+                        if (LooksContentKey(pair.Key))
+                        {
+                            jsonObject[pair.Key] = HarvestEmbeddedSecrets(text, vault, harvested, pair.Key);
+                        }
+
                         continue;
                     }
 
-                    if (pair.Value is not null) HarvestNode(pair.Value, vault, pair.Key);
+                    if (pair.Value is not null) HarvestNode(pair.Value, vault, harvested);
                 }
 
                 break;
             case JsonArray jsonArray:
                 foreach (var item in jsonArray)
                 {
-                    if (item is not null) HarvestNode(item, vault, parentKey);
+                    if (item is not null) HarvestNode(item, vault, harvested);
                 }
 
                 break;
         }
     }
 
+    private static string HarvestEmbeddedSecrets(
+        string text,
+        BrowserSecretVault vault,
+        ICollection<JsonObject> harvested,
+        string hint)
+    {
+        var matches = EmbeddedSecretPattern().Matches(text)
+            .Select(match => match.Value)
+            .Where(secret => !IsMaskedSecret(secret))
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        if (matches.Length == 0) return text;
+
+        var redacted = text;
+        foreach (var secret in matches)
+        {
+            var reference = vault.Store(secret, hint);
+            redacted = redacted.Replace(secret, RedactedPlaceholder, StringComparison.Ordinal);
+            harvested.Add(new JsonObject
+            {
+                ["secret_ref"] = reference,
+                ["hint"] = "api_key",
+            });
+        }
+
+        return redacted;
+    }
+
     private static bool LooksSecretKey(string key) => SecretKeyPattern().IsMatch(key);
+
+    private static bool LooksContentKey(string key) =>
+        key.Equals("content", StringComparison.OrdinalIgnoreCase)
+        || key.Equals("html", StringComparison.OrdinalIgnoreCase)
+        || key.Equals("markdown", StringComparison.OrdinalIgnoreCase);
 
     private static bool LooksSecretValue(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return false;
-        // 过滤过短的占位值与明显非 Secret 的文本
         var trimmed = value.Trim();
+        if (IsMaskedSecret(trimmed)) return false;
         if (trimmed.Length < 8 || trimmed.Contains(' ') && !trimmed.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return false;
         return SecretValuePattern().IsMatch(trimmed);
     }
+
+    private static bool IsMaskedSecret(string value) =>
+        value.Contains("...", StringComparison.Ordinal) || value.Contains('…');
 
     /// <summary>从 "Bearer xxx" / 原始值中提取纯 Secret。</summary>
     public static string? ExtractSecret(string value)
@@ -118,4 +172,7 @@ public static partial class BrowserSecretHarvester
 
     [GeneratedRegex("(?i)^(bearer\\s+)?(sk|key|pk|tok|api|ey|xox|ghp|hf|sk-or|sk-ant)[-_][a-z0-9]{6,}|^bearer\\s+[a-z0-9][a-z0-9._-]{10,}$|^[a-z0-9][a-z0-9._-]{23,}$")]
     private static partial Regex SecretValuePattern();
+
+    [GeneratedRegex("(?i)(?:sk(?:-or|-ant)?|key|pk|tok|api|ey|xox|ghp|hf)[-_][a-z0-9][a-z0-9._-]{7,}")]
+    private static partial Regex EmbeddedSecretPattern();
 }

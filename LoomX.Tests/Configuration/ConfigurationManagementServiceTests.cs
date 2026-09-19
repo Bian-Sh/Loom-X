@@ -270,6 +270,9 @@ public sealed class ConfigurationManagementServiceTests
                 context.ChangeTracker.Clear();
             }
 
+            // 手工改 schema 后必须让初始化缓存失效，否则下面的 InitializeAsync 会被短路。
+            ConfigurationDatabase.ResetInitializationCache();
+
             await using (var migratedContext = new ConfigurationDbContext(options))
             {
                 await ConfigurationDatabase.InitializeAsync(migratedContext);
@@ -340,6 +343,64 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Single(configurationProvider.Current.GatewayEndpoints.Single(item => item.Key == "openai").ComboBindings);
             Assert.Single(configurationProvider.Current.GatewayEndpoints.Single(item => item.Key == "ollama").ComboBindings);
             Assert.Empty(configurationProvider.Current.GatewayEndpoints.Single(item => item.Key == "azure").ComboBindings);
+        }
+        finally { DeleteDatabaseFiles(databasePath); }
+    }
+
+    [Fact]
+    public async Task DeletingBoundCombo_PreservesComboAndEndpointBinding()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+
+            var combo = await service.CreateGatewayComboAsync(new GatewayComboInput("待保留组合", true, 0));
+            await service.UpdateGatewayEndpointComboBindingsAsync("ollama", new GatewayEndpointComboSelectionInput([combo.Id]));
+
+            await service.DeleteGatewayComboAsync(combo.Id);
+
+            await using var verifyContext = new ConfigurationDbContext(options);
+            var storedCombo = await verifyContext.GatewayCombos.SingleOrDefaultAsync(item => item.Id == combo.Id);
+            Assert.NotNull(storedCombo);
+            Assert.True(storedCombo!.IsDeleted);
+            Assert.True(await verifyContext.GatewayEndpointComboBindings.AnyAsync(item => item.EndpointKey == "ollama" && item.ComboId == combo.Id));
+            Assert.DoesNotContain(configurationProvider.Current.GatewayCombos, item => item.Id == combo.Id);
+            var endpoint = (await service.ListGatewayEndpointsAsync()).Single(item => item.Key == "ollama");
+            Assert.True(Assert.Single(endpoint.Combos).IsDeleted);
+        }
+        finally { DeleteDatabaseFiles(databasePath); }
+    }
+
+    [Fact]
+    public async Task UpdatingDeletedCombo_RestoresItsExistingEndpointBinding()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+            var configurationProvider = new DatabaseConfigurationProvider(context);
+            await configurationProvider.ReloadAsync();
+            var service = new ConfigurationManagementService(new TestDbContextFactory(options), configurationProvider);
+
+            var combo = await service.CreateGatewayComboAsync(new GatewayComboInput("可恢复组合", true, 0));
+            await service.UpdateGatewayEndpointComboBindingsAsync("ollama", new GatewayEndpointComboSelectionInput([combo.Id]));
+            await service.DeleteGatewayComboAsync(combo.Id);
+
+            var restored = await service.UpdateGatewayComboAsync(combo.Id, new GatewayComboInput("可恢复组合", true, 0));
+            Assert.False(restored.IsDeleted);
+            var endpoint = (await service.ListGatewayEndpointsAsync()).Single(item => item.Key == "ollama");
+            var binding = Assert.Single(endpoint.Combos);
+            Assert.Equal(combo.Id, binding.ComboId);
+            Assert.False(binding.IsDeleted);
+            Assert.True(binding.Enabled);
         }
         finally { DeleteDatabaseFiles(databasePath); }
     }

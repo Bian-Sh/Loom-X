@@ -89,7 +89,7 @@
     <value>定位协议转换、上游延迟与 HTTP 错误，保留可追溯的脱敏上下文。</value>
   </data>
   <data name="nav.assistant">
-    <value>小助手</value>
+    <value>AI 助手</value>
   </data>
   <data name="nav.assistant.description">
     <value>用自然语言配置 Provider、诊断连通性、接入中转站。</value>
@@ -295,6 +295,9 @@
   </data>
   <data name="settings.status.save.failed">
     <value>保存设置失败：{0}</value>
+  </data>
+  <data name="settings.status.save.failed.toast">
+    <value>设置自动保存失败，请查看状态栏。</value>
   </data>
   <data name="settings.status.waiting">
     <value>等待自动保存…</value>
@@ -1441,7 +1444,10 @@
     <value>、</value>
   </data>
   <data name="gateway.combo.disabled">
-    <value>全局停用</value>
+    <value>停用</value>
+  </data>
+  <data name="gateway.combo.missing">
+    <value>不存在</value>
   </data>
 
   <!-- ========== Phase 2: GatewayRoute / RecentRequest 派生状态 ========== -->
@@ -1477,6 +1483,11 @@
   <data name="assistant.history.placeholder">
     <value>历史会话…</value>
   </data>
+  <data name="assistant.session.new"><value>新会话</value></data>
+  <data name="assistant.history.list.tooltip"><value>历史会话</value></data>
+  <data name="assistant.history.empty"><value>暂无历史会话</value></data>
+  <data name="assistant.empty.title"><value>还没有对话</value></data>
+  <data name="assistant.empty.description"><value>输入第一条消息开始，或从右上角的历史会话里继续</value></data>
   <data name="assistant.new_session">
     <value>＋ 新会话</value>
   </data>
@@ -1486,11 +1497,44 @@
   <data name="assistant.cancel">
     <value>取消</value>
   </data>
+  <data name="assistant.copy.tooltip"><value>复制消息</value></data>
+  <data name="assistant.copied"><value>消息已复制</value></data>
+  <data name="assistant.jump.tooltip"><value>跳至最新消息</value></data>
+  <data name="assistant.process.thinking"><value>思考</value></data>
+  <data name="assistant.process.summary"><value>思考摘要</value></data>
+  <data name="assistant.process.elapsed"><value>处理中 {0}</value></data>
+  <data name="assistant.process.completed"><value>已完成 {0}</value></data>
+  <data name="assistant.process.steps"><value>工具调用</value></data>
+  <data name="assistant.tool.function"><value>函数</value></data>
+  <data name="assistant.tool.arguments"><value>参数</value></data>
+  <data name="assistant.tool.result"><value>结果</value></data>
+  <data name="assistant.tool.failed"><value>{0} 失败</value></data>
+  <data name="assistant.step.call"><value>调用工具 {0}</value></data>
+  <data name="assistant.step.approval"><value>等待你批准修改：{0}</value></data>
+  <data name="assistant.step.completed"><value>{0} 完成</value></data>
+  <data name="assistant.step.failed"><value>{0} 失败：{1}</value></data>
+  <data name="assistant.task.cancelled"><value>已取消。</value></data>
+  <data name="assistant.persistence.failed"><value>当前会话包含敏感内容或存储失败，后续消息未保存。</value></data>
+  <data name="assistant.status.working"><value>思考中…</value></data>
+  <data name="assistant.error.service_unavailable"><value>AI 助手服务初始化失败，请查看控制台日志。</value></data>
+  <data name="assistant.error.unexpected"><value>请求失败，请重试或查看控制台日志。</value></data>
+  <data name="assistant.error.retry"><value>重试</value></data>
+  <data name="assistant.error.dismiss"><value>关闭</value></data>
+  <data name="assistant.status.failed"><value>请求失败</value></data>
   <data name="assistant.input.watermark">
     <value>输入消息，Enter 发送…</value>
   </data>
   <data name="assistant.history.delete.tooltip">
     <value>删除此会话</value>
+  </data>
+  <data name="assistant.history.rename.tooltip">
+    <value>重命名会话</value>
+  </data>
+  <data name="assistant.history.renamed">
+    <value>会话已重命名</value>
+  </data>
+  <data name="assistant.history.rename.failed">
+    <value>重命名失败</value>
   </data>
   <data name="assistant.permission.auto">
     <value>自动批准</value>
@@ -1529,7 +1573,7 @@
     <value>高</value>
   </data>
   <data name="assistant.approval.title">
-    <value>小助手请求修改</value>
+    <value>AI 助手请求修改</value>
   </data>
   <data name="assistant.approval.approve">
     <value>批准</value>
@@ -1591,4 +1635,36 @@
   <data name="assistant.error.upstream">
     <value>服务描述：{0}</value>
   </data>
+  <data name="assistant.decision.validation_failed"><value>请检查决策字段后重试。</value></data>
+  <data name="providers.tab.advanced"><value>高级</value></data>
+  <data name="providers.tab.test"><value>测试</value></data>
+  <data name="providers.advanced.header"><value>代理与请求增强</value></data>
+  <data name="providers.compatibility.label"><value>接口兼容类型</value></data>
+  <data name="providers.compat.chat.title"><value>OpenAI Chat-compatible</value></data>
+  <data name="providers.compat.chat.description"><value>使用 /chat/completions</value></data>
+  <data name="providers.compat.responses.title"><value>OpenAI Responses-compatible</value></data>
+  <data name="providers.compat.responses.description"><value>使用 /responses</value></data>
+  <data name="providers.compat.anthropic.title"><value>Anthropic Messages-compatible</value></data>
+  <data name="providers.compat.anthropic.description"><value>使用 /messages</value></data>
+  <data name="providers.apikey.label"><value>API Key</value></data>
+  <data name="providers.test.model.label"><value>测试模型</value></data>
+  <data name="providers.test.mode.label"><value>测试模式</value></data>
+  <data name="providers.test.mode.regular"><value>常规请求</value></data>
+  <data name="providers.test.mode.streaming"><value>流式请求</value></data>
+  <data name="providers.test.prompt.label"><value>发送内容</value></data>
+  <data name="providers.test.prompt.watermark"><value>输入测试提示词</value></data>
+  <data name="providers.test.send"><value>发送</value></data>
+  <data name="providers.test.stop"><value>停止</value></data>
+  <data name="providers.test.retry"><value>重试</value></data>
+  <data name="providers.test.clear"><value>清空</value></data>
+  <data name="providers.test.summary.title"><value>请求摘要</value></data>
+  <data name="providers.test.response.title"><value>Response</value></data>
+  <data name="providers.test.copy"><value>复制响应</value></data>
+  <data name="providers.test.copy.success"><value>响应已复制</value></data>
+  <data name="providers.test.copy.failure"><value>复制响应失败</value></data>
+  <data name="providers.delete.dialog.title"><value>提示</value></data>
+  <data name="providers.delete.dialog.cancel"><value>取消</value></data>
+  <data name="providers.delete.dialog.confirm"><value>删除</value></data>
+  <data name="providers.delete.dialog.message"><value>确定删除 Provider“{0}”吗？</value></data>
+  <data name="providers.test.model.empty"><value>当前 Provider 没有可测试模型</value></data>
 </root>

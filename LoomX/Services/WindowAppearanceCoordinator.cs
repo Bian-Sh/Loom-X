@@ -47,6 +47,10 @@ public sealed class WindowAppearanceCoordinator
         SetConfiguredBrushAlpha("SuccessSoftBrush", 214, blurFactor);
         SetConfiguredBrushAlpha("WarningSoftBrush", 214, blurFactor);
         SetConfiguredBrushAlpha("DangerSoftBrush", 214, blurFactor);
+        // 错误阅读层保留 85% 的最低不透明度，不能随装饰玻璃一起退化。
+        SetBrushAlpha("DangerMessageSurfaceBrush", Current.Enabled
+            ? Math.Max((byte)217, MainWindow.CalculateBrushAlpha(235, Current.Opacity, blurFactor))
+            : 255);
         SetConfiguredBrushAlpha("SuccessBorderBrush", 160, blurFactor);
         SetConfiguredBrushAlpha("WarningBorderBrush", 160, blurFactor);
         SetConfiguredBrushAlpha("DangerBorderBrush", 160, blurFactor);

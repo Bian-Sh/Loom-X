@@ -37,12 +37,12 @@
               <StackPanel Spacing="14">
                 <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.mode.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.proxy.mode.hint}" Classes="hint"/><ComboBox ItemsSource="{Binding ProxyModeOptions}" ItemTemplate="{StaticResource SettingsOptionTemplate}" SelectionBoxItemTemplate="{StaticResource SettingsOptionTemplate}" SelectedItem="{Binding SelectedProxyMode, Mode=TwoWay}"/></StackPanel>
                 <Grid ColumnDefinitions="*,140" ColumnSpacing="10" IsVisible="{Binding IsCustomProxyVisible}">
-                  <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.host.label}" Classes="label"/><TextBox Text="{Binding ProxyHost}" Watermark="http://127.0.0.1"/></StackPanel>
+                  <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.host.label}" Classes="label"/><TextBox Text="{Binding ProxyHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="http://127.0.0.1"/></StackPanel>
                   <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="{l:Locale settings.proxy.port.label}" Classes="label"/><NumericUpDown Value="{Binding ProxyPort}" Minimum="1" Maximum="65535"/></StackPanel>
                 </Grid>
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="10" IsVisible="{Binding IsCustomProxyVisible}">
-                  <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.username.label}" Classes="label"/><TextBox Text="{Binding ProxyUsername}"/></StackPanel>
-                  <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="{l:Locale settings.proxy.password.label}" Classes="label"/><TextBox Text="{Binding ProxyPassword}" PasswordChar="●"/></StackPanel>
+                  <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.proxy.username.label}" Classes="label"/><TextBox Text="{Binding ProxyUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/></StackPanel>
+                  <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="{l:Locale settings.proxy.password.label}" Classes="label"/><TextBox Text="{Binding ProxyPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" PasswordChar="●"/></StackPanel>
                 </Grid>
                 <TextBlock Text="{l:Locale settings.proxy.password.saved.hint}" Classes="hint" IsVisible="{Binding HasProxyPassword}"/>
                 <CheckBox Content="{l:Locale settings.proxy.password.clear}" IsChecked="{Binding ClearProxyPassword}" IsVisible="{Binding HasProxyPassword}"/>
