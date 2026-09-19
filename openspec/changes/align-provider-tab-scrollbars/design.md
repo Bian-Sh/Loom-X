@@ -1,12 +1,12 @@
 ## Context
 
-Provider 详情区当前由一个带左右 18px 内边距的外层 `Border` 包含标题和 `TabControl`，四个 Tab 分别拥有外层 `ScrollViewer`。为了让滚动条相对面板外边缘精确保持 20px，需要统一处理详情区右侧布局，而不是分别写不同数值。
+Provider 详情区由外层 `Border`、标题和 `TabControl` 组成，四个 Tab 分别拥有外层 `ScrollViewer`。用户截图显示，先前为追求 20px 数值而增加的 8px 页面补偿使滚动条落在红色参考线左侧；目标位置实际是 `TabControl` 模板默认内容边界。
 
 ## Goals / Non-Goals
 
 **Goals:**
 - 四个详情 Tab 的主纵向滚动条共用同一定位规则。
-- 滚动条相对右侧详情面板边缘向左 20px。
+- 滚动条对齐用户截图标出的红色参考线。
 - 保持标题、表单内容和嵌套响应文本框的既有交互。
 
 **Non-Goals:**
@@ -16,13 +16,16 @@ Provider 详情区当前由一个带左右 18px 内边距的外层 `Border` 包�
 
 ## Decisions
 
-1. 将详情内容外层 `Border` 的右侧 Padding 从 18px 改为 0，并给标题区域保留 18px 右边距，使 `TabControl` 的可用区域右边缘与详情面板右边缘一致。
-2. 为四个 Tab 的外层 `ScrollViewer` 添加统一 `provider-tab-scroll` class。Avalonia 当前 `TabControl` 模板已提供 12px 内容内缩，因此页面局部样式设置 `Margin="0,0,8,0"`，与模板内缩合计后使滚动条相对面板边缘精确向左 20px。
-3. 使用视图契约测试断言共享样式、四个 class 使用点以及详情容器右侧 Padding，避免后续只修改部分 Tab 或重复叠加边距。
+1. 保持详情内容外层 `Border` 的右侧 Padding 为 0，并给标题区域保留 18px 右边距，使 `TabControl` 的可用区域右边缘与详情面板右边缘一致。
+2. 四个 Tab 的外层 `ScrollViewer` 继续共用 `provider-tab-scroll` class，但页面局部样式改为 `Margin="0"`。不再叠加 8px 右侧 Margin，直接使用 Avalonia `TabControl` 模板自身的内容内缩，使滚动条向右移动到截图红线位置。
+3. 视图契约测试断言共享样式的 Margin 为 0、四个 class 使用点以及详情容器右侧 Padding，避免后续只修改部分 Tab或再次叠加页面边距。
 
-备选方案是仅给现有 `ScrollViewer` 增加 2px 右边距以叠加当前 18px Padding，但该方案把 20px 约束拆散到父子两层，语义不清晰且更容易被后续布局调整破坏。
+## Root Cause
+
+- 截图中现有滚动条位于约 `x=548..553`，红色参考线位于约 `x=559..564`。
+- 先前新增的 8 DIP 右侧 Margin 在当前显示缩放下对应约 10 个物理像素，正是滚动条与参考线之间的主要偏差。
+- 因此根因是重复补偿：`TabControl` 已有模板内缩，页面又额外增加了 8px。
 
 ## Risks / Trade-offs
 
-- [TabControl 可用宽度增加 18px] → 四个滚动区域再统一收进 20px，最终内容宽度只比现状减少 2px；标题区域仍保留原有 18px 右侧留白。
-- [默认 Tab 模板变化影响位置] → 契约测试锁定页面补偿值，并通过打包后的 UIA 几何读数验证面板右边缘与滚动条右边缘相差 20px。
+- [`TabControl` 默认模板变化影响位置] → 契约测试锁定页面不再额外补偿，并使用重新发布后的桌面端界面复核。

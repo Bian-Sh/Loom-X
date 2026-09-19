@@ -411,11 +411,11 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
-    public void ProviderTabsShareTwentyPixelScrollbarInset()
+    public void ProviderTabsAlignScrollbarsToRequestedGuide()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
 
-        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0,0,8,0\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0\"/>", source, StringComparison.Ordinal);
         Assert.Contains("<Border Padding=\"18,16,0,0\"", source, StringComparison.Ordinal);
         Assert.Contains("<Grid ColumnDefinitions=\"*\" Margin=\"0,0,18,0\">", source, StringComparison.Ordinal);
 
