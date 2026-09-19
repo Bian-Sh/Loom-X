@@ -276,16 +276,29 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
-    public void BasicTabUsesCompatibilityCardsHidesProviderIdAndOwnsApiKey()
+    public void BasicTabUsesCompactCompatibilitySelectorHidesProviderIdAndOwnsApiKey()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
         var basic = ReadTab(source, "providers.tab.basic");
         var advanced = ReadTab(source, "providers.tab.advanced");
         Assert.DoesNotContain("SelectedProvider.BusinessId", basic, StringComparison.Ordinal);
-        Assert.Contains("SelectedProvider.SelectedCompatibility", basic, StringComparison.Ordinal);
-        Assert.Contains("providers.compat.chat.title", basic, StringComparison.Ordinal);
-        Assert.Contains("providers.compat.responses.title", basic, StringComparison.Ordinal);
-        Assert.Contains("providers.compat.anthropic.title", basic, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding SelectedProvider.CompatibilityOptions}\"", basic, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem=\"{Binding SelectedProvider.SelectedCompatibility, Mode=TwoWay}\"", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("GroupName=\"ProviderCompatibility\"", basic, StringComparison.Ordinal);
+
+        var itemTemplateStart = basic.IndexOf("<ComboBox.ItemTemplate>", StringComparison.Ordinal);
+        var itemTemplateEnd = basic.IndexOf("</ComboBox.ItemTemplate>", StringComparison.Ordinal);
+        Assert.True(itemTemplateStart >= 0 && itemTemplateEnd > itemTemplateStart);
+        var itemTemplate = basic[itemTemplateStart..itemTemplateEnd];
+        Assert.Contains("providers.compat.chat.title", itemTemplate, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.responses.title", itemTemplate, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.anthropic.title", itemTemplate, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.compat.chat.description", itemTemplate, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.compat.responses.description", itemTemplate, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.compat.anthropic.description", itemTemplate, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.chat.description", basic, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.responses.description", basic, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.anthropic.description", basic, StringComparison.Ordinal);
         Assert.Contains("SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
         Assert.DoesNotContain("SelectedProvider.ApiKey", advanced, StringComparison.Ordinal);
     }
