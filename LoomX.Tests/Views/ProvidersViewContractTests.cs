@@ -410,6 +410,21 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("providerTestLogger", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ProviderTabsShareTwentyPixelScrollbarInset()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+
+        Assert.Contains("Selector=\"ScrollViewer.provider-tab-scroll\"><Setter Property=\"Margin\" Value=\"0,0,8,0\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("<Border Padding=\"18,16,0,0\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid ColumnDefinitions=\"*\" Margin=\"0,0,18,0\">", source, StringComparison.Ordinal);
+
+        foreach (var tabKey in new[] { "providers.tab.basic", "providers.tab.advanced", "providers.tab.models", "providers.tab.test" })
+        {
+            Assert.Contains("<ScrollViewer Classes=\"provider-tab-scroll\" VerticalScrollBarVisibility=\"Auto\" HorizontalScrollBarVisibility=\"Disabled\">", ReadTab(source, tabKey), StringComparison.Ordinal);
+        }
+    }
+
     private static string ReadTab(string source, string headerKey)
     {
         var marker = $"<TabItem Header=\"{{l:Locale {headerKey}}}\">";
