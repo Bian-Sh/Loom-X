@@ -300,6 +300,10 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("SelectedProvider.Headers", advanced, StringComparison.Ordinal);
         Assert.Contains("SelectedProvider.CliIdentities", advanced, StringComparison.Ordinal);
         Assert.Contains("TestPanel.SelectedModel", test, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding TestPanel.TestableModels}\"", test, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding TestPanel.HasTestableModels, Converter={StaticResource ProviderBooleanNotConverter}}\"", test, StringComparison.Ordinal);
+        Assert.Contains("providers.test.model.empty", test, StringComparison.Ordinal);
+        Assert.DoesNotContain("ItemsSource=\"{Binding SelectedProvider.Models}\"", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.SelectedMode", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.Prompt", test, StringComparison.Ordinal);
         Assert.Contains("TestPanel.SendCommand", test, StringComparison.Ordinal);

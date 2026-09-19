@@ -22,10 +22,68 @@ public sealed class ProviderTestPanelViewModelTests
         var provider = new ProviderEditorViewModel { BusinessId = "p", BaseUrl = "https://example.com", ApiMode = "openai", EndpointFormat = "responses" };
         provider.Models.Add(new ModelEditorViewModel { ModelId = "disabled", Enabled = false });
         provider.Models.Add(new ModelEditorViewModel { ModelId = "enabled", Enabled = true });
+        provider.Models.Add(ModelEditorViewModel.CreatePlaceholder());
+        var panel = new ProviderTestPanelViewModel(new StubProviderTestService());
+
+        panel.BindProvider(provider);
+
+        Assert.Collection(panel.TestableModels, model => Assert.Equal("enabled", model.ModelId));
+        Assert.Equal("enabled", panel.SelectedModel?.ModelId);
+        Assert.True(panel.HasTestableModels);
+        Assert.True(panel.CanSend);
+    }
+
+    [Fact]
+    public void 模型启用状态变化会实时更新测试列表和选择()
+    {
+        var provider = new ProviderEditorViewModel { BusinessId = "p", BaseUrl = "https://example.com", ApiMode = "openai", EndpointFormat = "responses" };
+        var first = new ModelEditorViewModel { ModelId = "first", Enabled = true };
+        var second = new ModelEditorViewModel { ModelId = "second", Enabled = true };
+        provider.Models.Add(first);
+        provider.Models.Add(second);
         var panel = new ProviderTestPanelViewModel(new StubProviderTestService());
         panel.BindProvider(provider);
-        Assert.Equal("enabled", panel.SelectedModel?.ModelId);
+        panel.SelectedModel = second;
+
+        second.Enabled = false;
+
+        Assert.Collection(panel.TestableModels, model => Assert.Same(first, model));
+        Assert.Same(first, panel.SelectedModel);
         Assert.True(panel.CanSend);
+
+        first.Enabled = false;
+
+        Assert.Empty(panel.TestableModels);
+        Assert.Null(panel.SelectedModel);
+        Assert.False(panel.HasTestableModels);
+        Assert.False(panel.CanSend);
+
+        second.Enabled = true;
+
+        Assert.Collection(panel.TestableModels, model => Assert.Same(second, model));
+        Assert.Same(second, panel.SelectedModel);
+        Assert.True(panel.HasTestableModels);
+        Assert.True(panel.CanSend);
+    }
+
+    [Fact]
+    public void 模型集合变化会实时更新测试列表()
+    {
+        var provider = new ProviderEditorViewModel { BusinessId = "p", BaseUrl = "https://example.com", ApiMode = "openai", EndpointFormat = "responses" };
+        var panel = new ProviderTestPanelViewModel(new StubProviderTestService());
+        panel.BindProvider(provider);
+        var model = new ModelEditorViewModel { ModelId = "added", Enabled = true };
+
+        provider.Models.Add(model);
+
+        Assert.Collection(panel.TestableModels, item => Assert.Same(model, item));
+        Assert.Same(model, panel.SelectedModel);
+
+        provider.Models.Remove(model);
+
+        Assert.Empty(panel.TestableModels);
+        Assert.Null(panel.SelectedModel);
+        Assert.False(panel.CanSend);
     }
 
     [Fact]

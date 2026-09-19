@@ -563,5 +563,5 @@
   <data name="providers.delete.dialog.cancel"><value>Cancel</value></data>
   <data name="providers.delete.dialog.confirm"><value>Delete</value></data>
   <data name="providers.delete.dialog.message"><value>Delete Provider “{0}”?</value></data>
-  <data name="providers.test.model.empty"><value>This Provider has no testable models</value></data>
+  <data name="providers.test.model.empty"><value>No models are enabled. Enable one in the Models tab first.</value></data>
 </root>

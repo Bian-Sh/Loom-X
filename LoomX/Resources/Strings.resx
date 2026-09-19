@@ -1659,5 +1659,5 @@
   <data name="providers.delete.dialog.cancel"><value>取消</value></data>
   <data name="providers.delete.dialog.confirm"><value>删除</value></data>
   <data name="providers.delete.dialog.message"><value>确定删除 Provider“{0}”吗？</value></data>
-  <data name="providers.test.model.empty"><value>当前 Provider 没有可测试模型</value></data>
+  <data name="providers.test.model.empty"><value>未启用任何模型，请先前往模型 Tab 启用。</value></data>
 </root>

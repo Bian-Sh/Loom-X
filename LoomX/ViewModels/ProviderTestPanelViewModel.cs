@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Text.Json;
 using System.Windows.Input;
@@ -8,6 +10,8 @@ namespace LoomX.ViewModels;
 public sealed class ProviderTestPanelViewModel : NotifyViewModel
 {
     private readonly IProviderTestService service;
+    private readonly ObservableCollection<ModelEditorViewModel> testableModels = [];
+    private readonly HashSet<ModelEditorViewModel> subscribedModels = [];
     private ProviderEditorViewModel? provider;
     private ModelEditorViewModel? selectedModel;
     private ProviderTestMode selectedMode = ProviderTestMode.Regular;
@@ -24,9 +28,13 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
     public ProviderTestPanelViewModel(IProviderTestService service)
     {
         this.service = service ?? throw new ArgumentNullException(nameof(service));
+        TestableModels = new ReadOnlyObservableCollection<ModelEditorViewModel>(testableModels);
         SendCommand = new AsyncCommand(SendAsync, () => CanSend);
         ClearCommand = new DelegateCommand(Clear);
     }
+
+    public ReadOnlyObservableCollection<ModelEditorViewModel> TestableModels { get; }
+    public bool HasTestableModels => testableModels.Count > 0;
 
     public ModelEditorViewModel? SelectedModel
     {
@@ -69,21 +77,24 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
 
     public bool HasResult { get => hasResult; private set => SetProperty(ref hasResult, value); }
     public bool HasError { get => hasError; private set => SetProperty(ref hasError, value); }
-    public bool CanSend => provider is not null && SelectedModel is { Enabled: true, IsRealModel: true } && !string.IsNullOrWhiteSpace(Prompt) && !IsRunning;
+    public bool CanSend => provider is not null && SelectedModel is { IsRealModel: true } model && testableModels.Contains(model) && !string.IsNullOrWhiteSpace(Prompt) && !IsRunning;
     public ICommand SendCommand { get; }
     public ICommand ClearCommand { get; }
 
     public void BindProvider(ProviderEditorViewModel? value)
     {
         CancelPendingRequest();
-        if (provider is not null)
-            provider.PropertyChanged -= ProviderOnPropertyChanged;
+        UnsubscribeProvider();
 
         provider = value;
         if (provider is not null)
+        {
             provider.PropertyChanged += ProviderOnPropertyChanged;
+            provider.Models.CollectionChanged += ProviderModelsOnCollectionChanged;
+            UpdateModelSubscriptions();
+        }
 
-        SelectedModel = provider?.Models.FirstOrDefault(model => model.IsRealModel && model.Enabled);
+        RefreshTestableModels();
         Clear();
         RefreshRequestSummary();
         OnPropertyChanged(nameof(CanSend));
@@ -146,6 +157,62 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
             Prompt,
             SelectedMode,
             12000);
+    }
+
+    private void ProviderModelsOnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs args)
+    {
+        UpdateModelSubscriptions();
+        RefreshTestableModels();
+    }
+
+    private void ModelOnPropertyChanged(object? sender, PropertyChangedEventArgs args)
+    {
+        if (args.PropertyName == nameof(ModelEditorViewModel.Enabled))
+            RefreshTestableModels();
+    }
+
+    private void UpdateModelSubscriptions()
+    {
+        var currentModels = provider?.Models.ToHashSet() ?? [];
+        foreach (var model in subscribedModels.Except(currentModels).ToArray())
+        {
+            model.PropertyChanged -= ModelOnPropertyChanged;
+            subscribedModels.Remove(model);
+        }
+
+        foreach (var model in currentModels.Except(subscribedModels))
+        {
+            model.PropertyChanged += ModelOnPropertyChanged;
+            subscribedModels.Add(model);
+        }
+    }
+
+    private void RefreshTestableModels()
+    {
+        var previousSelection = SelectedModel;
+        var available = provider?.Models.Where(model => model.IsRealModel && model.Enabled).ToArray() ?? [];
+
+        testableModels.Clear();
+        foreach (var model in available)
+            testableModels.Add(model);
+
+        OnPropertyChanged(nameof(HasTestableModels));
+        SelectedModel = previousSelection is not null && available.Contains(previousSelection)
+            ? previousSelection
+            : available.FirstOrDefault();
+    }
+
+    private void UnsubscribeProvider()
+    {
+        if (provider is not null)
+        {
+            provider.PropertyChanged -= ProviderOnPropertyChanged;
+            provider.Models.CollectionChanged -= ProviderModelsOnCollectionChanged;
+        }
+
+        foreach (var model in subscribedModels)
+            model.PropertyChanged -= ModelOnPropertyChanged;
+        subscribedModels.Clear();
     }
 
     private void ProviderOnPropertyChanged(object? sender, PropertyChangedEventArgs args)

@@ -59,6 +59,17 @@ public sealed class LocalizationResourceParityTest
         }
     }
 
+    [Theory]
+    [InlineData("Strings.resx", "未启用任何模型")]
+    [InlineData("Strings.zh-TW.resx", "尚未啟用任何模型")]
+    [InlineData("Strings.en-US.resx", "No models are enabled")]
+    public void Provider测试无启用模型提示已本地化(string fileName, string expected)
+    {
+        var resources = Load(fileName);
+
+        Assert.Contains(expected, resources["providers.test.model.empty"], StringComparison.Ordinal);
+    }
+
     private static string[] Placeholders(string value) =>
         Regex.Matches(value, @"\{\d+(?:[^}]*)\}")
             .Select(match => match.Value)

@@ -5,7 +5,7 @@
 ## ADDED Requirements
 
 ### Requirement: 用户可以配置并发送真实模型测试请求
-测试 Tab MUST 允许用户从当前 Provider 中选择模型、选择常规或流式模式并编辑单行发送内容；发送内容默认 MUST 为“每日一言”。系统 MUST 按当前 Provider 兼容类型构造并发送真实推理请求。
+测试 Tab MUST 仅允许用户从模型 Tab 已启用的真实模型中选择测试模型、选择常规或流式模式并编辑单行发送内容；发送内容默认 MUST 为“每日一言”。模型启用状态或模型集合变化时，测试模型列表 MUST 立即同步。系统 MUST 按当前 Provider 兼容类型构造并发送真实推理请求。
 
 #### Scenario: 发送常规请求
 - **WHEN** 用户选择启用模型、保留默认 Prompt 并以常规模式发送
@@ -19,9 +19,13 @@
 - **WHEN** 请求已经发送且尚未成功、失败或超时
 - **THEN** 输入框内发送按钮显示不可交互的动态等待状态，页面不提供停止或重试操作
 
-#### Scenario: 没有可用模型
-- **WHEN** 当前 Provider 不存在可选择的真实模型
-- **THEN** 发送操作不可用，页面明确提示先同步或添加模型
+#### Scenario: 当前测试模型被取消启用
+- **WHEN** 用户在模型 Tab 取消当前测试模型，但仍有其他已启用模型
+- **THEN** 测试模型下拉列表移除该模型并自动选择第一个仍启用的真实模型
+
+#### Scenario: 没有启用模型
+- **WHEN** 当前 Provider 没有任何已启用的真实模型
+- **THEN** 测试模型选择为空、发送操作不可用，并以当前界面语言提示用户先前往模型 Tab 启用模型
 
 ### Requirement: 测试请求继承当前 Provider 的有效连接配置
 测试请求 MUST 使用当前 Provider 的 Base URL、API Key、自定义请求头、代理开关和已应用的 CLI/UA 身份。测试服务与真实 OpenAI/Anthropic 路由 MUST 共用同一端点解析实现，测试模块 MUST NOT 单独归一化或修正真实路由将使用的 URL。请求摘要 MUST 在绑定 Provider 时立即生成，并随基础或高级配置变化实时更新。摘要只展示当前测试页不可见但会影响真实请求的信息，包括真实路由将使用的最终请求端点、代理状态、CLI 身份与版本和自定义 Header 数量；摘要 MUST NOT 重复展示 Provider、模型、常规/流式模式或请求 ID，也 MUST NOT 显示 API Key、Authorization 或 Header 值。
