@@ -33,7 +33,10 @@ public sealed class GlassDialogWindowContractTests
         Assert.Contains("owner.AppearanceCoordinator.ApplyTo(dialog)", source, StringComparison.Ordinal);
         Assert.Contains("dialog.DialogActions = buttons", source, StringComparison.Ordinal);
         Assert.Contains("dialog-action", source, StringComparison.Ordinal);
-        Assert.Contains("Title = \"提示\"", source, StringComparison.Ordinal);
+        Assert.Contains("Title = ResourceLookup.Resolve(\"providers.delete.dialog.title\")", source, StringComparison.Ordinal);
+        Assert.Contains("ResourceLookup.Resolve(\"providers.delete.dialog.cancel\")", source, StringComparison.Ordinal);
+        Assert.Contains("ResourceLookup.Resolve(\"providers.delete.dialog.confirm\")", source, StringComparison.Ordinal);
+        Assert.Contains("ResourceLookup.Resolve(\"providers.delete.dialog.message\")", source, StringComparison.Ordinal);
         Assert.Contains("ShowDialog<bool>(owner)", source, StringComparison.Ordinal);
         Assert.Contains("dialog-danger", source, StringComparison.Ordinal);
     }
