@@ -561,5 +561,6 @@
   <data name="providers.delete.dialog.cancel"><value>Cancel</value></data>
   <data name="providers.delete.dialog.confirm"><value>Delete</value></data>
   <data name="providers.delete.dialog.message"><value>Delete Provider “{0}”?</value></data>
+  <data name="providers.test.response.empty"><value>The response will appear here after you send a test request</value></data>
   <data name="providers.test.model.empty"><value>No models are enabled. Enable one in the Models tab first.</value></data>
 </root>

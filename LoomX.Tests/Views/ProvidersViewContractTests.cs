@@ -368,6 +368,16 @@ public sealed class ProvidersViewContractTests
         Assert.DoesNotContain("CopyTestResponseButton_OnClick", codeBehind, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ResponseShowsLocalizedEmptyStateAndHidesScrollableTextUntilResultExists()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var test = ReadTab(source, "providers.tab.test");
+
+        Assert.Contains("Text=\"{l:Locale providers.test.response.empty}\"", test, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding TestPanel.HasResponseText, Converter={StaticResource ProviderBooleanNotConverter}}\"", test, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding TestPanel.HasResponseText}\"", test, StringComparison.Ordinal);
+    }
     [Theory]
     [InlineData(Key.Delete, false, 6, 0, 6, true)]
     [InlineData(Key.Back, false, 6, 6, 0, true)]

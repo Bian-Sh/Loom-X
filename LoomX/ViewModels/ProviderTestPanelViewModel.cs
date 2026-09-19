@@ -59,7 +59,16 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
         }
     }
 
-    public string ResponseText { get => responseText; private set => SetProperty(ref responseText, value); }
+    public string ResponseText
+    {
+        get => responseText;
+        private set
+        {
+            if (!SetProperty(ref responseText, value)) return;
+            OnPropertyChanged(nameof(HasResponseText));
+        }
+    }
+    public bool HasResponseText => !string.IsNullOrEmpty(ResponseText);
     public string RequestSummary { get => requestSummary; private set => SetProperty(ref requestSummary, value); }
     public ProviderTestSummary? Summary { get => summary; private set => SetProperty(ref summary, value); }
 

@@ -167,6 +167,17 @@ public sealed class ProviderTestPanelViewModelTests
         Assert.True(panel.SendCommand.CanExecute(null));
     }
     [Fact]
+    public void ResponseContentStateIsSeparateFromCompletedResultState()
+    {
+        var property = typeof(ProviderTestPanelViewModel).GetProperty("HasResponseText");
+
+        Assert.NotNull(property);
+
+        var panel = new ProviderTestPanelViewModel(new StubProviderTestService());
+
+        Assert.False((bool)property!.GetValue(panel)!);
+    }
+    [Fact]
     public async Task 清空和发送生命周期()
     {
         var service = new StubProviderTestService();
