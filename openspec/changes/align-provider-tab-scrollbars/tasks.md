@@ -24,3 +24,9 @@
 
 - [x] 5.1 运行 Provider 页面测试、完整测试、Release 构建和 OpenSpec 严格校验。
 - [x] 5.2 提交修正并生成基于最终提交的发布包。
+
+## 6. API Key 输入框边界修正
+
+- [x] 6.1 通过 UIA 复现 API Key 输入框比显示名称、Base URL 多延伸 8px。
+- [x] 6.2 按 RED → GREEN 更新契约测试，并将 API Key 行改为按钮覆盖布局与 8px 右侧保留。
+- [x] 6.3 重新发布验证包，确认三个输入框的 UIA Right 一致。

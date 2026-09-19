@@ -302,6 +302,10 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("providers.compat.responses.description", basic, StringComparison.Ordinal);
         Assert.Contains("providers.compat.anthropic.description", basic, StringComparison.Ordinal);
         Assert.Contains("SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
+        Assert.Contains("<Grid Margin=\"0,0,8,0\"><TextBox Text=\"{Binding SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
+        Assert.Contains("Padding=\"12,9,46,9\"/><Button HorizontalAlignment=\"Right\" Width=\"38\" Height=\"34\" Margin=\"0,0,4,0\"", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Grid ColumnDefinitions=\"*,Auto\"><TextBox Text=\"{Binding SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Button Grid.Column=\"1\" Width=\"38\" Height=\"34\" Margin=\"-42,0,4,0\"", basic, StringComparison.Ordinal);
         Assert.DoesNotContain("SelectedProvider.ApiKey", advanced, StringComparison.Ordinal);
     }
 

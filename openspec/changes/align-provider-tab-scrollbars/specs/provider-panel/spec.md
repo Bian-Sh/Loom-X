@@ -11,6 +11,10 @@ Provider 右侧详情面板的基础、高级、模型和测试 Tab MUST 保持�
 - **WHEN** 用户在基础、高级、模型和测试 Tab 之间切换
 - **THEN** 每个 Tab 均使用相同的内容 inset 和原生 ScrollBar 位置
 
+#### Scenario: API Key 输入框保持内容边界
+- **WHEN** 基础 Tab 显示 API Key 输入框和可见性按钮
+- **THEN** API Key 输入框右边缘与显示名称、Base URL 输入框一致，不延伸到主滚动条预留区域
+
 #### Scenario: 嵌套内容保留自身滚动行为
 - **WHEN** 测试响应文本框的内容需要独立滚动
 - **THEN** 该嵌套滚动区域保持自身布局，不应用详情 Tab 主滚动区域的内容 Padding
