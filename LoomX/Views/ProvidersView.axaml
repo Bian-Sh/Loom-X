@@ -211,8 +211,12 @@
                             <TextBlock Grid.Row="1" Text="{Binding TestPanel.RequestSummary}" Classes="muted" FontFamily="Consolas" TextWrapping="Wrap"/>
                             <Grid Grid.Row="2">
                               <TextBox Text="{Binding TestPanel.Prompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.test.prompt.watermark}" AcceptsReturn="False" TextWrapping="NoWrap" Height="38" Padding="10,0,50,0" VerticalContentAlignment="Center" IsEnabled="{Binding TestPanel.IsRunning, Converter={StaticResource ProviderBooleanNotConverter}}"/>
-                              <Button HorizontalAlignment="Right" VerticalAlignment="Stretch" MinWidth="40" Margin="3" Padding="10,0" Command="{Binding TestPanel.SendCommand}" IsVisible="{Binding TestPanel.IsRunning, Converter={StaticResource ProviderBooleanNotConverter}}" ToolTip.Tip="{l:Locale providers.test.send}"><Path Classes="icon-glyph" Data="M 4,4 L 24,12 L 4,20 L 8,12 Z" Width="14" Height="14"/></Button>
-                              <Button HorizontalAlignment="Right" VerticalAlignment="Stretch" MinWidth="40" Margin="3" Padding="8,0" IsEnabled="False" IsVisible="{Binding TestPanel.IsRunning}"><ProgressBar IsIndeterminate="True" Width="24" Height="3" MinHeight="0"/></Button>
+                              <Button HorizontalAlignment="Right" VerticalAlignment="Stretch" MinWidth="40" Margin="3" Padding="8,0" Command="{Binding TestPanel.SendCommand}" IsEnabled="{Binding TestPanel.CanSend}" ToolTip.Tip="{l:Locale providers.test.send}">
+                                <Grid>
+                                  <Path Classes="icon-glyph" Data="M 4,4 L 24,12 L 4,20 L 8,12 Z" Width="14" Height="14" IsVisible="{Binding TestPanel.IsRunning, Converter={StaticResource ProviderBooleanNotConverter}}"/>
+                                  <ProgressBar IsIndeterminate="True" Width="24" Height="3" MinHeight="0" IsVisible="{Binding TestPanel.IsRunning}"/>
+                                </Grid>
+                              </Button>
                             </Grid>
                           </Grid>
                         </Border>

@@ -85,6 +85,30 @@ public sealed class ProviderTestPanelViewModelTests
     }
 
     [Fact]
+    public async Task 请求完成后发送命令可以再次执行()
+    {
+        var service = new StubProviderTestService();
+        var panel = new ProviderTestPanelViewModel(service);
+        var provider = new ProviderEditorViewModel
+        {
+            BusinessId = "p",
+            BaseUrl = "https://example.com",
+            ApiMode = "openai",
+            EndpointFormat = "responses",
+        };
+        provider.Models.Add(new ModelEditorViewModel { ModelId = "m", Enabled = true });
+        panel.BindProvider(provider);
+
+        panel.SendCommand.Execute(null);
+        await WaitUntilAsync(() => service.ExecutionCount == 1 && !panel.IsRunning);
+
+        Assert.True(panel.SendCommand.CanExecute(null));
+        panel.SendCommand.Execute(null);
+        await WaitUntilAsync(() => service.ExecutionCount == 2 && !panel.IsRunning);
+
+        Assert.True(panel.SendCommand.CanExecute(null));
+    }
+    [Fact]
     public async Task 清空和发送生命周期()
     {
         var service = new StubProviderTestService();
@@ -101,11 +125,19 @@ public sealed class ProviderTestPanelViewModelTests
         Assert.False(panel.HasResult);
     }
 
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var attempt = 0; attempt < 100 && !condition(); attempt++)
+            await Task.Delay(10);
+        Assert.True(condition());
+    }
     private sealed class StubProviderTestService : IProviderTestService
     {
+        public int ExecutionCount { get; private set; }
         public TaskCompletionSource<ProviderTestResult> Completed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<ProviderTestResult> ExecuteAsync(ProviderTestRequest request, IProgress<ProviderTestProgress>? progress = null, CancellationToken cancellationToken = default)
         {
+            ExecutionCount++;
             progress?.Report(new ProviderTestProgress(request.RequestId, ProviderTestStatus.Sending));
             var result = new ProviderTestResult(request.RequestId, ProviderTestStatus.Completed, new ProviderTestSummary(request.RequestId, request.ProviderId, request.ModelId, "openai_responses", "/responses", request.Mode, false, "direct", null, 0), 200, "application/json", 1, 10, "答复");
             Completed.TrySetResult(result);

@@ -319,6 +319,20 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
+    public void SendButtonRemainsMountedAndUsesDirectEnabledBinding()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var test = ReadTab(source, "providers.tab.test");
+        var commandIndex = test.IndexOf("Command=\"{Binding TestPanel.SendCommand}\"", StringComparison.Ordinal);
+        Assert.True(commandIndex >= 0);
+        var buttonStart = test.LastIndexOf("<Button", commandIndex, StringComparison.Ordinal);
+        var buttonEnd = test.IndexOf(">", commandIndex, StringComparison.Ordinal);
+        var sendButton = test[buttonStart..buttonEnd];
+
+        Assert.Contains("IsEnabled=\"{Binding TestPanel.CanSend}\"", sendButton, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsVisible=\"{Binding TestPanel.IsRunning", sendButton, StringComparison.Ordinal);
+    }
+    [Fact]
     public void ResponseUsesSelectableReadonlyTextWithoutCopyHandler()
     {
         var view = ReadDesktopFile("Views", "ProvidersView.axaml");
