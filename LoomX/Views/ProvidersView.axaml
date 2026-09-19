@@ -29,7 +29,7 @@
     <Style Selector="Border.model-drag-preview"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="0,0,0,1"/><Setter Property="Padding" Value="10,8"/><Setter Property="Opacity" Value="0.98"/></Style>
     <Style Selector="Border.stat"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/><Setter Property="Padding" Value="16,14"/></Style>
     <Style Selector="Button.icon-button"><Setter Property="Width" Value="36"/><Setter Property="Height" Value="36"/><Setter Property="Padding" Value="0"/><Setter Property="CornerRadius" Value="10"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
-    <Style Selector="Button.provider-test-action"><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style Selector="Button.provider-test-action"><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="VerticalAlignment" Value="Stretch"/><Setter Property="MinHeight" Value="0"/><Setter Property="CornerRadius" Value="4"/></Style>
     <Style Selector="Button.small-button"><Setter Property="Padding" Value="11,7"/><Setter Property="MinHeight" Value="34"/></Style>
   </UserControl.Styles>
   <Grid RowDefinitions="Auto,*" RowSpacing="12">
@@ -224,7 +224,7 @@
                             <TextBlock Grid.Row="1" Text="{Binding TestPanel.RequestSummary}" Classes="muted" FontFamily="Consolas" TextWrapping="Wrap"/>
                             <Grid Grid.Row="2">
                               <TextBox Text="{Binding TestPanel.Prompt, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.test.prompt.watermark}" AcceptsReturn="False" TextWrapping="NoWrap" Height="38" Padding="10,0,72,0" VerticalContentAlignment="Center" IsEnabled="{Binding TestPanel.IsRunning, Converter={StaticResource ProviderBooleanNotConverter}}"/>
-                              <Grid HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="3">
+                              <Grid HorizontalAlignment="Right" VerticalAlignment="Stretch" Margin="0,2,2,2">
                                 <Button Classes="provider-test-action" MinWidth="64" Padding="10,0" Content="{l:Locale providers.test.send}" Command="{Binding TestPanel.SendCommand}" IsEnabled="{Binding TestPanel.CanSend}" IsVisible="{Binding TestPanel.IsRunning, Converter={StaticResource ProviderBooleanNotConverter}}"/>
                                 <Button Classes="provider-test-action" MinWidth="64" Padding="10,0" Content="{l:Locale providers.test.stop}" Command="{Binding TestPanel.StopCommand}" IsVisible="{Binding TestPanel.IsRunning}"/>
                               </Grid>

@@ -497,8 +497,10 @@ public sealed class ProvidersViewContractTests
     public void TestSendAndStopActionsCenterTheirContent()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var test = ReadTab(source, "providers.tab.test");
 
-        Assert.Contains("Selector=\"Button.provider-test-action\"><Setter Property=\"HorizontalContentAlignment\" Value=\"Center\"/><Setter Property=\"VerticalContentAlignment\" Value=\"Center\"/></Style>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Button.provider-test-action\"><Setter Property=\"HorizontalContentAlignment\" Value=\"Center\"/><Setter Property=\"VerticalContentAlignment\" Value=\"Center\"/><Setter Property=\"VerticalAlignment\" Value=\"Stretch\"/><Setter Property=\"MinHeight\" Value=\"0\"/><Setter Property=\"CornerRadius\" Value=\"4\"/></Style>", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid HorizontalAlignment=\"Right\" VerticalAlignment=\"Stretch\" Margin=\"0,2,2,2\">", test, StringComparison.Ordinal);
         Assert.Equal(2, source.Split("Classes=\"provider-test-action\"", StringSplitOptions.None).Length - 1);
     }
 
