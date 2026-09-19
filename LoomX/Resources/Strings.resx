@@ -1636,4 +1636,35 @@
     <value>服务描述：{0}</value>
   </data>
   <data name="assistant.decision.validation_failed"><value>请检查决策字段后重试。</value></data>
+  <data name="providers.tab.advanced"><value>高级</value></data>
+  <data name="providers.tab.test"><value>测试</value></data>
+  <data name="providers.advanced.header"><value>代理与请求增强</value></data>
+  <data name="providers.compatibility.label"><value>接口兼容类型</value></data>
+  <data name="providers.compat.chat.title"><value>OpenAI Chat-compatible</value></data>
+  <data name="providers.compat.chat.description"><value>使用 /chat/completions</value></data>
+  <data name="providers.compat.responses.title"><value>OpenAI Responses-compatible</value></data>
+  <data name="providers.compat.responses.description"><value>使用 /responses</value></data>
+  <data name="providers.compat.anthropic.title"><value>Anthropic Messages-compatible</value></data>
+  <data name="providers.compat.anthropic.description"><value>使用 /messages</value></data>
+  <data name="providers.apikey.label"><value>API Key</value></data>
+  <data name="providers.test.model.label"><value>测试模型</value></data>
+  <data name="providers.test.mode.label"><value>测试模式</value></data>
+  <data name="providers.test.mode.regular"><value>常规请求</value></data>
+  <data name="providers.test.mode.streaming"><value>流式请求</value></data>
+  <data name="providers.test.prompt.label"><value>发送内容</value></data>
+  <data name="providers.test.prompt.watermark"><value>输入测试提示词</value></data>
+  <data name="providers.test.send"><value>发送</value></data>
+  <data name="providers.test.stop"><value>停止</value></data>
+  <data name="providers.test.retry"><value>重试</value></data>
+  <data name="providers.test.clear"><value>清空</value></data>
+  <data name="providers.test.summary.title"><value>请求摘要</value></data>
+  <data name="providers.test.response.title"><value>Response</value></data>
+  <data name="providers.test.copy"><value>复制响应</value></data>
+  <data name="providers.test.copy.success"><value>响应已复制</value></data>
+  <data name="providers.test.copy.failure"><value>复制响应失败</value></data>
+  <data name="providers.delete.dialog.title"><value>提示</value></data>
+  <data name="providers.delete.dialog.cancel"><value>取消</value></data>
+  <data name="providers.delete.dialog.confirm"><value>删除</value></data>
+  <data name="providers.delete.dialog.message"><value>确定删除 Provider“{0}”吗？</value></data>
+  <data name="providers.test.model.empty"><value>当前 Provider 没有可测试模型</value></data>
 </root>

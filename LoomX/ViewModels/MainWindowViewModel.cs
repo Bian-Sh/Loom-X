@@ -800,14 +800,12 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private readonly IStringLocalizer<ProvidersViewModel> _loc;
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(8) };
     private readonly IProviderHealthService healthService;
+    private readonly ProviderTestPanelViewModel testPanel;
     private ProviderEditorViewModel? selectedProvider;
     private ModelEditorViewModel? selectedModel;
     private string status = "";
-    private string connectionStatus = ResourceLookup.Resolve("providers.connection.status.pending");
     private string? statusKey;
     private object[] statusArguments = [];
-    private string connectionStatusKey = "providers.connection.status.pending";
-    private object[] connectionStatusArguments = [];
     private int totalModelCount;
     private int protectedKeyCount;
     private int healthyProviderCount;
@@ -819,7 +817,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private bool isProviderHealthChecking;
     private int activeTabIndex;
     private bool isCliMenuOpen;
-    private CancellationTokenSource? connectionCancellation;
     private CancellationTokenSource? healthVerificationCancellation;
     private CancellationTokenSource? modelSyncCancellation;
     private DispatcherTimer? modelSyncAnimationTimer;
@@ -840,6 +837,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private Task? refreshTask;
     private int lastIncompleteHeaderWarningCount;
     public ObservableCollection<ProviderEditorViewModel> Providers { get; } = [];
+    public ProviderTestPanelViewModel TestPanel => testPanel;
     public IReadOnlyList<string> ProviderTypeOptions { get; } = ["openai", "anthropic", "ollama"];
     public ProviderEditorViewModel? SelectedProvider
     {
@@ -852,6 +850,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             DetachProvider(selectedProvider);
             SetProperty(ref selectedProvider, value);
             AttachProvider(selectedProvider);
+            testPanel.BindProvider(selectedProvider);
             SelectedModel = null;
             OnPropertyChanged(nameof(HasSelectedProvider));
             OnPropertyChanged(nameof(HasNoSelectedProvider));
@@ -942,7 +941,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public string Status { get => status; private set => SetProperty(ref status, value); }
     public bool IsModelSyncing { get => isModelSyncing; private set => SetProperty(ref isModelSyncing, value); }
     public double SyncIconAngle { get => syncIconAngle; private set => SetProperty(ref syncIconAngle, value); }
-    public string ConnectionStatus { get => connectionStatus; private set => SetProperty(ref connectionStatus, value); }
     public int TotalModelCount { get => totalModelCount; private set => SetProperty(ref totalModelCount, value); }
     public int ProtectedKeyCount { get => protectedKeyCount; private set => SetProperty(ref protectedKeyCount, value); }
     public int HealthyProviderCount { get => healthyProviderCount; private set => SetProperty(ref healthyProviderCount, value); }
@@ -988,7 +986,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public ICommand SaveModelCommand { get; }
     public ICommand DeleteModelCommand { get; }
     public ICommand ToggleAllModelsCommand { get; }
-    public ICommand TestConnectionCommand { get; }
     public ICommand VerifyAllProvidersCommand { get; }
     public ICommand SyncModelsCommand { get; }
 
@@ -1002,17 +999,18 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         return models;
     }
 
-    public ProvidersViewModel(AppDataStore dataStore, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null, IStringLocalizer<ProvidersViewModel>? localizer = null, IProviderHealthService? healthService = null)
+    public ProvidersViewModel(AppDataStore dataStore, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null, IStringLocalizer<ProvidersViewModel>? localizer = null, IProviderHealthService? healthService = null, IProviderTestService? providerTestService = null)
     {
         this.dataStore = dataStore;
         this.toastService = toastService ?? new ToastService();
         this.logger = logger;
         _loc = localizer ?? LocalizerFactory.Create<ProvidersViewModel>();
         this.healthService = healthService ?? new ProviderHealthService(httpClient);
+        testPanel = new ProviderTestPanelViewModel(providerTestService ?? new ProviderTestService(httpClient));
         Providers.CollectionChanged += ProvidersChanged;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;
-        RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(parameter => DeleteModelAsync(parameter as ModelEditorViewModel)); ToggleAllModelsCommand = new AsyncCommand(ToggleAllModelsAsync); TestConnectionCommand = new AsyncCommand(TestConnectionAsync); VerifyAllProvidersCommand = new AsyncCommand(VerifyAllProvidersAsync, () => IsProviderHealthIdle); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
+        RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(parameter => DeleteModelAsync(parameter as ModelEditorViewModel)); ToggleAllModelsCommand = new AsyncCommand(ToggleAllModelsAsync); VerifyAllProvidersCommand = new AsyncCommand(VerifyAllProvidersAsync, () => IsProviderHealthIdle); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
     }
 
     public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null, IStringLocalizer<ProvidersViewModel>? localizer = null)
@@ -1027,20 +1025,12 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         Status = LocFormat(key, args);
     }
 
-    private void SetConnectionStatus(string key, params object[] args)
-    {
-        connectionStatusKey = key;
-        connectionStatusArguments = args;
-        ConnectionStatus = LocFormat(key, args);
-    }
-
     private void OnCultureChanged(object? sender, CultureInfo culture)
     {
         if (statusKey is not null) Status = LocFormat(statusKey, statusArguments);
-        ConnectionStatus = LocFormat(connectionStatusKey, connectionStatusArguments);
         OnPropertyChanged(nameof(ProviderHealthSummary));
         OnPropertyChanged(nameof(EnabledModelSummary));
-        OnPropertyChanged(nameof(ConnectionStatus));
+        testPanel.RefreshLocalization();
         foreach (var provider in Providers)
         {
             provider.RefreshLocalization();
@@ -1140,17 +1130,17 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         dataStore.ConfigurationChanged -= OnConfigurationChanged;
         // 尽力把待存的编辑在退出前落库；保存锁由未完成的异步操作自行释放。
         _ = SavePendingChangesAsync();
-        connectionCancellation?.Cancel();
         healthVerificationCancellation?.Cancel();
         healthVerificationCancellation?.Dispose();
         modelSyncCancellation?.Cancel();
+        testPanel.BindProvider(null);
         modelSyncAnimationTimer?.Stop();
         modelSyncAnimationTimer = null;
         httpClient.Dispose();
         LocaleService.CultureChanged -= OnCultureChanged;
     }
 
-    private void NewProvider() { var provider = new ProviderEditorViewModel { DisplayName = Loc("providers.edit.new.displayname"), ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); SetStatus("providers.status.edit.new"); }
+    private void NewProvider() { var provider = new ProviderEditorViewModel { BusinessId = GenerateProviderBusinessId(Providers), DisplayName = Loc("providers.edit.new.displayname"), ApiMode = "openai", EndpointFormat = "responses", Enabled = true }; Providers.Add(provider); SelectedProvider = provider; UpdateSummary(); SetStatus("providers.status.edit.new"); }
 
     private async Task SavePendingChangesAsync()
     {
@@ -1253,30 +1243,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         catch (Exception exception) { SetStatus("providers.model.delete.failure", exception.Message); }
     }
 
-    private async Task TestConnectionAsync()
-    {
-        var provider = SelectedProvider;
-        if (provider is null) return;
-
-        connectionCancellation?.Cancel();
-        connectionCancellation?.Dispose();
-        var requestCancellation = new CancellationTokenSource();
-        connectionCancellation = requestCancellation;
-        try
-        {
-            await VerifyProviderAsync(provider, requestCancellation.Token);
-            toastService.Show(
-                provider.IsHealthPassed ? Loc("providers.test.toast.success") : Loc("providers.test.toast.failure"),
-                provider.IsHealthPassed ? ToastLevel.Success : ToastLevel.Error);
-        }
-        catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested) { }
-        finally
-        {
-            if (ReferenceEquals(connectionCancellation, requestCancellation)) connectionCancellation = null;
-            requestCancellation.Dispose();
-        }
-    }
-
     private async Task VerifyAllProvidersAsync()
     {
         var targets = Providers.Where(provider => provider.Enabled).ToArray();
@@ -1326,7 +1292,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             }
             if (!provider.Enabled) result = new ProviderHealthResult(ProviderHealthState.Disabled);
             provider.ApplyHealthResult(result);
-            ConnectionStatus = provider.HealthDetailText;
             UpdateSummary();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -1339,7 +1304,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         {
             logger?.LogError(exception, "Provider 验证流程失败 {ProviderId}", provider.BusinessId);
             provider.ApplyHealthResult(new ProviderHealthResult(ProviderHealthState.Unavailable, ProviderHealthFailureKind.Unavailable, FailureCode: "unexpected"));
-            ConnectionStatus = provider.HealthDetailText;
             UpdateSummary();
         }
     }
@@ -1730,6 +1694,19 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         OnPropertyChanged(nameof(ProviderHealthSummary));
     }
 
+    public static string GenerateProviderBusinessId(IEnumerable<ProviderEditorViewModel> providers)
+        => GenerateProviderBusinessId(providers, () => Guid.NewGuid().ToString("N")[..8]);
+
+    internal static string GenerateProviderBusinessId(IEnumerable<ProviderEditorViewModel> providers, Func<string> suffixFactory)
+    {
+        var existingIds = providers.Select(provider => provider.BusinessId).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        while (true)
+        {
+            var candidate = $"provider-{suffixFactory()}";
+            if (existingIds.Add(candidate)) return candidate;
+        }
+    }
+
     internal static bool MatchesProviderSearch(ProviderEditorViewModel provider, string query)
     {
         query = query.Trim();
@@ -1760,8 +1737,10 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     private bool suppressDirtyTracking;
     private bool suppressCliIdentityVersionChange;
     public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ModelListUrl { get => modelListUrl; set => SetProperty(ref modelListUrl, value); }
-    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); UpdateCliIdentityRecommendations(); } }
-    public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); } }
+    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); OnPropertyChanged(nameof(SelectedCompatibility)); UpdateCliIdentityRecommendations(); } }
+    public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); OnPropertyChanged(nameof(SelectedCompatibility)); } }
+    public IReadOnlyList<ProviderCompatibilityOption> CompatibilityOptions { get; } = ProviderCompatibilityOption.All;
+    public ProviderCompatibilityOption SelectedCompatibility { get => ProviderCompatibilityOption.FromFields(ApiMode, EndpointFormat); set => value?.ApplyTo(this); }
     public IReadOnlyList<EndpointFormatOption> EndpointFormatOptions { get; } = EndpointFormatOption.All;
     public EndpointFormatOption SelectedEndpointFormat { get => EndpointFormatOption.FromValue(EndpointFormat); set { if (value is not null) EndpointFormat = value.Value; } }
     public bool IsEndpointFormatVisible => string.Equals(ApiMode, "openai", StringComparison.OrdinalIgnoreCase);

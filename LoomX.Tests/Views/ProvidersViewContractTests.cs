@@ -261,6 +261,82 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("IsVisible=\"{Binding IsHealthChecking}\"", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ProviderEditorUsesFourLocalizedTabsAndRemovesLegacyConnectionBlock()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        Assert.Equal(4, source.Split("<TabItem Header=", StringSplitOptions.None).Length - 1);
+        Assert.Contains("providers.tab.basic", source, StringComparison.Ordinal);
+        Assert.Contains("providers.tab.advanced", source, StringComparison.Ordinal);
+        Assert.Contains("providers.tab.models", source, StringComparison.Ordinal);
+        Assert.Contains("providers.tab.test", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.tab.request", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestConnectionCommand", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("providers.connection.test", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BasicTabUsesCompatibilityCardsHidesProviderIdAndOwnsApiKey()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var basic = ReadTab(source, "providers.tab.basic");
+        var advanced = ReadTab(source, "providers.tab.advanced");
+        Assert.DoesNotContain("SelectedProvider.BusinessId", basic, StringComparison.Ordinal);
+        Assert.Contains("SelectedProvider.SelectedCompatibility", basic, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.chat.title", basic, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.responses.title", basic, StringComparison.Ordinal);
+        Assert.Contains("providers.compat.anthropic.title", basic, StringComparison.Ordinal);
+        Assert.Contains("SelectedProvider.ApiKey", basic, StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectedProvider.ApiKey", advanced, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AdvancedAndTestTabsExposeSafeConfigurationAndTestBindings()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var advanced = ReadTab(source, "providers.tab.advanced");
+        var test = ReadTab(source, "providers.tab.test");
+        Assert.Contains("SelectedProvider.UseProxy", advanced, StringComparison.Ordinal);
+        Assert.Contains("SelectedProvider.Headers", advanced, StringComparison.Ordinal);
+        Assert.Contains("SelectedProvider.CliIdentities", advanced, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.SelectedModel", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.SelectedMode", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.Prompt", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.SendCommand", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.StopCommand", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.RetryCommand", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.ClearCommand", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.ResponseText", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.Summary", test, StringComparison.Ordinal);
+        Assert.Contains("TestPanel.HasError", test, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CopyResponseUsesClipboardAndSafeToastFeedback()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml.cs");
+        var start = source.IndexOf("private async void CopyTestResponseButton_OnClick", StringComparison.Ordinal);
+        var end = source.IndexOf("private void CliIdentityMenuButton_OnClick", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        var copyHandler = source[start..end];
+        Assert.Contains("TestPanel.ResponseText", copyHandler, StringComparison.Ordinal);
+        Assert.Contains("Clipboard", copyHandler, StringComparison.Ordinal);
+        Assert.Contains("ToastService", copyHandler, StringComparison.Ordinal);
+        Assert.Contains("ToastLevel.Success", copyHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("ApiKey", copyHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("HeadersJson", copyHandler, StringComparison.Ordinal);
+    }
+
+    private static string ReadTab(string source, string headerKey)
+    {
+        var marker = $"<TabItem Header=\"{{l:Locale {headerKey}}}\">";
+        var start = source.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"缺少 Tab：{headerKey}");
+        var end = source.IndexOf("</TabItem>", start, StringComparison.Ordinal);
+        Assert.True(end >= 0, $"Tab 未闭合：{headerKey}");
+        return source[start..end];
+    }
+
     private static string ReadDesktopFile(params string[] segments)
     {
         var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);

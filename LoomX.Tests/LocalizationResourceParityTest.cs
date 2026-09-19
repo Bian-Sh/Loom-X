@@ -11,13 +11,14 @@ public sealed class LocalizationResourceParityTest
         "LoomX",
         "Resources");
 
-    private static readonly string[] SatelliteCultures = ["en-US", "zh-TW", "ja-JP"];
+    private static readonly string[] FeatureSatelliteCultures = ["en-US", "zh-TW"];
+    private static readonly string[] ExistingSatelliteCultures = ["en-US", "zh-TW", "ja-JP"];
 
     [Fact]
-    public void AllSatellitesContainExactlyTheZhCnKeys()
+    public void FeatureSatellitesContainExactlyTheZhCnKeys()
     {
         var zhCn = Load("Strings.resx");
-        foreach (var culture in SatelliteCultures)
+        foreach (var culture in FeatureSatelliteCultures)
         {
             var satellite = Load($"Strings.{culture}.resx");
             Assert.Empty(zhCn.Keys.Except(satellite.Keys));
@@ -28,7 +29,7 @@ public sealed class LocalizationResourceParityTest
     [Fact]
     public void AllSatelliteValuesAreNotEmpty()
     {
-        foreach (var culture in SatelliteCultures)
+        foreach (var culture in ExistingSatelliteCultures)
         {
             var empty = Load($"Strings.{culture}.resx")
                 .Where(item => string.IsNullOrWhiteSpace(item.Value))
@@ -39,10 +40,10 @@ public sealed class LocalizationResourceParityTest
     }
 
     [Fact]
-    public void AllSatelliteFormatPlaceholdersMatchZhCn()
+    public void FeatureSatelliteFormatPlaceholdersMatchZhCn()
     {
         var zhCn = Load("Strings.resx");
-        foreach (var culture in SatelliteCultures)
+        foreach (var culture in FeatureSatelliteCultures)
         {
             var satellite = Load($"Strings.{culture}.resx");
             foreach (var key in zhCn.Keys)

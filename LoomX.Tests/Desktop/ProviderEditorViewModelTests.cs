@@ -8,6 +8,64 @@ namespace LoomX.Tests.Desktop;
 public sealed class ProviderEditorViewModelTests
 {
     [Fact]
+    public void GenerateProviderBusinessId_返回固定格式()
+    {
+        var businessId = ProvidersViewModel.GenerateProviderBusinessId([]);
+
+        Assert.Matches("^provider-[0-9a-f]{8}$", businessId);
+    }
+
+    [Fact]
+    public void GenerateProviderBusinessId_当前集合冲突时忽略大小写重试()
+    {
+        var providers = new[]
+        {
+            new ProviderEditorViewModel { BusinessId = "provider-DEADBEEF" }
+        };
+        var suffixes = new Queue<string>(["deadbeef", "cafebabe"]);
+
+        var businessId = ProvidersViewModel.GenerateProviderBusinessId(providers, suffixes.Dequeue);
+
+        Assert.Equal("provider-cafebabe", businessId);
+        Assert.Empty(suffixes);
+    }
+
+    [Fact]
+    public void ProviderBusinessId_名称和兼容类型变化后保持不变()
+    {
+        var provider = new ProviderEditorViewModel
+        {
+            BusinessId = "provider-1234abcd",
+            DisplayName = "初始名称"
+        };
+
+        provider.DisplayName = "新名称";
+        provider.SelectedCompatibility = ProviderCompatibilityOption.AnthropicMessages;
+
+        Assert.Equal("provider-1234abcd", provider.BusinessId);
+    }
+
+    [Fact]
+    public void FromResponse_保留已有ProviderId()
+    {
+        var response = new ProviderResponse(
+            Guid.NewGuid(),
+            "legacy-provider-id",
+            "已有 Provider",
+            "https://example.com",
+            "openai",
+            true,
+            false,
+            false,
+            0,
+            "{}",
+            []);
+
+        var provider = ProviderEditorViewModel.FromResponse(response);
+
+        Assert.Equal("legacy-provider-id", provider.BusinessId);
+    }
+    [Fact]
     public void ExplicitModelListUrlPreservesTrailingSlashForSync()
     {
         var provider = new ProviderEditorViewModel { ModelListUrl = "https://www.baidu.com/" };
