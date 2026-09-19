@@ -1,0 +1,6 @@
+{
+  "openspec_proposal": "openspec/changes/simplify-provider-compatibility-selector/proposal.md",
+  "openspec_design": "openspec/changes/simplify-provider-compatibility-selector/design.md",
+  "openspec_tasks": "openspec/changes/simplify-provider-compatibility-selector/tasks.md",
+  "openspec_delta_spec": "openspec/changes/simplify-provider-compatibility-selector/specs/provider-panel/spec.md"
+}
