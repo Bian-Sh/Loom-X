@@ -286,7 +286,7 @@ public sealed record PreparedUpdate(
     DateTimeOffset VerifiedAt);
 ~~~
 
-- [ ] **步骤 1：把旧“下载即安装”测试改成失败优先测试**
+- [x] **步骤 1：把旧“下载即安装”测试改成失败优先测试**
 
 用以下测试替换 DownloadAndInstallAsync_ShouldVerifyChecksumBeforeLaunchingInstaller，并新增缓存与校验失败用例：
 
@@ -344,7 +344,7 @@ public async Task PrepareUpdateAsync_校验失败删除当前版本临时文件(
 }
 ~~~
 
-- [ ] **步骤 2：运行测试并确认红灯**
+- [x] **步骤 2：运行测试并确认红灯**
 
 ~~~powershell
 dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateServiceTests"
@@ -352,7 +352,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "Ful
 
 预期：FAIL，PrepareUpdateAsync、PreparedUpdate 和 LaunchInstaller 尚不存在；旧实现会在准备完成后立即记录 Launcher.Path。
 
-- [ ] **步骤 3：实现 .partial 下载、缓存复验和准备阶段进度**
+- [x] **步骤 3：实现 .partial 下载、缓存复验和准备阶段进度**
 
 PrepareUpdateAsync 使用以下固定顺序：
 
@@ -438,13 +438,13 @@ public void LaunchInstaller(PreparedUpdate preparedUpdate)
 
 删除 UpdateInstallResult 和 DownloadAndInstallAsync；下载方法继续只记录版本、资产名、字节数、耗时和结果。
 
-- [ ] **步骤 4：运行测试并确认绿灯**
+- [x] **步骤 4：运行测试并确认绿灯**
 
 运行步骤 2 命令。
 
 预期：PASS；准备成功时启动次数为 0，显式调用后为 1；有效缓存不新增请求；校验失败不留下 .partial 文件。
 
-- [ ] **步骤 5：勾选 OpenSpec 1.3、1.4 并提交**
+- [x] **步骤 5：勾选 OpenSpec 1.3、1.4 并提交**
 
 ~~~powershell
 git add LoomX/Services/UpdateService.cs LoomX.Tests/UpdateServiceTests.cs openspec/changes/enhance-update-experience/tasks.md
