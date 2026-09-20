@@ -35,13 +35,13 @@ Assistant 页面底部形成一个共享 composer anchor：
 └─────────────────────────────────────────────────┘
 ```
 
-AskUserCard 与队列使用 overlay 层覆盖消息区底部，不成为 `Messages` 项，也不创建原生 Popup/Window。输入容器保持正常布局；overlay 根据输入容器实际位置和高度向上排列，间距约 10–12px。卡片使用 DynamicResource、边框、圆角和轻阴影，不显示独立标题栏或右上角关闭按钮。
+AskUserCard 与队列使用 `Popup.ShouldUseOverlayLayer=True` 挂载到应用内 OverlayLayer，不成为 `Messages` 项，也不创建第二个顶层 Window 或 HWND。输入容器保持正常布局；overlay 根据输入容器实际位置和高度向上排列，间距约 10–12px。卡片使用 DynamicResource、边框、圆角和轻阴影，不显示独立标题栏或右上角关闭按钮。
 
 窄窗口中，卡片、队列和输入容器按可用宽度收缩；宽窗口中通过 MaxWidth 避免横向拉伸产生大块空白。
 
 ## 4. AskUser 状态与完成
 
-`PendingAskUser` 只允许一个活动实例，并保存 RequestId、SessionId 和字段状态。卡片提供：
+`PendingAskUser` 只允许一个活动实例并保存 RequestId 与字段状态；它通过 `AssistantViewModel.activeRunSessionId` 关联当前运行会话。卡片提供：
 
 - Previous / Next；
 - Skip（仅可选字段）；
@@ -96,5 +96,5 @@ AskUserCard 与队列使用 overlay 层覆盖消息区底部，不成为 `Messag
 - AskUser 状态：分页、值保留、跳过、必填、取消、最终结果。
 - 队列：运行中入队、删除、FIFO、完整轮次边界、失败暂停、SessionId 隔离。
 - Broker：Claim、Submit、Cancel、请求结束和迟到事件。
-- Avalonia：异步准备后 UI 对象始终在 Dispatcher UI 线程创建和关闭。
+- Avalonia：`SetupWithoutStarting` 后 UI 对象始终在其绑定的初始化线程创建和关闭，不在 `await` 后换线程。
 - 桌面验收：使用本地 `cua-driver` 获取 LoomX 顶层窗口截图；优先 UIA 和虚拟光标，必要时才使用系统鼠标。

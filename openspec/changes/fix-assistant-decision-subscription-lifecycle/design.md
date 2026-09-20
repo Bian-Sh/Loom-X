@@ -65,9 +65,9 @@ AskUser 卡片提交只恢复当前 AgentLoop，不触发出队。只有当前 A
 
 每个队列项记录创建时 SessionId。切换会话不得把旧队列发送到新会话；当前版本只在对应会话活动且没有运行中的轮次时自动排空。队列为内存状态，应用退出时不承诺恢复。
 
-### 8. Avalonia 测试必须显式回到 UI 线程
+### 8. Avalonia 测试不得离开初始化 UI 线程
 
-初始化 Avalonia 后，任何创建 Window、Control、Geometry 或关闭窗口的断言都必须在 `Dispatcher.UIThread` 上执行。异步数据库准备不得依赖 xUnit continuation 恰好回到初始化线程。现有失败的生命周期测试作为回归入口。
+`SetupWithoutStarting` 会把 Avalonia UI 线程绑定到执行初始化的测试线程。Window、Control、Geometry 的创建和关闭必须保留在该线程；异步数据库准备使用同步等待完成，避免 `await` continuation 切换线程。现有失败的生命周期测试作为回归入口。
 
 ## Risks / Mitigations
 

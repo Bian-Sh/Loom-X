@@ -1104,10 +1104,19 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         ResolveService()?.Cancel();
     }
 
-    private void NewSession()
+    private void PrepareSessionSwitch()
     {
         currentTurnCancellationRequested = true;
         PendingAskUser?.TryAbort();
+        PendingApproval?.Resolve(false);
+        ResolveService()?.Cancel();
+    }
+
+    internal void PrepareSessionSwitchForTesting() => PrepareSessionSwitch();
+
+    private void NewSession()
+    {
+        PrepareSessionSwitch();
         var service = ResolveService();
         service?.NewSession();
         ShowQueueForSession(service?.CurrentSession.Id);
@@ -1184,6 +1193,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         var service = await EnsureServiceAsync();
         if (service is null) return;
 
+        PrepareSessionSwitch();
         if (!await service.LoadSessionAsync(item.SessionId))
         {
             AddSystemMessage("会话载入失败（文件可能已损坏或删除）。");

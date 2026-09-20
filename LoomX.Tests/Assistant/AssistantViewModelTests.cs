@@ -632,6 +632,26 @@ public sealed class AssistantViewModelUserDecisionTests
         Assert.True(SpinWait.SpinUntil(() => viewModel.PendingAskUser is null, TimeSpan.FromSeconds(2)));
     }
 
+    [Fact]
+    public async Task 会话切换会终止活动AskUser并取消已Claim请求()
+    {
+        var broker = new RecordingUserDecisionBroker();
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            userDecisionBroker: broker,
+            uiDispatcher: action => action());
+        viewModel.Activate();
+
+        broker.Raise(CreatePending("switch-session", "切换前问题"));
+        Assert.True(SpinWait.SpinUntil(() => viewModel.PendingAskUser is not null, TimeSpan.FromSeconds(2)));
+
+        viewModel.PrepareSessionSwitchForTesting();
+        await broker.WaitForCompletionAsync();
+
+        Assert.Equal("switch-session", broker.CancelledRequestId);
+        Assert.Null(broker.SubmittedRequestId);
+        Assert.True(SpinWait.SpinUntil(() => viewModel.PendingAskUser is null, TimeSpan.FromSeconds(2)));
+    }
     private static PendingUserDecision CreatePending(string requestId, string question) => new(
         requestId,
         "owner-sensitive-id",

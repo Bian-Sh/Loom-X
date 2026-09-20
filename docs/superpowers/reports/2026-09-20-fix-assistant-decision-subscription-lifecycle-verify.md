@@ -29,16 +29,17 @@
 ## 生命周期测试稳定性
 
 - 根因是 `AppBuilder.SetupWithoutStarting()` 把 Avalonia UI 线程绑定到初始化测试线程，而异步数据库准备后的 continuation 可能切换线程。
+- 完整验证时发现历史会话切换尚未终止活动 AskUser；已增加统一的会话切换收敛入口，在 NewSession/LoadSession 前终止卡片、审批和当前运行，并补充回归测试。
 - 生命周期测试改为在初始化线程同步等待异步准备和 Broker 结果，使 UI 对象创建、显示、关闭和释放不跨线程，消除执行顺序依赖。
 
 ## 自动验证
 
 - RED 证据：新增契约与队列测试最初因缺少 `PendingAskUser`、卡片文件、队列 API 和完成信号而编译失败。
 - 定向测试：36/36 通过，覆盖 AskUser、队列、默认卡片链路、UI 契约与生命周期。
-- 完整测试：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore`，1083/1083 通过。
+- 完整测试：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore`，1084/1084 通过。
 - Release 构建：`dotnet build LoomX.slnx -c Release --no-restore`，0 error。
 - OpenSpec：`openspec validate fix-assistant-decision-subscription-lifecycle --strict` 通过。
-- 发布：`scripts/publish-desktop.ps1 -Configuration Release -OutputDirectory outputs/2026-09-20-223553-assistant-ask-user-queue` 通过。
+- 发布：`scripts/publish-desktop.ps1 -Configuration Release -OutputDirectory outputs/2026-09-20-225645-assistant-ask-user-queue` 通过。
 
 ## `cua-driver` 顶层窗口验收
 
@@ -49,6 +50,7 @@
   - `outputs/2026-09-20-223553-assistant-ask-user-queue/cua-askuser-card-12s.png`
   - `outputs/2026-09-20-223553-assistant-ask-user-queue/cua-queue-visible.png`
   - `outputs/2026-09-20-223553-assistant-ask-user-queue/cua-queue-deleted.png`
+  - `outputs/2026-09-20-225645-assistant-ask-user-queue/cua-final-assistant.png`
 - UIA 树始终只包含一个顶层 `Window "Loom-X"`；AskUser 和队列均作为该窗口内元素出现。
 
 ## 已知警告
