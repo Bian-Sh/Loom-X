@@ -2,6 +2,9 @@ using System.ComponentModel;
 using LoomX.Localization;
 using LoomX.Services;
 using LoomX.ViewModels;
+using Markdig;
+using Markdig.Syntax;
+using Markdig.Syntax.Inlines;
 using Xunit;
 
 namespace LoomX.Tests.ViewModels;
@@ -47,6 +50,46 @@ public sealed class ReleaseNotesContentViewModelTests
         Assert.Contains("[文档](https://example.com/docs)", result);
         Assert.Contains("本地文件", result);
         Assert.DoesNotContain("file:", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Sanitize_Html移除后不会重新拼接出不安全链接或图片()
+    {
+        var source = """
+            [危险]<span></span>(http://evil.example)
+            ![图片]<span></span>(https://img.example/a.png)
+            """;
+
+        var result = ReleaseNotesMarkdownPolicy.Sanitize(source);
+
+        Assert.Contains("危险", result);
+        Assert.Contains("图片", result);
+        Assert.DoesNotContain("http://evil.example", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("img.example", result, StringComparison.OrdinalIgnoreCase);
+        AssertNoUnsafeInteractiveTargets(result);
+    }
+
+    [Fact]
+    public void Sanitize_将非Https自动链接降级为不可点击可见文本()
+    {
+        var source = "<http://evil.example> <mailto:person@example.com> <https://example.com>";
+
+        var result = ReleaseNotesMarkdownPolicy.Sanitize(source);
+
+        Assert.Contains(@"\<http://evil.example\>", result);
+        Assert.Contains(@"\<mailto:person@example.com\>", result);
+        Assert.Contains("<https://example.com>", result);
+        AssertNoUnsafeInteractiveTargets(result);
+    }
+
+    [Fact]
+    public void Sanitize_保留缩进代码块的前导空格()
+    {
+        const string source = "    code";
+
+        var result = ReleaseNotesMarkdownPolicy.Sanitize(source);
+
+        Assert.Equal(source, result);
     }
 
     [Theory]
@@ -125,6 +168,28 @@ public sealed class ReleaseNotesContentViewModelTests
         finally
         {
             LocaleService.SetCulture(previousCulture);
+        }
+    }
+
+    private static void AssertNoUnsafeInteractiveTargets(string markdown)
+    {
+        var pipeline = new MarkdownPipelineBuilder().UsePreciseSourceLocation().Build();
+        var document = Markdown.Parse(markdown, pipeline);
+
+        foreach (var node in document.Descendants())
+        {
+            switch (node)
+            {
+                case LinkInline link:
+                    Assert.False(link.IsImage);
+                    Assert.True(Uri.TryCreate(link.Url, UriKind.Absolute, out var linkUri));
+                    Assert.Equal(Uri.UriSchemeHttps, linkUri.Scheme);
+                    break;
+                case AutolinkInline autolink:
+                    Assert.True(Uri.TryCreate(autolink.Url, UriKind.Absolute, out var autolinkUri));
+                    Assert.Equal(Uri.UriSchemeHttps, autolinkUri.Scheme);
+                    break;
+            }
         }
     }
 

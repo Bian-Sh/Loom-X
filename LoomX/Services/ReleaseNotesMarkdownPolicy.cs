@@ -8,13 +8,29 @@ namespace LoomX.Services;
 /// <summary>在更新说明进入 Markdown 渲染器前移除可能触发外部内容或不安全导航的节点。</summary>
 public static class ReleaseNotesMarkdownPolicy
 {
+    private const int MaxSanitizePasses = 4;
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UsePreciseSourceLocation()
         .Build();
+
     public static string Sanitize(string? markdown)
     {
         if (string.IsNullOrWhiteSpace(markdown)) return string.Empty;
 
+        var current = markdown;
+        for (var pass = 0; pass < MaxSanitizePasses; pass++)
+        {
+            var next = SanitizeOnce(current);
+            if (string.IsNullOrWhiteSpace(next)) return string.Empty;
+            if (string.Equals(next, current, StringComparison.Ordinal)) return next;
+            current = next;
+        }
+
+        return string.Empty;
+    }
+
+    private static string SanitizeOnce(string markdown)
+    {
         var document = Markdown.Parse(markdown, Pipeline);
         var edits = new List<SourceEdit>();
 
@@ -29,10 +45,13 @@ public static class ReleaseNotesMarkdownPolicy
                 case LinkInline link when link.IsImage || !IsSafeHttps(link.Url):
                     AddEdit(edits, link.Span, GetVisibleText(markdown, link), markdown.Length);
                     break;
+                case AutolinkInline autolink when !IsSafeHttps(autolink.Url):
+                    AddEdit(edits, autolink.Span, EscapeAutolink(autolink.Url), markdown.Length);
+                    break;
             }
         }
 
-        if (edits.Count == 0) return markdown.Trim();
+        if (edits.Count == 0) return markdown;
 
         var builder = new StringBuilder(markdown);
         foreach (var edit in RemoveContainedEdits(edits).OrderByDescending(item => item.Start))
@@ -41,7 +60,7 @@ public static class ReleaseNotesMarkdownPolicy
             builder.Insert(edit.Start, edit.Replacement);
         }
 
-        return builder.ToString().Trim();
+        return builder.ToString();
     }
 
     private static bool IsSafeHttps(string? value) =>
@@ -59,6 +78,9 @@ public static class ReleaseNotesMarkdownPolicy
             ? label
             : Sanitize(label);
     }
+
+    private static string EscapeAutolink(string? value) =>
+        string.IsNullOrEmpty(value) ? string.Empty : $@"\<{value}\>";
 
     private static string Slice(string source, SourceSpan span)
     {
