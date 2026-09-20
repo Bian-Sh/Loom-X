@@ -81,3 +81,16 @@ outputs/LoomX-win-x64-2026-09-16-no-legacy-migration
 ## 最终结论
 
 所有本次 change 任务均已完成，目标测试、完整测试、Release 构建、win-x64 发布和规格校验均通过。当前实现可进入分支收尾和归档前确认。
+
+## 2026-09-20 对账复验
+
+- 已归档 OpenSpec 任务保持 4/4 完成；Superpowers 实施计划中的历史未勾选步骤已统一对齐。
+- `ConsoleNoiseLoggingTests`、`AppDataPathsTests`、`LoomXHostTests`、`LoomXBrandingContractTests` 和配置数据库迁移相关测试包含在本次定向测试集中，结果通过。
+- 完整串行测试结果：1063 passed、0 failed、0 skipped。
+- Release 构建结果：0 errors；保留既有 NU1903 警告。
+- CodeGraph 查询 `ApplicationDataMigration`、`EnsureMigratedAsync` 均无结果。
+- 生产代码范围未发现旧数据库迁移类型、入口、锁路径或旧数据库文件名；负向契约测试中的字符串断言按预期保留。
+- `MainWindow.ApplyAppearance` 的开始/完成日志仍为 `Debug`；Shell 自启动子进程失败回退日志仍为 `Debug`。
+- 复验发布包：`outputs/20260920-213425-reconciliation-verification`，启动与退出正常。
+
+复验结论：归档状态与当前实现一致，无需重新打开 change。
