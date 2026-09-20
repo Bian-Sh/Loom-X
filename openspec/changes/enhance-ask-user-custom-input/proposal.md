@@ -10,6 +10,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 - AskUser 结果新增 `custom_inputs` 映射，按字段 id 向 AI 返回选择题的自由输入原文，同时保留 `values` 中既有选择结果结构。
 - 自由文本字段直接返回用户实际输入字符串，不再仅返回 `{ "provided": true }`。
 - 补充 Schema、解析、校验、ViewModel、Avalonia 视图和工具结果的回归测试。
+- 明确 assistant.ask_user 的模型可见建模规则：每个字段独立分页；选择题同页输入必须使用同一字段的 allow_custom_input，不得拆成独立 text 字段。
 
 ## Capabilities
 

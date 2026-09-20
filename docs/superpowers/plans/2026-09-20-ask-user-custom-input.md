@@ -16,6 +16,7 @@ base-ref: e364174ae800c15d97106d3b5f8b90ddbf34d823
 <!-- comet-task-ref:askuser-4-1 -->
 <!-- comet-task-ref:askuser-4-2 -->
 <!-- comet-task-ref:askuser-4-3 -->
+<!-- comet-task-ref:askuser-5-1 -->
 
 # AskUser 选择题自由输入与真实文本回传实施计划
 
@@ -641,3 +642,8 @@ git commit -m "完成 AskUser 自由输入验证与交付"
 - 自动验证：AskUser 定向测试 187 项通过；Release 全量测试 1110 项通过；OpenSpec strict 校验通过；Release 构建 0 error。
 - 桌面验收：已验证默认 Watermark“我有其他想法...”、无“其他（可选）”标签、单选/多选互斥、重新选择清空自由文本、分页状态保留和必填自由输入提交。提交后外部模型返回非标准空响应，最终 AI 回复未生成；实际文本与 `custom_inputs` 进入后续模型请求由 `AssistantServiceTests` 自动化验证覆盖。
 - 发布目录：`outputs/2026-09-20-043915-ask-user-custom-input`。
+## 补充修复：模型调用契约明确同页输入
+
+**Step 9：补充模型可见的同页建模规则** <!-- comet-task-ref:askuser-5-1 -->
+
+为避免“单选 + 输入框”被模型拆成两个分页字段，`assistant.ask_user` 的工具描述、Schema description 和 AssistantService 系统提示必须明确：`fields` 中每个字段独立分页；选项下方同页输入只使用同一个选择字段的 `allow_custom_input=true`；用户指定的“输入框80字”等长度要求写入同一字段的 `max_length`；不得新增独立 `text` 字段。新增契约测试先红后绿。

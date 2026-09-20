@@ -7,6 +7,10 @@
 - **WHEN** 单选或多选字段设置 `allow_custom_input=true`
 - **THEN** 桌面端在选项列表下方展示自由输入框，并使用调用方指定的占位提示或默认的“我有其他想法...”
 
+#### Scenario: 用户要求选择题与输入框同页时使用单字段建模
+- **WHEN** 用户要求在单选或多选选项下方、同一个弹窗内提供输入框，或指定该输入框的字数限制（例如80字）
+- **THEN** assistant.ask_user 调用 SHALL 只创建一个选择字段，设置 `allow_custom_input=true`，并将字数限制写入该字段的 `max_length`；不得新增独立 `text` 字段，因为每个字段会独立分页
+
 #### Scenario: 未启用时保持原有界面
 - **WHEN** 选择字段未设置 `allow_custom_input` 或其值为 false
 - **THEN** 桌面端不展示自由输入框，字段继续只接受预设选项

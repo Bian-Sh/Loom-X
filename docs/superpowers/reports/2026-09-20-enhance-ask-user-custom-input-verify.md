@@ -8,144 +8,126 @@
 
 ## 结论
 
-**PASS，可以进入归档确认阶段。**
+**针对本 change 的验证通过，可以再次进入归档确认阶段。**
 
-本次完整验证未发现 CRITICAL 或 WARNING 级别问题。11/11 个实施任务均已完成，2 项需求、11 个规格场景均有实现与自动化测试或桌面验收证据；实现与 OpenSpec design、Superpowers Design Doc 及 proposal 一致，未发现 spec 漂移。
+本轮针对用户反馈补齐了模型调用契约：工具描述、Schema description 与 AssistantService 系统提示现在明确“每个 fields 字段独立分页；选择题选项下方同页输入必须使用同一个选择字段的 `allow_custom_input=true`；输入长度写入同字段 `max_length`；不得新增独立 `text` 字段”。因此用户要求“单选和输入框在同一个弹窗、不换页、输入框80字”时，模型有明确的参数建模依据。
 
 ## 验证总览
 
 | 维度 | 结果 | 证据 |
 |---|---|---|
-| 完整性 | PASS | `tasks.md` 11/11 完成；OpenSpec 状态 `all_done` |
-| 正确性 | PASS | AskUser 定向测试 187/187；Release 全量测试 1110/1110 |
-| 一致性 | PASS | OpenSpec strict validate 通过；实现符合两份设计文档与 delta spec |
-| 构建 | PASS | Release build 0 error |
-| 桌面交互 | PASS | 时间戳发布包通过 CUA 验收 |
-| 安全边界 | PASS | 日志回归测试确认用户文本不进入格式化消息、结构化 state 或异常文本 |
-| 审查 | PASS | `standard` 本地集成审查无 CRITICAL/IMPORTANT 发现 |
+| 任务完整性 | PASS | OpenSpec `tasks.md` 12/12 完成，计划映射有效 |
+| 针对性测试 | PASS | AskUser 相关测试 189/189 通过 |
+| OpenSpec | PASS | strict validate 通过 |
+| Release 构建 | PASS | `dotnet build LoomX.slnx -c Release --no-restore`，0 error |
+| 发布包 | PASS | 新发布目录存在 `LoomX.exe` |
+| UI/结果回归 | PASS | 原有选择题自由输入、文本回传与日志安全测试继续通过 |
 
-## 1. 任务完成度
+## 1. 本轮根因与修复
 
-OpenSpec `instructions apply` 返回：
+### 根因
 
-- 总任务：11
-- 已完成：11
-- 未完成：0
-- 状态：`all_done`
+之前只实现了运行时 UI 和结果链路：当模型自行把用户请求理解为“一个选择字段 + 一个 text 字段”时，UI 会按既有分页模型将两个字段分别显示在两页。工具契约没有明确告诉模型“同页输入必须是选择字段的自由输入”，所以截图中的目标布局无法稳定由自然语言请求触发。
 
-任务权威文件：`openspec/changes/enhance-ask-user-custom-input/tasks.md`。
+### 修复
+
+1. `assistant.ask_user` 工具描述补充字段分页规则与同页自由输入建模规则。
+2. `fields` Schema 增加说明：每个字段独立分页；同页输入不得新增 `text` 字段。
+3. `allow_custom_input` Schema description 明确其用途、同页位置和禁止拆字段规则。
+4. `custom_input_placeholder` 明确为选择题同页输入框 Watermark。
+5. `max_length` 明确适用于启用自由输入的选择字段，并以“输入框80字”作为模型可见示例。
+6. AssistantService 系统提示同步上述规则。
+7. 新增工具契约测试与系统提示测试，先验证失败，再实现并转绿。
 
 ## 2. 需求与场景覆盖
 
-### 2.1 AskUser 选择字段支持可选自由输入
+### 2.1 AskUser 选择字段自由输入
 
-| 规格场景 | 实现证据 | 测试/验收证据 | 结果 |
-|---|---|---|---|
-| 选择字段展示自由输入框 | `LoomX/Views/AskUserCard.axaml:59-63,84-88` | `AskUserDialogContractTests`、`AssistantViewStyleTests`；CUA 实际显示 | PASS |
-| 未启用时保持原有界面 | `IsVisible="{Binding AllowsCustomInput}"` | 视图契约测试覆盖可见条件 | PASS |
-| 输入自由内容清除已有选择 | `AskUserDialogViewModel.cs` 的单选/多选 `CustomInput` setter | `单选自由输入_展示默认提示并与预设选项互斥`、`多选自由输入_与预设项互斥并投影到独立映射`；CUA 验收 | PASS |
-| 重新选择选项清空自由输入 | 选择项变更回调清空 `CustomInput` | 同上；CUA 验收 | PASS |
-| 自由输入满足必填选择题 | `UserDecisionValidator.ValidateSubmission` 同时校验 `values` 与 `customInputs` | `提交校验_选择题自由输入满足必填并拒绝冲突或未授权输入`；CUA 提交必填单选/多选 | PASS |
-| 空白自由输入不满足校验 | `string.IsNullOrWhiteSpace` 判定 | `提交校验_拒绝空白超长与未知自由输入` | PASS |
+OpenSpec 当前覆盖 7 个场景：展示输入框、同页单字段建模、未启用时保持原界面、输入清除选项、重新选择清空输入、自由输入满足必填、空白输入不满足校验。相关 ViewModel、Validator、XAML 和 CUA 证据均保留并通过。
 
-### 2.2 AskUser 返回用户输入原文
+### 2.2 AskUser 返回输入原文
 
-| 规格场景 | 实现证据 | 测试证据 | 结果 |
-|---|---|---|---|
-| 文本字段返回实际内容 | `AssistantTools.SerializeResult` 直接序列化 `result.Values` | `AssistantToolsTests`、`AssistantServiceTests` | PASS |
-| 单选自由输入返回实际内容 | `values` 保持 `null`，自由文本进入 `CustomInputs` | `AskUser_选择题自由输入返回CustomInputs原文`、ViewModel/Broker 测试 | PASS |
-| 多选自由输入返回实际内容 | `values` 保持空只读数组，文本进入 `CustomInputs` | ViewModel、Validator 与工具结果测试 | PASS |
-| 预设选择保持兼容 | 自由输入与 option 互斥；`values` 结构未改 | 现有完整回归测试与新增兼容断言 | PASS |
-| 用户输入不进入日志 | Broker 成功日志只记录 `RequestId`、`FieldCount`、`CustomInputCount` | `日志_不包含普通文本与选择题自由输入原文` | PASS |
+OpenSpec 当前覆盖 5 个场景：普通文本实际字符串、单选自由输入、 多选自由输入、预设选择兼容、用户输入不进入日志。相关 Broker、工具序列化、AssistantService 与日志回归测试均通过。
 
-## 3. 设计一致性
+## 3. 自动化验证
 
-### OpenSpec design 决策
+### 定向测试
 
-1. **显式开关与占位提示**：已实现 `AllowCustomInput`、`CustomInputPlaceholder`，Schema 暴露 `allow_custom_input` 与 `custom_input_placeholder`。
-2. **结构化选择与自由输入分离**：ViewModel 保存独立 `CustomInput`，并在选择/文字之间执行互斥清理。
-3. **双映射提交校验**：Validator、Broker、ViewModel 和 AssistantViewModel 均传递 `values + customInputs`。
-4. **不可变结果快照**：`UserDecisionResult` 对 `Values` 和 `CustomInputs` 分别复制为只读映射。
-5. **兼容结果契约**：根对象固定包含 `custom_inputs`，普通 text 直接返回字符串，选择字段的既有值类型保持不变。
-6. **自然 UI 文案**：单选、多选模板仅展示 Watermark，不显示“其他（可选）”标签；四语资源已补齐。
+```text
+dotnet test LoomX.Tests\\LoomX.Tests.csproj -c Release --no-restore
+  --filter "FullyQualifiedName~UserDecision|FullyQualifiedName~AskUser|FullyQualifiedName~AssistantToolsTests|FullyQualifiedName~AssistantServiceTests|FullyQualifiedName~AssistantViewModelTests"
 
-### Superpowers Design Doc
+已通过! - 失败: 0，通过: 189，已跳过: 0，总计: 189
+```
 
-`docs/superpowers/specs/2026-09-20-ask-user-custom-input-design.md` 可定位，组件边界、数据契约、互斥状态机、日志安全、键盘行为与实际实现一致。未发现 delta spec 已改变但 Design Doc 未同步的情况。
+Comet build 与 verify evidence 均已记录；verify evidence 日志：
 
-## 4. 自动化验证
+```text
+openspec/changes/enhance-ask-user-custom-input/.comet/checks/1e71bc0c-9eb7-4c85-9e60-8ec23426bfa2.log
+```
 
-### OpenSpec
+### OpenSpec strict validate
 
 ```text
 node .../comet-runtime.mjs openspec -- validate enhance-ask-user-custom-input --strict
 Change 'enhance-ask-user-custom-input' is valid
 ```
 
-### AskUser 定向测试
-
-```text
-已通过! - 失败: 0，通过: 187，已跳过: 0，总计: 187
-```
-
-覆盖 `UserDecision`、`AskUser`、`AssistantToolsTests`、`AssistantServiceTests`、`AssistantViewModelTests`。
-
-### Release 全量测试
-
-Comet verify evidence：
-
-```text
-openspec/changes/enhance-ask-user-custom-input/.comet/checks/2b80bb6f-a004-4ea5-b2e5-d4a1439edd1b.log
-已通过! - 失败: 0，通过: 1110，已跳过: 0，总计: 1110
-```
-
 ### Release 构建
 
 ```text
+dotnet build LoomX.slnx -c Release --no-restore
 已成功生成。
-7 个警告
 0 个错误
 ```
 
-这些警告均为仓库已有基线问题，不是本 change 引入：
+仓库已有警告仍存在：NU1903、SettingsViewModel.cs CS8618、AnthropicResponseMapper.cs CA2024，以及测试中的 CS8602；本轮未新增这些警告。
 
-- `SQLitePCLRaw.lib.e_sqlite3 2.1.11`：NU1903
-- `SettingsViewModel.cs`：CS8618
-- `AnthropicResponseMapper.cs`：CA2024
-- `AnthropicRequestFactoryTests.cs`：CS8602
+## 4. 全量测试环境说明
 
-## 5. 桌面发布与 CUA 验收
+本轮直接运行完整测试时，当前测试套件存在与本 change 无关的环境/顺序问题：
 
-交付发布包：
+- 并行运行出现 Avalonia `Call from invalid thread`，涉及既有 NodeGraph/View 测试。
+- 禁用并行后有 2 个既有 `ProviderEditorViewModelTests` 文化状态断言失败；单独运行该类 24/24 通过。
+- 排除该既有测试类后，其余 1088/1088 通过。
+
+AskUser 相关测试 189/189 通过，且失败堆栈不涉及本轮修改的工具描述、Schema 或系统提示。因此这些全局测试环境问题不阻塞本 change；没有修改无关测试基础设施。
+
+## 5. 发布包
+
+新发布包：
 
 ```text
-outputs/2026-09-20-043915-ask-user-custom-input/LoomX.exe
+outputs/2026-09-20-055155-ask-user-custom-input-model-guidance/LoomX.exe
 ```
 
-验收结果：
+已确认 `LoomX.exe` 存在。旧发布目录和另一个 Session 产物均未删除。
 
-- Watermark 显示“我有其他想法...”。
-- 界面未显示“其他（可选）”。
-- 单选、多选的预设选项与自由输入互斥。
-- 重新选择单选 option 会清空自由输入，并沿用既有自动前进逻辑。
-- Previous / Next 后自由输入保持。
-- 必填单选和多选均可由自由输入满足并提交。
-- 发布进程 Path 已确认来自上述时间戳目录。
+## 6. 桌面与交互验收依据
 
-另有一个由主机时钟生成的 `outputs/2026-09-21-043207-ask-user-custom-input` 目录；按多会话产物边界未删除，也不作为本次正式交付路径。
+已有 CUA 验收继续证明：
 
-## 6. 已知外部限制
+- 选择题选项下方显示 Watermark“我有其他想法...”。
+- 不显示“其他（可选）”标签。
+- 自由输入与预设 option 互斥。
+- Previous / Next 保留输入状态。
+- 必填单选、多选可由自由输入满足。
+- 普通 text 与 `custom_inputs` 原文进入后续 AI 工具结果。
 
-桌面验收提交后，上游模型返回非标准空响应：
+本轮修复的重点是模型如何生成调用参数，而不是改变该已通过的 UI 布局。
+
+## 7. 外部限制
+
+此前桌面提交后上游模型返回非标准空响应：
 
 ```text
 模型请求失败。可能是模型返回了非标准响应，请重试或更换模型。
 服务描述：Responses 流没有文本或工具调用。
 ```
 
-该问题发生在工具结果已提交后的上游模型响应阶段，不属于 AskUser 数据链路缺陷。`AssistantServiceTests` 已自动验证包含实际 text 与 `custom_inputs` 的工具结果会进入下一轮模型请求，因此不阻塞本 change。
+该问题发生在工具结果提交后的上游模型响应阶段，不属于 AskUser 参数建模或数据链路缺陷；AssistantServiceTests 已覆盖工具结果进入下一轮模型请求。
 
-## 7. 审查问题分级
+## 8. 问题分级
 
 ### CRITICAL
 
@@ -153,12 +135,12 @@ outputs/2026-09-20-043915-ask-user-custom-input/LoomX.exe
 
 ### WARNING
 
-无。
+无（全局测试套件的既有环境/顺序问题已在第 4 节单独记录，未纳入本 change 的功能缺陷）。
 
 ### SUGGESTION
 
-- `git diff --check` 报告 3 个文件存在尾部空行；属于格式清理项，不影响编译、测试、运行时行为或规格一致性，且 Verify 阶段不修改实现/测试/Design Doc，因此留待后续常规整理。
+无新增建议。
 
 ## 最终评估
 
-所有必需检查通过，未发现阻止归档的问题。Change 已准备好进入 archive 阶段，等待用户明确授权后执行归档。
+本轮反馈对应的根因已定位并修复：模型现在能从工具契约中明确知道截图所示布局应使用单个选择字段的 `allow_custom_input`，而不是拆出下一页 `text` 字段。针对性测试、OpenSpec、Release 构建和发布包检查均通过，change 可以进入 archive 待用户确认阶段。

@@ -60,6 +60,27 @@ public sealed class AssistantToolsTests
     }
 
     [Fact]
+    public void RegisterAll_AskUser明确选择题同页自由输入建模规则()
+    {
+        using var broker = CreateBroker();
+        var tool = GetTool(broker);
+        var fieldsSchema = tool.ParametersSchema["properties"]!["fields"]!.AsObject();
+        var fieldProperties = fieldsSchema["items"]!["properties"]!.AsObject();
+        var fieldsDescription = fieldsSchema["description"]?.GetValue<string>() ?? string.Empty;
+        var customInputDescription = fieldProperties["allow_custom_input"]!["description"]?.GetValue<string>() ?? string.Empty;
+        var maxLengthDescription = fieldProperties["max_length"]!["description"]?.GetValue<string>() ?? string.Empty;
+
+        Assert.Contains("每个字段独立分页", fieldsDescription, StringComparison.Ordinal);
+        Assert.Contains("选项下方", customInputDescription, StringComparison.Ordinal);
+        Assert.Contains("同一页", customInputDescription, StringComparison.Ordinal);
+        Assert.Contains("不要新增 text 字段", customInputDescription, StringComparison.Ordinal);
+        Assert.Contains("allow_custom_input", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("不要创建独立 text 字段", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("自由输入", maxLengthDescription, StringComparison.Ordinal);
+        Assert.Contains("输入框80字", maxLengthDescription, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RegisterAll_AskUser描述为无需Skill或Bridge的通用交互()
     {
         using var broker = CreateBroker();

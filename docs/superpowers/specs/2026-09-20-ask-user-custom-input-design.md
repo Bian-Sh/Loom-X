@@ -228,6 +228,9 @@ public string CustomInput { get; set; }
 - `LoomX.Tests/Assistant/UserDecisionModelsTests.cs`、`AssistantToolsTests.cs`、`AssistantServiceTests.cs`、`AssistantViewModelTests.cs`：领域与集成回归。
 - `LoomX.Tests/Views/AskUserDialogContractTests.cs`、`AssistantViewStyleTests.cs`：ViewModel、XAML 和本地化契约。
 
+### 7. 模型调用契约必须表达分页与同页输入
+
+实现不仅要渲染选择字段下方的自由输入框，还必须让模型知道如何构造请求：`fields` 中每个字段独立分页；用户要求单选/多选选项下方同页输入时，使用同一个选择字段的 `allow_custom_input=true`，并把“输入框80字”等长度要求写入该字段的 `max_length`，不要创建独立 `text` 字段。该说明同时放入工具描述、Schema description 和系统提示，避免模型将同页输入误建模为下一页字段。
 ## 10. TDD 与验证策略
 
 实施分四个红绿循环：

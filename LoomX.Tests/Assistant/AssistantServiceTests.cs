@@ -60,6 +60,19 @@ public sealed class AssistantServiceTests : IDisposable
 
 
     [Fact]
+    public void NewSession_SystemPrompt_选择题同页输入使用自由输入而非独立字段()
+    {
+        var service = CreateService(new StubModelClientFactory(null));
+
+        var prompt = Assert.IsType<string>(service.CurrentSession.Options.SystemPrompt);
+        Assert.Contains("fields 中每个字段独立分页", prompt, StringComparison.Ordinal);
+        Assert.Contains("allow_custom_input=true", prompt, StringComparison.Ordinal);
+        Assert.Contains("不要额外创建 text 字段", prompt, StringComparison.Ordinal);
+        Assert.Contains("max_length", prompt, StringComparison.Ordinal);
+        Assert.Contains("输入框80字", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void NewSession_SystemPrompt_允许直接测试AskUser且不依赖外部能力()
     {
         var service = CreateService(new StubModelClientFactory(null));

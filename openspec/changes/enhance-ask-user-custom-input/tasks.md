@@ -20,3 +20,6 @@
 - [x] 4.1 运行 AskUser、UserDecision、AssistantTools、AssistantService 和 AssistantViewModel 相关测试，确认选择结果兼容、实际文本回传和日志安全边界 <!-- comet-task:askuser-4-1 -->
 - [x] 4.2 运行 `openspec validate enhance-ask-user-custom-input --strict`、完整测试和 Release 构建，确认无失败、无编译错误 <!-- comet-task:askuser-4-2 -->
 - [x] 4.3 发布桌面端到 `outputs/2026-09-20-<time>-ask-user-custom-input`，使用 `cua-driver` 验证单选、多选自由输入、互斥行为、默认提示和提交后的 AI 可见结果 <!-- comet-task:askuser-4-3 -->
+## 5. 模型调用契约与同页建模回归
+
+- [x] 5.1 为工具描述、Schema description 和系统提示补充“字段独立分页、选择题同页输入使用 allow_custom_input、字数写入同一字段 max_length、不得新增 text 字段”的失败测试与实现，并运行定向测试确认通过 <!-- comet-task:askuser-5-1 -->

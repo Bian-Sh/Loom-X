@@ -52,6 +52,9 @@
 
 在单选和多选 DataTemplate 的选项列表下方复用现有 TextBox 风格，不增加“其他（可选）”标签。输入框仅通过占位提示传达用途；默认资源在各 Locale 中提供自然语言等价文案。输入内容参与现有 Continue / Submit 校验和 Previous / Next 值保留。
 
+### 7. 明确模型可见的同页建模规则
+
+`assistant.ask_user` 的工具描述、Schema 字段 description 和 AssistantService 系统提示必须明确：`fields` 中每个字段独立分页；当用户要求选择题选项下方同页输入时，只创建一个 `single_select` 或 `multi_select` 字段并设置 `allow_custom_input=true`，用户指定的输入长度写入同一字段的 `max_length`，不得额外创建 `text` 字段。该规则属于工具调用契约，不改变运行时 UI 或结果结构。
 ## Risks / Trade-offs
 
 - [工具结果开始包含用户实际文本，模型上下文敏感度提高] → 仅把内容返回发起 AskUser 的当前工具调用；日志、SafeArguments、Toast 和诊断信息继续只使用安全摘要。

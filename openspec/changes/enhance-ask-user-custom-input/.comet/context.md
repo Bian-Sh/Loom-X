@@ -3,17 +3,18 @@
 - Change: enhance-ask-user-custom-input
 - Phase: design
 - Mode: compact
-- Context hash: 11e5b298b8219a9de602f7673285b483fbd812ba61eaa1dae7fbce6e51a24d69
+- Context hash: 71a12c63a17e96ee34a088e7214af051e537cc0a3f6f5ccd8a4079754ae63452
 
 Generated-by: comet-handoff.sh
+Task hash policy: task-content-v1. Read tasks.md for live completion; excerpts are design-time context.
 
 OpenSpec remains the canonical capability spec. This handoff is a deterministic, source-traceable context pack, not an agent-authored summary.
 
 ## openspec/changes/enhance-ask-user-custom-input/proposal.md
 
 - Source: openspec/changes/enhance-ask-user-custom-input/proposal.md
-- Lines: 1-30
-- SHA256: d0e413a247161028ec511d7ecd3bca046ca7bc207bdc6ad17e5ac930d48f083a
+- Lines: 1-31
+- SHA256: 149afade08809ea0ac585d1b4a407d58efcf023bd2091d45480f1146814787b5
 
 ```md
 ## Why
@@ -28,6 +29,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 - AskUser 结果新增 `custom_inputs` 映射，按字段 id 向 AI 返回选择题的自由输入原文，同时保留 `values` 中既有选择结果结构。
 - 自由文本字段直接返回用户实际输入字符串，不再仅返回 `{ "provided": true }`。
 - 补充 Schema、解析、校验、ViewModel、Avalonia 视图和工具结果的回归测试。
+- 明确 assistant.ask_user 的模型可见建模规则：每个字段独立分页；选择题同页输入必须使用同一字段的 allow_custom_input，不得拆成独立 text 字段。
 
 ## Capabilities
 
@@ -52,8 +54,8 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 ## openspec/changes/enhance-ask-user-custom-input/design.md
 
 - Source: openspec/changes/enhance-ask-user-custom-input/design.md
-- Lines: 1-69
-- SHA256: b5759c3196dbc0e8fc25587a4428578e699964309941cfe79204e025c03ffd71
+- Lines: 1-72
+- SHA256: 9ccabbc34ca6d5debb08a0c44be17001582de1729439d8402e62ddeeeb3e95c9
 
 ```md
 ## Context
@@ -110,6 +112,9 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 
 在单选和多选 DataTemplate 的选项列表下方复用现有 TextBox 风格，不增加“其他（可选）”标签。输入框仅通过占位提示传达用途；默认资源在各 Locale 中提供自然语言等价文案。输入内容参与现有 Continue / Submit 校验和 Previous / Next 值保留。
 
+### 7. 明确模型可见的同页建模规则
+
+`assistant.ask_user` 的工具描述、Schema 字段 description 和 AssistantService 系统提示必须明确：`fields` 中每个字段独立分页；当用户要求选择题选项下方同页输入时，只创建一个 `single_select` 或 `multi_select` 字段并设置 `allow_custom_input=true`，用户指定的输入长度写入同一字段的 `max_length`，不得额外创建 `text` 字段。该规则属于工具调用契约，不改变运行时 UI 或结果结构。
 ## Risks / Trade-offs
 
 - [工具结果开始包含用户实际文本，模型上下文敏感度提高] → 仅把内容返回发起 AskUser 的当前工具调用；日志、SafeArguments、Toast 和诊断信息继续只使用安全摘要。
@@ -131,40 +136,55 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 ## openspec/changes/enhance-ask-user-custom-input/tasks.md
 
 - Source: openspec/changes/enhance-ask-user-custom-input/tasks.md
-- Lines: 1-22
-- SHA256: 91f9c171b1aeb7fdf506162392b269fff52dec1f2e42efe8cf2d0feb30a11c6c
+- Lines: 1-25
+- SHA256: f0d9d3954140db6888619a9a475cb17d44efcdf1afa3c867cbf4c69950110544
 
 ```md
 ## 1. 请求契约与领域模型
 
-- [ ] 1.1 先为 `allow_custom_input`、`custom_input_placeholder`、选择字段 `max_length` 适用范围和非法组合补充失败测试，并运行 `UserDecisionModelsTests` 与 `AssistantToolsTests` 确认因能力缺失而失败
-- [ ] 1.2 扩展 `UserDecisionField`、AskUser JSON Schema、参数解析和请求校验，并运行上述定向测试确认通过
+- [x] 1.1 先为 `allow_custom_input`、`custom_input_placeholder`、选择字段 `max_length` 适用范围和非法组合补充失败测试，并运行 `UserDecisionModelsTests` 与 `AssistantToolsTests` 确认因能力缺失而失败 <!-- comet-task:askuser-1-1 -->
+- [x] 1.2 扩展 `UserDecisionField`、AskUser JSON Schema、参数解析和请求校验，并运行上述定向测试确认通过 <!-- comet-task:askuser-1-2 -->
 
 ## 2. 提交校验与工具结果
 
-- [ ] 2.1 先为必填选择题自由输入、空白/超长输入、未授权自由输入和 `UserDecisionResult.CustomInputs` 补充失败测试，并运行定向测试确认预期失败
-- [ ] 2.2 扩展提交校验、Broker 提交接口和结果快照，使 `Values` 与 `CustomInputs` 独立复制与校验，并运行 Broker/模型测试确认通过
-- [ ] 2.3 先更新工具结果测试要求 text 返回实际字符串且根对象包含 `custom_inputs`，确认失败后修改序列化实现，并运行 `AssistantToolsTests`、`AssistantServiceTests` 确认通过
+- [x] 2.1 先为必填选择题自由输入、空白/超长输入、未授权自由输入和 `UserDecisionResult.CustomInputs` 补充失败测试，并运行定向测试确认预期失败 <!-- comet-task:askuser-2-1 -->
+- [x] 2.2 扩展提交校验、Broker 提交接口和结果快照，使 `Values` 与 `CustomInputs` 独立复制与校验，并运行 Broker/模型测试确认通过 <!-- comet-task:askuser-2-2 -->
+- [x] 2.3 先更新工具结果测试要求 text 返回实际字符串且根对象包含 `custom_inputs`，确认失败后修改序列化实现，并运行 `AssistantToolsTests`、`AssistantServiceTests` 确认通过 <!-- comet-task:askuser-2-3 -->
 
 ## 3. 卡片交互与本地化
 
-- [ ] 3.1 先为单选/多选自由输入的状态保留、选项互斥、跳过清空、必填替代校验及单选不自动前进补充失败测试，并运行 AskUser ViewModel/视图契约测试确认失败
-- [ ] 3.2 扩展选择字段 ViewModel 和 `AskUserCard` 模板，在选项下方展示无额外标签的输入框，使用本地化默认提示“我有其他想法...”，并运行定向测试确认通过
-- [ ] 3.3 补齐所有 Locale 资源和源码契约检查，运行 `AskUserDialogContractTests`、`AssistantViewStyleTests` 确认输入框显示条件、watermark 与现有卡片布局兼容
+- [x] 3.1 先为单选/多选自由输入的状态保留、选项互斥、跳过清空、必填替代校验及单选不自动前进补充失败测试，并运行 AskUser ViewModel/视图契约测试确认失败 <!-- comet-task:askuser-3-1 -->
+- [x] 3.2 扩展选择字段 ViewModel 和 `AskUserCard` 模板，在选项下方展示无额外标签的输入框，使用本地化默认提示“我有其他想法...”，并运行定向测试确认通过 <!-- comet-task:askuser-3-2 -->
+- [x] 3.3 补齐所有 Locale 资源和源码契约检查，运行 `AskUserDialogContractTests`、`AssistantViewStyleTests` 确认输入框显示条件、watermark 与现有卡片布局兼容 <!-- comet-task:askuser-3-3 -->
 
 ## 4. 集成验证与交付
 
-- [ ] 4.1 运行 AskUser、UserDecision、AssistantTools、AssistantService 和 AssistantViewModel 相关测试，确认选择结果兼容、实际文本回传和日志安全边界
-- [ ] 4.2 运行 `openspec validate enhance-ask-user-custom-input --strict`、完整测试和 Release 构建，确认无失败、无编译错误
-- [ ] 4.3 发布桌面端到 `outputs/2026-09-20-<time>-ask-user-custom-input`，使用 `cua-driver` 验证单选、多选自由输入、互斥行为、默认提示和提交后的 AI 可见结果
+- [x] 4.1 运行 AskUser、UserDecision、AssistantTools、AssistantService 和 AssistantViewModel 相关测试，确认选择结果兼容、实际文本回传和日志安全边界 <!-- comet-task:askuser-4-1 -->
+- [x] 4.2 运行 `openspec validate enhance-ask-user-custom-input --strict`、完整测试和 Release 构建，确认无失败、无编译错误 <!-- comet-task:askuser-4-2 -->
+- [x] 4.3 发布桌面端到 `outputs/2026-09-20-<time>-ask-user-custom-input`，使用 `cua-driver` 验证单选、多选自由输入、互斥行为、默认提示和提交后的 AI 可见结果 <!-- comet-task:askuser-4-3 -->
+## 5. 模型调用契约与同页建模回归
+
+- [x] 5.1 为工具描述、Schema description 和系统提示补充“字段独立分页、选择题同页输入使用 allow_custom_input、字数写入同一字段 max_length、不得新增 text 字段”的失败测试与实现，并运行定向测试确认通过 <!-- comet-task:askuser-5-1 -->
+
+```
+
+## openspec/changes/enhance-ask-user-custom-input/.openspec.yaml
+
+- Source: openspec/changes/enhance-ask-user-custom-input/.openspec.yaml
+- Lines: 1-2
+- SHA256: 38b9a21742cd7082f58c6fd05e35c7787002fc92efecda464d1d11ad04b8cc65
+
+```md
+schema: spec-driven
+created: 2026-09-21
 
 ```
 
 ## openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md
 
 - Source: openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md
-- Lines: 1-51
-- SHA256: 48dc949410eebe9faab68cafb759d09cfd036c966ac719de18a2747667fde13d
+- Lines: 1-55
+- SHA256: 9f4f31b6375291612809a833ced455397590539702a70d4c7edd19dde3f76e42
 
 ```md
 ## ADDED Requirements
@@ -175,6 +195,10 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 #### Scenario: 选择字段展示自由输入框
 - **WHEN** 单选或多选字段设置 `allow_custom_input=true`
 - **THEN** 桌面端在选项列表下方展示自由输入框，并使用调用方指定的占位提示或默认的“我有其他想法...”
+
+#### Scenario: 用户要求选择题与输入框同页时使用单字段建模
+- **WHEN** 用户要求在单选或多选选项下方、同一个弹窗内提供输入框，或指定该输入框的字数限制（例如80字）
+- **THEN** assistant.ask_user 调用 SHALL 只创建一个选择字段，设置 `allow_custom_input=true`，并将字数限制写入该字段的 `max_length`；不得新增独立 `text` 字段，因为每个字段会独立分页
 
 #### Scenario: 未启用时保持原有界面
 - **WHEN** 选择字段未设置 `allow_custom_input` 或其值为 false
