@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using Microsoft.EntityFrameworkCore;
 using LoomX.Configuration;
+using LoomX.Localization;
 using LoomX.Services;
+using LoomX.Tests.Logging;
 using LoomX.ViewModels;
 using Xunit;
 
@@ -9,6 +11,64 @@ namespace LoomX.Tests.ViewModels;
 
 public sealed class UpdateCoordinatorTests
 {
+    [Fact]
+    public async Task Release正文与异常响应不会进入协调器日志()
+    {
+        const string releaseBody = "release-body-secret";
+        const string apiKey = "test-api-key-secret";
+        const string responseBody = "response-body-secret";
+        await using var fixture = await CoordinatorFixture.CreateAsync();
+        var service = new FakeUpdateService
+        {
+            CheckResult = new UpdateCheckResult(AppVersion.Current, new UpdateRelease(
+                "v9.9.9", "9.9.9", "Loom-X 9.9.9", $"{releaseBody} {apiKey}",
+                "https://example.com/releases/9.9.9", DateTimeOffset.UtcNow, [],
+                new UpdateAsset("LoomXSetup.exe", "https://example.com/LoomXSetup.exe", 100, "application/octet-stream"),
+                new UpdateAsset("LoomXSetup.exe.sha256", "https://example.com/LoomXSetup.exe.sha256", 64, "text/plain")))
+        };
+        service.EnqueuePreparation().SetException(new InvalidOperationException(responseBody));
+        var logger = new RecordingLogger<UpdateCoordinator>();
+        using var coordinator = fixture.CreateCoordinator(service, logger: logger);
+
+        await coordinator.CheckNowAsync(false);
+        await WaitForAsync(() => coordinator.Stage == UpdateStage.Error);
+
+        var logs = string.Join("\n", logger.Messages);
+        Assert.Contains("9.9.9", logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(releaseBody, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(apiKey, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(responseBody, logs, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 文化切换重新计算状态进度和错误摘要()
+    {
+        var originalCulture = LocaleService.CurrentCulture.Name;
+        try
+        {
+            LocaleService.SetCulture("en-US");
+            await using var fixture = await CoordinatorFixture.CreateAsync();
+            var service = new FakeUpdateService { CheckException = new InvalidOperationException("private-response") };
+            using var coordinator = fixture.CreateCoordinator(service);
+
+            await coordinator.CheckNowAsync(true);
+            var englishStatus = coordinator.StatusText;
+            var englishError = coordinator.ErrorMessage;
+            var englishTotal = coordinator.TotalText;
+
+            LocaleService.SetCulture("zh-CN");
+
+            Assert.NotEqual(englishStatus, coordinator.StatusText);
+            Assert.NotEqual(englishError, coordinator.ErrorMessage);
+            Assert.NotEqual(englishTotal, coordinator.TotalText);
+            Assert.Equal(ResourceLookup.Resolve("update.error.check", LocaleService.CurrentCulture), coordinator.ErrorMessage);
+        }
+        finally
+        {
+            LocaleService.SetCulture(originalCulture);
+        }
+    }
+
     [Fact]
     public void 更新服务程序集不再暴露旧下载并安装兼容名称()
     {
@@ -228,6 +288,7 @@ public sealed class UpdateCoordinatorTests
 
         public UpdateCheckResult CheckResult { get; set; } = new(AppVersion.Current, CreateRelease());
         public bool BlockCheck { get; set; }
+        public Exception? CheckException { get; set; }
         public Exception? LaunchException { get; set; }
         public int CheckCalls { get; private set; }
         public int PrepareCalls { get; private set; }
@@ -249,6 +310,7 @@ public sealed class UpdateCoordinatorTests
             CheckCalls++;
             CheckStarted.TrySetResult(true);
             if (BlockCheck) return await blockedCheck.Task.WaitAsync(cancellationToken);
+            if (CheckException is not null) throw CheckException;
             return CheckResult;
         }
 
@@ -321,8 +383,8 @@ public sealed class UpdateCoordinatorTests
             return new CoordinatorFixture(directory, configService, gatewayService, dataStore);
         }
 
-        public UpdateCoordinator CreateCoordinator(FakeUpdateService service, Action? requestExit = null) =>
-            new(dataStore, service, requestApplicationExit: requestExit, dispatch: action => action());
+        public UpdateCoordinator CreateCoordinator(FakeUpdateService service, Action? requestExit = null, Microsoft.Extensions.Logging.ILogger<UpdateCoordinator>? logger = null) =>
+            new(dataStore, service, logger, requestExit, dispatch: action => action());
 
         public ValueTask DisposeAsync()
         {

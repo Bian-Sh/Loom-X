@@ -104,7 +104,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             updateService,
             this.dataStore.GetUpdateProxySettingsAsync,
             this.loggerFactory.CreateLogger<ReleaseHistoryViewModel>());
-        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, localizer: LocalizerFactory.Create<SettingsViewModel>());
+        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, releaseHistory: releaseHistoryViewModel, localizer: LocalizerFactory.Create<SettingsViewModel>());
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
         NavigationItems = new([
             new("nav.overview", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),

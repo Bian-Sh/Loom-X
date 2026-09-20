@@ -21,8 +21,10 @@ public sealed class UpdateExperienceContractTests
         Assert.Contains("IUpdateService updateService = new UpdateService(", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("new UpdateCoordinator(\n            this.dataStore,\n            updateService,", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("new ReleaseHistoryViewModel(\n            updateService,\n            this.dataStore.GetUpdateProxySettingsAsync,", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("releaseHistory: releaseHistoryViewModel", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("releaseHistoryViewModel.Dispose();", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("updateCoordinator.Dispose();", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("if (ownsReleaseHistory) ReleaseHistory.Dispose();", settingsViewModel, StringComparison.Ordinal);
         Assert.Contains("if (ownsUpdateCoordinator) updateCoordinator.Dispose();", settingsViewModel, StringComparison.Ordinal);
     }
 
@@ -49,6 +51,11 @@ public sealed class UpdateExperienceContractTests
         Assert.Contains("Command=\"{Binding Update.InstallAndRestartCommand}\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding Update.RetryCommand}\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding Update.DismissDialogCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{l:Locale update.dialog.later}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{l:Locale update.dialog.install}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{l:Locale update.dialog.retry}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale update.dialog.close}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"重启并安装\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Update.CardVisible", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Update.ReleaseNotesVisible", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Update.OpenReleaseNotesCommand", source, StringComparison.Ordinal);

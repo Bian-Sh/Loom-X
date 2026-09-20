@@ -48,6 +48,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private readonly ToastService toastService;
     private readonly UpdateCoordinator updateCoordinator;
     private readonly bool ownsUpdateCoordinator;
+    private readonly bool ownsReleaseHistory;
     private readonly ILogger<SettingsViewModel> logger;
     private readonly Action<bool, int, int, string>? applyAppearance;
     private readonly IStringLocalizer<SettingsViewModel> _loc;
@@ -71,6 +72,8 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private string status;
     private bool hasProxyPassword;
     private bool suppressAutoSave;
+    private bool releaseHistoryLoadRequested;
+    private int selectedTabIndex;
     private readonly SemaphoreSlim saveLock = new(1, 1);
     private readonly object saveScheduleLock = new();
     private CancellationTokenSource? saveDebounceCancellation;
@@ -126,6 +129,17 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public bool IsBusy { get => isBusy; private set { if (SetProperty(ref isBusy, value)) { OnPropertyChanged(nameof(IsNotBusy)); } } }
     public bool IsNotBusy => !IsBusy;
     public string Status { get => status; private set => SetProperty(ref status, value); }
+    public int SelectedTabIndex
+    {
+        get => selectedTabIndex;
+        set
+        {
+            if (!SetProperty(ref selectedTabIndex, value) || value != 1 || releaseHistoryLoadRequested) return;
+            releaseHistoryLoadRequested = true;
+            _ = ReleaseHistory.EnsureLoadedAsync();
+        }
+    }
+    public ReleaseHistoryViewModel ReleaseHistory { get; }
     public string VersionLabel => AppVersion.Label;
     public string DataDirectory => AppDataPaths.RootDirectory;
     public bool IsCustomProxyVisible => SelectedProxyMode.Value == "custom";
@@ -143,13 +157,17 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public ICommand ClearLogsCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
 
-    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null, IStringLocalizer<SettingsViewModel>? localizer = null)
+    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null, ReleaseHistoryViewModel? releaseHistory = null, IStringLocalizer<SettingsViewModel>? localizer = null)
     {
         this.dataStore = dataStore;
         this.logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         this.toastService = toastService ?? new ToastService();
         this.updateCoordinator = updateCoordinator ?? new UpdateCoordinator(dataStore);
         ownsUpdateCoordinator = updateCoordinator is null;
+        ReleaseHistory = releaseHistory ?? new ReleaseHistoryViewModel(
+            new UpdateService(logger: null, currentVersion: AppVersion.Current),
+            dataStore.GetUpdateProxySettingsAsync);
+        ownsReleaseHistory = releaseHistory is null;
         this.applyAppearance = applyAppearance;
         _loc = localizer ?? LocalizerFactory.Create<SettingsViewModel>();
         Status = Loc("settings.status.loading");
@@ -165,7 +183,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     }
 
     public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null)
-        : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance, null) { }
+        : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance, null, null) { }
 
     private string Loc(string key) => _loc[key]?.Value ?? key;
 
@@ -414,6 +432,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             saveDebounceCancellation = null;
         }
         _ = SaveAsync();
+        if (ownsReleaseHistory) ReleaseHistory.Dispose();
         if (ownsUpdateCoordinator) updateCoordinator.Dispose();
     }
 }

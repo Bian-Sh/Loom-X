@@ -125,7 +125,7 @@ public sealed class ReleaseNotesContentViewModelTests
 
         Assert.True(vm.IsEmpty);
         Assert.Equal(string.Empty, vm.Markdown.ToString());
-        Assert.Equal("release.notes.empty", vm.EmptyText);
+        Assert.Equal(ResourceLookup.Resolve("release.notes.empty", LocaleService.CurrentCulture), vm.EmptyText);
     }
 
     [Fact]

@@ -254,7 +254,7 @@
           <Button Grid.Column="3" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="{l:Locale window.maximize}" AutomationProperties.Name="{l:Locale window.maximize}">
             <Path Data="M 5,5 L 19,5 L 19,19 L 5,19 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
-          <Button Grid.Column="4" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="{l:Locale window.close}" AutomationProperties.Name="{l:Locale window.close}">
+          <Button Grid.Column="4" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="{l:Locale update.dialog.close}" AutomationProperties.Name="{l:Locale update.dialog.close}">
             <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
         </Grid>
@@ -285,8 +285,8 @@
             </StackPanel>
             <Button x:Name="updateDialogCloseButton" Grid.Column="2" Width="32" Height="32" MinHeight="32"
                     Padding="0" Background="Transparent" BorderBrush="Transparent"
-                    Command="{Binding Update.DismissDialogCommand}" ToolTip.Tip="{l:Locale window.close}"
-                    AutomationProperties.Name="{l:Locale window.close}">
+                    Command="{Binding Update.DismissDialogCommand}" ToolTip.Tip="{l:Locale update.dialog.close}"
+                    AutomationProperties.Name="{l:Locale update.dialog.close}">
               <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}"
                     StrokeThickness="1" Stretch="Uniform" Width="12" Height="12" />
             </Button>
@@ -306,7 +306,7 @@
               </Grid>
               <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="14">
                 <ProgressBar Value="{Binding Update.DownloadPercent}" Minimum="0" Maximum="100" Height="7" VerticalAlignment="Center" />
-                <Button Grid.Column="1" Content="{l:Locale update.card.later}" Command="{Binding Update.DismissDialogCommand}" />
+                <Button Grid.Column="1" Content="{l:Locale update.dialog.later}" Command="{Binding Update.DismissDialogCommand}" />
               </Grid>
             </Grid>
             <Grid IsVisible="{Binding Update.IsVerifying}" ColumnDefinitions="*,Auto" ColumnSpacing="14">
@@ -314,18 +314,18 @@
                 <TextBlock Text="{Binding Update.StatusText}" Foreground="{DynamicResource TextSecondaryBrush}" />
                 <ProgressBar IsIndeterminate="True" Height="7" />
               </StackPanel>
-              <Button Grid.Column="1" Content="{l:Locale update.card.later}" Command="{Binding Update.DismissDialogCommand}" />
+              <Button Grid.Column="1" Content="{l:Locale update.dialog.later}" Command="{Binding Update.DismissDialogCommand}" />
             </Grid>
             <Grid IsVisible="{Binding Update.CanInstall}" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-              <Button Grid.Column="1" Content="{l:Locale update.card.later}" Command="{Binding Update.DismissDialogCommand}" />
-              <Button x:Name="updateInstallButton" Grid.Column="2" Classes="primary" Content="重启并安装"
+              <Button Grid.Column="1" Content="{l:Locale update.dialog.later}" Command="{Binding Update.DismissDialogCommand}" />
+              <Button x:Name="updateInstallButton" Grid.Column="2" Classes="primary" Content="{l:Locale update.dialog.install}"
                       Command="{Binding Update.InstallAndRestartCommand}" />
             </Grid>
             <Grid IsVisible="{Binding Update.CanRetry}" RowDefinitions="Auto,Auto" RowSpacing="12">
               <TextBlock Text="{Binding Update.ErrorMessage}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />
               <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                <Button Grid.Column="1" Content="{l:Locale update.card.later}" Command="{Binding Update.DismissDialogCommand}" />
-                <Button x:Name="updateRetryButton" Grid.Column="2" Classes="primary" Content="{l:Locale assistant.error.retry}"
+                <Button Grid.Column="1" Content="{l:Locale update.dialog.later}" Command="{Binding Update.DismissDialogCommand}" />
+                <Button x:Name="updateRetryButton" Grid.Column="2" Classes="primary" Content="{l:Locale update.dialog.retry}"
                         Command="{Binding Update.RetryCommand}" />
               </Grid>
             </Grid>

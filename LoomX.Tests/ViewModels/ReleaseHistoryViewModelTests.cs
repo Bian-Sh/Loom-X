@@ -4,6 +4,7 @@ using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using LoomX.Localization;
 using LoomX.Services;
+using LoomX.Tests.Logging;
 using LoomX.ViewModels;
 using Xunit;
 
@@ -12,6 +13,34 @@ namespace LoomX.Tests.ViewModels;
 public sealed class ReleaseHistoryViewModelTests
 {
     private static readonly UpdateProxySettings DirectSettings = new(false, "direct", string.Empty, 0, null, null);
+
+    [Fact]
+    public async Task Release正文与凭据不会进入历史日志()
+    {
+        const string releaseBody = "release-body-secret";
+        const string apiKey = "test-api-key-secret";
+        const string proxyPassword = "proxy-password-secret";
+        const string responseBody = "response-body-secret";
+        var logger = new RecordingLogger<ReleaseHistoryViewModel>();
+        var service = FakeUpdateService.WithPages(Page(1, false, Release("0.13.0", $"{releaseBody} {apiKey}")));
+        service.EnqueueFailure(new InvalidOperationException(responseBody));
+        using var vm = new ReleaseHistoryViewModel(
+            service,
+            _ => Task.FromResult(new UpdateProxySettings(true, "custom", "https://proxy.example", 7890, "proxy-user", proxyPassword)),
+            logger,
+            dispatch: action => action());
+
+        await vm.EnsureLoadedAsync();
+        vm.RefreshCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+        await WaitForAsync(() => !vm.IsRefreshing);
+
+        var logs = string.Join("\n", logger.Messages);
+        Assert.DoesNotContain(releaseBody, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(apiKey, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(proxyPassword, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(responseBody, logs, StringComparison.Ordinal);
+    }
 
     [Fact]
     public async Task 首次加载固定请求十条并默认选择最高正式版本()
@@ -234,12 +263,21 @@ public sealed class ReleaseHistoryViewModelTests
                 Page(1, false, Release("0.13.0", publishedAt: new DateTimeOffset(2026, 9, 20, 8, 0, 0, TimeSpan.Zero))));
             using var vm = CreateHistory(service);
             await vm.EnsureLoadedAsync();
+            service.EnqueueFailure(new InvalidOperationException("private-response"));
+            vm.RefreshCommand.Execute(null);
+            await service.WaitForRequestCountAsync(2);
+            await WaitForAsync(() => !vm.IsRefreshing);
             var englishDate = vm.Releases[0].PublishedAtText;
+            var englishBadge = vm.Releases[0].LatestBadgeText;
+            var englishError = vm.ErrorText;
+            var requestCount = service.Requests.Count;
 
             LocaleService.SetCulture("zh-CN");
 
             Assert.NotEqual(englishDate, vm.Releases[0].PublishedAtText);
-            Assert.Single(service.Requests);
+            Assert.NotEqual(englishBadge, vm.Releases[0].LatestBadgeText);
+            Assert.NotEqual(englishError, vm.ErrorText);
+            Assert.Equal(requestCount, service.Requests.Count);
         }
         finally
         {
@@ -263,7 +301,7 @@ public sealed class ReleaseHistoryViewModelTests
 
         await vm.EnsureLoadedAsync();
 
-        Assert.Equal("无法加载版本历史，请重试。", vm.ErrorText);
+        Assert.Equal("settings.update.history.error.load", vm.ErrorText);
         Assert.True(dispatchCalls >= 2);
     }
 

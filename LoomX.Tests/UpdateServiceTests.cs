@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using LoomX.Services;
+using LoomX.Tests.Logging;
 using Xunit;
 
 namespace LoomX.Tests;
@@ -12,6 +13,41 @@ public sealed class UpdateServiceTests
 {
     private static readonly UpdateProxySettings DirectSettings = new(false, "direct", "", 0, null, null);
 
+    [Fact]
+    public async Task Release元数据与代理凭据不会进入更新服务日志()
+    {
+        const string releaseBody = "release-body-secret";
+        const string apiKey = "test-api-key-secret";
+        const string proxyPassword = "proxy-password-secret";
+        const string responseBody = "response-body-secret";
+        var logger = new RecordingLogger<UpdateService>();
+        var handler = new StubHandler(_ => JsonResponse(BuildReleasesJson(new
+        {
+            tag_name = "v0.12.7",
+            name = "v0.12.7",
+            body = $"{releaseBody} {apiKey} {responseBody}",
+            html_url = "https://github.com/Bian-Sh/Loom-X/releases/tag/v0.12.7",
+            draft = false,
+            prerelease = false,
+            assets = Array.Empty<object>()
+        })));
+        var service = new UpdateService(_ => new HttpClient(handler), logger: logger, currentVersion: "0.12.6");
+        var settings = new UpdateProxySettings(true, "custom", "https://proxy.example", 7890, "proxy-user", proxyPassword);
+
+        await service.GetStableReleasesAsync(settings, 1, 10);
+        var failingService = new UpdateService(
+            _ => new HttpClient(new StubHandler(_ => throw new InvalidOperationException($"{releaseBody} {apiKey} {proxyPassword} {responseBody}"))),
+            logger: logger,
+            currentVersion: "0.12.6");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => failingService.CheckAsync(settings));
+
+        var logs = string.Join("\n", logger.Messages);
+        Assert.Contains("1", logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(releaseBody, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(apiKey, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(proxyPassword, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(responseBody, logs, StringComparison.Ordinal);
+    }
     [Fact]
     public async Task CheckAsync_ShouldIgnoreDraftPrereleaseAndSelectHighestStableRelease()
     {

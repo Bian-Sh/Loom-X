@@ -17,6 +17,7 @@ internal sealed class RecordingLogger<T> : ILogger<T>
         Exception? exception,
         Func<TState, Exception?, string> formatter)
     {
-        Messages.Add(formatter(state, exception));
+        var message = formatter(state, exception);
+        Messages.Add(exception is null ? message : $"{message}{Environment.NewLine}{exception}");
     }
 }

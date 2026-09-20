@@ -147,7 +147,7 @@
     <value>自動更新チェック</value>
   </data>
   <data name="settings.update.auto.check.hint">
-    <value>起動時にチェックし、アプリ実行中は24時間ごとにチェックします。自動インストールはされません。</value>
+    <value>起動時とアプリ実行中の 24 時間ごとに確認し、互換性のある更新をバックグラウンドでダウンロードしてインストール確認を待ちます。</value>
   </data>
   <data name="settings.update.use.proxy">
     <value>更新時にプロキシを使用</value>
@@ -1502,4 +1502,37 @@
   <data name="assistant.decision.cancel_input"><value>この入力をキャンセル</value></data>
   <data name="assistant.queue.title"><value>キュー内のメッセージ</value></data>
   <data name="assistant.queue.delete"><value>キュー内のメッセージを削除</value></data>
+  <data name="update.entry.downloading"><value>更新をダウンロード中</value></data>
+  <data name="update.entry.verifying"><value>更新を検証中</value></data>
+  <data name="update.entry.ready"><value>{0} の準備ができました</value></data>
+  <data name="update.entry.error"><value>更新の確認が必要です</value></data>
+  <data name="update.dialog.close"><value>閉じる</value></data>
+  <data name="update.dialog.later"><value>後で</value></data>
+  <data name="update.dialog.install"><value>再起動してインストール</value></data>
+  <data name="update.dialog.retry"><value>再試行</value></data>
+  <data name="update.progress.unknown"><value>不明</value></data>
+  <data name="update.progress.second"><value>秒</value></data>
+  <data name="update.progress.calculating"><value>計算中</value></data>
+  <data name="update.status.idle"><value>更新はまだ確認されていません</value></data>
+  <data name="update.status.checking"><value>更新を確認しています…</value></data>
+  <data name="update.status.downloading"><value>更新をダウンロードしています…</value></data>
+  <data name="update.status.verifying"><value>更新パッケージを検証しています…</value></data>
+  <data name="update.status.ready"><value>更新の準備ができました</value></data>
+  <data name="update.status.installing"><value>インストーラーを起動しました。アプリを終了します…</value></data>
+  <data name="update.status.latest"><value>最新バージョンです</value></data>
+  <data name="update.status.error"><value>更新に失敗しました</value></data>
+  <data name="update.error.check"><value>更新を確認できませんでした。後でもう一度お試しください。</value></data>
+  <data name="update.error.prepare"><value>更新を準備できませんでした。もう一度お試しください。</value></data>
+  <data name="update.error.install"><value>更新インストーラーを起動できませんでした。もう一度お試しください。</value></data>
+  <data name="release.notes.empty"><value>このバージョンにはリリースノートがありません。</value></data>
+  <data name="settings.update.history.title"><value>リリース履歴</value></data>
+  <data name="settings.update.history.refresh"><value>更新</value></data>
+  <data name="settings.update.history.loading"><value>リリース履歴を読み込んでいます…</value></data>
+  <data name="settings.update.history.empty"><value>安定版リリースはありません。</value></data>
+  <data name="settings.update.history.error.load"><value>リリース履歴を読み込めませんでした。もう一度お試しください。</value></data>
+  <data name="settings.update.history.retry"><value>再試行</value></data>
+  <data name="settings.update.history.load.more"><value>さらに読み込む</value></data>
+  <data name="settings.update.history.loading.more"><value>さらに読み込んでいます…</value></data>
+  <data name="settings.update.history.badge.latest"><value>最新</value></data>
+  <data name="settings.update.history.badge.current"><value>現在</value></data>
 </root>

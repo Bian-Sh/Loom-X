@@ -52,9 +52,6 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     private bool isDialogVisible;
     private bool disposed;
     private int installStarted;
-    private string statusText = string.Empty;
-    private string errorMessage = string.Empty;
-    private string updateEntryText = string.Empty;
     private int downloadPercent;
     private long downloadedBytes;
     private long totalBytes;
@@ -95,14 +92,14 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     public string VersionComparison => release is null ? string.Empty : $"v{CurrentVersion} → v{release.Version}";
     public string ReleaseTitle => release?.Name ?? string.Empty;
     public string ReleaseUrl => release?.HtmlUrl ?? string.Empty;
-    public string StatusText => statusText;
-    public string ErrorMessage => errorMessage;
-    public string UpdateEntryText => updateEntryText;
+    public string StatusText => ResolveStatusText();
+    public string ErrorMessage => ResolveErrorText();
+    public string UpdateEntryText => ResolveEntryText();
     public int DownloadPercent => downloadPercent;
     public string DownloadedText => FormatBytes(downloadedBytes);
-    public string TotalText => totalBytes > 0 ? FormatBytes(totalBytes) : Loc("update.progress.unknown", "未知");
+    public string TotalText => totalBytes > 0 ? FormatBytes(totalBytes) : Loc("update.progress.unknown");
     public string ProgressText => $"{DownloadedText} / {TotalText}";
-    public string SpeedText => bytesPerSecond > 0 ? $"{FormatBytes(bytesPerSecond)}/{Loc("update.progress.second", "秒")}" : Loc("update.progress.calculating", "计算中");
+    public string SpeedText => bytesPerSecond > 0 ? $"{FormatBytes(bytesPerSecond)}/{Loc("update.progress.second")}" : Loc("update.progress.calculating");
     public bool IsBusy => Stage is UpdateStage.Checking or UpdateStage.Downloading or UpdateStage.Verifying or UpdateStage.Installing;
     public bool IsUpdateEntryVisible => Stage is UpdateStage.Downloading or UpdateStage.Verifying or UpdateStage.Ready
         || Stage == UpdateStage.Error && Release is not null;
@@ -142,9 +139,9 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
 
     public void RefreshLocalizedText() => dispatch(() =>
     {
-        var nextStatus = ResolveStatusText();
-        SetText(ref statusText, nextStatus, nameof(StatusText));
-        SetText(ref updateEntryText, ResolveEntryText(), nameof(UpdateEntryText));
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(ErrorMessage));
+        OnPropertyChanged(nameof(UpdateEntryText));
         OnPropertyChanged(nameof(TotalText));
         OnPropertyChanged(nameof(ProgressText));
         OnPropertyChanged(nameof(SpeedText));
@@ -184,8 +181,8 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         }
         catch (Exception exception)
         {
-            TransitionTo(UpdateStage.Error, UpdateErrorKind.Check, Loc("update.error.check", "检查更新失败，请稍后重试。"));
-            logger.LogWarning(exception, "更新检查失败 {Manual}", manual);
+            TransitionTo(UpdateStage.Error, UpdateErrorKind.Check);
+            logger.LogWarning(SafeLogException(exception), "更新检查失败 {Manual}", manual);
             return null;
         }
         finally
@@ -225,12 +222,12 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             if (!lifetime.IsCancellationRequested)
-                TransitionTo(UpdateStage.Error, UpdateErrorKind.Prepare, Loc("update.error.prepare", "更新准备已取消，请重试。"));
+                TransitionTo(UpdateStage.Error, UpdateErrorKind.Prepare);
         }
         catch (Exception exception)
         {
-            TransitionTo(UpdateStage.Error, UpdateErrorKind.Prepare, Loc("update.error.prepare", "更新包准备失败，请重试。"));
-            logger.LogWarning(exception, "更新包准备失败 {Version}", targetRelease.Version);
+            TransitionTo(UpdateStage.Error, UpdateErrorKind.Prepare);
+            logger.LogWarning(SafeLogException(exception), "更新包准备失败 {Version}", targetRelease.Version);
         }
         finally
         {
@@ -281,8 +278,8 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             Interlocked.Exchange(ref installStarted, 0);
-            TransitionTo(UpdateStage.Ready, UpdateErrorKind.Install, Loc("update.error.install", "无法启动更新安装器，请重试。"));
-            logger.LogWarning(exception, "更新安装器启动失败 {Version}", target.Version);
+            TransitionTo(UpdateStage.Ready, UpdateErrorKind.Install);
+            logger.LogWarning(SafeLogException(exception), "更新安装器启动失败 {Version}", target.Version);
         }
 
         return Task.CompletedTask;
@@ -300,15 +297,13 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
             logger.LogDebug("更新浮窗可见性变化 {Visible} {Stage}", visible, Stage);
     });
 
-    private void TransitionTo(UpdateStage nextStage, UpdateErrorKind nextErrorKind = UpdateErrorKind.None, string? nextError = null) => dispatch(() =>
+    private void TransitionTo(UpdateStage nextStage, UpdateErrorKind nextErrorKind = UpdateErrorKind.None) => dispatch(() =>
     {
-        var nextErrorMessage = nextError ?? string.Empty;
-        if (stage == nextStage && errorKind == nextErrorKind && string.Equals(errorMessage, nextErrorMessage, StringComparison.Ordinal)) return;
+        if (stage == nextStage && errorKind == nextErrorKind) return;
 
         var previous = stage;
         stage = nextStage;
         errorKind = nextErrorKind;
-        errorMessage = nextErrorMessage;
         OnPropertyChanged(nameof(Stage));
         OnPropertyChanged(nameof(ErrorKind));
         OnPropertyChanged(nameof(ErrorMessage));
@@ -325,33 +320,42 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
 
     private string ResolveStatusText()
     {
-        if (!string.IsNullOrWhiteSpace(errorMessage)) return errorMessage;
+        var error = ResolveErrorText();
+        if (!string.IsNullOrWhiteSpace(error)) return error;
         return Stage switch
         {
-            UpdateStage.Checking => Loc("update.status.checking", "正在检查更新…"),
-            UpdateStage.Downloading => Loc("update.status.downloading", "正在下载更新…"),
-            UpdateStage.Verifying => Loc("update.status.verifying", "正在校验更新包…"),
-            UpdateStage.Ready => Loc("update.status.ready", "更新已准备好"),
-            UpdateStage.Installing => Loc("update.status.installing", "安装器已启动，应用即将退出…"),
-            UpdateStage.Latest => Loc("update.status.latest", "已是最新版本"),
-            UpdateStage.Error => Loc("update.status.error", "更新失败"),
-            _ => Loc("update.status.idle", "尚未检查更新")
+            UpdateStage.Checking => Loc("update.status.checking"),
+            UpdateStage.Downloading => Loc("update.status.downloading"),
+            UpdateStage.Verifying => Loc("update.status.verifying"),
+            UpdateStage.Ready => Loc("update.status.ready"),
+            UpdateStage.Installing => Loc("update.status.installing"),
+            UpdateStage.Latest => Loc("update.status.latest"),
+            UpdateStage.Error => Loc("update.status.error"),
+            _ => Loc("update.status.idle")
         };
     }
 
     private string ResolveEntryText() => Stage switch
     {
-        UpdateStage.Downloading => Loc("update.entry.downloading", "正在下载更新"),
-        UpdateStage.Verifying => Loc("update.entry.verifying", "正在校验更新"),
-        UpdateStage.Ready => string.Format(CultureInfo.CurrentCulture, Loc("update.entry.ready", "{0} 已准备好"), LatestVersion),
-        UpdateStage.Error when Release is not null => Loc("update.entry.error", "更新需要处理"),
+        UpdateStage.Downloading => Loc("update.entry.downloading"),
+        UpdateStage.Verifying => Loc("update.entry.verifying"),
+        UpdateStage.Ready => string.Format(CultureInfo.CurrentCulture, Loc("update.entry.ready"), LatestVersion),
+        UpdateStage.Error when Release is not null => Loc("update.entry.error"),
         _ => string.Empty
     };
 
-    private string Loc(string key, string fallback)
+    private string ResolveErrorText() => ErrorKind switch
+    {
+        UpdateErrorKind.Check => Loc("update.error.check"),
+        UpdateErrorKind.Prepare => Loc("update.error.prepare"),
+        UpdateErrorKind.Install => Loc("update.error.install"),
+        _ => string.Empty
+    };
+
+    private string Loc(string key)
     {
         var value = localizer[key];
-        return value.ResourceNotFound || string.Equals(value.Value, key, StringComparison.Ordinal) ? fallback : value.Value;
+        return value.ResourceNotFound || string.Equals(value.Value, key, StringComparison.Ordinal) ? key : value.Value;
     }
 
     private void ResetProgress() => dispatch(() =>
@@ -402,7 +406,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception exception) { logger.LogWarning(exception, "更新定时检查循环失败"); }
+        catch (Exception exception) { logger.LogWarning(SafeLogException(exception), "更新定时检查循环失败"); }
     }
 
     private void OnCultureChanged(object? sender, CultureInfo culture) => RefreshLocalizedText();
@@ -411,13 +415,6 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     {
         if (Dispatcher.UIThread.CheckAccess()) action();
         else Dispatcher.UIThread.InvokeAsync(action).GetAwaiter().GetResult();
-    }
-
-    private void SetText(ref string field, string value, string propertyName)
-    {
-        if (string.Equals(field, value, StringComparison.Ordinal)) return;
-        field = value;
-        OnPropertyChanged(propertyName);
     }
 
     private static string FormatBytes(long bytes)
@@ -429,6 +426,8 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         if (value < 1024) return $"{value:0.0} MB";
         return $"{value / 1024d:0.00} GB";
     }
+
+    private static Exception SafeLogException(Exception exception) => new InvalidOperationException(exception.GetType().Name);
 
     public void Dispose()
     {

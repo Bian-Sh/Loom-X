@@ -11,21 +11,18 @@ public sealed class ReleaseNotesContentViewModel : NotifyViewModel, IDisposable
 {
     private UpdateRelease? release;
     private string title = string.Empty;
-    private string publishedAtText = string.Empty;
     private ObservableStringBuilder markdown = null!;
     private bool isEmpty = true;
-    private string emptyText = string.Empty;
     private bool disposed;
 
     public ReleaseNotesContentViewModel()
     {
         RunOnUiThread(() => markdown = new ObservableStringBuilder());
-        RefreshLocalizedText(LocaleService.CurrentCulture);
         LocaleService.CultureChanged += OnCultureChanged;
     }
 
     public string Title { get => title; private set => SetProperty(ref title, value); }
-    public string PublishedAtText { get => publishedAtText; private set => SetProperty(ref publishedAtText, value); }
+    public string PublishedAtText => release?.PublishedAt?.ToLocalTime().ToString("d", LocaleService.CurrentCulture) ?? string.Empty;
     public ObservableStringBuilder Markdown { get => markdown; private set => SetProperty(ref markdown, value); }
     public bool IsEmpty
     {
@@ -36,7 +33,7 @@ public sealed class ReleaseNotesContentViewModel : NotifyViewModel, IDisposable
         }
     }
     public bool HasContent => !IsEmpty;
-    public string EmptyText { get => emptyText; private set => SetProperty(ref emptyText, value); }
+    public string EmptyText => ResourceLookup.Resolve("release.notes.empty", LocaleService.CurrentCulture);
 
     public void SetRelease(UpdateRelease? value)
     {
@@ -50,20 +47,16 @@ public sealed class ReleaseNotesContentViewModel : NotifyViewModel, IDisposable
             if (!string.IsNullOrWhiteSpace(sanitized)) nextMarkdown.Append(sanitized);
             Markdown = nextMarkdown;
             IsEmpty = string.IsNullOrWhiteSpace(sanitized);
-            RefreshLocalizedText(LocaleService.CurrentCulture);
+            OnPropertyChanged(nameof(PublishedAtText));
+            OnPropertyChanged(nameof(EmptyText));
         });
     }
 
-    private void OnCultureChanged(object? sender, CultureInfo culture) =>
-        RunOnUiThread(() => RefreshLocalizedText(culture, notifyEmptyText: true));
-
-    private void RefreshLocalizedText(CultureInfo culture, bool notifyEmptyText = false)
+    private void OnCultureChanged(object? sender, CultureInfo culture) => RunOnUiThread(() =>
     {
-        PublishedAtText = release?.PublishedAt?.ToLocalTime().ToString("d", culture) ?? string.Empty;
-        var nextEmptyText = ResourceLookup.Resolve("release.notes.empty", culture);
-        if (!SetProperty(ref emptyText, nextEmptyText, nameof(EmptyText)) && notifyEmptyText)
-            OnPropertyChanged(nameof(EmptyText));
-    }
+        OnPropertyChanged(nameof(PublishedAtText));
+        OnPropertyChanged(nameof(EmptyText));
+    });
 
     private static void RunOnUiThread(Action action)
     {

@@ -229,6 +229,30 @@ public sealed class SettingsViewContractTests
         Assert.NotEqual(originalAlpha, brush.Color.A);
     }
 
+    [Fact]
+    public void 更新页保留原设置并提供完整版本历史分栏状态()
+    {
+        var source = ReadDesktopFile("Views", "SettingsView.axaml");
+
+        Assert.Contains("<TabControl SelectedIndex=\"{Binding SelectedTabIndex, Mode=TwoWay}\">", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding VersionLabel}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding AutoCheckUpdates}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding UseProxyForUpdates}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding CheckUpdateCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Height=\"430\"", source, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"200,*\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding ReleaseHistory.RefreshCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding ReleaseHistory.Releases}\"", source, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem=\"{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("<views:ReleaseNotesView DataContext=\"{Binding ReleaseHistory.Content}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsInitialLoading}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsEmpty}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.HasError}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.HasCachedContent}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsLoadingMore}\"", source, StringComparison.Ordinal);
+    }
+
     private static void EnsureAvaloniaSetup()
     {
         AvaloniaTestBootstrap.Ensure();

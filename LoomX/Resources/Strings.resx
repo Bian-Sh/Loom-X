@@ -207,7 +207,7 @@
     <value>自动检查更新</value>
   </data>
   <data name="settings.update.auto.check.hint">
-    <value>启动后检查，并在应用运行期间每 24 小时检查一次；不会自动安装。</value>
+    <value>启动时检查，并在应用运行期间每 24 小时检查一次；发现兼容版本后会在后台下载并等待确认安装。</value>
   </data>
   <data name="settings.update.use.proxy">
     <value>更新时使用代理</value>
@@ -1673,4 +1673,37 @@
   <data name="assistant.decision.cancel_input"><value>取消本次输入</value></data>
   <data name="assistant.queue.title"><value>排队消息</value></data>
   <data name="assistant.queue.delete"><value>删除排队消息</value></data>
+  <data name="update.entry.downloading"><value>正在下载更新</value></data>
+  <data name="update.entry.verifying"><value>正在校验更新</value></data>
+  <data name="update.entry.ready"><value>{0} 已准备好</value></data>
+  <data name="update.entry.error"><value>更新需要处理</value></data>
+  <data name="update.dialog.close"><value>关闭</value></data>
+  <data name="update.dialog.later"><value>稍后</value></data>
+  <data name="update.dialog.install"><value>重启并安装</value></data>
+  <data name="update.dialog.retry"><value>重试</value></data>
+  <data name="update.progress.unknown"><value>未知</value></data>
+  <data name="update.progress.second"><value>秒</value></data>
+  <data name="update.progress.calculating"><value>计算中</value></data>
+  <data name="update.status.idle"><value>尚未检查更新</value></data>
+  <data name="update.status.checking"><value>正在检查更新…</value></data>
+  <data name="update.status.downloading"><value>正在下载更新…</value></data>
+  <data name="update.status.verifying"><value>正在校验更新包…</value></data>
+  <data name="update.status.ready"><value>更新已准备好</value></data>
+  <data name="update.status.installing"><value>安装器已启动，应用即将退出…</value></data>
+  <data name="update.status.latest"><value>已是最新版本</value></data>
+  <data name="update.status.error"><value>更新失败</value></data>
+  <data name="update.error.check"><value>检查更新失败，请稍后重试。</value></data>
+  <data name="update.error.prepare"><value>更新包准备失败，请重试。</value></data>
+  <data name="update.error.install"><value>无法启动更新安装器，请重试。</value></data>
+  <data name="release.notes.empty"><value>此版本暂无发布说明。</value></data>
+  <data name="settings.update.history.title"><value>版本历史</value></data>
+  <data name="settings.update.history.refresh"><value>刷新</value></data>
+  <data name="settings.update.history.loading"><value>正在加载版本历史…</value></data>
+  <data name="settings.update.history.empty"><value>暂无正式版本</value></data>
+  <data name="settings.update.history.error.load"><value>无法加载版本历史，请重试。</value></data>
+  <data name="settings.update.history.retry"><value>重试</value></data>
+  <data name="settings.update.history.load.more"><value>加载更多</value></data>
+  <data name="settings.update.history.loading.more"><value>正在加载更多…</value></data>
+  <data name="settings.update.history.badge.latest"><value>最新</value></data>
+  <data name="settings.update.history.badge.current"><value>当前</value></data>
 </root>

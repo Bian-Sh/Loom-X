@@ -12,17 +12,14 @@ namespace LoomX.ViewModels;
 /// <summary>正式版本历史中的单个可展示版本。</summary>
 public sealed class ReleaseHistoryItemViewModel : NotifyViewModel
 {
-    private readonly Func<string, string, string> localize;
+    private readonly Func<string, string> localize;
     private bool isLatest;
-    private string publishedAtText = string.Empty;
-    private string latestBadgeText = string.Empty;
-    private string currentBadgeText = string.Empty;
 
     internal ReleaseHistoryItemViewModel(
         UpdateRelease release,
         bool isLatest,
         bool isCurrent,
-        Func<string, string, string> localize,
+        Func<string, string> localize,
         CultureInfo culture)
     {
         Release = release;
@@ -36,17 +33,17 @@ public sealed class ReleaseHistoryItemViewModel : NotifyViewModel
     public string VersionText => $"v{NormalizeVersion(Release.Version)}";
     public bool IsLatest { get => isLatest; private set => SetProperty(ref isLatest, value); }
     public bool IsCurrent { get; }
-    public string PublishedAtText { get => publishedAtText; private set => SetProperty(ref publishedAtText, value); }
-    public string LatestBadgeText { get => latestBadgeText; private set => SetProperty(ref latestBadgeText, value); }
-    public string CurrentBadgeText { get => currentBadgeText; private set => SetProperty(ref currentBadgeText, value); }
+    public string PublishedAtText => Release.PublishedAt?.ToLocalTime().ToString("d", LocaleService.CurrentCulture) ?? string.Empty;
+    public string LatestBadgeText => localize("settings.update.history.badge.latest");
+    public string CurrentBadgeText => localize("settings.update.history.badge.current");
 
     internal void SetLatest(bool value) => IsLatest = value;
 
     internal void RefreshLocalizedText(CultureInfo culture)
     {
-        PublishedAtText = Release.PublishedAt?.ToLocalTime().ToString("d", culture) ?? string.Empty;
-        LatestBadgeText = localize("update.history.badge.latest", "最新");
-        CurrentBadgeText = localize("update.history.badge.current", "当前");
+        OnPropertyChanged(nameof(PublishedAtText));
+        OnPropertyChanged(nameof(LatestBadgeText));
+        OnPropertyChanged(nameof(CurrentBadgeText));
     }
 
     internal static string NormalizeVersion(string? value)
@@ -79,7 +76,6 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
     private bool hasLoaded;
     private volatile bool disposed;
     private int currentPage;
-    private string errorText = string.Empty;
 
     public ReleaseHistoryViewModel(
         IUpdateService updateService,
@@ -118,10 +114,17 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
     public bool IsRefreshing { get => isRefreshing; private set => SetState(ref isRefreshing, value); }
     public bool IsLoadingMore { get => isLoadingMore; private set => SetState(ref isLoadingMore, value); }
     public bool IsEmpty { get => isEmpty; private set => SetProperty(ref isEmpty, value); }
-    public bool HasError { get => hasError; private set => SetProperty(ref hasError, value); }
+    public bool HasError
+    {
+        get => hasError;
+        private set
+        {
+            if (SetProperty(ref hasError, value)) OnPropertyChanged(nameof(ErrorText));
+        }
+    }
     public bool HasCachedContent { get => hasCachedContent; private set => SetProperty(ref hasCachedContent, value); }
     public bool HasMore { get => hasMore; private set => SetState(ref hasMore, value); }
-    public string ErrorText { get => errorText; private set => SetProperty(ref errorText, value); }
+    public string ErrorText => HasError ? Loc("settings.update.history.error.load") : string.Empty;
     private bool IsBusy => IsInitialLoading || IsRefreshing || IsLoadingMore;
     private bool HasLoadedContent => hasLoaded;
 
@@ -173,7 +176,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
             ClearError();
         });
 
-        var operation = isRefresh ? "刷新" : "首次加载";
+        var operation = isRefresh ? "refresh" : "initial";
         logger.LogInformation("正式版本历史加载开始 {Operation} {Page} {PageSize}", operation, 1, PageSize);
         try
         {
@@ -203,12 +206,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
                 RaiseCommandStates();
             });
 
-            logger.LogInformation(
-                "正式版本历史加载完成 {Operation} {Page} {Count} {HasMore}",
-                operation,
-                page.Page,
-                nextItems.Count,
-                page.HasMore);
+            logger.LogInformation("正式版本历史加载完成 {Operation} {Page} {Count} {HasMore}", operation, page.Page, nextItems.Count, page.HasMore);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -217,11 +215,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             DispatchIfActive(ApplyFailure);
-            logger.LogWarning(
-                exception,
-                "正式版本历史加载失败 {Operation} {HasCachedContent}",
-                operation,
-                Releases.Count > 0);
+            logger.LogWarning(SafeLogException(exception), "正式版本历史加载失败 {Operation} {HasCachedContent}", operation, Releases.Count > 0);
         }
         finally
         {
@@ -266,11 +260,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
                 RaiseCommandStates();
             });
 
-            logger.LogInformation(
-                "正式版本历史加载更多完成 {Page} {AddedCount} {HasMore}",
-                page.Page,
-                additions.Count,
-                page.HasMore);
+            logger.LogInformation("正式版本历史加载更多完成 {Page} {AddedCount} {HasMore}", page.Page, additions.Count, page.HasMore);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -279,7 +269,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             DispatchIfActive(ApplyFailure);
-            logger.LogWarning(exception, "正式版本历史加载更多失败 {Page} {HasCachedContent}", nextPage, Releases.Count > 0);
+            logger.LogWarning(SafeLogException(exception), "正式版本历史加载更多失败 {Page} {HasCachedContent}", nextPage, Releases.Count > 0);
         }
         finally
         {
@@ -373,7 +363,6 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         HasError = true;
         HasCachedContent = Releases.Count > 0;
         IsEmpty = false;
-        ErrorText = Loc("update.history.error.load", "无法加载版本历史，请重试。");
         RaiseCommandStates();
     }
 
@@ -381,21 +370,18 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
     {
         HasError = false;
         HasCachedContent = false;
-        ErrorText = string.Empty;
     }
 
-    private string Loc(string key, string fallback)
+    private string Loc(string key)
     {
         var value = localizer[key];
-        return value.ResourceNotFound || string.Equals(value.Value, key, StringComparison.Ordinal)
-            ? fallback
-            : value.Value;
+        return value.ResourceNotFound || string.Equals(value.Value, key, StringComparison.Ordinal) ? key : value.Value;
     }
 
     private void OnCultureChanged(object? sender, CultureInfo culture) => DispatchIfActive(() =>
     {
         foreach (var item in Releases) item.RefreshLocalizedText(culture);
-        if (HasError) ErrorText = Loc("update.history.error.load", "无法加载版本历史，请重试。");
+        if (HasError) OnPropertyChanged(nameof(ErrorText));
     });
 
     private bool SetState(ref bool field, bool value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
@@ -426,6 +412,8 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         if (Dispatcher.UIThread.CheckAccess()) action();
         else Dispatcher.UIThread.InvokeAsync(action).GetAwaiter().GetResult();
     }
+
+    private static Exception SafeLogException(Exception exception) => new InvalidOperationException(exception.GetType().Name);
 
     public void Dispose()
     {

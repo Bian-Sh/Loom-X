@@ -240,7 +240,7 @@ public sealed class UpdateService : IUpdateService
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(exception, "更新检查失败 {CurrentVersion} {ElapsedMs}ms", currentVersion, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            logger.LogWarning(SafeLogException(exception), "更新检查失败 {CurrentVersion} {ElapsedMs}ms", currentVersion, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             throw;
         }
     }
@@ -359,6 +359,8 @@ public sealed class UpdateService : IUpdateService
         installerLauncher.Launch(preparedUpdate.InstallerPath);
         logger.LogInformation("更新安装器已启动 {Version}", preparedUpdate.Version);
     }
+
+    private static Exception SafeLogException(Exception exception) => new InvalidOperationException(exception.GetType().Name);
 
     private async Task DownloadFileAsync(HttpClient client, string url, string path, IProgress<UpdateDownloadProgress>? progress, CancellationToken cancellationToken)
     {
