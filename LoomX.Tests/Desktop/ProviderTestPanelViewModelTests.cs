@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text;
+using LoomX.Localization;
 using LoomX.Services;
 using LoomX.ViewModels;
 using Xunit;
@@ -330,9 +331,27 @@ public sealed class ProviderTestPanelViewModelTests
         await WaitUntilAsync(() => !runningPanel.IsRunning);
     }
 
-    private static ProviderTestPanelViewModel CreateBoundPanel(IProviderTestService service)
+    [Theory]
+    [InlineData(ProviderTestStatus.Completed, "providers.test.toast.success", ToastLevel.Success)]
+    [InlineData(ProviderTestStatus.Failed, "providers.test.toast.failure", ToastLevel.Error)]
+    public async Task 测试完成后显示对应Toast(ProviderTestStatus status, string messageKey, ToastLevel level)
     {
-        var panel = new ProviderTestPanelViewModel(service);
+        var toastService = new ToastService();
+        ToastNotification? notification = null;
+        toastService.Requested += (_, value) => notification = value;
+        var panel = CreateBoundPanel(new StubProviderTestService("答复", status), toastService);
+
+        panel.SendCommand.Execute(null);
+        await WaitUntilAsync(() => !panel.IsRunning && panel.HasResult);
+
+        Assert.NotNull(notification);
+        Assert.Equal(ResourceLookup.Resolve(messageKey), notification.Message);
+        Assert.Equal(level, notification.Level);
+    }
+
+    private static ProviderTestPanelViewModel CreateBoundPanel(IProviderTestService service, ToastService? toastService = null)
+    {
+        var panel = new ProviderTestPanelViewModel(service, toastService);
         var provider = new ProviderEditorViewModel
         {
             BusinessId = "p",
@@ -352,7 +371,7 @@ public sealed class ProviderTestPanelViewModelTests
             await Task.Delay(10);
         Assert.True(condition());
     }
-    private sealed class StubProviderTestService(string responseText = "答复") : IProviderTestService
+    private sealed class StubProviderTestService(string responseText = "答复", ProviderTestStatus status = ProviderTestStatus.Completed) : IProviderTestService
     {
         public int ExecutionCount { get; private set; }
         public TaskCompletionSource<ProviderTestResult> Completed { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -360,7 +379,7 @@ public sealed class ProviderTestPanelViewModelTests
         {
             ExecutionCount++;
             progress?.Report(new ProviderTestProgress(request.RequestId, ProviderTestStatus.Sending));
-            var result = new ProviderTestResult(request.RequestId, ProviderTestStatus.Completed, new ProviderTestSummary(request.RequestId, request.ProviderId, request.ModelId, "openai_responses", "/responses", request.Mode, false, "direct", null, 0), 200, "application/json", 1, 10, responseText);
+            var result = new ProviderTestResult(request.RequestId, status, new ProviderTestSummary(request.RequestId, request.ProviderId, request.ModelId, "openai_responses", "/responses", request.Mode, false, "direct", null, 0), 200, "application/json", 1, 10, responseText);
             Completed.TrySetResult(result);
             return Task.FromResult(result);
         }

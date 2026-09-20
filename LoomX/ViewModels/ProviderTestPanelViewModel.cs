@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 using System.Windows.Input;
+using LoomX.Localization;
 using LoomX.Services;
 
 namespace LoomX.ViewModels;
@@ -14,6 +15,7 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
     private const int MaxLivePreviewCharacters = 32_768;
     private static readonly TimeSpan ProgressFlushInterval = TimeSpan.FromMilliseconds(75);
     private readonly IProviderTestService service;
+    private readonly ToastService? toastService;
     private readonly ObservableCollection<ModelEditorViewModel> testableModels = [];
     private readonly HashSet<ModelEditorViewModel> subscribedModels = [];
     private ProviderEditorViewModel? provider;
@@ -29,9 +31,10 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
     private CancellationTokenSource? cancellation;
     private long requestVersion;
 
-    public ProviderTestPanelViewModel(IProviderTestService service)
+    public ProviderTestPanelViewModel(IProviderTestService service, ToastService? toastService = null)
     {
         this.service = service ?? throw new ArgumentNullException(nameof(service));
+        this.toastService = toastService;
         TestableModels = new ReadOnlyObservableCollection<ModelEditorViewModel>(testableModels);
         SendCommand = new AsyncCommand(SendAsync, () => CanSend);
         StopCommand = new AsyncCommand(StopAsync, () => IsRunning);
@@ -158,6 +161,10 @@ public sealed class ProviderTestPanelViewModel : NotifyViewModel
             ResponseText = result.ResponseText;
             HasError = result.Status == ProviderTestStatus.Failed;
             HasResult = result.Status is ProviderTestStatus.Completed or ProviderTestStatus.Failed;
+            if (result.Status == ProviderTestStatus.Completed)
+                toastService?.Show(ResourceLookup.Resolve("providers.test.toast.success"), ToastLevel.Success);
+            else if (result.Status == ProviderTestStatus.Failed)
+                toastService?.Show(ResourceLookup.Resolve("providers.test.toast.failure"), ToastLevel.Error);
         }
         finally
         {

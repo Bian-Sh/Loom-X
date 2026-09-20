@@ -1010,7 +1010,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         this.logger = logger;
         _loc = localizer ?? LocalizerFactory.Create<ProvidersViewModel>();
         this.healthService = healthService ?? new ProviderHealthService(httpClient);
-        testPanel = new ProviderTestPanelViewModel(providerTestService ?? new ProviderTestService(httpClient, providerTestLogger));
+        testPanel = new ProviderTestPanelViewModel(providerTestService ?? new ProviderTestService(httpClient, providerTestLogger), this.toastService);
         Providers.CollectionChanged += ProvidersChanged;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;

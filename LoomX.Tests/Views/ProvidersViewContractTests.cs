@@ -393,12 +393,12 @@ public sealed class ProvidersViewContractTests
         var responseTag = test[responseStart..responseEnd];
         Assert.Contains("<ScrollViewer Classes=\"provider-tab-scroll\" VerticalScrollBarVisibility=\"Auto\" HorizontalScrollBarVisibility=\"Disabled\">", test, StringComparison.Ordinal);
         Assert.Contains("<Border x:Name=\"TestResponsePanel\" Grid.Row=\"1\" Classes=\"panel\" Padding=\"14\" MinHeight=\"150\"", test, StringComparison.Ordinal);
-        Assert.Contains("MaxHeight=\"{Binding #TestResponsePanel.Bounds.Height}\"", responseTag, StringComparison.Ordinal);
+        Assert.DoesNotContain("MaxHeight=", responseTag, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Stretch\"", responseTag, StringComparison.Ordinal);
         Assert.Contains("VerticalAlignment=\"Stretch\"", responseTag, StringComparison.Ordinal);
         Assert.Contains("TextWrapping=\"NoWrap\"", responseTag, StringComparison.Ordinal);
-        Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", responseTag, StringComparison.Ordinal);
-        Assert.Contains("ScrollViewer.HorizontalScrollBarVisibility=\"Auto\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Disabled\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer.HorizontalScrollBarVisibility=\"Disabled\"", responseTag, StringComparison.Ordinal);
     }
     [Theory]
     [InlineData(Key.Delete, false, 6, 0, 6, true)]
@@ -521,7 +521,8 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("Text=\"{l:Locale providers.test.response.empty}\" Classes=\"muted\" FontSize=\"13\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" TextAlignment=\"Center\"", testTab, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding TestPanel.HasResponseText, Converter={StaticResource ProviderBooleanNotConverter}}\"", testTab, StringComparison.Ordinal);
         Assert.Contains("<TextBox x:Name=\"TestResponseTextBox\"", testTab, StringComparison.Ordinal);
-        Assert.Contains("MaxHeight=\"{Binding #TestResponsePanel.Bounds.Height}\" HorizontalAlignment=\"Stretch\" VerticalAlignment=\"Stretch\"", testTab, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Stretch\" VerticalAlignment=\"Stretch\"", testTab, StringComparison.Ordinal);
+        Assert.DoesNotContain("MaxHeight=\"{Binding #TestResponsePanel.Bounds.Height}\"", testTab, StringComparison.Ordinal);
     }
 
     [Fact]
