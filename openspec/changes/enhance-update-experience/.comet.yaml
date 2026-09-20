@@ -11,7 +11,7 @@ isolation: null
 verify_mode: null
 auto_transition: true
 base_ref: e28f82861bafaab9c428b17f75d73fd29153597e
-design_doc: null
+design_doc: docs/superpowers/specs/2026-09-20-enhance-update-experience-design.md
 plan: null
 verify_result: pending
 verification_report: null
