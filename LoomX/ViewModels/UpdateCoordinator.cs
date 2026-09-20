@@ -1,6 +1,9 @@
-using System.Text.RegularExpressions;
+using System.Globalization;
 using System.Windows.Input;
+using Avalonia.Threading;
+using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
+using LoomX.Localization;
 using LoomX.Services;
 
 namespace LoomX.ViewModels;
@@ -9,89 +12,112 @@ public enum UpdateStage
 {
     Idle,
     Checking,
-    Available,
     Downloading,
     Verifying,
+    Ready,
     Installing,
     Latest,
     Error
 }
 
-/// <summary>
-/// 统一管理启动、定时和手动更新检查，并向主窗口与设置页提供同一份状态。
-/// </summary>
+public enum UpdateErrorKind
+{
+    None,
+    Check,
+    Prepare,
+    Install
+}
+
+/// <summary>统一管理启动、定时、准备与安装确认，并向所有更新入口提供同一份状态。</summary>
 public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
 {
     private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
     private readonly AppDataStore dataStore;
-    private readonly UpdateService updateService;
+    private readonly IUpdateService updateService;
     private readonly ILogger<UpdateCoordinator> logger;
-    private readonly SemaphoreSlim checkGate = new(1, 1);
-    private readonly SemaphoreSlim downloadGate = new(1, 1);
+    private readonly Action requestApplicationExit;
+    private readonly IStringLocalizer<UpdateCoordinator> localizer;
+    private readonly Action<Action> dispatch;
     private readonly CancellationTokenSource lifetime = new();
-    private UpdateRelease? release;
+    private readonly object checkSync = new();
+    private readonly object prepareSync = new();
+    private Task<UpdateCheckResult?>? checkTask;
+    private Task? prepareTask;
     private Task? timerTask;
-    private bool started;
-    private bool cardVisible;
-    private bool releaseNotesVisible;
+    private UpdateRelease? release;
+    private PreparedUpdate? preparedUpdate;
     private UpdateStage stage;
-    private string statusText = "尚未检查更新";
+    private UpdateErrorKind errorKind;
+    private bool started;
+    private bool isDialogVisible;
+    private bool disposed;
+    private int installStarted;
+    private string statusText = string.Empty;
     private string errorMessage = string.Empty;
+    private string updateEntryText = string.Empty;
     private int downloadPercent;
     private long downloadedBytes;
     private long totalBytes;
     private long bytesPerSecond;
 
+    public UpdateCoordinator(
+        AppDataStore dataStore,
+        IUpdateService? updateService = null,
+        ILogger<UpdateCoordinator>? logger = null,
+        Action? requestApplicationExit = null,
+        IStringLocalizer<UpdateCoordinator>? localizer = null,
+        Action<Action>? dispatch = null)
+    {
+        this.dataStore = dataStore;
+        this.updateService = updateService ?? new UpdateService(logger: null, currentVersion: CurrentVersion);
+        this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<UpdateCoordinator>.Instance;
+        this.requestApplicationExit = requestApplicationExit ?? (() => { });
+        this.localizer = localizer ?? LocalizerFactory.Create<UpdateCoordinator>();
+        this.dispatch = dispatch ?? DispatchToUiThread;
+
+        CheckCommand = new AsyncCommand(() => CheckNowAsync(true), () => !IsBusy, this.logger);
+        ToggleDialogCommand = new DelegateCommand(ToggleDialog);
+        DismissDialogCommand = new DelegateCommand(() => SetDialogVisible(false));
+        LaterCommand = DismissDialogCommand;
+        RetryCommand = new AsyncCommand(RetryAsync, () => CanRetry, this.logger);
+        InstallAndRestartCommand = new AsyncCommand(InstallAndRestartAsync, () => CanInstall, this.logger);
+        RefreshLocalizedText();
+        LocaleService.CultureChanged += OnCultureChanged;
+    }
+
     public string CurrentVersion => AppVersion.Current;
     public UpdateRelease? Release => release;
-    public UpdateStage Stage
-    {
-        get => stage;
-        private set
-        {
-            if (!SetProperty(ref stage, value)) return;
-            OnPropertyChanged(nameof(IsBusy));
-            OnPropertyChanged(nameof(CanDownload));
-            OnPropertyChanged(nameof(CanRetry));
-            RaiseCommandStates();
-        }
-    }
-    public bool CardVisible { get => cardVisible; private set => SetProperty(ref cardVisible, value); }
-    public bool ReleaseNotesVisible { get => releaseNotesVisible; private set => SetProperty(ref releaseNotesVisible, value); }
+    public PreparedUpdate? PreparedUpdate => preparedUpdate;
+    public UpdateStage Stage => stage;
+    public UpdateErrorKind ErrorKind => errorKind;
     public bool HasUpdate => release is not null;
     public string LatestVersion => release is null ? string.Empty : $"v{release.Version}";
     public string VersionComparison => release is null ? string.Empty : $"v{CurrentVersion} → v{release.Version}";
     public string ReleaseTitle => release?.Name ?? string.Empty;
     public string ReleaseUrl => release?.HtmlUrl ?? string.Empty;
-    public string ReleaseNotes => SanitizeMarkdown(release?.Body);
-    public string StatusText { get => statusText; private set => SetProperty(ref statusText, value); }
-    public string ErrorMessage { get => errorMessage; private set => SetProperty(ref errorMessage, value); }
-    public int DownloadPercent { get => downloadPercent; private set => SetProperty(ref downloadPercent, value); }
+    public string StatusText => statusText;
+    public string ErrorMessage => errorMessage;
+    public string UpdateEntryText => updateEntryText;
+    public int DownloadPercent => downloadPercent;
     public string DownloadedText => FormatBytes(downloadedBytes);
-    public string TotalText => totalBytes > 0 ? FormatBytes(totalBytes) : "未知";
+    public string TotalText => totalBytes > 0 ? FormatBytes(totalBytes) : Loc("update.progress.unknown", "未知");
     public string ProgressText => $"{DownloadedText} / {TotalText}";
-    public string SpeedText => bytesPerSecond > 0 ? $"{FormatBytes(bytesPerSecond)}/秒" : "计算中";
+    public string SpeedText => bytesPerSecond > 0 ? $"{FormatBytes(bytesPerSecond)}/{Loc("update.progress.second", "秒")}" : Loc("update.progress.calculating", "计算中");
     public bool IsBusy => Stage is UpdateStage.Checking or UpdateStage.Downloading or UpdateStage.Verifying or UpdateStage.Installing;
-    public bool CanDownload => HasUpdate && (Stage is UpdateStage.Available or UpdateStage.Error);
-    public bool CanRetry => HasUpdate && Stage == UpdateStage.Error;
+    public bool IsUpdateEntryVisible => Stage is UpdateStage.Downloading or UpdateStage.Verifying or UpdateStage.Ready
+        || Stage == UpdateStage.Error && Release is not null;
+    public bool IsDialogVisible => isDialogVisible;
+    public bool IsProgressVisible => Stage is UpdateStage.Downloading or UpdateStage.Verifying;
+    public bool IsProgressIndeterminate => Stage == UpdateStage.Verifying;
+    public bool CanInstall => Stage == UpdateStage.Ready && PreparedUpdate is not null;
+    public bool CanRetry => Stage == UpdateStage.Error && ErrorKind is UpdateErrorKind.Check or UpdateErrorKind.Prepare;
 
     public ICommand CheckCommand { get; }
-    public ICommand DownloadCommand { get; }
+    public ICommand ToggleDialogCommand { get; }
+    public ICommand DismissDialogCommand { get; }
     public ICommand LaterCommand { get; }
-    public ICommand OpenReleaseNotesCommand { get; }
-    public ICommand CloseReleaseNotesCommand { get; }
-
-    public UpdateCoordinator(AppDataStore dataStore, UpdateService? updateService = null, ILogger<UpdateCoordinator>? logger = null)
-    {
-        this.dataStore = dataStore;
-        this.updateService = updateService ?? new UpdateService(logger: null, currentVersion: CurrentVersion);
-        this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<UpdateCoordinator>.Instance;
-        CheckCommand = new AsyncCommand(() => CheckNowAsync(true), () => !IsBusy);
-        DownloadCommand = new AsyncCommand(DownloadAndInstallAsync, () => CanDownload);
-        LaterCommand = new DelegateCommand(() => CardVisible = false);
-        OpenReleaseNotesCommand = new DelegateCommand(() => ReleaseNotesVisible = true);
-        CloseReleaseNotesCommand = new DelegateCommand(() => ReleaseNotesVisible = false);
-    }
+    public ICommand RetryCommand { get; }
+    public ICommand InstallAndRestartCommand { get; }
 
     public void Start()
     {
@@ -100,32 +126,56 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         timerTask = RunTimerAsync(lifetime.Token);
     }
 
-    public async Task<UpdateCheckResult?> CheckNowAsync(bool manual = false, CancellationToken cancellationToken = default)
+    public Task<UpdateCheckResult?> CheckNowAsync(bool manual = false, CancellationToken cancellationToken = default)
     {
-        if (Stage is UpdateStage.Downloading or UpdateStage.Verifying or UpdateStage.Installing) return null;
-        if (!await checkGate.WaitAsync(0, cancellationToken)) return null;
+        lock (checkSync)
+        {
+            if (checkTask is { IsCompleted: false }) return checkTask;
+            if (prepareTask is { IsCompleted: false } && release is not null)
+                return Task.FromResult<UpdateCheckResult?>(new UpdateCheckResult(CurrentVersion, release));
+            if (Stage == UpdateStage.Installing) return Task.FromResult<UpdateCheckResult?>(null);
+
+            checkTask = CheckCoreAsync(manual, cancellationToken);
+            return checkTask;
+        }
+    }
+
+    public void RefreshLocalizedText() => dispatch(() =>
+    {
+        var nextStatus = ResolveStatusText();
+        SetText(ref statusText, nextStatus, nameof(StatusText));
+        SetText(ref updateEntryText, ResolveEntryText(), nameof(UpdateEntryText));
+        OnPropertyChanged(nameof(TotalText));
+        OnPropertyChanged(nameof(ProgressText));
+        OnPropertyChanged(nameof(SpeedText));
+    });
+
+    private async Task<UpdateCheckResult?> CheckCoreAsync(bool manual, CancellationToken cancellationToken)
+    {
         try
         {
-            Stage = UpdateStage.Checking;
-            StatusText = "正在检查更新…";
-            ErrorMessage = string.Empty;
+            TransitionTo(UpdateStage.Checking);
             var settings = await dataStore.GetUpdateProxySettingsAsync(cancellationToken);
             var result = await updateService.CheckAsync(settings, cancellationToken);
-            release = result.Latest;
-            OnReleaseChanged();
-            if (release is null)
+            dispatch(() =>
             {
-                Stage = UpdateStage.Latest;
-                StatusText = "已是最新版本";
-                CardVisible = false;
+                release = result.Latest;
+                preparedUpdate = null;
+                OnReleaseChanged();
+            });
+
+            if (result.Latest is null)
+            {
+                SetDialogVisible(false);
+                TransitionTo(manual ? UpdateStage.Latest : UpdateStage.Idle);
             }
             else
             {
-                Stage = UpdateStage.Available;
-                StatusText = $"发现新版本 {LatestVersion}";
-                CardVisible = true;
+                SetDialogVisible(true);
+                _ = StartPreparation();
             }
-            logger.LogInformation("更新状态刷新完成 {Manual} {Stage} {LatestVersion}", manual, Stage, release?.Version ?? "无");
+
+            logger.LogInformation("更新检查完成 {Manual} {HasUpdate} {Version}", manual, result.IsAvailable, result.Latest?.Version ?? "无");
             return result;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -134,73 +184,204 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         }
         catch (Exception exception)
         {
-            Stage = UpdateStage.Error;
-            ErrorMessage = "检查更新失败，请稍后重试。";
-            StatusText = manual ? ErrorMessage : "更新检查失败";
-            logger.LogWarning(exception, "更新状态刷新失败 {Manual}", manual);
+            TransitionTo(UpdateStage.Error, UpdateErrorKind.Check, Loc("update.error.check", "检查更新失败，请稍后重试。"));
+            logger.LogWarning(exception, "更新检查失败 {Manual}", manual);
             return null;
         }
         finally
         {
-            checkGate.Release();
-            RaiseCommandStates();
+            lock (checkSync) checkTask = null;
         }
     }
 
-    private async Task DownloadAndInstallAsync()
+    private Task StartPreparation()
     {
-        if (release is null || !await downloadGate.WaitAsync(0)) return;
+        lock (prepareSync)
+        {
+            if (prepareTask is { IsCompleted: false }) return prepareTask;
+            if (release is null) return Task.CompletedTask;
+            prepareTask = PrepareCoreAsync(release, lifetime.Token);
+            return prepareTask;
+        }
+    }
+
+    private async Task PrepareCoreAsync(UpdateRelease targetRelease, CancellationToken cancellationToken)
+    {
         try
         {
-            Stage = UpdateStage.Downloading;
-            StatusText = "正在下载更新…";
-            ErrorMessage = string.Empty;
-            downloadedBytes = totalBytes = bytesPerSecond = 0;
-            OnPropertyChanged(nameof(DownloadedText));
-            OnPropertyChanged(nameof(TotalText));
-            OnPropertyChanged(nameof(ProgressText));
-            OnPropertyChanged(nameof(SpeedText));
-            var settings = await dataStore.GetUpdateProxySettingsAsync(lifetime.Token);
-            var progress = new Progress<UpdateDownloadProgress>(value =>
+            ResetProgress();
+            TransitionTo(UpdateStage.Downloading);
+            var settings = await dataStore.GetUpdateProxySettingsAsync(cancellationToken);
+            var progress = new InlineProgress<UpdateDownloadProgress>(ApplyProgress);
+            var result = await updateService.PrepareUpdateAsync(targetRelease, settings, progress, cancellationToken);
+            dispatch(() =>
             {
-                downloadedBytes = value.Transferred;
-                totalBytes = value.Total;
-                bytesPerSecond = value.BytesPerSecond;
-                DownloadPercent = value.Percent;
-                OnPropertyChanged(nameof(DownloadedText));
-                OnPropertyChanged(nameof(TotalText));
-                OnPropertyChanged(nameof(ProgressText));
-                OnPropertyChanged(nameof(SpeedText));
-                if (value.Percent >= 100 && Stage == UpdateStage.Downloading)
-                {
-                    Stage = UpdateStage.Verifying;
-                    StatusText = "正在校验更新包…";
-                }
+                preparedUpdate = result;
+                OnPropertyChanged(nameof(PreparedUpdate));
             });
-            await updateService.DownloadAndInstallAsync(release, settings, progress, lifetime.Token);
-            Stage = UpdateStage.Installing;
-            StatusText = "安装器已启动，应用即将重启…";
-            CardVisible = true;
-            logger.LogInformation("更新安装流程已启动 {Version}", release.Version);
+            TransitionTo(UpdateStage.Ready);
+            logger.LogInformation("更新包准备完成 {Version}", targetRelease.Version);
         }
-        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            Stage = UpdateStage.Error;
-            ErrorMessage = "更新已取消。";
-            StatusText = ErrorMessage;
+            if (!lifetime.IsCancellationRequested)
+                TransitionTo(UpdateStage.Error, UpdateErrorKind.Prepare, Loc("update.error.prepare", "更新准备已取消，请重试。"));
         }
         catch (Exception exception)
         {
-            Stage = UpdateStage.Error;
-            ErrorMessage = "下载或安装失败，请重试。";
-            StatusText = ErrorMessage;
-            logger.LogWarning(exception, "更新下载或安装失败 {Version}", release?.Version ?? "未知");
+            TransitionTo(UpdateStage.Error, UpdateErrorKind.Prepare, Loc("update.error.prepare", "更新包准备失败，请重试。"));
+            logger.LogWarning(exception, "更新包准备失败 {Version}", targetRelease.Version);
         }
         finally
         {
-            downloadGate.Release();
-            RaiseCommandStates();
+            lock (prepareSync) prepareTask = null;
         }
+    }
+
+    private void ApplyProgress(UpdateDownloadProgress value) => dispatch(() =>
+    {
+        downloadedBytes = value.Transferred;
+        totalBytes = value.Total;
+        bytesPerSecond = value.BytesPerSecond;
+        downloadPercent = value.Percent;
+        OnPropertyChanged(nameof(DownloadPercent));
+        OnPropertyChanged(nameof(DownloadedText));
+        OnPropertyChanged(nameof(TotalText));
+        OnPropertyChanged(nameof(ProgressText));
+        OnPropertyChanged(nameof(SpeedText));
+        TransitionTo(value.Phase == UpdatePreparationPhase.Verifying ? UpdateStage.Verifying : UpdateStage.Downloading);
+    });
+
+    private async Task RetryAsync()
+    {
+        if (!CanRetry) return;
+        if (ErrorKind == UpdateErrorKind.Check)
+        {
+            await CheckNowAsync(true, lifetime.Token);
+            return;
+        }
+
+        if (ErrorKind == UpdateErrorKind.Prepare) await StartPreparation();
+    }
+
+    private Task InstallAndRestartAsync()
+    {
+        var target = preparedUpdate;
+        if (Stage != UpdateStage.Ready || target is null || Interlocked.Exchange(ref installStarted, 1) != 0)
+            return Task.CompletedTask;
+
+        try
+        {
+            TransitionTo(UpdateStage.Installing);
+            updateService.LaunchInstaller(target);
+            requestApplicationExit();
+            logger.LogInformation("更新安装器已启动 {Version}", target.Version);
+        }
+        catch (Exception exception)
+        {
+            Interlocked.Exchange(ref installStarted, 0);
+            TransitionTo(UpdateStage.Ready, UpdateErrorKind.Install, Loc("update.error.install", "无法启动更新安装器，请重试。"));
+            logger.LogWarning(exception, "更新安装器启动失败 {Version}", target.Version);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private void ToggleDialog()
+    {
+        if (!IsUpdateEntryVisible) return;
+        SetDialogVisible(!IsDialogVisible);
+    }
+
+    private void SetDialogVisible(bool visible) => dispatch(() =>
+    {
+        if (SetProperty(ref isDialogVisible, visible, nameof(IsDialogVisible)))
+            logger.LogDebug("更新浮窗可见性变化 {Visible} {Stage}", visible, Stage);
+    });
+
+    private void TransitionTo(UpdateStage nextStage, UpdateErrorKind nextErrorKind = UpdateErrorKind.None, string? nextError = null) => dispatch(() =>
+    {
+        var previous = stage;
+        stage = nextStage;
+        errorKind = nextErrorKind;
+        errorMessage = nextError ?? string.Empty;
+        OnPropertyChanged(nameof(Stage));
+        OnPropertyChanged(nameof(ErrorKind));
+        OnPropertyChanged(nameof(ErrorMessage));
+        OnPropertyChanged(nameof(IsBusy));
+        OnPropertyChanged(nameof(IsUpdateEntryVisible));
+        OnPropertyChanged(nameof(IsProgressVisible));
+        OnPropertyChanged(nameof(IsProgressIndeterminate));
+        OnPropertyChanged(nameof(CanInstall));
+        OnPropertyChanged(nameof(CanRetry));
+        RefreshLocalizedText();
+        RaiseCommandStates();
+        logger.LogInformation("更新状态切换 {PreviousStage} {Stage} {ErrorKind} {Version}", previous, nextStage, nextErrorKind, release?.Version ?? "无");
+    });
+
+    private string ResolveStatusText()
+    {
+        if (!string.IsNullOrWhiteSpace(errorMessage)) return errorMessage;
+        return Stage switch
+        {
+            UpdateStage.Checking => Loc("update.status.checking", "正在检查更新…"),
+            UpdateStage.Downloading => Loc("update.status.downloading", "正在下载更新…"),
+            UpdateStage.Verifying => Loc("update.status.verifying", "正在校验更新包…"),
+            UpdateStage.Ready => Loc("update.status.ready", "更新已准备好"),
+            UpdateStage.Installing => Loc("update.status.installing", "安装器已启动，应用即将退出…"),
+            UpdateStage.Latest => Loc("update.status.latest", "已是最新版本"),
+            UpdateStage.Error => Loc("update.status.error", "更新失败"),
+            _ => Loc("update.status.idle", "尚未检查更新")
+        };
+    }
+
+    private string ResolveEntryText() => Stage switch
+    {
+        UpdateStage.Downloading => Loc("update.entry.downloading", "正在下载更新"),
+        UpdateStage.Verifying => Loc("update.entry.verifying", "正在校验更新"),
+        UpdateStage.Ready => string.Format(CultureInfo.CurrentCulture, Loc("update.entry.ready", "{0} 已准备好"), LatestVersion),
+        UpdateStage.Error when Release is not null => Loc("update.entry.error", "更新需要处理"),
+        _ => string.Empty
+    };
+
+    private string Loc(string key, string fallback)
+    {
+        var value = localizer[key];
+        return value.ResourceNotFound || string.Equals(value.Value, key, StringComparison.Ordinal) ? fallback : value.Value;
+    }
+
+    private void ResetProgress() => dispatch(() =>
+    {
+        downloadedBytes = 0;
+        totalBytes = 0;
+        bytesPerSecond = 0;
+        downloadPercent = 0;
+        OnPropertyChanged(nameof(DownloadPercent));
+        OnPropertyChanged(nameof(DownloadedText));
+        OnPropertyChanged(nameof(TotalText));
+        OnPropertyChanged(nameof(ProgressText));
+        OnPropertyChanged(nameof(SpeedText));
+    });
+
+    private void OnReleaseChanged()
+    {
+        OnPropertyChanged(nameof(Release));
+        OnPropertyChanged(nameof(PreparedUpdate));
+        OnPropertyChanged(nameof(HasUpdate));
+        OnPropertyChanged(nameof(LatestVersion));
+        OnPropertyChanged(nameof(VersionComparison));
+        OnPropertyChanged(nameof(ReleaseTitle));
+        OnPropertyChanged(nameof(ReleaseUrl));
+        OnPropertyChanged(nameof(IsUpdateEntryVisible));
+        OnPropertyChanged(nameof(CanInstall));
+        OnPropertyChanged(nameof(CanRetry));
+    }
+
+    private void RaiseCommandStates()
+    {
+        (CheckCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+        (RetryCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+        (InstallAndRestartCommand as AsyncCommand)?.RaiseCanExecuteChanged();
     }
 
     private async Task RunTimerAsync(CancellationToken cancellationToken)
@@ -208,46 +389,31 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         try
         {
             await dataStore.InitializeAsync(cancellationToken);
-            if (dataStore.Settings?.AutoCheckUpdates == true)
-                await CheckNowAsync(false, cancellationToken);
+            if (dataStore.Settings?.AutoCheckUpdates == true) await CheckNowAsync(false, cancellationToken);
 
             using var timer = new PeriodicTimer(CheckInterval);
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
-                if (dataStore.Settings?.AutoCheckUpdates == true)
-                    await CheckNowAsync(false, cancellationToken);
+                if (dataStore.Settings?.AutoCheckUpdates == true) await CheckNowAsync(false, cancellationToken);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         catch (Exception exception) { logger.LogWarning(exception, "更新定时检查循环失败"); }
     }
 
-    private void OnReleaseChanged()
+    private void OnCultureChanged(object? sender, CultureInfo culture) => RefreshLocalizedText();
+
+    private static void DispatchToUiThread(Action action)
     {
-        OnPropertyChanged(nameof(Release));
-        OnPropertyChanged(nameof(HasUpdate));
-        OnPropertyChanged(nameof(LatestVersion));
-        OnPropertyChanged(nameof(VersionComparison));
-        OnPropertyChanged(nameof(ReleaseTitle));
-        OnPropertyChanged(nameof(ReleaseUrl));
-        OnPropertyChanged(nameof(ReleaseNotes));
-        OnPropertyChanged(nameof(CanDownload));
-        OnPropertyChanged(nameof(CanRetry));
+        if (Dispatcher.UIThread.CheckAccess()) action();
+        else Dispatcher.UIThread.InvokeAsync(action).GetAwaiter().GetResult();
     }
 
-    private void RaiseCommandStates()
+    private void SetText(ref string field, string value, string propertyName)
     {
-        (CheckCommand as AsyncCommand)?.RaiseCanExecuteChanged();
-        (DownloadCommand as AsyncCommand)?.RaiseCanExecuteChanged();
-    }
-
-    private static string SanitizeMarkdown(string? markdown)
-    {
-        if (string.IsNullOrWhiteSpace(markdown)) return "暂无更新说明。";
-        var text = Regex.Replace(markdown, @"<[^>]*>", string.Empty);
-        text = Regex.Replace(text, @"\[([^\]]+)\]\([^\)]+\)", "$1");
-        text = Regex.Replace(text, @"^\s*#{1,6}\s*", string.Empty, RegexOptions.Multiline);
-        return text.Trim();
+        if (string.Equals(field, value, StringComparison.Ordinal)) return;
+        field = value;
+        OnPropertyChanged(propertyName);
     }
 
     private static string FormatBytes(long bytes)
@@ -262,10 +428,16 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
 
     public void Dispose()
     {
+        if (disposed) return;
+        disposed = true;
+        LocaleService.CultureChanged -= OnCultureChanged;
         lifetime.Cancel();
         try { timerTask?.Wait(TimeSpan.FromSeconds(1)); } catch { }
         lifetime.Dispose();
-        checkGate.Dispose();
-        downloadGate.Dispose();
+    }
+
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
     }
 }
