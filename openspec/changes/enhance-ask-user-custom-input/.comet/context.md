@@ -1,0 +1,222 @@
+# Comet Design Handoff
+
+- Change: enhance-ask-user-custom-input
+- Phase: design
+- Mode: compact
+- Context hash: 11e5b298b8219a9de602f7673285b483fbd812ba61eaa1dae7fbce6e51a24d69
+
+Generated-by: comet-handoff.sh
+
+OpenSpec remains the canonical capability spec. This handoff is a deterministic, source-traceable context pack, not an agent-authored summary.
+
+## openspec/changes/enhance-ask-user-custom-input/proposal.md
+
+- Source: openspec/changes/enhance-ask-user-custom-input/proposal.md
+- Lines: 1-30
+- SHA256: d0e413a247161028ec511d7ecd3bca046ca7bc207bdc6ad17e5ac930d48f083a
+
+```md
+## Why
+
+AskUser 的选择题只能返回预设 option id，用户遇到所有选项均不符合意图时无法直接补充真实想法；同时自由文本字段当前只向 AI 返回 `provided=true`，实际内容被丢弃，导致 AskUser 无法完成有效澄清。
+
+## What Changes
+
+- 为 `single_select` 与 `multi_select` 字段增加可选的自由输入能力，并允许调用方提供输入框占位提示。
+- 在选择题选项下方以“我有其他想法...”作为默认占位提示展示输入框；自由输入与预设选项互斥。
+- 必填选择题可以由有效预设选项或非空自由输入任一满足。
+- AskUser 结果新增 `custom_inputs` 映射，按字段 id 向 AI 返回选择题的自由输入原文，同时保留 `values` 中既有选择结果结构。
+- 自由文本字段直接返回用户实际输入字符串，不再仅返回 `{ "provided": true }`。
+- 补充 Schema、解析、校验、ViewModel、Avalonia 视图和工具结果的回归测试。
+
+## Capabilities
+
+### New Capabilities
+
+- 无。
+
+### Modified Capabilities
+
+- `assistant-user-decisions`: 扩展选择题自由输入、必填校验与 AskUser 结果回传契约。
+
+## Impact
+
+- 公开接口：`assistant.ask_user` 参数 Schema 和工具结果 JSON 契约。
+- 数据模型与校验：`UserDecisionField`、`UserDecisionResult`、`UserDecisionValidator`。
+- 桌面交互：AskUser 字段 ViewModel、悬浮卡片选择题模板及键盘/选择互斥行为。
+- 测试：AssistantTools、UserDecision、AskUser ViewModel 与视图契约测试。
+- 不引入新依赖，不修改数据库 Schema，不记录用户输入到日志。
+
+```
+
+## openspec/changes/enhance-ask-user-custom-input/design.md
+
+- Source: openspec/changes/enhance-ask-user-custom-input/design.md
+- Lines: 1-69
+- SHA256: b5759c3196dbc0e8fc25587a4428578e699964309941cfe79204e025c03ffd71
+
+```md
+## Context
+
+当前 AskUser 请求模型把单选、多选、数字和文本统一表示为 `UserDecisionField`，提交时仅传递字段值字典。选择字段没有承载自由输入的状态，文本结果又在工具序列化阶段被转换为存在性标记。此次变更需要贯穿请求 Schema、领域校验、Broker 提交结果、卡片 ViewModel 和 Avalonia 模板，同时保持未启用自由输入的选择字段兼容。需求契约见 `specs/assistant-user-decisions/spec.md`。
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- 让单选和多选字段按需启用与选项互斥的自由输入。
+- 保留 `values` 中既有 option id / option id 数组结构，通过独立 `custom_inputs` 返回自由输入。
+- 让文本字段向 AI 返回实际内容，并确保内容不进入日志。
+- 使用现有 ViewModel、Validator、Broker 和资源本地化模式完成最小扩展。
+
+**Non-Goals:**
+
+- 不允许自由输入与预设选项同时提交。
+- 不新增富文本、附件、多个自由输入项或持久化草稿。
+- 不改变数字字段，也不改变未启用自由输入的选择题行为。
+- 不把用户输入写入日志、Toast、会话标题或诊断摘要。
+
+## Decisions
+
+### 1. 在选择字段契约上增加显式开关和占位提示
+
+`UserDecisionField` 与工具 Schema 增加 `allow_custom_input` 和 `custom_input_placeholder`。开关默认 false；占位提示仅在开关启用时生效。长度限制复用字段已有 `max_length`：未指定时使用现有默认值 1000，最大 4000，避免再引入一组重复限制属性。默认占位提示通过本地化资源提供，中文为“我有其他想法...”。
+
+备选方案是在每个选项列表中自动插入一个伪造的“其他” option。该方案会污染 option id、要求调用方识别特殊值，并无法自然承载用户原文，因此不采用。
+
+### 2. ViewModel 分别保存结构化选择和自由输入
+
+单选、多选字段 ViewModel 增加 `CustomInput`、`AllowsCustomInput`、`CustomInputPlaceholder` 和可见性状态。自由输入变为非空时清除现有选择；用户选择任一预设项时清空自由输入。清空/跳过操作同时清除两种状态。单选自动前进只由预设 RadioButton 点击触发，自由输入不会自动前进，避免用户尚未完成表达就切换题目。
+
+备选方案是允许选择与文字共存。该方案会让必填、最少选择数和 AI 解释优先级变得含糊，也不符合“所有选项均不符合时输入其他想法”的目标，因此采用互斥模型。
+
+### 3. 校验同时接收 values 与 customInputs
+
+提交校验在既有字段值字典之外接收只包含非空文本的 `customInputs` 字典。选择字段启用自由输入时，非空且长度合法的自由输入可以替代选项满足 `is_required` 和 `min_selections`；`max_selections` 仍只约束 option id。未启用自由输入的字段如果出现对应 custom input，校验应拒绝，防止绕过请求契约。
+
+字段请求校验负责限制占位提示和 `max_length` 的适用范围，并继续使用敏感字段模式检查展示文本；用户实际答案只做长度与空白校验，不把内容写入错误消息。
+
+### 4. Broker 结果显式携带两类数据
+
+扩展提交链路和 `UserDecisionResult`，同时保存只读的 `Values` 与 `CustomInputs`。Broker 在完成请求前复制并校验两个字典，维持现有并发、Claim 和取消语义。AskUser ViewModel 构造两个结果映射：选择自由输入时，单选值为 null、多选值为空数组，原文放入 `CustomInputs`。
+
+备选方案是把自由输入伪装成 `values` 中的特殊对象。该方案会破坏现有值类型约定并迫使所有消费者解析联合类型，因此采用独立映射。
+
+### 5. 工具结果保持向后兼容并修复文本丢失
+
+`SerializeResult` 不再特殊隐藏 text 字段，统一把 `Values` 序列化为实际值，并新增 `custom_inputs` 对象。该对象只包含实际提交自由输入的字段；未使用时返回空对象。`SafeArgumentsProjector` 仍只输出字段类型、必填状态和选项数量等安全摘要，不投影默认文本、占位提示或用户答案。
+
+### 6. UI 使用本地化默认提示并遵循现有卡片视觉
+
+在单选和多选 DataTemplate 的选项列表下方复用现有 TextBox 风格，不增加“其他（可选）”标签。输入框仅通过占位提示传达用途；默认资源在各 Locale 中提供自然语言等价文案。输入内容参与现有 Continue / Submit 校验和 Previous / Next 值保留。
+
+## Risks / Trade-offs
+
+- [工具结果开始包含用户实际文本，模型上下文敏感度提高] → 仅把内容返回发起 AskUser 的当前工具调用；日志、SafeArguments、Toast 和诊断信息继续只使用安全摘要。
+- [Broker 接口扩展影响测试替身和调用点] → 保持单一提交入口并更新全部实现/替身，使用编译错误和定向测试覆盖遗漏。
+- [输入文字与选项互斥可能因双向绑定产生递归通知] → 在选择字段 ViewModel 内使用现有更新保护标记，集中执行状态切换并用单元测试覆盖。
+- [默认占位提示在不同语言中长度不同] → 使用资源本地化和 TextBox watermark，不为提示预留固定宽度。
+
+## Migration Plan
+
+1. 先扩展模型、Schema 和校验，保留 `allow_custom_input=false` 默认值。
+2. 再扩展 Broker 结果和工具序列化；现有请求无需修改即可继续工作。
+3. 最后接入卡片 ViewModel、Avalonia 模板和本地化资源。
+4. 通过定向测试、完整测试、Release 构建和桌面验收后发布新的时间戳输出目录。
+
+回滚时可整体恢复本 change；数据库和持久化格式未变化，无需数据迁移。
+
+```
+
+## openspec/changes/enhance-ask-user-custom-input/tasks.md
+
+- Source: openspec/changes/enhance-ask-user-custom-input/tasks.md
+- Lines: 1-22
+- SHA256: 91f9c171b1aeb7fdf506162392b269fff52dec1f2e42efe8cf2d0feb30a11c6c
+
+```md
+## 1. 请求契约与领域模型
+
+- [ ] 1.1 先为 `allow_custom_input`、`custom_input_placeholder`、选择字段 `max_length` 适用范围和非法组合补充失败测试，并运行 `UserDecisionModelsTests` 与 `AssistantToolsTests` 确认因能力缺失而失败
+- [ ] 1.2 扩展 `UserDecisionField`、AskUser JSON Schema、参数解析和请求校验，并运行上述定向测试确认通过
+
+## 2. 提交校验与工具结果
+
+- [ ] 2.1 先为必填选择题自由输入、空白/超长输入、未授权自由输入和 `UserDecisionResult.CustomInputs` 补充失败测试，并运行定向测试确认预期失败
+- [ ] 2.2 扩展提交校验、Broker 提交接口和结果快照，使 `Values` 与 `CustomInputs` 独立复制与校验，并运行 Broker/模型测试确认通过
+- [ ] 2.3 先更新工具结果测试要求 text 返回实际字符串且根对象包含 `custom_inputs`，确认失败后修改序列化实现，并运行 `AssistantToolsTests`、`AssistantServiceTests` 确认通过
+
+## 3. 卡片交互与本地化
+
+- [ ] 3.1 先为单选/多选自由输入的状态保留、选项互斥、跳过清空、必填替代校验及单选不自动前进补充失败测试，并运行 AskUser ViewModel/视图契约测试确认失败
+- [ ] 3.2 扩展选择字段 ViewModel 和 `AskUserCard` 模板，在选项下方展示无额外标签的输入框，使用本地化默认提示“我有其他想法...”，并运行定向测试确认通过
+- [ ] 3.3 补齐所有 Locale 资源和源码契约检查，运行 `AskUserDialogContractTests`、`AssistantViewStyleTests` 确认输入框显示条件、watermark 与现有卡片布局兼容
+
+## 4. 集成验证与交付
+
+- [ ] 4.1 运行 AskUser、UserDecision、AssistantTools、AssistantService 和 AssistantViewModel 相关测试，确认选择结果兼容、实际文本回传和日志安全边界
+- [ ] 4.2 运行 `openspec validate enhance-ask-user-custom-input --strict`、完整测试和 Release 构建，确认无失败、无编译错误
+- [ ] 4.3 发布桌面端到 `outputs/2026-09-20-<time>-ask-user-custom-input`，使用 `cua-driver` 验证单选、多选自由输入、互斥行为、默认提示和提交后的 AI 可见结果
+
+```
+
+## openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md
+
+- Source: openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md
+- Lines: 1-51
+- SHA256: 48dc949410eebe9faab68cafb759d09cfd036c966ac719de18a2747667fde13d
+
+```md
+## ADDED Requirements
+
+### Requirement: AskUser 选择字段必须支持可选自由输入
+系统 SHALL 允许 `single_select` 和 `multi_select` 字段通过 `allow_custom_input` 启用自由输入，并 SHALL 允许调用方通过 `custom_input_placeholder` 自定义占位提示。未提供占位提示时，桌面端 SHALL 使用“我有其他想法...”作为默认提示。自由输入与预设选项 SHALL 互斥，且未启用该能力的选择字段 SHALL 保持现有交互和结果结构。
+
+#### Scenario: 选择字段展示自由输入框
+- **WHEN** 单选或多选字段设置 `allow_custom_input=true`
+- **THEN** 桌面端在选项列表下方展示自由输入框，并使用调用方指定的占位提示或默认的“我有其他想法...”
+
+#### Scenario: 未启用时保持原有界面
+- **WHEN** 选择字段未设置 `allow_custom_input` 或其值为 false
+- **THEN** 桌面端不展示自由输入框，字段继续只接受预设选项
+
+#### Scenario: 输入自由内容清除已有选择
+- **WHEN** 用户在选择字段的自由输入框中输入非空内容
+- **THEN** 系统清除该字段已选中的单选或多选 option id，并保留用户输入原文
+
+#### Scenario: 重新选择选项清空自由输入
+- **WHEN** 用户已输入自由内容后重新选择任一预设选项
+- **THEN** 系统清空该字段的自由输入，并按既有单选或多选规则保存 option id
+
+#### Scenario: 自由输入满足必填选择题
+- **WHEN** 必填选择字段没有有效预设选项但包含非空自由输入
+- **THEN** 字段校验通过；多选字段的 `min_selections` 约束不阻止该自由输入作为替代答案提交
+
+#### Scenario: 空白自由输入不满足校验
+- **WHEN** 必填选择字段仅包含空白自由输入且没有有效预设选项
+- **THEN** 系统按缺少有效值处理并显示安全校验摘要
+
+### Requirement: AskUser 必须把用户输入原文返回给助手
+系统 SHALL 在 AskUser 成功提交时把文本字段的实际字符串写入 `values`，不得仅返回输入存在性标记。选择字段使用自由输入时，系统 SHALL 在结果根对象的 `custom_inputs` 映射中按字段 id 返回用户原文，同时在 `values` 中保留该选择字段现有类型对应的空值。系统 MUST NOT 因返回原文而把用户输入记录到运行日志。
+
+#### Scenario: 文本字段返回实际内容
+- **WHEN** 用户在文本字段输入内容并提交 AskUser
+- **THEN** 工具结果的 `values` 对应字段包含实际字符串，而不是 `{ "provided": true }`
+
+#### Scenario: 单选自由输入返回实际内容
+- **WHEN** 用户使用单选字段的自由输入提交答案
+- **THEN** `values` 中该字段为 null，`custom_inputs` 中同名字段包含用户输入原文
+
+#### Scenario: 多选自由输入返回实际内容
+- **WHEN** 用户使用多选字段的自由输入提交答案
+- **THEN** `values` 中该字段为空数组，`custom_inputs` 中同名字段包含用户输入原文
+
+#### Scenario: 预设选择保持兼容
+- **WHEN** 用户使用预设 option 完成选择字段且没有自由输入
+- **THEN** `values` 继续返回现有的 option id 或 option id 数组，`custom_inputs` 不包含该字段
+
+#### Scenario: 用户输入不进入日志
+- **WHEN** AskUser 解析、校验、提交或序列化包含文本或选择题自由输入的结果
+- **THEN** 运行日志只记录安全摘要，不记录用户输入原文
+
+```
