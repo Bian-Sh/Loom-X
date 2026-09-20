@@ -298,7 +298,7 @@ public sealed class AskUserDialogContractTests
         Assert.DoesNotContain("Background=\"#", source, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Content=\"{Binding CurrentField}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ItemsSource=\"{Binding Fields}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding CurrentField.Label}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding CurrentField.Label}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding StepText}\"", source, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"PreviousButton\"", source, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"NextButton\"", source, StringComparison.Ordinal);
@@ -327,6 +327,9 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("Description", source, StringComparison.Ordinal);
         Assert.Contains("ImpactSummary", source, StringComparison.Ordinal);
         Assert.Contains("ErrorSummary", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding Title}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding CurrentField.Label}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{Binding CurrentField.RequiredSuffix}\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -342,6 +345,17 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("MaxLines=\"2\"", source, StringComparison.Ordinal);
         Assert.Contains("TextTrimming=\"CharacterEllipsis\"", source, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void CardXaml_底部按钮组进一步压缩()
+    {
+        var source = ReadDesktopFile("Views", "AskUserCard.axaml");
+
+        Assert.Contains("MinHeight\" Value=\"28\"", source, StringComparison.Ordinal);
+        Assert.Contains("Padding\" Value=\"8,2\"", source, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"16,6,16,8\"", source, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void CardCodeBehind_接通右上角取消输入与其余交互()
     {
