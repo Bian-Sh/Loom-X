@@ -11,6 +11,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 - 自由文本字段直接返回用户实际输入字符串，不再仅返回 `{ "provided": true }`。
 - 补充 Schema、解析、校验、ViewModel、Avalonia 视图和工具结果的回归测试。
 - 明确 assistant.ask_user 的模型可见建模规则：每个字段独立分页；选择题同页输入必须使用同一字段的 allow_custom_input，不得拆成独立 text 字段。
+- 修复 AskUser 取消后的生命周期：保留 cancelled=true 供助手总结，并在当前轮次屏蔽后续重复 AskUser 调用，避免卡片重新弹出。
 
 ## Capabilities
 
@@ -28,4 +29,5 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 - 数据模型与校验：`UserDecisionField`、`UserDecisionResult`、`UserDecisionValidator`。
 - 桌面交互：AskUser 字段 ViewModel、悬浮卡片选择题模板及键盘/选择互斥行为。
 - 测试：AssistantTools、UserDecision、AskUser ViewModel 与视图契约测试。
+- Agent 循环：AskUser 取消后本轮移除工具可见性，并对模型的重复调用复用取消结果。
 - 不引入新依赖，不修改数据库 Schema，不记录用户输入到日志。

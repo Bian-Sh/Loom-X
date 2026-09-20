@@ -23,3 +23,4 @@
 ## 5. 模型调用契约与同页建模回归
 
 - [x] 5.1 为工具描述、Schema description 和系统提示补充“字段独立分页、选择题同页输入使用 allow_custom_input、字数写入同一字段 max_length、不得新增 text 字段”的失败测试与实现，并运行定向测试确认通过 <!-- comet-task:askuser-5-1 -->
+- [x] 5.2 为右上角取消后卡片重弹补充 AgentLoop 失败测试；取消后本轮移除 AskUser 工具，并对模型重复调用复用 `cancelled=true`，确认不再进入 Handler/Broker/UI 且助手仍可生成取消摘要 <!-- comet-task:askuser-5-2 -->

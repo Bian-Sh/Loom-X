@@ -70,3 +70,11 @@
 4. 通过定向测试、完整测试、Release 构建和桌面验收后发布新的时间戳输出目录。
 
 回滚时可整体恢复本 change；数据库和持久化格式未变化，无需数据迁移。
+
+### 8. AskUser 取消后在当前 AgentLoop 内禁用重复面板
+
+卡片关闭按钮现有链路已能通过 `AskUserDialogViewModel.TryCancel`、`AssistantViewModel.CancelOwnedUserDecision` 和 `UserDecisionBroker.Cancel` 生成 `cancelled=true`。缺陷发生在结果返回后：AgentLoop 把取消结果当作普通成功工具结果，并在下一次模型请求中继续公开 `assistant.ask_user`，模型因此可以重新调用并产生第二张卡片。
+
+AgentLoop 在检测到成功的 AskUser 取消结果后，按工具名保存该结构化结果，并在本轮后续模型请求的工具列表中移除 `assistant.ask_user`。若上游模型忽略工具列表仍生成重复调用，AgentLoop 直接复用已保存的取消结果，不执行 Handler、不进入 Broker、不再次展示 UI。会话本身不立即终止，模型仍可读取 `cancelled=true` 并生成最终取消摘要。禁用状态只存在于单次 `RunAsync`，下一轮用户消息仍可正常使用 AskUser。
+
+该方案比直接取消整个 Assistant 轮次更符合既有“助手收到结构化取消结果并恢复原流程”的契约；同时比仅增加提示词更可靠，因为重复调用在运行时边界被确定性拦截。

@@ -3,7 +3,7 @@
 - Change: enhance-ask-user-custom-input
 - Phase: design
 - Mode: compact
-- Context hash: 71a12c63a17e96ee34a088e7214af051e537cc0a3f6f5ccd8a4079754ae63452
+- Context hash: 588e003ceb713032f2e6d374a9f9c01cc3e229bb65b8e66553fadeac2ac20b92
 
 Generated-by: comet-handoff.sh
 Task hash policy: task-content-v1. Read tasks.md for live completion; excerpts are design-time context.
@@ -13,8 +13,8 @@ OpenSpec remains the canonical capability spec. This handoff is a deterministic,
 ## openspec/changes/enhance-ask-user-custom-input/proposal.md
 
 - Source: openspec/changes/enhance-ask-user-custom-input/proposal.md
-- Lines: 1-31
-- SHA256: 149afade08809ea0ac585d1b4a407d58efcf023bd2091d45480f1146814787b5
+- Lines: 1-33
+- SHA256: ec87a6a3e711ad518e1ed2af59aebc724d7855e899b0053289d4f6e56224d46c
 
 ```md
 ## Why
@@ -30,6 +30,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 - 自由文本字段直接返回用户实际输入字符串，不再仅返回 `{ "provided": true }`。
 - 补充 Schema、解析、校验、ViewModel、Avalonia 视图和工具结果的回归测试。
 - 明确 assistant.ask_user 的模型可见建模规则：每个字段独立分页；选择题同页输入必须使用同一字段的 allow_custom_input，不得拆成独立 text 字段。
+- 修复 AskUser 取消后的生命周期：保留 cancelled=true 供助手总结，并在当前轮次屏蔽后续重复 AskUser 调用，避免卡片重新弹出。
 
 ## Capabilities
 
@@ -47,6 +48,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 - 数据模型与校验：`UserDecisionField`、`UserDecisionResult`、`UserDecisionValidator`。
 - 桌面交互：AskUser 字段 ViewModel、悬浮卡片选择题模板及键盘/选择互斥行为。
 - 测试：AssistantTools、UserDecision、AskUser ViewModel 与视图契约测试。
+- Agent 循环：AskUser 取消后本轮移除工具可见性，并对模型的重复调用复用取消结果。
 - 不引入新依赖，不修改数据库 Schema，不记录用户输入到日志。
 
 ```
@@ -54,8 +56,8 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 ## openspec/changes/enhance-ask-user-custom-input/design.md
 
 - Source: openspec/changes/enhance-ask-user-custom-input/design.md
-- Lines: 1-72
-- SHA256: 9ccabbc34ca6d5debb08a0c44be17001582de1729439d8402e62ddeeeb3e95c9
+- Lines: 1-80
+- SHA256: 86477960a55dbde50dc03a3ea9d2c78706d8f73565bf14ab0af8549a35e2f32a
 
 ```md
 ## Context
@@ -131,13 +133,21 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 
 回滚时可整体恢复本 change；数据库和持久化格式未变化，无需数据迁移。
 
+### 8. AskUser 取消后在当前 AgentLoop 内禁用重复面板
+
+卡片关闭按钮现有链路已能通过 `AskUserDialogViewModel.TryCancel`、`AssistantViewModel.CancelOwnedUserDecision` 和 `UserDecisionBroker.Cancel` 生成 `cancelled=true`。缺陷发生在结果返回后：AgentLoop 把取消结果当作普通成功工具结果，并在下一次模型请求中继续公开 `assistant.ask_user`，模型因此可以重新调用并产生第二张卡片。
+
+AgentLoop 在检测到成功的 AskUser 取消结果后，按工具名保存该结构化结果，并在本轮后续模型请求的工具列表中移除 `assistant.ask_user`。若上游模型忽略工具列表仍生成重复调用，AgentLoop 直接复用已保存的取消结果，不执行 Handler、不进入 Broker、不再次展示 UI。会话本身不立即终止，模型仍可读取 `cancelled=true` 并生成最终取消摘要。禁用状态只存在于单次 `RunAsync`，下一轮用户消息仍可正常使用 AskUser。
+
+该方案比直接取消整个 Assistant 轮次更符合既有“助手收到结构化取消结果并恢复原流程”的契约；同时比仅增加提示词更可靠，因为重复调用在运行时边界被确定性拦截。
+
 ```
 
 ## openspec/changes/enhance-ask-user-custom-input/tasks.md
 
 - Source: openspec/changes/enhance-ask-user-custom-input/tasks.md
-- Lines: 1-25
-- SHA256: f0d9d3954140db6888619a9a475cb17d44efcdf1afa3c867cbf4c69950110544
+- Lines: 1-26
+- SHA256: 600ea38ab595b8aff8fc70f4fa1b10193e1918bb1388d90eb396c2f3344eb612
 
 ```md
 ## 1. 请求契约与领域模型
@@ -165,6 +175,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 ## 5. 模型调用契约与同页建模回归
 
 - [x] 5.1 为工具描述、Schema description 和系统提示补充“字段独立分页、选择题同页输入使用 allow_custom_input、字数写入同一字段 max_length、不得新增 text 字段”的失败测试与实现，并运行定向测试确认通过 <!-- comet-task:askuser-5-1 -->
+- [x] 5.2 为右上角取消后卡片重弹补充 AgentLoop 失败测试；取消后本轮移除 AskUser 工具，并对模型重复调用复用 `cancelled=true`，确认不再进入 Handler/Broker/UI 且助手仍可生成取消摘要 <!-- comet-task:askuser-5-2 -->
 
 ```
 
@@ -183,8 +194,8 @@ created: 2026-09-21
 ## openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md
 
 - Source: openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md
-- Lines: 1-55
-- SHA256: 9f4f31b6375291612809a833ced455397590539702a70d4c7edd19dde3f76e42
+- Lines: 1-70
+- SHA256: c516680d8115a77757a13b051cd09ce300bb90d27a93ca9bcf4bcef4d8474e19
 
 ```md
 ## ADDED Requirements
@@ -242,5 +253,20 @@ created: 2026-09-21
 #### Scenario: 用户输入不进入日志
 - **WHEN** AskUser 解析、校验、提交或序列化包含文本或选择题自由输入的结果
 - **THEN** 运行日志只记录安全摘要，不记录用户输入原文
+
+### Requirement: AskUser 取消必须在当前助手轮次内保持终态
+系统 SHALL 在用户取消 AskUser 后向助手返回 `cancelled=true`、空 `values` 和空 `custom_inputs`。当前 AgentLoop SHALL 继续允许模型生成取消摘要，但在该轮剩余步骤中不得再次展示 AskUser；即使模型仍发出重复的 `assistant.ask_user` 调用，也 SHALL 复用原取消结果而不重新进入 Broker 或 UI。
+
+#### Scenario: 点击卡片关闭按钮后不再弹出
+- **WHEN** 请求允许取消且用户点击 AskUser 卡片右上角关闭按钮
+- **THEN** 当前请求完成为 `cancelled=true`，卡片关闭，并且当前助手轮次内后续模型步骤不再获得或执行新的 AskUser 面板调用
+
+#### Scenario: 模型在取消后重复调用 AskUser
+- **WHEN** 模型已经收到 `cancelled=true` 后仍生成新的 `assistant.ask_user` 工具调用
+- **THEN** AgentLoop 不再次调用 AskUser Handler、不发布新的 Pending 请求，而是向模型复用原结构化取消结果
+
+#### Scenario: 取消后助手可以准确总结
+- **WHEN** AskUser 取消结果已进入会话工具消息
+- **THEN** AgentLoop 继续一次正常模型处理流程，使助手可以基于 `cancelled=true` 输出取消摘要，而不是把后续提交误写为 `cancelled=false`
 
 ```

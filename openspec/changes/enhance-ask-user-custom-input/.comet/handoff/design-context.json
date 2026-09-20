@@ -5,12 +5,12 @@
   "canonical_spec": "openspec",
   "task_hash_policy": "task-content-v1",
   "generated_by": "comet-handoff.sh",
-  "context_hash": "71a12c63a17e96ee34a088e7214af051e537cc0a3f6f5ccd8a4079754ae63452",
+  "context_hash": "588e003ceb713032f2e6d374a9f9c01cc3e229bb65b8e66553fadeac2ac20b92",
   "files": [
-    { "path": "openspec/changes/enhance-ask-user-custom-input/proposal.md", "sha256": "149afade08809ea0ac585d1b4a407d58efcf023bd2091d45480f1146814787b5" },
-    { "path": "openspec/changes/enhance-ask-user-custom-input/design.md", "sha256": "9ccabbc34ca6d5debb08a0c44be17001582de1729439d8402e62ddeeeb3e95c9" },
-    { "path": "openspec/changes/enhance-ask-user-custom-input/tasks.md", "sha256": "f0d9d3954140db6888619a9a475cb17d44efcdf1afa3c867cbf4c69950110544" },
+    { "path": "openspec/changes/enhance-ask-user-custom-input/proposal.md", "sha256": "ec87a6a3e711ad518e1ed2af59aebc724d7855e899b0053289d4f6e56224d46c" },
+    { "path": "openspec/changes/enhance-ask-user-custom-input/design.md", "sha256": "86477960a55dbde50dc03a3ea9d2c78706d8f73565bf14ab0af8549a35e2f32a" },
+    { "path": "openspec/changes/enhance-ask-user-custom-input/tasks.md", "sha256": "600ea38ab595b8aff8fc70f4fa1b10193e1918bb1388d90eb396c2f3344eb612" },
     { "path": "openspec/changes/enhance-ask-user-custom-input/.openspec.yaml", "sha256": "38b9a21742cd7082f58c6fd05e35c7787002fc92efecda464d1d11ad04b8cc65" },
-    { "path": "openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md", "sha256": "9f4f31b6375291612809a833ced455397590539702a70d4c7edd19dde3f76e42" }
+    { "path": "openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md", "sha256": "c516680d8115a77757a13b051cd09ce300bb90d27a93ca9bcf4bcef4d8474e19" }
   ]
 }

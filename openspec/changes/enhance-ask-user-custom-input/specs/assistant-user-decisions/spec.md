@@ -53,3 +53,18 @@
 #### Scenario: 用户输入不进入日志
 - **WHEN** AskUser 解析、校验、提交或序列化包含文本或选择题自由输入的结果
 - **THEN** 运行日志只记录安全摘要，不记录用户输入原文
+
+### Requirement: AskUser 取消必须在当前助手轮次内保持终态
+系统 SHALL 在用户取消 AskUser 后向助手返回 `cancelled=true`、空 `values` 和空 `custom_inputs`。当前 AgentLoop SHALL 继续允许模型生成取消摘要，但在该轮剩余步骤中不得再次展示 AskUser；即使模型仍发出重复的 `assistant.ask_user` 调用，也 SHALL 复用原取消结果而不重新进入 Broker 或 UI。
+
+#### Scenario: 点击卡片关闭按钮后不再弹出
+- **WHEN** 请求允许取消且用户点击 AskUser 卡片右上角关闭按钮
+- **THEN** 当前请求完成为 `cancelled=true`，卡片关闭，并且当前助手轮次内后续模型步骤不再获得或执行新的 AskUser 面板调用
+
+#### Scenario: 模型在取消后重复调用 AskUser
+- **WHEN** 模型已经收到 `cancelled=true` 后仍生成新的 `assistant.ask_user` 工具调用
+- **THEN** AgentLoop 不再次调用 AskUser Handler、不发布新的 Pending 请求，而是向模型复用原结构化取消结果
+
+#### Scenario: 取消后助手可以准确总结
+- **WHEN** AskUser 取消结果已进入会话工具消息
+- **THEN** AgentLoop 继续一次正常模型处理流程，使助手可以基于 `cancelled=true` 输出取消摘要，而不是把后续提交误写为 `cancelled=false`

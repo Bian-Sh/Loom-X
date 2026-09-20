@@ -647,3 +647,8 @@ git commit -m "完成 AskUser 自由输入验证与交付"
 **Step 9：补充模型可见的同页建模规则** <!-- comet-task-ref:askuser-5-1 -->
 
 为避免“单选 + 输入框”被模型拆成两个分页字段，`assistant.ask_user` 的工具描述、Schema description 和 AssistantService 系统提示必须明确：`fields` 中每个字段独立分页；选项下方同页输入只使用同一个选择字段的 `allow_custom_input=true`；用户指定的“输入框80字”等长度要求写入同一字段的 `max_length`；不得新增独立 `text` 字段。新增契约测试先红后绿。
+## 补充修复：取消后卡片重复弹出
+
+**Step 10：固定 AskUser 取消终态** <!-- comet-task-ref:askuser-5-2 -->
+
+先在 `AgentLoopTests` 复现：首个 AskUser 返回 `cancelled=true` 后，模型再次生成 AskUser 调用；断言 Handler 只执行一次、第二次不产生面板，取消结果保持为 true，且模型仍能在后续步骤输出准确摘要。实现时仅在单次 `RunAsync` 保存已取消的工具结果，从后续 `ModelRequest.Tools` 移除 AskUser，并对上游重复调用复用原结果。运行 AgentLoop、AssistantTools、UserDecisionBroker 和 AssistantViewModel 决策链路测试，随后执行 OpenSpec、Release 构建和新时间戳发布验证。

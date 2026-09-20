@@ -1,3 +1,5 @@
+> 2026-09-21 补充：后续发现 AskUser 取消后模型可重复调用并重新弹出卡片，本报告的归档结论已被重新打开；修复与最新验证见 2026-09-21-enhance-ask-user-cancel-lifecycle-verify.md。
+
 # enhance-ask-user-custom-input 验证报告
 
 - Change：`enhance-ask-user-custom-input`

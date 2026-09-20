@@ -258,3 +258,21 @@ public string CustomInput { get; set; }
 - 所有日志和用户可见诊断都不包含输入原文。
 - 完整测试、Release 构建、OpenSpec strict validate、发布和桌面验收均通过。
 
+
+## 9. AskUser 取消终态与重复调用屏蔽
+
+### 9.1 根因
+
+右上角关闭按钮本身已正确完成 ViewModel 与 Broker 取消，工具结果也是 `{"cancelled":true,"values":{},"custom_inputs":{}}`。问题在 AgentLoop：该结果被当作普通成功结果后，下一轮模型请求仍携带 `assistant.ask_user` 工具定义。模型再次调用同一工具时会创建新的 Pending 请求，所以用户看到卡片关闭后又弹出；若第二张卡片最终提交，助手看到的最后结果就会变成 `cancelled=false`。
+
+### 9.2 运行时约束
+
+单次 `AgentLoop.RunAsync` 维护仅限本轮的禁用工具结果映射。首次 AskUser 返回 `cancelled=true` 后：
+
+1. 将原结构化取消结果按 `assistant.ask_user` 保存；
+2. 后续模型请求不再公开该工具；
+3. 若模型仍生成重复调用，直接写入保存的取消结果，不执行 Handler，因此不会再次进入 Broker 或 UI；
+4. AgentLoop 继续运行，让模型能够准确总结“面板已取消（cancelled: true）”；
+5. 新的用户轮次重新创建映射，AskUser 能力恢复。
+
+该边界以运行时拦截为主，不依赖模型遵守提示词，并保持既有“取消面板不等于停止整个助手轮次”的语义。
