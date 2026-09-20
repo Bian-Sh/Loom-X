@@ -478,14 +478,3 @@ public sealed class UpdateService : IUpdateService
         long Size,
         [property: JsonPropertyName("content_type")] string? ContentType);
 }
-
-internal static class UpdateServiceCompatibilityExtensions
-{
-    public static Task<PreparedUpdate> DownloadAndInstallAsync(
-        this UpdateService service,
-        UpdateRelease release,
-        UpdateProxySettings settings,
-        IProgress<UpdateDownloadProgress>? progress = null,
-        CancellationToken cancellationToken = default) =>
-        service.PrepareUpdateAsync(release, settings, progress, cancellationToken);
-}

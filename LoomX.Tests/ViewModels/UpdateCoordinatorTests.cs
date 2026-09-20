@@ -10,6 +10,17 @@ namespace LoomX.Tests.ViewModels;
 public sealed class UpdateCoordinatorTests
 {
     [Fact]
+    public void 更新服务程序集不再暴露旧下载并安装兼容名称()
+    {
+        var legacyMethods = typeof(UpdateService).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static))
+            .Where(method => string.Equals(method.Name, "DownloadAndInstallAsync", StringComparison.Ordinal));
+
+        Assert.Empty(legacyMethods);
+    }
+
+    [Fact]
     public async Task 自动检查发现版本后依次进入下载校验和就绪()
     {
         await using var fixture = await CoordinatorFixture.CreateAsync();
@@ -38,6 +49,31 @@ public sealed class UpdateCoordinatorTests
     }
 
     [Fact]
+    public async Task 重复下载进度不会重复通知相同阶段()
+    {
+        await using var fixture = await CoordinatorFixture.CreateAsync();
+        var service = new FakeUpdateService();
+        var preparation = service.EnqueuePreparation();
+        using var coordinator = fixture.CreateCoordinator(service);
+
+        await coordinator.CheckNowAsync(false);
+        await service.PrepareStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var stageNotifications = 0;
+        coordinator.PropertyChanged += (_, args) =>
+        {
+            if (args.PropertyName == nameof(UpdateCoordinator.Stage)) stageNotifications++;
+        };
+
+        service.ReportDownloading(40);
+        service.ReportDownloading(65);
+
+        Assert.Equal(UpdateStage.Downloading, coordinator.Stage);
+        Assert.Equal(0, stageNotifications);
+        preparation.SetResult(CreatePreparedUpdate());
+        await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
+    }
+
+    [Fact]
     public async Task 并发检查复用同一服务任务()
     {
         await using var fixture = await CoordinatorFixture.CreateAsync();
@@ -51,8 +87,10 @@ public sealed class UpdateCoordinatorTests
         service.CompleteCheck();
 
         var results = await Task.WhenAll(first, second);
+        await service.PrepareStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.Equal(1, service.CheckCalls);
+        Assert.Equal(1, service.PrepareCalls);
         Assert.All(results, result => Assert.NotNull(result?.Latest));
     }
 
@@ -228,6 +266,9 @@ public sealed class UpdateCoordinatorTests
             PrepareStarted.TrySetResult(true);
             return await preparations.Dequeue().Task.WaitAsync(cancellationToken);
         }
+
+        public void ReportDownloading(int percent) =>
+            currentProgress?.Report(new UpdateDownloadProgress(percent, 100, percent, 10, UpdatePreparationPhase.Downloading));
 
         public void ReportVerifying() =>
             currentProgress?.Report(new UpdateDownloadProgress(100, 100, 100, 10, UpdatePreparationPhase.Verifying));

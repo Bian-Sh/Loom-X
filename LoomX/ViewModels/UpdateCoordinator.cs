@@ -249,7 +249,8 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         OnPropertyChanged(nameof(TotalText));
         OnPropertyChanged(nameof(ProgressText));
         OnPropertyChanged(nameof(SpeedText));
-        TransitionTo(value.Phase == UpdatePreparationPhase.Verifying ? UpdateStage.Verifying : UpdateStage.Downloading);
+        var progressStage = value.Phase == UpdatePreparationPhase.Verifying ? UpdateStage.Verifying : UpdateStage.Downloading;
+        if (Stage != progressStage || ErrorKind != UpdateErrorKind.None) TransitionTo(progressStage);
     });
 
     private async Task RetryAsync()
@@ -301,10 +302,13 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
 
     private void TransitionTo(UpdateStage nextStage, UpdateErrorKind nextErrorKind = UpdateErrorKind.None, string? nextError = null) => dispatch(() =>
     {
+        var nextErrorMessage = nextError ?? string.Empty;
+        if (stage == nextStage && errorKind == nextErrorKind && string.Equals(errorMessage, nextErrorMessage, StringComparison.Ordinal)) return;
+
         var previous = stage;
         stage = nextStage;
         errorKind = nextErrorKind;
-        errorMessage = nextError ?? string.Empty;
+        errorMessage = nextErrorMessage;
         OnPropertyChanged(nameof(Stage));
         OnPropertyChanged(nameof(ErrorKind));
         OnPropertyChanged(nameof(ErrorMessage));
