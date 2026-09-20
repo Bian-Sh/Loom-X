@@ -1669,7 +1669,7 @@
   <data name="assistant.decision.previous"><value>上一项</value></data>
   <data name="assistant.decision.next"><value>下一项</value></data>
   <data name="assistant.decision.close"><value>关闭</value></data>
-  <data name="assistant.decision.cancel"><value>取消</value></data>
+  <data name="assistant.decision.cancel_input"><value>取消本次输入</value></data>
   <data name="assistant.queue.title"><value>排队消息</value></data>
   <data name="assistant.queue.delete"><value>删除排队消息</value></data>
 </root>

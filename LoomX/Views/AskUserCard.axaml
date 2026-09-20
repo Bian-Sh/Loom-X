@@ -22,9 +22,13 @@
       <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
-    <Style Selector="Button.card-secondary">
+    <Style Selector="Button.card-action">
       <Setter Property="MinHeight" Value="34"/>
       <Setter Property="Padding" Value="14,7"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.card-secondary">
       <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
       <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -117,6 +121,7 @@
                     VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="12">
           <TextBlock Text="{Binding Title}"
+                     Margin="0,0,36,0"
                      Foreground="{DynamicResource TextSecondaryBrush}"
                      FontSize="12"
                      FontWeight="SemiBold"
@@ -139,8 +144,21 @@
         </StackPanel>
       </ScrollViewer>
 
+      <Button Grid.Row="0"
+              x:Name="CancelInputButton"
+              Classes="card-icon"
+              Content="×"
+              FontSize="18"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Top"
+              Margin="0,10,10,0"
+              ToolTip.Tip="{l:Locale assistant.decision.cancel_input}"
+              AutomationProperties.Name="{l:Locale assistant.decision.cancel_input}"
+              IsVisible="{Binding AllowCancel}"
+              Click="CancelInputButton_OnClick"/>
+
       <Border Grid.Row="1" Margin="20,16,20,18">
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
             <Button x:Name="PreviousButton"
                     Classes="card-icon"
@@ -167,21 +185,12 @@
 
           <Button Grid.Column="2"
                   Margin="0,0,8,0"
-                  Classes="card-secondary"
-                  Content="{l:Locale assistant.decision.cancel}"
-                  IsVisible="{Binding AllowCancel}"
-                  Click="CancelButton_OnClick"/>
-          <Button Grid.Column="3"
-                  Margin="0,0,8,0"
-                  Classes="card-secondary"
+                  Classes="card-secondary card-action"
                   Content="{l:Locale assistant.decision.skip}"
                   IsVisible="{Binding CanSkipCurrentField}"
                   Click="SkipButton_OnClick"/>
-          <Button Grid.Column="4"
-                  MinWidth="92"
-                  MinHeight="34"
-                  Padding="16,7"
-                  Classes="accent"
+          <Button Grid.Column="3"
+                  Classes="accent card-action"
                   Content="{Binding PrimaryActionText}"
                   Click="PrimaryButton_OnClick"/>
         </Grid>

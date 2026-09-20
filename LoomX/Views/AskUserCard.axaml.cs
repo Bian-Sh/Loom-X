@@ -13,7 +13,7 @@ public partial class AskUserCard : UserControl
 
     private AskUserDialogViewModel? ViewModel => DataContext as AskUserDialogViewModel;
 
-    private void CancelButton_OnClick(object? sender, RoutedEventArgs e) =>
+    private void CancelInputButton_OnClick(object? sender, RoutedEventArgs e) =>
         ViewModel?.TryCancel();
 
     private void PreviousButton_OnClick(object? sender, RoutedEventArgs e) =>
