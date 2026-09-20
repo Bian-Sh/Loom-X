@@ -423,6 +423,39 @@ public sealed class UpdateWindowPresentation : IDisposable
 
 public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, IDisposable
 {
+    private static readonly string[] SourceReplacementProperties =
+    [
+        nameof(ReleaseNotesContent),
+        nameof(LatestVersion),
+        nameof(StatusText),
+        nameof(ErrorMessage),
+        nameof(UpdateEntryText),
+        nameof(ProgressText),
+        nameof(SpeedText),
+        nameof(DownloadPercent),
+        nameof(IsUpdateEntryVisible),
+        nameof(IsDialogVisible),
+        nameof(IsDownloading),
+        nameof(IsVerifying),
+        nameof(IsPreparing),
+        nameof(IsReady),
+        nameof(IsError),
+        nameof(CanInstall),
+        nameof(CanRetry),
+        nameof(ToggleDialogCommand),
+        nameof(DismissDialogCommand),
+        nameof(RetryCommand),
+        nameof(InstallAndRestartCommand)
+    ];
+    private static readonly string[] StageDerivedProperties =
+    [
+        nameof(IsDownloading),
+        nameof(IsVerifying),
+        nameof(IsPreparing),
+        nameof(IsReady),
+        nameof(IsError)
+    ];
+
     private UpdateCoordinator? coordinator;
     private ReleaseNotesContentViewModel? releaseNotesContent;
 
@@ -468,18 +501,62 @@ public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, ID
             releaseNotesContent ??= new ReleaseNotesContentViewModel();
             releaseNotesContent.SetRelease(coordinator.Release);
         }
-        RaiseAllPropertiesChanged();
+        RaisePropertiesChanged(SourceReplacementProperties);
     }
 
     private void Coordinator_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(UpdateCoordinator.Release))
-            releaseNotesContent?.SetRelease(coordinator?.Release);
-        RaiseAllPropertiesChanged();
+        switch (e.PropertyName)
+        {
+            case nameof(UpdateCoordinator.Release):
+                releaseNotesContent?.SetRelease(coordinator?.Release);
+                break;
+            case nameof(UpdateCoordinator.Stage):
+                RaisePropertiesChanged(StageDerivedProperties);
+                break;
+            case nameof(UpdateCoordinator.DownloadPercent):
+                RaisePropertyChanged(nameof(DownloadPercent));
+                break;
+            case nameof(UpdateCoordinator.ProgressText):
+                RaisePropertyChanged(nameof(ProgressText));
+                break;
+            case nameof(UpdateCoordinator.SpeedText):
+                RaisePropertyChanged(nameof(SpeedText));
+                break;
+            case nameof(UpdateCoordinator.LatestVersion):
+                RaisePropertyChanged(nameof(LatestVersion));
+                break;
+            case nameof(UpdateCoordinator.StatusText):
+                RaisePropertyChanged(nameof(StatusText));
+                break;
+            case nameof(UpdateCoordinator.ErrorMessage):
+                RaisePropertyChanged(nameof(ErrorMessage));
+                break;
+            case nameof(UpdateCoordinator.UpdateEntryText):
+                RaisePropertyChanged(nameof(UpdateEntryText));
+                break;
+            case nameof(UpdateCoordinator.IsUpdateEntryVisible):
+                RaisePropertyChanged(nameof(IsUpdateEntryVisible));
+                break;
+            case nameof(UpdateCoordinator.IsDialogVisible):
+                RaisePropertyChanged(nameof(IsDialogVisible));
+                break;
+            case nameof(UpdateCoordinator.CanInstall):
+                RaisePropertyChanged(nameof(CanInstall));
+                break;
+            case nameof(UpdateCoordinator.CanRetry):
+                RaisePropertyChanged(nameof(CanRetry));
+                break;
+        }
     }
 
-    private void RaiseAllPropertiesChanged() =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+    private void RaisePropertiesChanged(IEnumerable<string> propertyNames)
+    {
+        foreach (var propertyName in propertyNames) RaisePropertyChanged(propertyName);
+    }
+
+    private void RaisePropertyChanged(string propertyName) =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 
     public void Dispose()
     {

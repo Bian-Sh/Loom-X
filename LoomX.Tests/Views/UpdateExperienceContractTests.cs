@@ -1,4 +1,7 @@
 using System.IO;
+using System.Reflection;
+using LoomX.Services;
+using LoomX.ViewModels;
 using Xunit;
 
 namespace LoomX.Tests.Views;
@@ -75,6 +78,134 @@ public sealed class UpdateExperienceContractTests
 
         Assert.Null(presentation.Update.ReleaseNotesContent);
     }
+
+    [Fact]
+    public void 下载百分比变化只转发对应展示属性()
+    {
+        using var source = UpdateCoordinatorOwner.Create();
+        using var presentation = new UpdateWindowPresentation();
+        presentation.Attach(source.Coordinator);
+        var notifications = new List<string?>();
+        presentation.Update.PropertyChanged += (_, args) => notifications.Add(args.PropertyName);
+
+        RaiseCoordinatorPropertyChanged(source.Coordinator, nameof(UpdateCoordinator.DownloadPercent));
+
+        Assert.Equal([nameof(UpdateWindowPresentationAdapter.DownloadPercent)], notifications);
+        Assert.DoesNotContain(notifications, string.IsNullOrEmpty);
+        Assert.DoesNotContain(nameof(UpdateWindowPresentationAdapter.UpdateEntryText), notifications);
+        Assert.DoesNotContain(nameof(UpdateWindowPresentationAdapter.StatusText), notifications);
+        Assert.DoesNotContain(nameof(UpdateWindowPresentationAdapter.ProgressText), notifications);
+        Assert.DoesNotContain(nameof(UpdateWindowPresentationAdapter.SpeedText), notifications);
+        Assert.DoesNotContain(nameof(UpdateWindowPresentationAdapter.IsDownloading), notifications);
+        Assert.DoesNotContain(nameof(UpdateWindowPresentationAdapter.ReleaseNotesContent), notifications);
+    }
+
+    [Fact]
+    public void 本地化展示属性变化按名称精确转发()
+    {
+        using var source = UpdateCoordinatorOwner.Create();
+        using var presentation = new UpdateWindowPresentation();
+        presentation.Attach(source.Coordinator);
+        var notifications = new List<string?>();
+        presentation.Update.PropertyChanged += (_, args) => notifications.Add(args.PropertyName);
+
+        RaiseCoordinatorPropertyChanged(source.Coordinator, nameof(UpdateCoordinator.StatusText));
+        RaiseCoordinatorPropertyChanged(source.Coordinator, nameof(UpdateCoordinator.UpdateEntryText));
+
+        Assert.Equal(
+            [nameof(UpdateWindowPresentationAdapter.StatusText), nameof(UpdateWindowPresentationAdapter.UpdateEntryText)],
+            notifications);
+        Assert.DoesNotContain(notifications, string.IsNullOrEmpty);
+    }
+
+    [Fact]
+    public void 替换脱离和销毁后旧协调器事件不再转发()
+    {
+        using var first = UpdateCoordinatorOwner.Create();
+        using var second = UpdateCoordinatorOwner.Create();
+        var presentation = new UpdateWindowPresentation();
+        presentation.Attach(first.Coordinator);
+        var notifications = new List<string?>();
+        presentation.Update.PropertyChanged += (_, args) => notifications.Add(args.PropertyName);
+
+        presentation.Attach(second.Coordinator);
+        Assert.NotEmpty(notifications);
+        Assert.DoesNotContain(notifications, string.IsNullOrEmpty);
+        notifications.Clear();
+        RaiseCoordinatorPropertyChanged(first.Coordinator, nameof(UpdateCoordinator.DownloadPercent));
+        Assert.Empty(notifications);
+
+        RaiseCoordinatorPropertyChanged(second.Coordinator, nameof(UpdateCoordinator.DownloadPercent));
+        Assert.Equal([nameof(UpdateWindowPresentationAdapter.DownloadPercent)], notifications);
+
+        notifications.Clear();
+        presentation.Attach(null);
+        Assert.NotEmpty(notifications);
+        Assert.DoesNotContain(notifications, string.IsNullOrEmpty);
+        notifications.Clear();
+        RaiseCoordinatorPropertyChanged(second.Coordinator, nameof(UpdateCoordinator.DownloadPercent));
+        Assert.Empty(notifications);
+
+        presentation.Attach(first.Coordinator);
+        notifications.Clear();
+        presentation.Dispose();
+        RaiseCoordinatorPropertyChanged(first.Coordinator, nameof(UpdateCoordinator.DownloadPercent));
+        Assert.Empty(notifications);
+    }
+
+    private static void RaiseCoordinatorPropertyChanged(UpdateCoordinator coordinator, string propertyName)
+    {
+        var method = typeof(NotifyViewModel).GetMethod(
+            "OnPropertyChanged",
+            BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("找不到属性通知入口。");
+        method.Invoke(coordinator, [propertyName]);
+    }
+
+    private sealed class UpdateCoordinatorOwner : IDisposable
+    {
+        private readonly string directory;
+        private readonly ConfigSnapshotService configService;
+        private readonly GatewayProcessService gatewayService;
+        private readonly AppDataStore dataStore;
+
+        private UpdateCoordinatorOwner(
+            string directory,
+            ConfigSnapshotService configService,
+            GatewayProcessService gatewayService,
+            AppDataStore dataStore,
+            UpdateCoordinator coordinator)
+        {
+            this.directory = directory;
+            this.configService = configService;
+            this.gatewayService = gatewayService;
+            this.dataStore = dataStore;
+            Coordinator = coordinator;
+        }
+
+        public UpdateCoordinator Coordinator { get; }
+
+        public static UpdateCoordinatorOwner Create()
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "LoomXTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(directory);
+            var configService = new ConfigSnapshotService(Path.Combine(directory, "LoomX.db"));
+            var gatewayService = new GatewayProcessService();
+            var dataStore = new AppDataStore(configService, gatewayService);
+            var coordinator = new UpdateCoordinator(dataStore, dispatch: action => action());
+            return new UpdateCoordinatorOwner(directory, configService, gatewayService, dataStore, coordinator);
+        }
+
+        public void Dispose()
+        {
+            Coordinator.Dispose();
+            dataStore.Dispose();
+            gatewayService.Dispose();
+            configService.Dispose();
+            try { Directory.Delete(directory, true); } catch { }
+        }
+    }
+
     private static string ReadDesktopFile(params string[] segments)
     {
         var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);
