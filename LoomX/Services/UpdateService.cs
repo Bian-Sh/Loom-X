@@ -83,7 +83,36 @@ public sealed record UpdateCheckResult(string CurrentVersion, UpdateRelease? Lat
 
 public sealed record UpdateDownloadProgress(long Transferred, long Total, int Percent, long BytesPerSecond);
 
+public sealed record PreparedUpdate(string InstallerPath, string Version);
+
 public sealed record UpdateInstallResult(string InstallerPath, string Version);
+
+public sealed record UpdateReleasePage(
+    IReadOnlyList<UpdateRelease> Items,
+    int Page,
+    int PageSize,
+    bool HasMore);
+
+public interface IUpdateService
+{
+    Task<UpdateCheckResult> CheckAsync(
+        UpdateProxySettings settings,
+        CancellationToken cancellationToken = default);
+
+    Task<UpdateReleasePage> GetStableReleasesAsync(
+        UpdateProxySettings settings,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<PreparedUpdate> PrepareUpdateAsync(
+        UpdateRelease release,
+        UpdateProxySettings settings,
+        IProgress<UpdateDownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    void LaunchInstaller(PreparedUpdate preparedUpdate);
+}
 
 public interface IUpdateInstallerLauncher
 {
@@ -138,7 +167,8 @@ public static class UpdateHttpClientFactory
 public sealed class UpdateService
 {
     private const string Repository = "Bian-Sh/Loom-X";
-    private const string ApiUrl = "https://api.github.com/repos/Bian-Sh/Loom-X/releases?per_page=30";
+    private const string ApiUrl = "https://api.github.com/repos/Bian-Sh/Loom-X/releases";
+    private const int GitHubPageSize = 100;
     private const int MaxRedirects = 8;
     private static readonly HashSet<string> AllowedHosts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -176,23 +206,24 @@ public sealed class UpdateService
         var startedAt = Stopwatch.GetTimestamp();
         try
         {
-            using var client = clientFactory(proxySettings);
-            using var response = await SendGetAsync(client, ApiUrl, cancellationToken);
-            var releases = await DeserializeReleasesAsync(response, cancellationToken);
+            var page = await GetStableReleasesAsync(proxySettings, 1, GitHubPageSize, cancellationToken);
             var current = AppVersion.TryParse(currentVersion, out var currentParsed) ? currentParsed : default;
-            var latest = releases
-                .Where(item => !item.Draft && !item.Prerelease)
-                .Select(MapRelease)
-                .Where(item => item is not null)
-                .Select(item => item!)
+            var latest = page.Items
+                .Where(item => item.InstallerAsset is not null && item.ChecksumAsset is not null)
                 .Where(item => AppVersion.TryParse(item.Version, out var parsed) && parsed.CompareTo(current) > 0)
-                .OrderByDescending(item => new StableVersion(
-                    int.Parse(item.Version.Split('.')[0]),
-                    int.Parse(item.Version.Split('.')[1]),
-                    int.Parse(item.Version.Split('.')[2])))
+                .OrderByDescending(item =>
+                {
+                    AppVersion.TryParse(item.Version, out var parsed);
+                    return parsed;
+                })
                 .FirstOrDefault();
 
-            logger.LogInformation("更新检查完成 {CurrentVersion} {LatestVersion} {ElapsedMs}ms", currentVersion, latest?.Version ?? "无", (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            logger.LogInformation(
+                "更新检查完成 {CurrentVersion} {LatestVersion} {ItemCount} {ElapsedMs}ms",
+                currentVersion,
+                latest?.Version ?? "无",
+                page.Items.Count,
+                (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             return new UpdateCheckResult(currentVersion, latest);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
@@ -200,6 +231,43 @@ public sealed class UpdateService
             logger.LogWarning(exception, "更新检查失败 {CurrentVersion} {ElapsedMs}ms", currentVersion, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             throw;
         }
+    }
+
+    public async Task<UpdateReleasePage> GetStableReleasesAsync(
+        UpdateProxySettings settings,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
+        if (pageSize is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(pageSize));
+
+        var skip = (page - 1) * pageSize;
+        var required = skip + pageSize + 1;
+        var stable = new List<UpdateRelease>(required);
+        var rawPage = 1;
+        var hasNextRawPage = true;
+        using var client = clientFactory(settings);
+
+        while (stable.Count < required && hasNextRawPage)
+        {
+            var url = $"{ApiUrl}?per_page={GitHubPageSize}&page={rawPage}";
+            using var response = await SendGetAsync(client, url, cancellationToken);
+            var releases = await DeserializeReleasesAsync(response, cancellationToken);
+            stable.AddRange(releases
+                .Where(item => !item.Draft && !item.Prerelease)
+                .Select(MapRelease)
+                .OfType<UpdateRelease>());
+            hasNextRawPage = HasNextPage(response);
+            rawPage++;
+        }
+
+        var items = stable.Skip(skip).Take(pageSize).ToArray();
+        var hasMore = stable.Count > skip + items.Length || hasNextRawPage;
+        logger.LogInformation(
+            "正式版本历史拉取完成 {Page} {PageSize} {ItemCount} {HasMore}",
+            page, pageSize, items.Length, hasMore);
+        return new UpdateReleasePage(items, page, pageSize, hasMore);
     }
 
     public async Task<UpdateInstallResult> DownloadAndInstallAsync(
@@ -307,6 +375,11 @@ public sealed class UpdateService
             || !AllowedHosts.Contains(uri.Host))
             throw new InvalidOperationException("更新下载地址不受信任。");
     }
+
+    private static bool HasNextPage(HttpResponseMessage response) =>
+        response.Headers.TryGetValues("Link", out var values)
+        && values.SelectMany(value => value.Split(','))
+            .Any(part => part.Contains("rel=\"next\"", StringComparison.OrdinalIgnoreCase));
 
     private static async Task<IReadOnlyList<GitHubRelease>> DeserializeReleasesAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
