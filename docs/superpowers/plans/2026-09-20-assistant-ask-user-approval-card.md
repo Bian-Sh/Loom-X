@@ -1,6 +1,7 @@
 ---
 comet_change: fix-assistant-decision-subscription-lifecycle
 base-ref: e0e1dde
+archived-with: 2026-09-20-fix-assistant-decision-subscription-lifecycle
 ---
 
 # AskUser 悬浮卡片与简版消息队列实施计划

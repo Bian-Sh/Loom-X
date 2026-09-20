@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: build
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -13,12 +13,12 @@ auto_transition: true
 base_ref: e28f82861bafaab9c428b17f75d73fd29153597e
 design_doc: docs/superpowers/specs/2026-09-20-assistant-ask-user-approval-card-design.md
 plan: docs/superpowers/plans/2026-09-20-assistant-ask-user-approval-card.md
-verify_result: fail
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-09-20-fix-assistant-decision-subscription-lifecycle-verify.md
 branch_status: handled
 created_at: 2026-09-20
-verified_at: null
-archived: false
+verified_at: 2026-09-20
+archived: true
 direct_override: true
 handoff_context: openspec/changes/fix-assistant-decision-subscription-lifecycle/.comet/handoff/design-context.json
 handoff_hash: 60317dc656bb09c75f866cea85f6a5b9bcc95be68681d4c90b2290ded12a6302
