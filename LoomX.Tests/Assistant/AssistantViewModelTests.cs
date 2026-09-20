@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -832,7 +832,8 @@ public sealed class AssistantViewModelUserDecisionTests
         public bool Submit(
             string requestId,
             string candidate,
-            IReadOnlyDictionary<string, object?> values)
+            IReadOnlyDictionary<string, object?> values,
+            IReadOnlyDictionary<string, string>? customInputs = null)
         {
             if (!string.Equals(claimantId, candidate, StringComparison.Ordinal))
             {
@@ -873,3 +874,4 @@ public sealed class AssistantViewModelUserDecisionTests
         public Task WaitForCompletionAsync() => completion.Task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 }
+

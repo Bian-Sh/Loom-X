@@ -80,6 +80,39 @@ public sealed class UserDecisionBrokerTests
     }
 
     [Fact]
+    public async Task Submit_复制自由输入并返回独立结果映射()
+    {
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync(
+            "owner",
+            new UserDecisionRequest(
+                "确认",
+                "请选择",
+                [new UserDecisionField(
+                    "mode",
+                    "运行模式",
+                    UserDecisionFieldType.SingleSelect,
+                    isRequired: true,
+                    options: [new UserDecisionOption("safe", "安全模式")],
+                    allowCustomInput: true)]),
+            CancellationToken.None);
+        var request = await pending.Task;
+        var customInputs = new Dictionary<string, string> { ["mode"] = "自定义模式" };
+
+        Assert.True(broker.Submit(
+            request.RequestId,
+            UserDecisionBrokerTestExtensions.ClaimantId,
+            new Dictionary<string, object?> { ["mode"] = null },
+            customInputs));
+        customInputs["mode"] = "提交后篡改";
+
+        var result = await task;
+        Assert.Null(result.Values["mode"]);
+        Assert.Equal("自定义模式", result.CustomInputs["mode"]);
+    }
+
+    [Fact]
     public async Task Cancel_返回不含字段值的取消结果()
     {
         var broker = CreateBroker();
@@ -93,6 +126,7 @@ public sealed class UserDecisionBrokerTests
         Assert.True(result.Cancelled);
         Assert.Equal("页面关闭", result.CancellationReason);
         Assert.Empty(result.Values);
+        Assert.Empty(result.CustomInputs);
     }
 
     [Fact]

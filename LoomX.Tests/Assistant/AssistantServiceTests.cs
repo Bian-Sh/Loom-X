@@ -1,4 +1,4 @@
-﻿using Xunit;
+using Xunit;
 using LoomX.Assistant;
 using LoomX.Assistant.Browser;
 using LoomX.Assistant.UserDecisions;
@@ -633,8 +633,9 @@ public sealed class AssistantServiceTests : IDisposable
         public bool Submit(
             string requestId,
             string claimantId,
-            IReadOnlyDictionary<string, object?> values) =>
-            inner.Submit(requestId, claimantId, values);
+            IReadOnlyDictionary<string, object?> values,
+            IReadOnlyDictionary<string, string>? customInputs = null) =>
+            inner.Submit(requestId, claimantId, values, customInputs);
 
         public bool Cancel(string requestId, string claimantId, string reason) =>
             inner.Cancel(requestId, claimantId, reason);
@@ -742,3 +743,4 @@ public sealed class AssistantServiceTests : IDisposable
             return Task.CompletedTask;
         }
     }}
+
