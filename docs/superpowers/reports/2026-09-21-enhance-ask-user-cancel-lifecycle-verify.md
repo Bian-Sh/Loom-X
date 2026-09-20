@@ -65,7 +65,7 @@ dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore --filter "Ful
 dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore
 
 已通过：1114 / 1114
-Comet 证据：openspec/changes/enhance-ask-user-custom-input/.comet/checks/9b342f01-83d1-4a2b-b21c-5cd81a1d3ac4.log
+Comet Verify 证据：openspec/changes/enhance-ask-user-custom-input/.comet/checks/ecd09978-345a-4111-8e83-e581551d8bf9.log
 ```
 
 ### Release 构建
@@ -97,6 +97,7 @@ outputs/2026-09-20-071229-ask-user-cancel-lifecycle-r2/LoomX.exe
 - UI 关闭按钮与 Broker 取消链路无需修改，避免在表现层重复打补丁。
 - 禁用状态仅限当前 `RunAsync`，不会永久关闭 AskUser。
 - Responses 历史工具名与返回工具名保持稳定映射，不会因隐藏当前工具而退化。
+- 独立集成审查未发现新的明确缺陷；审查沙箱内完整测试受 `LOCALAPPDATA`/`HttpListener` 权限限制，但同一提交已在本地 Comet Verify 环境通过 1114/1114。
 - 重复调用不读取或记录工具参数、用户 prompt 或输入内容。
 - 日志只记录工具名，不包含用户输入或取消原因。
 - 未修改数据库、持久化格式或其他 Session 产物。
