@@ -14,7 +14,7 @@
 ## 3. Release Notes 共享展示
 
 - [x] 3.1 增加 Release Notes 展示模型或适配层测试，覆盖 Markdown 替换、空正文、安全链接和不安全嵌入降级。
-- [ ] 3.2 提取基于 `LiveMarkdown.Avalonia` 的可复用 Release Notes 视图，供更新浮窗与设置页使用，并通过视图契约测试验证不再使用纯文本降级。
+- [x] 3.2 提取基于 `LiveMarkdown.Avalonia` 的可复用 Release Notes 视图，供更新浮窗与设置页使用，并通过视图契约测试验证不再使用纯文本降级。
 
 ## 4. 标题栏入口与更新浮窗
 

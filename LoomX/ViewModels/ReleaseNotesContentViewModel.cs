@@ -27,7 +27,15 @@ public sealed class ReleaseNotesContentViewModel : NotifyViewModel, IDisposable
     public string Title { get => title; private set => SetProperty(ref title, value); }
     public string PublishedAtText { get => publishedAtText; private set => SetProperty(ref publishedAtText, value); }
     public ObservableStringBuilder Markdown { get => markdown; private set => SetProperty(ref markdown, value); }
-    public bool IsEmpty { get => isEmpty; private set => SetProperty(ref isEmpty, value); }
+    public bool IsEmpty
+    {
+        get => isEmpty;
+        private set
+        {
+            if (SetProperty(ref isEmpty, value)) OnPropertyChanged(nameof(HasContent));
+        }
+    }
+    public bool HasContent => !IsEmpty;
     public string EmptyText { get => emptyText; private set => SetProperty(ref emptyText, value); }
 
     public void SetRelease(UpdateRelease? value)

@@ -145,6 +145,44 @@ public sealed class ReleaseNotesContentViewModelTests
     }
 
     [Fact]
+    public void HasContent_始终与IsEmpty相反()
+    {
+        using var vm = new ReleaseNotesContentViewModel();
+
+        Assert.True(vm.IsEmpty);
+        Assert.False(vm.HasContent);
+
+        vm.SetRelease(CreateRelease("0.12.7", "已有内容"));
+
+        Assert.False(vm.IsEmpty);
+        Assert.True(vm.HasContent);
+
+        vm.SetRelease(CreateRelease("0.12.8", "   "));
+
+        Assert.True(vm.IsEmpty);
+        Assert.False(vm.HasContent);
+    }
+
+    [Fact]
+    public void SetRelease_IsEmpty变化时同步通知HasContent()
+    {
+        using var vm = new ReleaseNotesContentViewModel();
+        var notifications = new List<string?>();
+        vm.PropertyChanged += (_, args) => notifications.Add(args.PropertyName);
+
+        vm.SetRelease(CreateRelease("0.12.7", "已有内容"));
+
+        Assert.Contains(nameof(ReleaseNotesContentViewModel.IsEmpty), notifications);
+        Assert.Contains(nameof(ReleaseNotesContentViewModel.HasContent), notifications);
+
+        notifications.Clear();
+        vm.SetRelease(CreateRelease("0.12.8", string.Empty));
+
+        Assert.Contains(nameof(ReleaseNotesContentViewModel.IsEmpty), notifications);
+        Assert.Contains(nameof(ReleaseNotesContentViewModel.HasContent), notifications);
+    }
+
+    [Fact]
     public void CultureChanged_重新计算日期和空态文案()
     {
         var previousCulture = LocaleService.CurrentCulture.Name;
