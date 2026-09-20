@@ -254,7 +254,7 @@
           <Button Grid.Column="3" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="{l:Locale window.maximize}" AutomationProperties.Name="{l:Locale window.maximize}">
             <Path Data="M 5,5 L 19,5 L 19,19 L 5,19 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
-          <Button Grid.Column="4" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="{l:Locale update.dialog.close}" AutomationProperties.Name="{l:Locale update.dialog.close}">
+          <Button Grid.Column="4" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="{l:Locale window.close}" AutomationProperties.Name="{l:Locale window.close}">
             <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
         </Grid>

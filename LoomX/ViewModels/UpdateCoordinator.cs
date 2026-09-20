@@ -182,7 +182,13 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             TransitionTo(UpdateStage.Error, UpdateErrorKind.Check);
-            logger.LogWarning(SafeLogException(exception), "更新检查失败 {Manual}", manual);
+            var diagnostic = SafeUpdateDiagnosticException.Create(exception, "check");
+            logger.LogWarning(diagnostic, "更新检查失败 {Manual} {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                manual,
+                diagnostic.OriginalExceptionType,
+                diagnostic.OriginalHResult,
+                diagnostic.HttpStatusCode,
+                diagnostic.Stage);
             return null;
         }
         finally
@@ -227,7 +233,13 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             TransitionTo(UpdateStage.Error, UpdateErrorKind.Prepare);
-            logger.LogWarning(SafeLogException(exception), "更新包准备失败 {Version}", targetRelease.Version);
+            var diagnostic = SafeUpdateDiagnosticException.Create(exception, "prepare");
+            logger.LogWarning(diagnostic, "更新包准备失败 {Version} {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                targetRelease.Version,
+                diagnostic.OriginalExceptionType,
+                diagnostic.OriginalHResult,
+                diagnostic.HttpStatusCode,
+                diagnostic.Stage);
         }
         finally
         {
@@ -279,7 +291,13 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         {
             Interlocked.Exchange(ref installStarted, 0);
             TransitionTo(UpdateStage.Ready, UpdateErrorKind.Install);
-            logger.LogWarning(SafeLogException(exception), "更新安装器启动失败 {Version}", target.Version);
+            var diagnostic = SafeUpdateDiagnosticException.Create(exception, "install");
+            logger.LogWarning(diagnostic, "更新安装器启动失败 {Version} {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                target.Version,
+                diagnostic.OriginalExceptionType,
+                diagnostic.OriginalHResult,
+                diagnostic.HttpStatusCode,
+                diagnostic.Stage);
         }
 
         return Task.CompletedTask;
@@ -406,7 +424,15 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
-        catch (Exception exception) { logger.LogWarning(SafeLogException(exception), "更新定时检查循环失败"); }
+        catch (Exception exception)
+        {
+            var diagnostic = SafeUpdateDiagnosticException.Create(exception, "scheduled-check");
+            logger.LogWarning(diagnostic, "更新定时检查循环失败 {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                diagnostic.OriginalExceptionType,
+                diagnostic.OriginalHResult,
+                diagnostic.HttpStatusCode,
+                diagnostic.Stage);
+        }
     }
 
     private void OnCultureChanged(object? sender, CultureInfo culture) => RefreshLocalizedText();
@@ -427,7 +453,6 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         return $"{value / 1024d:0.00} GB";
     }
 
-    private static Exception SafeLogException(Exception exception) => new InvalidOperationException(exception.GetType().Name);
 
     public void Dispose()
     {

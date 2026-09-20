@@ -23,7 +23,11 @@ public sealed class ReleaseHistoryViewModelTests
         const string responseBody = "response-body-secret";
         var logger = new RecordingLogger<ReleaseHistoryViewModel>();
         var service = FakeUpdateService.WithPages(Page(1, false, Release("0.13.0", $"{releaseBody} {apiKey}")));
-        service.EnqueueFailure(new InvalidOperationException(responseBody));
+        var failure = new HttpRequestException(
+            $"{responseBody} {apiKey} {proxyPassword}",
+            new InvalidOperationException("Authorization bearer-secret"),
+            System.Net.HttpStatusCode.ServiceUnavailable);
+        service.EnqueueFailure(failure);
         using var vm = new ReleaseHistoryViewModel(
             service,
             _ => Task.FromResult(new UpdateProxySettings(true, "custom", "https://proxy.example", 7890, "proxy-user", proxyPassword)),
@@ -36,10 +40,20 @@ public sealed class ReleaseHistoryViewModelTests
         await WaitForAsync(() => !vm.IsRefreshing);
 
         var logs = string.Join("\n", logger.Messages);
+        var warning = Assert.Single(logger.Entries, entry => entry.Exception is not null);
         Assert.DoesNotContain(releaseBody, logs, StringComparison.Ordinal);
         Assert.DoesNotContain(apiKey, logs, StringComparison.Ordinal);
         Assert.DoesNotContain(proxyPassword, logs, StringComparison.Ordinal);
         Assert.DoesNotContain(responseBody, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain("bearer-secret", logs, StringComparison.Ordinal);
+        var diagnostic = Assert.IsType<SafeUpdateDiagnosticException>(warning.Exception);
+        Assert.Null(diagnostic.InnerException);
+        Assert.Equal(failure.HResult, diagnostic.HResult);
+        Assert.Contains("LoadFirstPageAsync", warning.Exception.StackTrace, StringComparison.Ordinal);
+        Assert.Equal(typeof(HttpRequestException).FullName, warning.Properties["ExceptionType"]);
+        Assert.Equal(failure.HResult, warning.Properties["HResult"]);
+        Assert.Equal((int)System.Net.HttpStatusCode.ServiceUnavailable, warning.Properties["HttpStatusCode"]);
+        Assert.Equal("refresh", warning.Properties["Stage"]);
     }
 
     [Fact]
@@ -116,6 +130,29 @@ public sealed class ReleaseHistoryViewModelTests
         Assert.Equal("选中正文", vm.Content.Markdown.ToString());
         Assert.Equal([(1, 10), (2, 10)], service.Requests);
         Assert.False(vm.HasMore);
+    }
+
+    [Fact]
+    public async Task 加载更多期间隐藏加载按钮并在仍有后续页时恢复()
+    {
+        var completion = new TaskCompletionSource<UpdateReleasePage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = FakeUpdateService.WithPages(Page(1, true, Release("0.13.0")));
+        service.EnqueueResponse(completion.Task);
+        using var vm = CreateHistory(service);
+        await vm.EnsureLoadedAsync();
+
+        Assert.True(vm.CanShowLoadMore);
+        vm.LoadMoreCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+
+        Assert.True(vm.IsLoadingMore);
+        Assert.False(vm.CanShowLoadMore);
+
+        completion.SetResult(Page(2, true, Release("0.12.9")));
+        await WaitForAsync(() => !vm.IsLoadingMore);
+
+        Assert.True(vm.HasMore);
+        Assert.True(vm.CanShowLoadMore);
     }
 
     [Fact]
@@ -402,6 +439,7 @@ public sealed class ReleaseHistoryViewModelTests
 
         public void EnqueuePage(UpdateReleasePage page) => responses.Enqueue(page);
         public void EnqueueFailure(Exception exception) => responses.Enqueue(exception);
+        public void EnqueueResponse(Task<UpdateReleasePage> response) => responses.Enqueue(response);
 
         public async Task WaitForRequestCountAsync(int expected)
         {
@@ -437,6 +475,7 @@ public sealed class ReleaseHistoryViewModelTests
             if (!responses.TryDequeue(out var response))
                 throw new InvalidOperationException("测试未配置 Release 响应。");
             if (response is Exception exception) return Task.FromException<UpdateReleasePage>(exception);
+            if (response is Task<UpdateReleasePage> task) return task;
             return Task.FromResult((UpdateReleasePage)response);
         }
 

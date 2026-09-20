@@ -34,6 +34,10 @@ public sealed class UpdateExperienceContractTests
         var source = ReadDesktopFile("MainWindow.axaml");
         var toastStart = source.IndexOf("x:Name=\"toastBorder\"", StringComparison.Ordinal);
         var dialogStart = source.IndexOf("x:Name=\"updateDialogOverlay\"", StringComparison.Ordinal);
+        var systemCloseStart = source.IndexOf("Classes=\"window-control window-close\"", StringComparison.Ordinal);
+        var systemCloseEnd = systemCloseStart >= 0 ? source.IndexOf("</Button>", systemCloseStart, StringComparison.Ordinal) : -1;
+        var dialogCloseStart = source.IndexOf("x:Name=\"updateDialogCloseButton\"", StringComparison.Ordinal);
+        var dialogCloseEnd = dialogCloseStart >= 0 ? source.IndexOf("</Button>", dialogCloseStart, StringComparison.Ordinal) : -1;
 
         Assert.Contains("xmlns:views=\"using:LoomX.Views\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding Update.IsDialogVisible}\"", source, StringComparison.Ordinal);
@@ -55,6 +59,16 @@ public sealed class UpdateExperienceContractTests
         Assert.Contains("Content=\"{l:Locale update.dialog.install}\"", source, StringComparison.Ordinal);
         Assert.Contains("Content=\"{l:Locale update.dialog.retry}\"", source, StringComparison.Ordinal);
         Assert.Contains("ToolTip.Tip=\"{l:Locale update.dialog.close}\"", source, StringComparison.Ordinal);
+        Assert.True(systemCloseStart >= 0 && systemCloseEnd > systemCloseStart, "找不到标题栏系统关闭按钮。");
+        Assert.True(dialogCloseStart >= 0 && dialogCloseEnd > dialogCloseStart, "找不到更新浮窗关闭按钮。");
+        var systemClose = source[systemCloseStart..systemCloseEnd];
+        var dialogClose = source[dialogCloseStart..dialogCloseEnd];
+        Assert.Contains("ToolTip.Tip=\"{l:Locale window.close}\"", systemClose, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"{l:Locale window.close}\"", systemClose, StringComparison.Ordinal);
+        Assert.DoesNotContain("update.dialog.close", systemClose, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale update.dialog.close}\"", dialogClose, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"{l:Locale update.dialog.close}\"", dialogClose, StringComparison.Ordinal);
+        Assert.DoesNotContain("window.close", dialogClose, StringComparison.Ordinal);
         Assert.DoesNotContain("Content=\"重启并安装\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Update.CardVisible", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Update.ReleaseNotesVisible", source, StringComparison.Ordinal);

@@ -96,7 +96,7 @@
                         </ListBox.ItemTemplate>
                       </ListBox>
                       <StackPanel Grid.Row="1" Spacing="6" Margin="10,6,10,10">
-                        <Button Content="{l:Locale settings.update.history.load.more}" Command="{Binding ReleaseHistory.LoadMoreCommand}" IsVisible="{Binding ReleaseHistory.HasMore}" Classes="outline" HorizontalAlignment="Stretch"/>
+                        <Button Content="{l:Locale settings.update.history.load.more}" Command="{Binding ReleaseHistory.LoadMoreCommand}" IsVisible="{Binding ReleaseHistory.CanShowLoadMore}" Classes="outline" HorizontalAlignment="Stretch"/>
                         <TextBlock Text="{l:Locale settings.update.history.loading.more}" IsVisible="{Binding ReleaseHistory.IsLoadingMore}" Classes="hint" HorizontalAlignment="Center"/>
                       </StackPanel>
                     </Grid>

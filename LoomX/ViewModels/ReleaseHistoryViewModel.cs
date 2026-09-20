@@ -124,6 +124,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
     }
     public bool HasCachedContent { get => hasCachedContent; private set => SetProperty(ref hasCachedContent, value); }
     public bool HasMore { get => hasMore; private set => SetState(ref hasMore, value); }
+    public bool CanShowLoadMore => HasMore && !IsLoadingMore;
     public string ErrorText => HasError ? Loc("settings.update.history.error.load") : string.Empty;
     private bool IsBusy => IsInitialLoading || IsRefreshing || IsLoadingMore;
     private bool HasLoadedContent => hasLoaded;
@@ -215,7 +216,14 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             DispatchIfActive(ApplyFailure);
-            logger.LogWarning(SafeLogException(exception), "正式版本历史加载失败 {Operation} {HasCachedContent}", operation, Releases.Count > 0);
+            var diagnostic = SafeUpdateDiagnosticException.Create(exception, operation);
+            logger.LogWarning(diagnostic, "正式版本历史加载失败 {Operation} {HasCachedContent} {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                operation,
+                Releases.Count > 0,
+                diagnostic.OriginalExceptionType,
+                diagnostic.OriginalHResult,
+                diagnostic.HttpStatusCode,
+                diagnostic.Stage);
         }
         finally
         {
@@ -269,7 +277,14 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             DispatchIfActive(ApplyFailure);
-            logger.LogWarning(SafeLogException(exception), "正式版本历史加载更多失败 {Page} {HasCachedContent}", nextPage, Releases.Count > 0);
+            var diagnostic = SafeUpdateDiagnosticException.Create(exception, "load-more");
+            logger.LogWarning(diagnostic, "正式版本历史加载更多失败 {Page} {HasCachedContent} {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                nextPage,
+                Releases.Count > 0,
+                diagnostic.OriginalExceptionType,
+                diagnostic.OriginalHResult,
+                diagnostic.HttpStatusCode,
+                diagnostic.Stage);
         }
         finally
         {
@@ -387,6 +402,8 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
     private bool SetState(ref bool field, bool value, [System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)
     {
         if (!SetProperty(ref field, value, propertyName)) return false;
+        if (propertyName is nameof(HasMore) or nameof(IsLoadingMore))
+            OnPropertyChanged(nameof(CanShowLoadMore));
         RaiseCommandStates();
         return true;
     }
@@ -413,7 +430,6 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         else Dispatcher.UIThread.InvokeAsync(action).GetAwaiter().GetResult();
     }
 
-    private static Exception SafeLogException(Exception exception) => new InvalidOperationException(exception.GetType().Name);
 
     public void Dispose()
     {

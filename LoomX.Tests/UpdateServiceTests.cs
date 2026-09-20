@@ -35,18 +35,32 @@ public sealed class UpdateServiceTests
         var settings = new UpdateProxySettings(true, "custom", "https://proxy.example", 7890, "proxy-user", proxyPassword);
 
         await service.GetStableReleasesAsync(settings, 1, 10);
+        var failure = new HttpRequestException(
+            $"{releaseBody} {apiKey} {proxyPassword} {responseBody}",
+            new InvalidOperationException("Authorization bearer-secret"),
+            HttpStatusCode.Unauthorized);
         var failingService = new UpdateService(
-            _ => new HttpClient(new StubHandler(_ => throw new InvalidOperationException($"{releaseBody} {apiKey} {proxyPassword} {responseBody}"))),
+            _ => new HttpClient(new StubHandler(_ => throw failure)),
             logger: logger,
             currentVersion: "0.12.6");
-        await Assert.ThrowsAsync<InvalidOperationException>(() => failingService.CheckAsync(settings));
+        await Assert.ThrowsAsync<HttpRequestException>(() => failingService.CheckAsync(settings));
 
         var logs = string.Join("\n", logger.Messages);
+        var warning = Assert.Single(logger.Entries, entry => entry.Exception is not null);
         Assert.Contains("1", logs, StringComparison.Ordinal);
         Assert.DoesNotContain(releaseBody, logs, StringComparison.Ordinal);
         Assert.DoesNotContain(apiKey, logs, StringComparison.Ordinal);
         Assert.DoesNotContain(proxyPassword, logs, StringComparison.Ordinal);
         Assert.DoesNotContain(responseBody, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain("bearer-secret", logs, StringComparison.Ordinal);
+        var diagnostic = Assert.IsType<SafeUpdateDiagnosticException>(warning.Exception);
+        Assert.Null(diagnostic.InnerException);
+        Assert.Equal(failure.HResult, diagnostic.HResult);
+        Assert.Contains(nameof(UpdateService.CheckAsync), warning.Exception.StackTrace, StringComparison.Ordinal);
+        Assert.Equal(typeof(HttpRequestException).FullName, warning.Properties["ExceptionType"]);
+        Assert.Equal(failure.HResult, warning.Properties["HResult"]);
+        Assert.Equal((int)HttpStatusCode.Unauthorized, warning.Properties["HttpStatusCode"]);
+        Assert.Equal("check", warning.Properties["Stage"]);
     }
     [Fact]
     public async Task CheckAsync_ShouldIgnoreDraftPrereleaseAndSelectHighestStableRelease()

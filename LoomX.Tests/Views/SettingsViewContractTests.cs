@@ -245,6 +245,8 @@ public sealed class SettingsViewContractTests
         Assert.Contains("ItemsSource=\"{Binding ReleaseHistory.Releases}\"", source, StringComparison.Ordinal);
         Assert.Contains("SelectedItem=\"{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.CanShowLoadMore}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\" IsVisible=\"{Binding ReleaseHistory.HasMore}\"", source, StringComparison.Ordinal);
         Assert.Contains("<views:ReleaseNotesView DataContext=\"{Binding ReleaseHistory.Content}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsInitialLoading}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsEmpty}\"", source, StringComparison.Ordinal);

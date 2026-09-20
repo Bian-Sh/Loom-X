@@ -26,7 +26,11 @@ public sealed class UpdateCoordinatorTests
                 new UpdateAsset("LoomXSetup.exe", "https://example.com/LoomXSetup.exe", 100, "application/octet-stream"),
                 new UpdateAsset("LoomXSetup.exe.sha256", "https://example.com/LoomXSetup.exe.sha256", 64, "text/plain")))
         };
-        service.EnqueuePreparation().SetException(new InvalidOperationException(responseBody));
+        var failure = new HttpRequestException(
+            $"{responseBody} {apiKey}",
+            new InvalidOperationException("Authorization bearer-secret"),
+            System.Net.HttpStatusCode.BadGateway);
+        service.EnqueuePreparation().SetException(failure);
         var logger = new RecordingLogger<UpdateCoordinator>();
         using var coordinator = fixture.CreateCoordinator(service, logger: logger);
 
@@ -34,10 +38,20 @@ public sealed class UpdateCoordinatorTests
         await WaitForAsync(() => coordinator.Stage == UpdateStage.Error);
 
         var logs = string.Join("\n", logger.Messages);
+        var warning = Assert.Single(logger.Entries, entry => entry.Exception is not null);
         Assert.Contains("9.9.9", logs, StringComparison.Ordinal);
         Assert.DoesNotContain(releaseBody, logs, StringComparison.Ordinal);
         Assert.DoesNotContain(apiKey, logs, StringComparison.Ordinal);
         Assert.DoesNotContain(responseBody, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain("bearer-secret", logs, StringComparison.Ordinal);
+        var diagnostic = Assert.IsType<SafeUpdateDiagnosticException>(warning.Exception);
+        Assert.Null(diagnostic.InnerException);
+        Assert.Equal(failure.HResult, diagnostic.HResult);
+        Assert.Contains("PrepareCoreAsync", warning.Exception.StackTrace, StringComparison.Ordinal);
+        Assert.Equal(typeof(HttpRequestException).FullName, warning.Properties["ExceptionType"]);
+        Assert.Equal(failure.HResult, warning.Properties["HResult"]);
+        Assert.Equal((int)System.Net.HttpStatusCode.BadGateway, warning.Properties["HttpStatusCode"]);
+        Assert.Equal("prepare", warning.Properties["Stage"]);
     }
 
     [Fact]
