@@ -13,8 +13,9 @@ public sealed class AssistantMessageQueueTests
         viewModel.SetActiveRunForTesting("session-a");
         viewModel.InputText = "后续消息";
 
-        Assert.True(viewModel.SendCommand.CanExecute(null));
-        viewModel.SendCommand.Execute(null);
+        Assert.False(viewModel.IsComposerStopAction);
+        Assert.True(viewModel.IsComposerActionEnabled);
+        viewModel.ComposerActionCommand.Execute(null);
 
         Assert.True(SpinWait.SpinUntil(() => viewModel.QueuedMessages.Count == 1, TimeSpan.FromSeconds(2)));
         var queued = Assert.Single(viewModel.QueuedMessages);

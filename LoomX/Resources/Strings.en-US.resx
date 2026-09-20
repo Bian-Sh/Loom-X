@@ -477,6 +477,7 @@
   <data name="assistant.new_session"><value>＋ New chat</value></data>
   <data name="assistant.send"><value>Send</value></data>
   <data name="assistant.cancel"><value>Cancel</value></data>
+  <data name="assistant.stop"><value>Stop generating</value></data>
   <data name="assistant.copy.tooltip"><value>Copy message</value></data>
   <data name="assistant.copied"><value>Message copied</value></data>
   <data name="assistant.jump.tooltip"><value>Jump to latest message</value></data>

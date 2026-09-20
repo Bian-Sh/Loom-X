@@ -1347,6 +1347,7 @@
   <data name="assistant.cancel">
     <value>キャンセル</value>
   </data>
+  <data name="assistant.stop"><value>生成を停止</value></data>
   <data name="assistant.copy.tooltip"><value>メッセージをコピー</value></data>
   <data name="assistant.copied"><value>メッセージをコピーしました</value></data>
   <data name="assistant.jump.tooltip"><value>最新のメッセージへ</value></data>
