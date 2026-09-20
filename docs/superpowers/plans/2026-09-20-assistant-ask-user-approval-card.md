@@ -3,47 +3,47 @@ comet_change: fix-assistant-decision-subscription-lifecycle
 base-ref: e0e1dde
 ---
 
-# AskUser 通用能力与 Approval Card 实施计划
+# AskUser 悬浮卡片与简版消息队列实施计划
 
 ## 目标
 
-在不改变 Broker 并发协议和四类字段结果类型的前提下，使 `assistant.ask_user` 可被直接调用，并把桌面交互改造成紧凑、逐题、可导航和可跳过的 Approval Card。
+在不改变 Broker 并发协议和四类字段结果类型的前提下，使 `assistant.ask_user` 可被直接调用，将第一版独立 Window 改为输入框上方悬浮卡片，并增加兼容后续 Codex 风格能力的简版会话消息队列。
 
 ## 文件地图
 
-- 修改 `LoomX/Assistant/AssistantService.cs`：通用 AskUser 提示与 Skill/Bridge 解耦。
-- 修改 `LoomX/Assistant/AssistantTools.cs`：工具描述。
-- 修改 `LoomX/ViewModels/AskUserDialogViewModel.cs`：分页、跳过、当前页验证和值清空。
-- 修改 `LoomX/Views/AskUserDialog.axaml`：Approval Card 视觉结构。
-- 修改 `LoomX/Views/AskUserDialog.axaml.cs`：按钮、键盘和单选自动前进。
-- 修改 `LoomX/Resources/Strings*.resx`：步骤和操作文案。
-- 修改 `LoomX.Tests/Views/AskUserDialogContractTests.cs`：状态与 XAML 契约。
-- 修改 `LoomX.Tests/Assistant/AssistantServiceTests.cs`、`AssistantToolsTests.cs`：通用使用语义。
+- 修改 `LoomX/Assistant/AssistantService.cs`、`AssistantTools.cs`：保持通用 AskUser 语义。
+- 修改 `LoomX/ViewModels/AssistantViewModel.cs`：`PendingAskUser`、队列状态与串行处理循环。
+- 修改/重命名 `LoomX/ViewModels/AskUserDialogViewModel.cs`：卡片完成状态与现有分页能力。
+- 修改/重命名 `LoomX/Views/AskUserDialog.*`：由 Window 转为悬浮卡片 UserControl。
+- 修改 `LoomX/Views/AssistantView.axaml(.cs)`：overlay、队列、输入宽度和卡片交互。
+- 修改 `LoomX/Resources/Strings*.resx`：队列、取消和等待状态文案。
+- 修改 `LoomX.Tests/Views/AskUserDialogContractTests.cs`、`AssistantViewStyleTests.cs` 与 Assistant ViewModel 测试。
+- 修改 `LoomX.Tests/Views/AssistantDecisionLifecycleTests.cs`：显式 UI 线程调度。
 
-## Task 1：通用 AskUser 语义（TDD）
+## Task 1：悬浮卡片契约（TDD）
 
-1. 在 AssistantService/AssistantTools 测试中加入失败断言：系统提示和工具描述明确支持用户直接测试，且不要求 Skill、Bridge 或 Chrome。
-2. 运行定向测试确认按预期失败。
-3. 最小修改系统提示与工具描述。
-4. 重跑测试并提交。
+1. 更新源码契约测试，要求 AskUser 视图不再继承 Window、不调用 `ShowDialog`、不包含标题栏或右上角关闭按钮。
+2. 增加 AssistantView overlay 契约：卡片锚定输入容器上方，具有受控 MaxWidth，不进入 Messages。
+3. 运行定向测试，确认因现有 Dialog 实现而失败。
+4. 最小实现 UserControl 卡片与 `PendingAskUser` 完成链路。
 
-## Task 2：分页状态模型（TDD）
+## Task 2：简版消息队列（TDD）
 
-1. 为 `CurrentField`、步骤文本、前后导航、值保留、可选字段跳过、必填字段拒绝跳过、末页提交写失败测试。
-2. 运行测试确认失败原因是分页 API 尚不存在。
-3. 为 Dialog ViewModel 和字段 ViewModel 实现最小分页/清空/验证能力。
-4. 重跑 ViewModel 测试并提交。
+1. 为运行中入队、FIFO、删除、正常轮次结束后出队、失败暂停和 SessionId 隔离补充失败测试。
+2. 运行测试，确认现有 `SendCommand` 在运行中不可执行而失败。
+3. 增加稳定队列项模型、会话队列集合和单一处理循环。
+4. 在 AssistantView 输入区上方显示紧凑队列，提供删除入口；不实现编辑、排序或 Steer。
 
-## Task 3：Approval Card 视图（TDD）
+## Task 3：生命周期与线程稳定性（TDD）
 
-1. 更新源码契约测试，要求紧凑窗口、当前字段 ContentControl、步骤导航、Skip、Continue/Submit、关闭按钮和四类模板。
-2. 更新代码后置契约测试，要求关闭/键盘路由和单选自动前进。
-3. 重做 XAML 和代码后置，保持 DynamicResource 与透明主题兼容。
-4. 补齐本地化资源并运行 UI 契约测试。
+1. 使用现有 `AssistantDecisionLifecycleTests.MainWindowViewModel_Dispose幂等释放Assistant并收敛已Claim请求` 复现 UI 线程失败。
+2. 把所有 Avalonia UI 对象创建和关闭显式调度到 `Dispatcher.UIThread`。
+3. 重复运行该测试和相关生命周期测试，确认不依赖执行顺序。
 
-## Task 4：集成验证
+## Task 4：集成与交付
 
-1. 运行 AskUserDialog、AssistantViewModel、AssistantService、AssistantTools 和 UserDecisionBroker 定向测试。
-2. 运行 OpenSpec strict validate、Release build 和 xUnit 串行完整测试。
-3. 发布到 `outputs/2026-09-20-<time>-assistant-ask-user-approval-card`。
-4. 后台启动发布包并核对进程路径；用应用级截图验证单选、多选、数字和文本页面、步骤导航、主题与取消/提交行为。
+1. 运行 AskUser、AssistantViewModel、Broker、队列与生命周期定向测试。
+2. 运行 OpenSpec strict validate、Release build 和完整测试。
+3. 发布到新的 `outputs/2026-09-20-<time>-assistant-ask-user-floating-card`。
+4. 使用本地 `cua-driver` 获取 LoomX 顶层窗口，验证悬浮卡片、输入共存、队列删除和顺序出队；优先后台 UIA/虚拟光标，必要时才使用系统鼠标。
+5. 更新验证报告并进入 Comet verify。

@@ -4,74 +4,97 @@ role: technical-design
 canonical_spec: openspec
 ---
 
-# LoomX AskUser 通用能力与 Approval Card 设计
+# LoomX AskUser 悬浮卡片与简版消息队列设计
 
 ## 1. 背景
 
-AskUser 的 Broker、工具和四类字段已经可用，但系统提示把它主要描述为资料不可用时的兜底，现有 620×680 Dialog 又一次性展示全部字段。用户要求它可以脱离 Skill、Browser Bridge 和 Chrome 被直接调用，并采用 Beautiful UI Approval Card 的逐题交互，同时保持 LoomX 自身主题。
+AskUser 的 Broker、工具和四类字段已经可用，通用工具语义也已与 Skill、Browser Bridge 和 Chrome 解耦。第一版逐题 Approval Card 采用独立 Window；真实用户验收确认字段提交正确，但产品目标应是锚定在 AI 输入框上方的悬浮卡片，而不是弹窗或对话流消息。
+
+用户还确认，AskUser 等待期间不应锁死输入框。运行中的后续消息应按 Codex 类交互先进入可管理队列，当前 Assistant 轮次完整结束后再依次发送。
 
 ## 2. 组件边界
 
-- `AssistantService`：只负责告诉模型 AskUser 的通用使用原则，不决定具体 UI。
-- `AssistantTools`：维持独立注册和无限等待契约，更新描述为通用结构化交互。
-- `AskUserDialogViewModel`：拥有分页、当前字段验证、跳过和最终结果构造。
-- 字段 ViewModel：继续拥有具体值，并增加清空与当前有效性支持。
-- `AskUserDialog`：负责页面切换视觉、按钮/键盘路由和单选短延迟自动前进。
-- `AssistantViewModel` / `UserDecisionBroker`：继续负责 Claim、Submit、Cancel 与请求级订阅，不因 UX 改造改变并发模型。
+- `AssistantService`：维持通用 AskUser 提示，不感知桌面卡片或队列 UI。
+- `AssistantTools` / `UserDecisionBroker`：保持请求、Claim、Submit、Cancel 协议不变。
+- AskUser 状态 ViewModel：拥有分页、当前字段验证、跳过、最终结果构造和完成状态。
+- `AskUserCard`：由原 Dialog 视图转换而来的 `UserControl`，只负责字段模板、按钮、键盘路由和单选自动前进。
+- `AssistantViewModel.PendingAskUser`：当前唯一悬浮卡片状态，负责把完成结果提交或取消到 Broker。
+- `AssistantViewModel.QueuedMessages`：当前会话尚未正式发送的消息集合。
+- `AssistantView`：承载消息流、队列、输入框及 overlay；不创建 AskUser 第二顶层窗口。
 
-## 3. ViewModel 状态
+## 3. 悬浮布局
 
-新增只读或通知属性：
+Assistant 页面底部形成一个共享 composer anchor：
 
-- `CurrentFieldIndex`
-- `CurrentField`
-- `StepText`
-- `HasPreviousField`
-- `HasNextField`
-- `IsLastField`
-- `CanSkipCurrentField`
-- `CanContinueCurrentField`
-- `PrimaryActionText`
+```text
+┌──────── AskUserCard（可选，MaxWidth≈560）────────┐
+└─────────────────────────────────────────────────┘
+       ┌──── 待发送队列（可选，紧凑列表）────┐
+       └───────────────────────────────────────┘
+┌──────── 输入容器（MaxWidth≈760）───────────────┐
+└─────────────────────────────────────────────────┘
+```
 
-新增行为：
+AskUserCard 与队列使用 overlay 层覆盖消息区底部，不成为 `Messages` 项，也不创建原生 Popup/Window。输入容器保持正常布局；overlay 根据输入容器实际位置和高度向上排列，间距约 10–12px。卡片使用 DynamicResource、边框、圆角和轻阴影，不显示独立标题栏或右上角关闭按钮。
 
-- `MovePrevious()`
-- `MoveNextWithoutValidation()`
-- `TryAdvanceCurrentField()`
-- `TrySkipCurrentField(out bool shouldSubmit)`
-- `ClearValue()`（字段层）
+窄窗口中，卡片、队列和输入容器按可用宽度收缩；宽窗口中通过 MaxWidth 避免横向拉伸产生大块空白。
 
-构造时不再把其他未访问必填字段的错误全部显示出来。当前页前进时只显示当前字段错误；最终提交时执行完整 `ValidateSubmission`。
+## 4. AskUser 状态与完成
 
-## 4. View 映射
+`PendingAskUser` 只允许一个活动实例，并保存 RequestId、SessionId 和字段状态。卡片提供：
 
-Dialog 使用窄窗口和根 Border 卡片：
+- Previous / Next；
+- Skip（仅可选字段）；
+- Continue / Submit；
+- Cancel（仅 `allow_cancel=true`，位于底部低强调区域）。
 
-1. Header：当前字段标题、必填标记、可选关闭按钮。
-2. Context：请求问题、说明、字段描述、影响摘要。
-3. Body：当前字段 ContentControl，通过四个 DataTemplate 渲染。
-4. Footer：上一页、步骤、下一页；Skip；Continue/Submit。
+提交或取消时，先把卡片标记为已完成，防止重复点击，再由 `AssistantViewModel` 校验当前 Ownership 并调用 Broker。页面离开、会话切换、停止生成或 Dispose 会幂等终止卡片；迟到回调只能被忽略。
 
-选择项使用整行点击区域和现有 RadioButton/CheckBox 控件，数字与文本输入使用项目统一输入样式。所有背景、边框、文字、危险和强调状态从 DynamicResource 读取。
+## 5. 简版队列数据模型
 
-## 5. 交互规则
+队列项至少包含：
 
-- Previous/Next 箭头用于回看，不清空输入。
-- Continue 要求当前字段有效；最后一页执行完整提交。
-- Skip 只对可选字段生效，先清空当前值再前进或提交。
-- 非末页单选后短延迟自动前进；末页单选不自动提交。
-- Escape 和关闭按钮仅在 `AllowCancel` 时返回 false。
-- 单行输入 Enter 继续；多行输入 Ctrl+Enter 继续/提交。
-- XAML 页面切换动画不改变索引与结果状态。
+- 稳定 `Id`；
+- `SessionId`；
+- `Text`；
+- `CreatedAt`；
+- 显式状态（Queued/Dispatching/Paused）。
 
-## 6. 通用工具语义
+本次 UI 只显示顺序、文本预览和删除按钮。数据模型不暴露“永远不可编辑或不可排序”的契约，为后续 Codex 风格能力保留扩展空间。
 
-系统提示将明确：AskUser 可用于用户主动测试、偏好收集、必要输入、歧义澄清和行动确认。调用它不需要加载领域 Skill，也不需要 Bridge/Chrome。只有网页访问任务才遵循 Browser Bridge Skill 与 Session 租约。
+## 6. 发送状态机
 
-## 7. 测试与交付
+用户在空闲状态发送：直接启动一轮 Assistant 请求。
 
-- ViewModel 单测：分页、值保留、跳过、必填、最终结果。
-- 工具/提示契约：直接测试 AskUser 不依赖 Skill/Bridge。
-- XAML/代码后置契约：紧凑尺寸、当前字段 ContentControl、步骤和按钮、关闭/键盘/自动前进。
-- 既有 Broker 并发、生命周期和敏感日志测试全部回归。
-- 完整串行测试、Release build、OpenSpec strict validate、发布包与桌面验收。
+用户在 `IsRunning=true` 时发送：
+
+1. 捕获并清空输入框；
+2. 创建绑定当前 SessionId 的 Queued 项；
+3. 不写入正式消息历史；
+4. 不调用当前 AgentLoop。
+
+当前轮次正常结束后，由单一队列处理循环取出队首，将其转换为正式用户消息并启动下一轮。AskUser 卡片完成只是当前轮次内部的工具返回，不是出队边界。
+
+异常、服务不可用或用户停止时，处理循环暂停，剩余项目保留。切换会话时只展示目标会话队列，不得跨 Session 发送。
+
+## 7. 当前版本与后续版本边界
+
+当前版本实现：
+
+- 运行中发送入队；
+- 顺序显示；
+- 删除未发送项；
+- 当前轮次正常结束后顺序出队；
+- 失败暂停；
+- SessionId 隔离。
+
+后续完整 Codex 风格需求见 `docs/superpowers/specs/2026-09-20-assistant-message-queue-requirements.md`，包括编辑、拖动排序、立即发送、Steer、Stop-and-Send、跨重启恢复和更完整的失败恢复。本次结构必须允许这些能力在不替换队列核心模型的前提下增加。
+
+## 8. 测试
+
+- 悬浮卡片契约：无 Window、无标题栏/右上角关闭按钮、overlay 锚定输入容器、响应式宽度。
+- AskUser 状态：分页、值保留、跳过、必填、取消、最终结果。
+- 队列：运行中入队、删除、FIFO、完整轮次边界、失败暂停、SessionId 隔离。
+- Broker：Claim、Submit、Cancel、请求结束和迟到事件。
+- Avalonia：异步准备后 UI 对象始终在 Dispatcher UI 线程创建和关闭。
+- 桌面验收：使用本地 `cua-driver` 获取 LoomX 顶层窗口截图；优先 UIA 和虚拟光标，必要时才使用系统鼠标。
