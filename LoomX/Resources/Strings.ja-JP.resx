@@ -1498,7 +1498,7 @@
   <data name="assistant.decision.previous"><value>前へ</value></data>
   <data name="assistant.decision.next"><value>次へ</value></data>
   <data name="assistant.decision.close"><value>閉じる</value></data>
-  <data name="assistant.decision.cancel"><value>キャンセル</value></data>
+  <data name="assistant.decision.cancel_input"><value>この入力をキャンセル</value></data>
   <data name="assistant.queue.title"><value>キュー内のメッセージ</value></data>
   <data name="assistant.queue.delete"><value>キュー内のメッセージを削除</value></data>
 </root>

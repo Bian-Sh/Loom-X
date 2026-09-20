@@ -283,7 +283,7 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
-    public void CardXaml_使用应用内悬浮ApprovalCard逐题布局()
+    public void CardXaml_右上角取消输入且操作按钮自适应文字()
     {
         var source = ReadDesktopFile("Views", "AskUserCard.axaml");
 
@@ -305,9 +305,16 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("IsVisible=\"{Binding CanSkipCurrentField}\"", source, StringComparison.Ordinal);
         Assert.Contains("Content=\"{Binding PrimaryActionText}\"", source, StringComparison.Ordinal);
         Assert.Contains("Click=\"PrimaryButton_OnClick\"", source, StringComparison.Ordinal);
-        Assert.Contains("Click=\"CancelButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"CancelInputButton\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"×\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale assistant.decision.cancel_input}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"CancelInputButton_OnClick\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding AllowCancel}\"", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("CloseButton", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"{l:Locale assistant.decision.cancel}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"card-secondary card-action\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"accent card-action\"", source, StringComparison.Ordinal);
+        Assert.Contains("HorizontalContentAlignment\" Value=\"Center", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("MinWidth=\"92\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("AskUser 验收面板", source, StringComparison.Ordinal);
         Assert.Contains("AskUserSingleSelectFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("AskUserMultiSelectFieldViewModel", source, StringComparison.Ordinal);
@@ -322,7 +329,7 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
-    public void CardCodeBehind_接通导航跳过自动前进键盘提交与取消()
+    public void CardCodeBehind_接通右上角取消输入与其余交互()
     {
         var code = ReadDesktopFile("Views", "AskUserCard.axaml.cs");
 
@@ -330,7 +337,8 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("NextButton_OnClick", code, StringComparison.Ordinal);
         Assert.Contains("SkipButton_OnClick", code, StringComparison.Ordinal);
         Assert.Contains("PrimaryButton_OnClick", code, StringComparison.Ordinal);
-        Assert.Contains("CancelButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("CancelInputButton_OnClick", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("CancelButton_OnClick", code, StringComparison.Ordinal);
         Assert.Contains("SingleChoice_OnClick", code, StringComparison.Ordinal);
         Assert.Contains("Task.Delay", code, StringComparison.Ordinal);
         Assert.Contains("TryAdvanceCurrentField", code, StringComparison.Ordinal);
@@ -377,7 +385,8 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("name=\"assistant.decision.submit\"", source, StringComparison.Ordinal);
         Assert.Contains("name=\"assistant.decision.previous\"", source, StringComparison.Ordinal);
         Assert.Contains("name=\"assistant.decision.next\"", source, StringComparison.Ordinal);
-        Assert.Contains("name=\"assistant.decision.cancel\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.cancel_input\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("name=\"assistant.decision.cancel\"", source, StringComparison.Ordinal);
     }
 
     private static T ReadProperty<T>(object target, string propertyName)
