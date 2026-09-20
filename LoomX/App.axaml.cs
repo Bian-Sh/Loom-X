@@ -148,7 +148,8 @@ public partial class App : Application
                 configService,
                 mainWindow.ApplyAppearance,
                 dataStore,
-                LocalizerFactory.Create<MainWindowViewModel>());
+                LocalizerFactory.Create<MainWindowViewModel>(),
+                requestApplicationExit: () => desktop.Shutdown());
             desktop.MainWindow = mainWindow;
             if (activationPending)
                 mainWindow.ActivateFromSecondaryLaunch();

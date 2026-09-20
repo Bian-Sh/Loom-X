@@ -33,6 +33,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     private readonly ActivityViewModel activityViewModel;
     private readonly AssistantViewModel assistantViewModel;
     private readonly UpdateCoordinator updateCoordinator;
+    private readonly ReleaseHistoryViewModel releaseHistoryViewModel;
     private readonly Action<bool, int, int, string>? applyAppearance;
     private readonly IStringLocalizer<MainWindowViewModel> _loc;
     private object currentView;
@@ -71,7 +72,8 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         Action<bool, int, int, string>? applyAppearance = null,
         AppDataStore? dataStore = null,
         IStringLocalizer<MainWindowViewModel>? localizer = null,
-        AssistantViewModel? assistantViewModel = null)
+        AssistantViewModel? assistantViewModel = null,
+        Action? requestApplicationExit = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
@@ -90,7 +92,18 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
         activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
         this.assistantViewModel = assistantViewModel ?? new AssistantViewModel(gatewayService, this.loggerFactory, this.toastService);
-        updateCoordinator = new UpdateCoordinator(this.dataStore, logger: this.loggerFactory.CreateLogger<UpdateCoordinator>());
+        IUpdateService updateService = new UpdateService(
+            logger: this.loggerFactory.CreateLogger<UpdateService>(),
+            currentVersion: AppVersion.Current);
+        updateCoordinator = new UpdateCoordinator(
+            this.dataStore,
+            updateService,
+            this.loggerFactory.CreateLogger<UpdateCoordinator>(),
+            requestApplicationExit);
+        releaseHistoryViewModel = new ReleaseHistoryViewModel(
+            updateService,
+            this.dataStore.GetUpdateProxySettingsAsync,
+            this.loggerFactory.CreateLogger<ReleaseHistoryViewModel>());
         settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, localizer: LocalizerFactory.Create<SettingsViewModel>());
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
         NavigationItems = new([
@@ -248,6 +261,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         activityViewModel.Dispose();
         assistantViewModel.Dispose();
         settingsViewModel.Dispose();
+        releaseHistoryViewModel.Dispose();
         updateCoordinator.Dispose();
         consoleViewModel.Dispose();
         dataStore.Dispose();
