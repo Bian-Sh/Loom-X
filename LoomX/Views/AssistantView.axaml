@@ -696,8 +696,15 @@
            IsLightDismissEnabled="False"
            IsOpen="{Binding HasComposerOverlay}">
       <StackPanel Width="560" MaxWidth="560" Spacing="8">
-        <views:AskUserCard DataContext="{Binding PendingAskUser}"
-                           IsVisible="{Binding PendingAskUser, Converter={x:Static conv:ObjectConverters.IsNotNull}}"/>
+        <ContentControl Content="{Binding PendingAskUser}"
+                        IsVisible="{Binding PendingAskUser, Converter={x:Static conv:ObjectConverters.IsNotNull}}"
+                        HorizontalContentAlignment="Center">
+          <ContentControl.ContentTemplate>
+            <DataTemplate DataType="{x:Type vm:AskUserDialogViewModel}">
+              <views:AskUserCard/>
+            </DataTemplate>
+          </ContentControl.ContentTemplate>
+        </ContentControl>
         <Border IsVisible="{Binding HasQueuedMessages}"
                 Background="{DynamicResource DialogBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderStrongBrush}"

@@ -7,6 +7,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.VisualTree;
 using LoomX.Assistant;
+using LoomX.Assistant.UserDecisions;
 using LoomX.Services;
 using LoomX.ViewModels;
 using LoomX.Views;
@@ -593,6 +594,46 @@ public sealed class AssistantViewStyleTests
     }
 
     [Fact]
+    public void AskUser结束后排队消息仍保留时不会残留旧卡片()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        using var gatewayService = new GatewayProcessService();
+        using var viewModel = new AssistantViewModel(gatewayService);
+        viewModel.EnqueueMessageForTesting("session-id", "排队消息");
+        viewModel.ShowQueueForSessionForTesting("session-id");
+        var pendingAskUserProperty = typeof(AssistantViewModel).GetProperty(nameof(AssistantViewModel.PendingAskUser));
+        Assert.NotNull(pendingAskUserProperty);
+        pendingAskUserProperty.SetValue(viewModel, new AskUserDialogViewModel(new PendingUserDecision(
+            "request-id",
+            "owner-id",
+            new UserDecisionRequest(
+                "确认",
+                "请选择",
+                [new UserDecisionField("answer", "回答", UserDecisionFieldType.Text, isRequired: true)]))));
+        var view = new AssistantView { DataContext = viewModel };
+        var host = new Window { Content = view, Width = 1180, Height = 760, ShowActivated = false };
+        host.Show();
+        try
+        {
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            host.UpdateLayout();
+            var popup = Assert.IsType<Popup>(view.FindControl<Popup>("assistantInteractionOverlay"));
+            Assert.True(popup.IsOpen);
+            Assert.Contains(popup.Child!.GetVisualDescendants().OfType<AskUserCard>(), card => card.IsEffectivelyVisible);
+
+            pendingAskUserProperty.SetValue(viewModel, null);
+            host.UpdateLayout();
+
+            Assert.True(popup.IsOpen);
+            Assert.DoesNotContain(popup.Child!.GetVisualDescendants().OfType<AskUserCard>(), card => card.IsEffectivelyVisible);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
+    [Fact]
     public void AskUser与消息队列使用输入框锚定的应用内悬浮层()
     {
         var source = ReadDesktopFile("Views", "AssistantView.axaml");
@@ -601,7 +642,8 @@ public sealed class AssistantViewStyleTests
         Assert.Contains("PlacementTarget=\"{Binding #inputCard}\"", source, StringComparison.Ordinal);
         Assert.Contains("ShouldUseOverlayLayer=\"True\"", source, StringComparison.Ordinal);
         Assert.Contains("<views:AskUserCard", source, StringComparison.Ordinal);
-        Assert.Contains("DataContext=\"{Binding PendingAskUser}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{Binding PendingAskUser}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("DataContext=\"{Binding PendingAskUser}\"", source, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding QueuedMessages}\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding DeleteCommand}\"", source, StringComparison.Ordinal);
         Assert.Contains("MaxWidth=\"760\"", source, StringComparison.Ordinal);
