@@ -5,8 +5,8 @@
 
 ## 2. Approval Card 状态模型
 
-- [ ] 2.1 先为当前字段、步骤导航、跳过、必填限制、值保留和最终提交补充失败测试
-- [ ] 2.2 实现 AskUserDialogViewModel 的逐题分页状态与字段清空/当前页验证能力
+- [x] 2.1 先为当前字段、步骤导航、跳过、必填限制、值保留和最终提交补充失败测试
+- [x] 2.2 实现 AskUserDialogViewModel 的逐题分页状态与字段清空/当前页验证能力
 
 ## 3. Approval Card 视图
 
@@ -19,4 +19,5 @@
 - [ ] 4.1 运行 AskUser、AssistantService、Broker 和生命周期定向测试，修复回归
 - [ ] 4.2 运行 OpenSpec strict validate、Release build 和完整串行测试
 - [ ] 4.3 重新发布桌面包到带可读时间的 outputs 目录，并完成 Approval Card 桌面交互验收
+
 
