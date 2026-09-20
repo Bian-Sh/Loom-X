@@ -19,7 +19,7 @@ branch_status: handled
 created_at: 2026-09-20
 verified_at: null
 archived: false
-direct_override: null
+direct_override: true
 handoff_context: openspec/changes/fix-assistant-decision-subscription-lifecycle/.comet/handoff/design-context.json
 handoff_hash: 60317dc656bb09c75f866cea85f6a5b9bcc95be68681d4c90b2290ded12a6302
 classic_profile: full
