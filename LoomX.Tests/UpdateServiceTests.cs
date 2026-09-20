@@ -63,6 +63,39 @@ public sealed class UpdateServiceTests
         Assert.Equal("check", warning.Properties["Stage"]);
     }
     [Fact]
+    public async Task 重写堆栈和异常数据不会进入安全诊断日志()
+    {
+        const string sensitiveMarker = "stack-body-api-key-proxy-password-secret";
+        var failure = new MaliciousStackTraceException(sensitiveMarker, HttpStatusCode.BadGateway);
+        var logger = new RecordingLogger<UpdateService>();
+        var service = new UpdateService(
+            _ => new HttpClient(new StubHandler(_ => throw failure)),
+            logger: logger,
+            currentVersion: "0.12.6");
+
+        await Assert.ThrowsAsync<MaliciousStackTraceException>(() => service.CheckAsync(DirectSettings));
+
+        var warning = Assert.Single(logger.Entries, entry => entry.Exception is not null);
+        var diagnostic = Assert.IsType<SafeUpdateDiagnosticException>(warning.Exception);
+        var capturedLog = string.Join("\n", logger.Messages);
+        Assert.DoesNotContain(sensitiveMarker, diagnostic.StackTrace ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain(sensitiveMarker, diagnostic.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(sensitiveMarker, capturedLog, StringComparison.Ordinal);
+        Assert.Empty(diagnostic.Data);
+        Assert.Null(diagnostic.InnerException);
+        Assert.Equal(failure.GetType().FullName, diagnostic.OriginalExceptionType);
+        Assert.Equal(failure.HResult, diagnostic.OriginalHResult);
+        Assert.Equal(failure.HResult, diagnostic.HResult);
+        Assert.Equal((int)HttpStatusCode.BadGateway, diagnostic.HttpStatusCode);
+        Assert.Equal("check", diagnostic.Stage);
+        Assert.Equal(diagnostic.OriginalExceptionType, warning.Properties["ExceptionType"]);
+        Assert.Equal(diagnostic.OriginalHResult, warning.Properties["HResult"]);
+        Assert.Equal(diagnostic.HttpStatusCode, warning.Properties["HttpStatusCode"]);
+        Assert.Equal(diagnostic.Stage, warning.Properties["Stage"]);
+        Assert.Contains(nameof(UpdateService.CheckAsync), diagnostic.StackTrace, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CheckAsync_ShouldIgnoreDraftPrereleaseAndSelectHighestStableRelease()
     {
         var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
@@ -304,6 +337,21 @@ public sealed class UpdateServiceTests
             content_type = "text/plain"
         }
     ];
+
+    private sealed class MaliciousStackTraceException : Exception
+    {
+        private readonly string sensitiveMarker;
+
+        public MaliciousStackTraceException(string sensitiveMarker, HttpStatusCode statusCode)
+            : base(sensitiveMarker, new HttpRequestException(sensitiveMarker, null, statusCode))
+        {
+            this.sensitiveMarker = sensitiveMarker;
+            HResult = unchecked((int)0x81234567);
+            Data["response-body"] = sensitiveMarker;
+        }
+
+        public override string? StackTrace => sensitiveMarker;
+    }
 
     private sealed class RecordingLauncher : IUpdateInstallerLauncher
     {

@@ -16,8 +16,7 @@ internal sealed class SafeUpdateDiagnosticException : Exception
         Stage = stage;
         HResult = source.HResult;
 
-        if (!string.IsNullOrWhiteSpace(source.StackTrace))
-            ExceptionDispatchInfo.SetRemoteStackTrace(this, source.StackTrace);
+        ExceptionDispatchInfo.SetCurrentStackTrace(this);
     }
 
     public string OriginalExceptionType { get; }
