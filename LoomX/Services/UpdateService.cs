@@ -340,6 +340,8 @@ public sealed class UpdateService : IUpdateService
         }
         catch
         {
+            TryDelete(installerPath);
+            TryDelete(checksumPath);
             TryDelete(installerPartial);
             TryDelete(checksumPartial);
             throw;

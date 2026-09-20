@@ -100,6 +100,68 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task PrepareUpdateAsync_篡改缓存后重新下载并恢复()
+    {
+        var fixture = UpdateFixture.CreateValid();
+        try
+        {
+            var first = await fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings);
+            var requestCount = fixture.Handler.RequestUris.Count;
+            await File.WriteAllTextAsync(first.InstallerPath, "已篡改");
+
+            var second = await fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings);
+
+            Assert.Equal(requestCount + 2, fixture.Handler.RequestUris.Count);
+            Assert.Equal(fixture.InstallerBytes, await File.ReadAllBytesAsync(second.InstallerPath));
+            Assert.Null(fixture.Launcher.Path);
+        }
+        finally { fixture.Dispose(); }
+    }
+
+    [Fact]
+    public async Task PrepareUpdateAsync_修复当前版本无效缓存但保留其他版本文件()
+    {
+        var fixture = UpdateFixture.CreateValid();
+        try
+        {
+            Directory.CreateDirectory(fixture.VersionDirectory);
+            await File.WriteAllTextAsync(fixture.InstallerPath, "无效安装器");
+            await File.WriteAllTextAsync(fixture.ChecksumPath, new string('0', 64));
+            var otherVersionFile = Path.Combine(fixture.RootDirectory, "0.12.6", "keep.txt");
+            Directory.CreateDirectory(Path.GetDirectoryName(otherVersionFile)!);
+            await File.WriteAllTextAsync(otherVersionFile, "必须保留");
+
+            var prepared = await fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings);
+
+            Assert.Equal(fixture.InstallerBytes, await File.ReadAllBytesAsync(prepared.InstallerPath));
+            Assert.Equal("必须保留", await File.ReadAllTextAsync(otherVersionFile));
+            Assert.Equal(2, fixture.Handler.RequestUris.Count);
+            Assert.Null(fixture.Launcher.Path);
+        }
+        finally { fixture.Dispose(); }
+    }
+
+    [Fact]
+    public async Task PrepareUpdateAsync_校验文件发布失败时清理当前版本正式缓存和临时文件()
+    {
+        var fixture = UpdateFixture.CreateValid();
+        try
+        {
+            Directory.CreateDirectory(fixture.VersionDirectory);
+            Directory.CreateDirectory(fixture.ChecksumPath);
+
+            var exception = await Record.ExceptionAsync(() =>
+                fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings));
+
+            Assert.NotNull(exception);
+            Assert.False(File.Exists(fixture.InstallerPath));
+            Assert.Empty(Directory.EnumerateFiles(fixture.VersionDirectory, "*.partial"));
+            Assert.Null(fixture.Launcher.Path);
+        }
+        finally { fixture.Dispose(); }
+    }
+
+    [Fact]
     public async Task PrepareUpdateAsync_校验失败删除当前版本临时文件()
     {
         var fixture = UpdateFixture.CreateWithChecksum("0000000000000000000000000000000000000000000000000000000000000000");
@@ -205,18 +267,18 @@ public sealed class UpdateServiceTests
 
         private UpdateFixture(string checksum)
         {
-            var bytes = Encoding.UTF8.GetBytes("测试安装包");
+            InstallerBytes = Encoding.UTF8.GetBytes("测试安装包");
             Handler = new StubHandler(request =>
             {
                 if (request.RequestUri?.AbsoluteUri.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) == true)
                     return TextResponse($"{checksum}  LoomX-0.12.7-setup.exe");
-                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) };
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(InstallerBytes) };
             });
             Launcher = new RecordingLauncher();
             root = Path.Combine(Path.GetTempPath(), "LoomX-UpdateTests", Guid.NewGuid().ToString("N"));
             var assets = new[]
             {
-                new UpdateAsset("LoomX-0.12.7-setup.exe", "https://github.com/Bian-Sh/Loom-X/releases/download/v0.12.7/LoomX-0.12.7-setup.exe", bytes.Length, null),
+                new UpdateAsset("LoomX-0.12.7-setup.exe", "https://github.com/Bian-Sh/Loom-X/releases/download/v0.12.7/LoomX-0.12.7-setup.exe", InstallerBytes.Length, null),
                 new UpdateAsset("LoomX-0.12.7-setup.exe.sha256", "https://github.com/Bian-Sh/Loom-X/releases/download/v0.12.7/LoomX-0.12.7-setup.exe.sha256", checksum.Length, "text/plain")
             };
             Release = new UpdateRelease(
@@ -229,7 +291,11 @@ public sealed class UpdateServiceTests
         public UpdateRelease Release { get; }
         public StubHandler Handler { get; }
         public RecordingLauncher Launcher { get; }
+        public byte[] InstallerBytes { get; }
+        public string RootDirectory => root;
         public string VersionDirectory => Path.Combine(root, Release.Version);
+        public string InstallerPath => Path.Combine(VersionDirectory, Path.GetFileName(Release.InstallerAsset!.Name));
+        public string ChecksumPath => Path.Combine(VersionDirectory, Path.GetFileName(Release.ChecksumAsset!.Name));
 
         public static UpdateFixture CreateValid()
         {
