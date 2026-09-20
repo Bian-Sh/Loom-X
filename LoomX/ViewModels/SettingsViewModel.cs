@@ -134,7 +134,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         get => selectedTabIndex;
         set
         {
-            if (!SetProperty(ref selectedTabIndex, value) || value != 1 || releaseHistoryLoadRequested) return;
+            if (!SetProperty(ref selectedTabIndex, value) || value != 2 || releaseHistoryLoadRequested) return;
             releaseHistoryLoadRequested = true;
             _ = ReleaseHistory.EnsureLoadedAsync();
         }

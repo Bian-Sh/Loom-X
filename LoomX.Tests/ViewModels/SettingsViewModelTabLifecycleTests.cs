@@ -39,9 +39,13 @@ public sealed class SettingsViewModelTabLifecycleTests
         await WaitForAsync(() => !settings.IsBusy);
 
         selectedTabIndex.SetValue(settings, 1);
+        await Task.Delay(50);
+        Assert.Equal(0, service.HistoryRequests);
+
+        selectedTabIndex.SetValue(settings, 2);
         await WaitForAsync(() => service.HistoryRequests == 1 && !history.IsInitialLoading);
         selectedTabIndex.SetValue(settings, 0);
-        selectedTabIndex.SetValue(settings, 1);
+        selectedTabIndex.SetValue(settings, 2);
         await Task.Delay(50);
 
         Assert.Same(history, releaseHistory.GetValue(settings));

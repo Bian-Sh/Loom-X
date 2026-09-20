@@ -52,6 +52,11 @@ public sealed class MainWindowChromeContractTests
         Assert.Contains("ToolTip.Tip=\"{Binding Update.UpdateEntryText}\"", source, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"{Binding Update.UpdateEntryText}\"", source, StringComparison.Ordinal);
         Assert.Contains("Height=\"32\" MinWidth=\"32\"", source, StringComparison.Ordinal);
+        Assert.Contains("Style Selector=\"Button.update-entry\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Width\" Value=\"32\" />", source, StringComparison.Ordinal);
+        Assert.Contains("Style Selector=\"Button.update-entry:pointerover\"", source, StringComparison.Ordinal);
+        Assert.Contains("Style Selector=\"Button.update-entry:focus\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Width\" Value=\"252\" />", source, StringComparison.Ordinal);
         Assert.Contains("Style Selector=\"Border.update-entry-text\"", source, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"Width\" Value=\"0\" />", source, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"Opacity\" Value=\"0\" />", source, StringComparison.Ordinal);

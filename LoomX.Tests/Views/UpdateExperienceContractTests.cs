@@ -9,6 +9,21 @@ namespace LoomX.Tests.Views;
 public sealed class UpdateExperienceContractTests
 {
     [Fact]
+    public void Debug更新预览仅支持固定场景且由编译条件隔离()
+    {
+        var mainViewModel = NormalizeLineEndings(ReadDesktopFile("ViewModels", "MainWindowViewModel.cs"));
+        var previewService = NormalizeLineEndings(ReadDesktopFile("Services", "DebugUpdatePreviewService.cs"));
+
+        Assert.Contains("#if DEBUG\n        updateService = DebugUpdatePreviewService.CreateFromEnvironment(updateService);\n        updatePreviewEnabled = updateService is DebugUpdatePreviewService;\n#endif", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("#if DEBUG\n            if (updatePreviewEnabled) _ = updateCoordinator.CheckNowAsync();\n#endif", mainViewModel, StringComparison.Ordinal);
+        Assert.StartsWith("#if DEBUG\n", previewService, StringComparison.Ordinal);
+        Assert.EndsWith("#endif\n", previewService, StringComparison.Ordinal);
+        Assert.Contains("LOOMX_UPDATE_PREVIEW", previewService, StringComparison.Ordinal);
+        Assert.Contains("\"downloading\" or \"verifying\" or \"ready\" or \"error\" or \"history-empty\"", previewService, StringComparison.Ordinal);
+        Assert.DoesNotContain("default:", previewService, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void 更新安装请求复用正常退出路径和共享服务()
     {
         var app = NormalizeLineEndings(ReadDesktopFile("App.axaml.cs"));

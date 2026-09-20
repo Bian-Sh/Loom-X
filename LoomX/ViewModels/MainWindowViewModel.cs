@@ -42,6 +42,9 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     private double selectedNavigationOffset;
     private bool hasActiveNavigationItem;
     private bool disposed;
+#if DEBUG
+    private readonly bool updatePreviewEnabled;
+#endif
 
     public ObservableCollection<NavigationItemViewModel> NavigationItems { get; }
     public object CurrentView => currentView;
@@ -95,6 +98,10 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         IUpdateService updateService = new UpdateService(
             logger: this.loggerFactory.CreateLogger<UpdateService>(),
             currentVersion: AppVersion.Current);
+#if DEBUG
+        updateService = DebugUpdatePreviewService.CreateFromEnvironment(updateService);
+        updatePreviewEnabled = updateService is DebugUpdatePreviewService;
+#endif
         updateCoordinator = new UpdateCoordinator(
             this.dataStore,
             updateService,
@@ -192,6 +199,9 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             }
             ShowOverview();
             updateCoordinator.Start();
+#if DEBUG
+            if (updatePreviewEnabled) _ = updateCoordinator.CheckNowAsync();
+#endif
         }
         if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
     }

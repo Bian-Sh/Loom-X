@@ -32,8 +32,8 @@
 
 ## 6. 集成验证与发布包
 
-- [ ] 6.1 运行更新服务、协调器、设置页、主窗口、本地化和敏感日志相关测试，修复本次改动引入的失败并记录结果。
-- [ ] 6.2 运行 `dotnet build LoomX.slnx -c Release --no-restore` 与必要的完整测试，确认零编译错误且仅保留已知警告。
-- [ ] 6.3 使用 CUA 验证浅色、深色和关闭透明效果后的标题栏 Hover、浮窗进度/Ready 状态、版本切换及错误/空态可读性；透明主题截图仅作为辅助证据。
-- [ ] 6.4 重新发布桌面应用，并将可运行产物放入 `outputs/` 下以 `yyyyMMdd-HHmmss-enhance-update-experience` 格式命名的目录，校验启动进程路径与发布文件完整性。
-- [ ] 6.5 更新 Comet 任务状态和验证报告，确认实现与 `desktop-update-experience` delta spec 一致且未改动无关 session 产物。
+- [x] 6.1 运行更新服务、协调器、设置页、主窗口、本地化和敏感日志相关测试，修复本次改动引入的失败并记录结果。
+- [x] 6.2 运行 `dotnet build LoomX.slnx -c Release --no-restore` 与必要的完整测试，确认零编译错误且仅保留已知警告。
+- [x] 6.3 使用 CUA 验证浅色、深色和关闭透明效果后的标题栏 Hover、浮窗进度/Ready 状态、版本切换及错误/空态可读性；透明主题截图仅作为辅助证据。
+- [x] 6.4 重新发布桌面应用，并将可运行产物放入 `outputs/` 下以 `yyyyMMdd-HHmmss-enhance-update-experience` 格式命名的目录，校验启动进程路径与发布文件完整性。
+- [x] 6.5 更新 Comet 任务状态和验证报告，确认实现与 `desktop-update-experience` delta spec 一致且未改动无关 session 产物。
