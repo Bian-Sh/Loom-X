@@ -283,30 +283,80 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
-    public void DialogXaml_使用动态玻璃资源滚动字段模板与安全错误区()
+    public void DialogXaml_使用紧凑主题化ApprovalCard逐题布局()
     {
         var source = ReadDesktopFile("Views", "AskUserDialog.axaml");
-        var code = ReadDesktopFile("Views", "AskUserDialog.axaml.cs");
 
+        Assert.Contains("Width=\"460\"", source, StringComparison.Ordinal);
+        Assert.Contains("MinWidth=\"420\"", source, StringComparison.Ordinal);
+        Assert.Contains("SizeToContent=\"Height\"", source, StringComparison.Ordinal);
+        Assert.Contains("CanResize=\"False\"", source, StringComparison.Ordinal);
         Assert.Contains("Background=\"Transparent\"", source, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource DialogBackgroundBrush}", source, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource BorderStrongBrush}", source, StringComparison.Ordinal);
-        Assert.Contains("CornerRadius=\"10\"", source, StringComparison.Ordinal);
-        Assert.Contains("<ScrollViewer", source, StringComparison.Ordinal);
+        Assert.Contains("{DynamicResource SurfaceSubtleBrush}", source, StringComparison.Ordinal);
+        Assert.Contains("{DynamicResource AccentBrush}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"#", source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Content=\"{Binding CurrentField}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ItemsSource=\"{Binding Fields}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding CurrentField.Label}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding StepText}\"", source, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PreviousButton\"", source, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"NextButton\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"SkipButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding CanSkipCurrentField}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{Binding PrimaryActionText}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"PrimaryButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding AllowCancel}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"CloseButton_OnClick\"", source, StringComparison.Ordinal);
         Assert.Contains("AskUserSingleSelectFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("AskUserMultiSelectFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("AskUserNumberFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("AskUserTextFieldViewModel", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding Title}\"", source, StringComparison.Ordinal);
+        Assert.Contains("KeyDown=\"TextInput_OnKeyDown\"", source, StringComparison.Ordinal);
+        Assert.Contains("KeyDown=\"NumberInput_OnKeyDown\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Question}\"", source, StringComparison.Ordinal);
         Assert.Contains("Description", source, StringComparison.Ordinal);
         Assert.Contains("ImpactSummary", source, StringComparison.Ordinal);
         Assert.Contains("ErrorSummary", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"{l:Locale assistant.cancel}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"{l:Locale assistant.approval.approve}\"", source, StringComparison.Ordinal);
-        Assert.Contains("SubmitButton_OnClick", code, StringComparison.Ordinal);
-        Assert.Contains("TryBuildResult", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DialogCodeBehind_接通导航跳过自动前进键盘提交与取消()
+    {
+        var code = ReadDesktopFile("Views", "AskUserDialog.axaml.cs");
+
+        Assert.Contains("PreviousButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("NextButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("SkipButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("PrimaryButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("CloseButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("SingleChoice_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("Task.Delay", code, StringComparison.Ordinal);
+        Assert.Contains("TryAdvanceCurrentField", code, StringComparison.Ordinal);
+        Assert.Contains("TrySkipCurrentField", code, StringComparison.Ordinal);
+        Assert.Contains("Key.Enter", code, StringComparison.Ordinal);
+        Assert.Contains("KeyModifiers.Control", code, StringComparison.Ordinal);
+        Assert.Contains("AskUserTextFieldViewModel { IsMultiline: true }", code, StringComparison.Ordinal);
+        Assert.Contains("Close(true)", code, StringComparison.Ordinal);
         Assert.Contains("Close(false)", code, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Strings.resx")]
+    [InlineData("Strings.en-US.resx")]
+    [InlineData("Strings.ja-JP.resx")]
+    [InlineData("Strings.zh-TW.resx")]
+    public void ApprovalCard操作文案_覆盖全部Locale(string fileName)
+    {
+        var source = ReadDesktopFile("Resources", fileName);
+
+        Assert.Contains("name=\"assistant.decision.skip\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.continue\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.submit\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.previous\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.next\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.close\"", source, StringComparison.Ordinal);
     }
 
     private static T ReadProperty<T>(object target, string propertyName)

@@ -10,14 +10,15 @@
 
 ## 3. Approval Card 视图
 
-- [ ] 3.1 先更新 XAML/代码后置契约测试，覆盖紧凑卡片、步骤导航、关闭、Skip、Continue/Submit 和四类字段模板
-- [ ] 3.2 重做 AskUserDialog XAML 与代码后置，接通导航、单选自动前进、键盘行为、主题资源和 Broker 提交/取消
-- [ ] 3.3 补齐中英日繁体本地化，并验证透明/非透明主题下不使用固定网页配色
+- [x] 3.1 先更新 XAML/代码后置契约测试，覆盖紧凑卡片、步骤导航、关闭、Skip、Continue/Submit 和四类字段模板
+- [x] 3.2 重做 AskUserDialog XAML 与代码后置，接通导航、单选自动前进、键盘行为、主题资源和 Broker 提交/取消
+- [x] 3.3 补齐中英日繁体本地化，并验证透明/非透明主题下不使用固定网页配色
 
 ## 4. 集成与交付
 
 - [ ] 4.1 运行 AskUser、AssistantService、Broker 和生命周期定向测试，修复回归
 - [ ] 4.2 运行 OpenSpec strict validate、Release build 和完整串行测试
 - [ ] 4.3 重新发布桌面包到带可读时间的 outputs 目录，并完成 Approval Card 桌面交互验收
+
 
 
