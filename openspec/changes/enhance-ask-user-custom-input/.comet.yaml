@@ -26,6 +26,6 @@ classic_profile: full
 classic_migration: 1
 run_id: 3e4d5131-1be1-4853-aca6-3b7f5067dcee
 bound_branch: codex/enhance-ask-user-custom-input
-verify_failures: 1
-check_epoch: 8
+verify_failures: 2
+check_epoch: 10
 archive_confirmation: null

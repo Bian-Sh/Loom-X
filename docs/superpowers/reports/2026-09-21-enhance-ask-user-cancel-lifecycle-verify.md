@@ -8,7 +8,9 @@
 {"cancelled":true,"values":{},"custom_inputs":{}}
 ```
 
-缺陷位于 `AgentLoop`。取消结果被当作普通成功工具结果后，下一次模型请求仍公开 `assistant.ask_user`；模型重复调用时会创建新的 Pending 请求并重新展示卡片。若用户随后完成第二张卡片，助手最终看到的是第二次提交的 `cancelled=false`，从而产生“面板未取消”的错误汇总。
+首个缺陷位于 `AgentLoop`。取消结果被当作普通成功工具结果后，下一次模型请求仍公开 `assistant.ask_user`；模型重复调用时会创建新的 Pending 请求并重新展示卡片。若用户随后完成第二张卡片，助手最终看到的是第二次提交的 `cancelled=false`，从而产生“面板未取消”的错误汇总。
+
+独立审查随后发现 Responses/Codex 路径的关联回归：从当前工具列表移除 AskUser 后，`OpenAiCompatibleModelClient` 同时失去了历史 `assistant.ask_user` 的 wire name 映射，下一轮历史 `function_call.name` 会从 `assistant_ask_user` 退化为带点名称，重复调用也无法还原为逻辑工具名。
 
 ## 2. 修复行为
 
@@ -20,38 +22,41 @@
 4. AgentLoop 不直接终止整个助手轮次，模型仍可根据取消结果生成准确摘要；
 5. 新用户轮次重新创建状态，AskUser 可正常再次使用。
 
+Responses 工具名映射现在同时收集当前可用工具与历史 assistant tool call，并按逻辑工具名稳定排序后生成规范化名称。AskUser 虽然不再向模型公开，但历史调用仍序列化为 `assistant_ask_user`，模型返回的同名重复调用仍能还原为 `assistant.ask_user`，从而命中本轮取消结果复用。
+
 ## 3. TDD 证据
 
 新增回归测试：
 
 ```text
 AgentLoopTests.AskUser返回取消结果_应继续总结且不再展示AskUser
+OpenAiCompatibleModelClientTests.StreamAsync_Responses禁用工具后仍保留历史工具名映射
 ```
 
-RED 阶段失败证据：
+RED 阶段分别确认：
 
-```text
-Expected: Completed
-Actual:   Cancelled
-```
+- 取消后 AgentLoop 会被错误终止或再次执行 AskUser；
+- Responses 请求中的历史调用名实际为 `assistant.ask_user`，而不是规范化的 `assistant_ask_user`。
 
 GREEN 阶段断言：
 
-- 模型在收到取消结果后再次生成 AskUser 调用；
 - AskUser Handler 总调用次数仍为 1；
 - 后续模型请求不再公开 `assistant.ask_user`；
 - 两条工具结果均保持 `cancelled=true`；
-- AgentLoop 最终完成，并输出“面板已取消（cancelled: true）”。
+- AgentLoop 最终完成，并输出取消摘要；
+- Responses 请求不公开已禁用工具，但历史 `function_call` 继续使用规范化名称；
+- Responses 返回的 `assistant_ask_user` 能还原为 `assistant.ask_user`。
 
 ## 4. 自动化验证
 
-### AskUser 与 AgentLoop 定向测试
+### Responses 与 AgentLoop 定向测试
 
 ```text
-dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore \
-  --filter "FullyQualifiedName~UserDecision|FullyQualifiedName~AskUser|FullyQualifiedName~AssistantToolsTests|FullyQualifiedName~AssistantServiceTests|FullyQualifiedName~AssistantViewModelTests|FullyQualifiedName~AgentLoopTests"
+dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~OpenAiCompatibleModelClientTests"
+已通过：41 / 41
 
-已通过：213 / 213
+dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~AgentLoopTests"
+已通过：25 / 25
 ```
 
 ### 完整测试
@@ -59,7 +64,8 @@ dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore \
 ```text
 dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore
 
-已通过：1113 / 1113
+已通过：1114 / 1114
+Comet 证据：openspec/changes/enhance-ask-user-custom-input/.comet/checks/9b342f01-83d1-4a2b-b21c-5cd81a1d3ac4.log
 ```
 
 ### Release 构建
@@ -81,17 +87,16 @@ Change 'enhance-ask-user-custom-input' is valid
 ## 5. 发布包
 
 ```text
-outputs/2026-09-21-064653-ask-user-cancel-lifecycle/LoomX.exe
+outputs/2026-09-20-071229-ask-user-cancel-lifecycle-r2/LoomX.exe
 ```
 
-发布成功并确认 `LoomX.exe` 存在。尝试启动新包进行桌面复验时，LoomX 单实例机制检测到旧发布包 `outputs/2026-09-20-043915-ask-user-custom-input/LoomX.exe` 已运行，因此新进程立即退出。为避免关闭用户正在使用的实例，本轮未强制终止旧进程。取消重弹属于 AgentLoop 生命周期问题，已由覆盖重复模型调用、Handler 次数、工具可见性、工具结果和最终摘要的回归测试确定性验证。
+发布成功并确认 `LoomX.exe` 存在。桌面复验未强制启动新包，因为当前已有两个 LoomX 实例运行，其中包括旧发布包 `outputs/2026-09-20-043915-ask-user-custom-input/LoomX.exe`。为避免关闭用户正在使用的实例，本轮未终止任何进程。取消重弹与 Responses 映射均已由确定性回归测试覆盖。
 
 ## 6. 审查结论
 
 - UI 关闭按钮与 Broker 取消链路无需修改，避免在表现层重复打补丁。
 - 禁用状态仅限当前 `RunAsync`，不会永久关闭 AskUser。
+- Responses 历史工具名与返回工具名保持稳定映射，不会因隐藏当前工具而退化。
 - 重复调用不读取或记录工具参数、用户 prompt 或输入内容。
 - 日志只记录工具名，不包含用户输入或取消原因。
 - 未修改数据库、持久化格式或其他 Session 产物。
-
-本轮未发现新的 CRITICAL 或 WARNING 级问题；既有 NuGet 漏洞告警未由本次变更新增。
