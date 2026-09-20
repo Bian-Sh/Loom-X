@@ -4,9 +4,22 @@ design-doc: docs/superpowers/specs/2026-09-20-ask-user-custom-input-design.md
 base-ref: e364174ae800c15d97106d3b5f8b90ddbf34d823
 ---
 
+<!-- comet-task-authority: openspec/changes/enhance-ask-user-custom-input/tasks.md -->
+<!-- comet-task-ref:askuser-1-1 -->
+<!-- comet-task-ref:askuser-1-2 -->
+<!-- comet-task-ref:askuser-2-1 -->
+<!-- comet-task-ref:askuser-2-2 -->
+<!-- comet-task-ref:askuser-2-3 -->
+<!-- comet-task-ref:askuser-3-1 -->
+<!-- comet-task-ref:askuser-3-2 -->
+<!-- comet-task-ref:askuser-3-3 -->
+<!-- comet-task-ref:askuser-4-1 -->
+<!-- comet-task-ref:askuser-4-2 -->
+<!-- comet-task-ref:askuser-4-3 -->
+
 # AskUser 选择题自由输入与真实文本回传实施计划
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. 任务完成状态以 OpenSpec `tasks.md` 为权威，本计划通过稳定 task ref 映射实施步骤。
 
 **目标：** 为 AskUser 单选和多选字段增加可选的“我有其他想法...”自由输入，并把选择题自由输入与普通文本字段原文完整返回给 AI。
 
@@ -43,7 +56,7 @@ base-ref: e364174ae800c15d97106d3b5f8b90ddbf34d823
 - 产生：JSON 参数 `allow_custom_input`、`custom_input_placeholder`
 - 保持：`max_length` 对 text 和启用自由输入的选择字段生效，范围 1–4000
 
-- [x] **Step 1：为 Schema 与解析增加失败测试**
+- **Step 1：为 Schema 与解析增加失败测试**
 
 在 `AssistantToolsTests` 增加 Schema 断言：
 
@@ -77,7 +90,7 @@ public void RegisterAll_AskUser选择字段公开自由输入Schema()
 
 在 Pending 请求断言 `AllowCustomInput == true`、placeholder 和 `MaxLength == 120`。
 
-- [x] **Step 2：运行测试确认红灯**
+- **Step 2：运行测试确认红灯**
 
 运行：
 
@@ -87,7 +100,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~Assistan
 
 预期：Schema 缺少两个属性，解析器因未知属性失败，模型属性不存在。
 
-- [x] **Step 3：实现字段模型、Schema 与解析**
+- **Step 3：实现字段模型、Schema 与解析**
 
 在 `UserDecisionField` 构造函数和只读属性中加入：
 
@@ -113,7 +126,7 @@ CustomInputPlaceholder = customInputPlaceholder;
 
 不得投影 placeholder。
 
-- [x] **Step 4：实现请求属性适用性校验**
+- **Step 4：实现请求属性适用性校验**
 
 调整 `HasTextProperties` 与各字段类型属性检查，使规则为：
 
@@ -130,11 +143,11 @@ private static bool HasCustomInputProperties(UserDecisionField field) =>
 
 增加测试覆盖 number/text 误用、未开开关却提供 placeholder、超长 placeholder、合法选择字段 max length。
 
-- [x] **Step 5：运行定向测试确认绿灯**
+- **Step 5：运行定向测试确认绿灯**
 
 运行与 Step 2 相同命令，预期全部通过。
 
-- [x] **Step 6：提交 Task 1**
+- **Step 6：提交 Task 1**
 
 ```powershell
 git add LoomX/Assistant/UserDecisions/UserDecisionModels.cs LoomX/Assistant/AssistantTools.cs LoomX.Tests/Assistant/UserDecisionModelsTests.cs LoomX.Tests/Assistant/AssistantToolsTests.cs
@@ -156,7 +169,7 @@ git commit -m "新增 AskUser 选择题自由输入契约"
 - 修改：`IUserDecisionBroker.Submit(..., IReadOnlyDictionary<string, string>? customInputs = null)`
 - 兼容：三参数 Submit 调用通过可选参数继续编译，测试扩展默认传空映射
 
-- [x] **Step 1：为提交规则增加失败测试**
+- **Step 1：为提交规则增加失败测试**
 
 在 `UserDecisionModelsTests` 增加以下独立用例：
 
@@ -181,7 +194,7 @@ public void 提交校验_单选自由输入可满足必填()
 
 再覆盖：多选自由输入绕过 `min_selections`、空白输入失败、超长失败、未知字段失败、未授权字段失败、自由输入与选项同时存在失败。
 
-- [x] **Step 2：为 Broker 快照增加失败测试**
+- **Step 2：为 Broker 快照增加失败测试**
 
 在 `UserDecisionBrokerTests` 提交：
 
@@ -195,7 +208,7 @@ Assert.Equal("自定义模式", result.CustomInputs["mode"]);
 
 另加取消结果断言 `Values` 和 `CustomInputs` 都为空。
 
-- [x] **Step 3：运行测试确认红灯**
+- **Step 3：运行测试确认红灯**
 
 ```powershell
 dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~UserDecisionModelsTests|FullyQualifiedName~UserDecisionBrokerTests" --no-restore
@@ -203,7 +216,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~UserDeci
 
 预期：新重载、`CustomInputs` 和四参数 Submit 尚不存在。
 
-- [x] **Step 4：实现统一提交校验**
+- **Step 4：实现统一提交校验**
 
 保留旧重载并转发空映射：
 
@@ -223,7 +236,7 @@ var hasCustomInput = customInputs.TryGetValue(field.Id, out var customInput)
 
 有自由输入时验证授权、长度和互斥；合法后跳过选择数量校验。无自由输入时调用现有 `ValidateSubmittedValue`。
 
-- [x] **Step 5：实现结果快照与 Broker Submit**
+- **Step 5：实现结果快照与 Broker Submit**
 
 `UserDecisionResult` 增加：
 
@@ -244,11 +257,11 @@ bool Submit(
 
 Broker 把 null 转为空字典，分别创建快照，再调用新校验重载。成功日志只增加 `{CustomInputCount}` 数量字段。
 
-- [x] **Step 6：运行定向测试确认绿灯**
+- **Step 6：运行定向测试确认绿灯**
 
 运行 Step 3 命令，预期全部通过且现有并发/Claim 测试无回归。
 
-- [x] **Step 7：提交 Task 2**
+- **Step 7：提交 Task 2**
 
 ```powershell
 git add LoomX/Assistant/UserDecisions/UserDecisionModels.cs LoomX/Assistant/UserDecisions/UserDecisionBroker.cs LoomX.Tests/Assistant/UserDecisionBrokerTestExtensions.cs LoomX.Tests/Assistant/UserDecisionModelsTests.cs LoomX.Tests/Assistant/UserDecisionBrokerTests.cs
@@ -267,7 +280,7 @@ git commit -m "支持 AskUser 自由输入结果快照"
 - 修改：text 字段在 `values` 中直接序列化实际字符串
 - 保持：预设单选和多选仍返回原始 option id 类型
 
-- [x] **Step 1：更新工具结果测试为实际字符串**
+- **Step 1：更新工具结果测试为实际字符串**
 
 把现有 `provided` 断言改为：
 
@@ -285,7 +298,7 @@ Assert.Equal("自定义模式", result["custom_inputs"]!["mode"]!.GetValue<strin
 
 在 `AssistantServiceTests` 验证第二轮模型请求收到的 tool result 含实际文本与 `custom_inputs`。
 
-- [x] **Step 2：运行测试确认红灯**
+- **Step 2：运行测试确认红灯**
 
 ```powershell
 dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AssistantToolsTests|FullyQualifiedName~AssistantServiceTests" --no-restore
@@ -293,7 +306,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~Assistan
 
 预期：text 仍为 `provided` 对象，根对象缺少 `custom_inputs`。
 
-- [x] **Step 3：修改 SerializeResult**
+- **Step 3：修改 SerializeResult**
 
 删除 text 特判，统一序列化 `result.Values`：
 
@@ -313,11 +326,11 @@ foreach (var pair in result.CustomInputs)
 
 最终结果固定包含 `custom_inputs`。不得把该对象写入日志。
 
-- [x] **Step 4：运行定向测试确认绿灯**
+- **Step 4：运行定向测试确认绿灯**
 
 运行 Step 2 命令，预期全部通过。
 
-- [x] **Step 5：提交 Task 3**
+- **Step 5：提交 Task 3**
 
 ```powershell
 git add LoomX/Assistant/AssistantTools.cs LoomX.Tests/Assistant/AssistantToolsTests.cs LoomX.Tests/Assistant/AssistantServiceTests.cs
@@ -337,7 +350,7 @@ git commit -m "修复 AskUser 实际文本回传"
 - 产生：`TryBuildResult(out values, out customInputs)`
 - 保持：旧 `TryBuildResult(out values)` 转发新重载，减少测试迁移
 
-- [x] **Step 1：为单选互斥与默认提示增加失败测试**
+- **Step 1：为单选互斥与默认提示增加失败测试**
 
 创建启用自由输入且默认选中 `safe` 的单选字段，断言：
 
@@ -355,7 +368,7 @@ Assert.Equal(string.Empty, field.CustomInput);
 
 再验证自定义 placeholder 和 max length。
 
-- [x] **Step 2：为多选互斥、跳过和结果投影增加失败测试**
+- **Step 2：为多选互斥、跳过和结果投影增加失败测试**
 
 覆盖：输入文字清除所有 CheckBox；重新选中任一项清空文字；`ClearValue` 同时清空两者；多页 Previous/Next 后文字保留；最终：
 
@@ -365,7 +378,7 @@ Assert.Empty(Assert.IsAssignableFrom<IEnumerable<string>>(values["features"]));
 Assert.Equal("只启用本地索引", customInputs["features"]);
 ```
 
-- [x] **Step 3：运行测试确认红灯**
+- **Step 3：运行测试确认红灯**
 
 ```powershell
 dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AskUserDialogContractTests|FullyQualifiedName~AssistantViewModelTests" --no-restore
@@ -373,7 +386,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AskUserD
 
 预期：选择字段无自由输入属性，结果只有一个映射。
 
-- [x] **Step 4：实现字段基类与双映射构造**
+- **Step 4：实现字段基类与双映射构造**
 
 在基类增加：
 
@@ -392,7 +405,7 @@ public bool TryBuildResult(
 
 所有当前字段和最终校验都同时传入两个映射。
 
-- [x] **Step 5：实现单选和多选互斥状态**
+- **Step 5：实现单选和多选互斥状态**
 
 两个选择字段共享相同的公开属性命名，但保留各自选择逻辑。使用 `updatingSelection` 防止递归：
 
@@ -405,7 +418,7 @@ if (!string.IsNullOrWhiteSpace(customInput))
 
 option 选中时执行 `SetCustomInputWithoutSelectionReset(string.Empty)`。批量清理完成后只调用一次 `NotifyValueChanged()`。
 
-- [x] **Step 6：让 AssistantViewModel 提交两个映射**
+- **Step 6：让 AssistantViewModel 提交两个映射**
 
 修改提交路径：
 
@@ -424,11 +437,11 @@ var submitSucceeded = SubmitOwnedUserDecision(
 
 `SubmitOwnedUserDecision` 将两个映射传给 Broker。测试替身新增 `SubmittedCustomInputs`，断言实际原文到达 Broker。
 
-- [x] **Step 7：运行定向测试确认绿灯**
+- **Step 7：运行定向测试确认绿灯**
 
 运行 Step 3 命令，预期全部通过。
 
-- [x] **Step 8：提交 Task 4**
+- **Step 8：提交 Task 4**
 
 ```powershell
 git add LoomX/ViewModels/AskUserDialogViewModel.cs LoomX/ViewModels/AssistantViewModel.cs LoomX.Tests/Views/AskUserDialogContractTests.cs LoomX.Tests/Assistant/AssistantViewModelTests.cs
@@ -452,7 +465,7 @@ git commit -m "实现 AskUser 选择题自由输入交互"
 - 产生：`SelectionCustomInput_OnKeyDown`
 - 保持：RadioButton 点击仍是唯一单选自动前进入口
 
-- [x] **Step 1：增加 XAML 与 Locale 失败契约测试**
+- **Step 1：增加 XAML 与 Locale 失败契约测试**
 
 源码契约至少断言：
 
@@ -466,7 +479,7 @@ Assert.DoesNotContain("其他（可选）", xaml, StringComparison.Ordinal);
 
 Locale 测试要求四个 resx 都包含新 key，简中 Value 精确为 `我有其他想法...`。
 
-- [x] **Step 2：运行视图测试确认红灯**
+- **Step 2：运行视图测试确认红灯**
 
 ```powershell
 dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AskUserDialogContractTests|FullyQualifiedName~AssistantViewStyleTests" --no-restore
@@ -474,7 +487,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AskUserD
 
 预期：XAML 和资源缺少自由输入定义。
 
-- [x] **Step 3：修改单选和多选模板**
+- **Step 3：修改单选和多选模板**
 
 在两个 `ItemsControl` 后分别加入同构 TextBox：
 
@@ -488,7 +501,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AskUserD
 
 不添加额外标签；错误 TextBlock 继续放在输入框之后，确保自由输入校验错误可见。
 
-- [x] **Step 4：实现 Enter 行为和本地化资源**
+- **Step 4：实现 Enter 行为和本地化资源**
 
 代码后置：
 
@@ -510,7 +523,7 @@ private void SelectionCustomInput_OnKeyDown(object? sender, KeyEventArgs e)
 - ja-JP：`ほかの考えがあります...`
 - zh-TW：`我有其他想法...`
 
-- [x] **Step 5：运行视图和相关 ViewModel 测试确认绿灯**
+- **Step 5：运行视图和相关 ViewModel 测试确认绿灯**
 
 运行 Step 2 命令，再运行：
 
@@ -520,7 +533,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~Assistan
 
 预期全部通过。
 
-- [x] **Step 6：提交 Task 5**
+- **Step 6：提交 Task 5**
 
 ```powershell
 git add LoomX/Views/AskUserCard.axaml LoomX/Views/AskUserCard.axaml.cs LoomX/Resources/Strings.resx LoomX/Resources/Strings.en-US.resx LoomX/Resources/Strings.ja-JP.resx LoomX/Resources/Strings.zh-TW.resx LoomX.Tests/Views/AskUserDialogContractTests.cs LoomX.Tests/Views/AssistantViewStyleTests.cs
@@ -539,7 +552,7 @@ git commit -m "优化 AskUser 自由输入卡片体验"
 - 验证：任何 logger 捕获内容不包含普通文本字段或选择题自由输入原文
 - 验证：最终发布包包含本 change 的可执行桌面端
 
-- [x] **Step 1：增加日志泄漏回归测试**
+- **Step 1：增加日志泄漏回归测试**
 
 使用现有 `RecordingLogger<T>` 或测试内 RecordingLogger，提交两个标识文本：
 
@@ -555,7 +568,7 @@ Assert.DoesNotContain(textSecret, logs, StringComparison.Ordinal);
 Assert.DoesNotContain(customSecret, logs, StringComparison.Ordinal);
 ```
 
-- [x] **Step 2：运行全部 AskUser 定向测试**
+- **Step 2：运行全部 AskUser 定向测试**
 
 ```powershell
 dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~UserDecision|FullyQualifiedName~AskUser|FullyQualifiedName~AssistantToolsTests|FullyQualifiedName~AssistantServiceTests|FullyQualifiedName~AssistantViewModelTests" --no-restore
@@ -563,7 +576,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~UserDeci
 
 预期：0 failed。
 
-- [x] **Step 3：运行 OpenSpec 严格校验**
+- **Step 3：运行 OpenSpec 严格校验**
 
 ```powershell
 openspec validate enhance-ask-user-custom-input --strict
@@ -571,7 +584,7 @@ openspec validate enhance-ask-user-custom-input --strict
 
 预期：`Change 'enhance-ask-user-custom-input' is valid`。
 
-- [x] **Step 4：运行完整测试与 Release 构建**
+- **Step 4：运行完整测试与 Release 构建**
 
 ```powershell
 dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore
@@ -580,7 +593,7 @@ dotnet build Loom-X.sln -c Release --no-restore
 
 如果解决方案文件名不同，先用 `Get-ChildItem -Filter *.sln*` 读取实际名称，再对该文件执行同一命令。预期：所有测试通过，构建 0 error。
 
-- [x] **Step 5：同步 OpenSpec 任务完成状态**
+- **Step 5：同步 OpenSpec 任务完成状态**
 
 逐项核对 `openspec/changes/enhance-ask-user-custom-input/tasks.md`，仅把已有验证证据的任务改为 `[x]`。运行：
 
@@ -590,7 +603,7 @@ openspec status --change enhance-ask-user-custom-input --json
 
 预期：实现任务全部完成。
 
-- [x] **Step 6：发布时间戳桌面包**
+- **Step 6：发布时间戳桌面包**
 
 ```powershell
 $stamp = Get-Date -Format 'yyyy-MM-dd-HHmmss'
@@ -600,7 +613,7 @@ dotnet publish LoomX/LoomX.csproj -c Release -r win-x64 --self-contained false -
 
 确认 `$outputDir` 下存在 `LoomX.exe`。不得删除或覆盖其他 outputs 目录。
 
-- [x] **Step 7：使用 cua-driver 完成桌面验收**
+- **Step 7：使用 cua-driver 完成桌面验收**
 
 按项目规则隐藏启动新发布的 `LoomX.exe`，用进程 `Path` 确认启动的是 `$outputDir` 版本。通过本地 AskUser 测试入口依次验证：
 
@@ -612,7 +625,7 @@ dotnet publish LoomX/LoomX.csproj -c Release -r win-x64 --self-contained false -
 
 截图只截 LoomX 应用窗口，不截全屏；透明主题下不依据截图颜色武断判断主题配色。
 
-- [x] **Step 8：提交验证与流程产物**
+- **Step 8：提交验证与流程产物**
 
 ```powershell
 git add openspec/changes/enhance-ask-user-custom-input docs/superpowers/specs/2026-09-20-ask-user-custom-input-design.md docs/superpowers/plans/2026-09-20-ask-user-custom-input.md LoomX.Tests
