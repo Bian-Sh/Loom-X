@@ -54,7 +54,6 @@ public partial class AssistantView : UserControl
         AttachedToVisualTree += (_, _) =>
         {
             isAttached = true;
-            observedModel?.Activate();
             UpdateInputMaxHeight();
             Dispatcher.UIThread.Post(UpdateMessageScrollBar, DispatcherPriority.Loaded);
         };
@@ -186,7 +185,6 @@ public partial class AssistantView : UserControl
             if (observedModel is not null)
             {
                 observedModel.Messages.CollectionChanged += OnMessagesChanged;
-                if (isAttached) observedModel.Activate();
             }
         }
 

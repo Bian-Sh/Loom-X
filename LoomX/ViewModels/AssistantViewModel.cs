@@ -258,10 +258,10 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     private async Task<AssistantService?> EnsureServiceAsync(CancellationToken cancellationToken = default)
     {
         await gatewayService.EnsureHostedServicesAsync(cancellationToken);
-        SubscribeUserDecisionBrokerIfActive();
         return ResolveService();
     }
 
+    /// <summary>仅在单次 Assistant 请求进入 AgentLoop 前激活决策订阅；页面挂载不得调用。</summary>
     public void Activate()
     {
         lock (userDecisionGate)
@@ -303,6 +303,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         }
     }
 
+    /// <summary>结束请求或离开页面时停用决策订阅，并取消当前已领取请求。</summary>
     public void Deactivate()
     {
         IUserDecisionBroker? broker;
@@ -542,6 +543,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         IsRunning = true;
         StatusText = ResourceLookup.Resolve("assistant.status.working");
         AssistantService? service = null;
+        var userDecisionSubscriptionActivated = false;
 
         try
         {
@@ -552,6 +554,8 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
                 return;
             }
 
+            Activate();
+            userDecisionSubscriptionActivated = true;
             service.ApprovalHandler = ShowApprovalAsync;
             await foreach (var agentEvent in service.SendAsync(text))
             {
@@ -570,6 +574,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         }
         finally
         {
+            if (userDecisionSubscriptionActivated) Deactivate();
             if (service is not null) service.ApprovalHandler = null;
             Dispatcher.UIThread.Post(() =>
             {

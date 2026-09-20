@@ -16,7 +16,7 @@ namespace LoomX.Tests.Views;
 public sealed class AssistantDecisionLifecycleTests
 {
     [Fact]
-    public async Task AssistantView_仅在挂载期间订阅并在卸载时取消已Claim请求()
+    public async Task AssistantView_挂载不订阅且活动请求在卸载时取消已Claim请求()
     {
         AvaloniaTestBootstrap.Ensure();
         using var broker = new UserDecisionBroker(NullLogger<UserDecisionBroker>.Instance);
@@ -40,7 +40,14 @@ public sealed class AssistantDecisionLifecycleTests
 
         var host = new Window { Content = view, ShowActivated = false };
         host.Show();
-        var task = broker.RequestAsync("attached", CreateRequest(), CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => broker.RequestAsync(
+            "after-attach",
+            CreateRequest(),
+            CancellationToken.None));
+
+        viewModel.Activate(); // 模拟 SendAsync 已进入真实请求边界。
+        var task = broker.RequestAsync("active-request", CreateRequest(), CancellationToken.None);
         await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         host.Close();
