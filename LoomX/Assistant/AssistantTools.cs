@@ -499,19 +499,23 @@ public static class AssistantTools
 
     private static string SerializeResult(UserDecisionRequest request, UserDecisionResult result)
     {
-        var fields = request.Fields.ToDictionary(field => field.Id, StringComparer.Ordinal);
         var values = new JsonObject();
         foreach (var pair in result.Values)
         {
-            values[pair.Key] = fields[pair.Key].Type == UserDecisionFieldType.Text
-                ? new JsonObject { ["provided"] = pair.Value is not null }
-                : JsonSerializer.SerializeToNode(pair.Value, OutputJsonOptions);
+            values[pair.Key] = JsonSerializer.SerializeToNode(pair.Value, OutputJsonOptions);
+        }
+
+        var customInputs = new JsonObject();
+        foreach (var pair in result.CustomInputs)
+        {
+            customInputs[pair.Key] = pair.Value;
         }
 
         return new JsonObject
         {
             ["cancelled"] = result.Cancelled,
             ["values"] = values,
+            ["custom_inputs"] = customInputs,
         }.ToJsonString(OutputJsonOptions);
     }
 

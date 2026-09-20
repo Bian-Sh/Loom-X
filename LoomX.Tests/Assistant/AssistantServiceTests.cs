@@ -327,9 +327,9 @@ public sealed class AssistantServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SendAsync_AskUser提交后安全保留结构化结果并继续最终回答()
+    public async Task SendAsync_AskUser提交后保留实际文本并继续最终回答()
     {
-        const string originalText = "自由文本原文-绝不可进入模型上下文-981273";
+        const string originalText = "自由文本原文-需要进入模型上下文-981273";
         using var broker = CreateDecisionBroker();
         var pending = CaptureNext(broker);
         var registry = CreateAskUserRegistry(broker);
@@ -361,19 +361,16 @@ public sealed class AssistantServiceTests : IDisposable
         var toolResult = System.Text.Json.Nodes.JsonNode.Parse(toolMessage.Content!)!;
         Assert.Equal("safe", toolResult["values"]!["mode"]!.GetValue<string>());
         Assert.Equal(3m, toolResult["values"]!["count"]!.GetValue<decimal>());
-        Assert.True(toolResult["values"]!["note"]!["provided"]!.GetValue<bool>());
-        Assert.DoesNotContain(originalText, toolMessage.Content!, StringComparison.Ordinal);
-        Assert.DoesNotContain(messages, message => message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
-        Assert.DoesNotContain(events, item =>
-            item.Kind == AgentEventKind.MessageCompleted
-            && item.Message?.Content?.Contains(originalText, StringComparison.Ordinal) == true);
+        Assert.Equal(originalText, toolResult["values"]!["note"]!.GetValue<string>());
+        Assert.Empty(toolResult["custom_inputs"]!.AsObject());
         Assert.Contains(messages, message => message.Role == ChatRole.Assistant && message.Content == "已按安全模式继续。");
         Assert.Contains(events, item => item.Kind == AgentEventKind.TaskCompleted);
         Assert.Equal(2, model.Requests.Count);
         Assert.Contains(model.Requests[1].Messages,
             message => message.Role == ChatRole.Tool && message.ToolName == "assistant.ask_user");
-        Assert.DoesNotContain(model.Requests[1].Messages,
-            message => message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
+        Assert.Contains(model.Requests[1].Messages,
+            message => message.Role == ChatRole.Tool
+                && message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
     }
 
     [Fact]

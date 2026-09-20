@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 using LoomX.Assistant;
 using LoomX.Assistant.UserDecisions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -215,8 +215,31 @@ public sealed class AssistantToolsTests
         Assert.Equal("one", result["values"]!["single"]!.GetValue<string>());
         Assert.Equal(["one", "two"], result["values"]!["multi"]!.AsArray().Select(item => item!.GetValue<string>()));
         Assert.Equal(5m, result["values"]!["count"]!.GetValue<decimal>());
-        Assert.True(result["values"]!["note"]!["provided"]!.GetValue<bool>());
-        Assert.DoesNotContain("完成", toolResult.Content, StringComparison.Ordinal);
+        Assert.Equal("完成", result["values"]!["note"]!.GetValue<string>());
+        Assert.Empty(result["custom_inputs"]!.AsObject());
+    }
+
+    [Fact]
+    public async Task AskUser_选择题自由输入返回CustomInputs原文()
+    {
+        using var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var tool = GetTool(broker);
+        using var ownerScope = AssistantTools.BeginRun("assistant-run-test");
+        var arguments = CreateValidArguments();
+        arguments["fields"]![0]!["allow_custom_input"] = true;
+
+        var execution = tool.Handler(arguments, CancellationToken.None);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(broker.Submit(
+            request.RequestId,
+            UserDecisionBrokerTestExtensions.ClaimantId,
+            new Dictionary<string, object?> { ["mode"] = null },
+            new Dictionary<string, string> { ["mode"] = "我想逐步确认" }));
+
+        var result = JsonNode.Parse((await execution).Content)!;
+        Assert.Null(result["values"]!["mode"]);
+        Assert.Equal("我想逐步确认", result["custom_inputs"]!["mode"]!.GetValue<string>());
     }
 
     [Fact]
@@ -389,7 +412,7 @@ public sealed class AssistantToolsTests
 
         var result = await execution.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.True(result.Success);
-        Assert.Equal("{\"cancelled\":true,\"values\":{}}", result.Content);
+        Assert.Equal("{\"cancelled\":true,\"values\":{},\"custom_inputs\":{}}", result.Content);
         Assert.DoesNotContain(cancellationReason, result.Content, StringComparison.Ordinal);
     }
 
