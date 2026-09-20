@@ -1663,4 +1663,13 @@
   <data name="providers.delete.dialog.message"><value>确定删除 Provider“{0}”吗？</value></data>
   <data name="providers.test.response.empty"><value>发送测试请求后，响应会显示在这里</value></data>
   <data name="providers.test.model.empty"><value>未启用任何模型，请先前往模型 Tab 启用。</value></data>
+  <data name="assistant.decision.skip"><value>跳过</value></data>
+  <data name="assistant.decision.continue"><value>继续</value></data>
+  <data name="assistant.decision.submit"><value>提交</value></data>
+  <data name="assistant.decision.previous"><value>上一项</value></data>
+  <data name="assistant.decision.next"><value>下一项</value></data>
+  <data name="assistant.decision.close"><value>关闭</value></data>
+  <data name="assistant.decision.cancel_input"><value>取消本次输入</value></data>
+  <data name="assistant.queue.title"><value>排队消息</value></data>
+  <data name="assistant.queue.delete"><value>删除排队消息</value></data>
 </root>

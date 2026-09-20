@@ -12,11 +12,14 @@ using Xunit;
 
 namespace LoomX.Tests.Views;
 
+// SetupWithoutStarting 将 Avalonia UI 线程绑定到当前测试线程；此处同步等待用于防止 await 后换线程。
+#pragma warning disable xUnit1031
+
 [Collection("Avalonia UI")]
 public sealed class AssistantDecisionLifecycleTests
 {
     [Fact]
-    public async Task AssistantView_挂载不订阅且活动请求在卸载时取消已Claim请求()
+    public void AssistantView_挂载不订阅且活动请求在卸载时取消已Claim请求()
     {
         AvaloniaTestBootstrap.Ensure();
         using var broker = new UserDecisionBroker(NullLogger<UserDecisionBroker>.Instance);
@@ -33,32 +36,38 @@ public sealed class AssistantDecisionLifecycleTests
             });
         var view = new AssistantView { DataContext = viewModel };
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => broker.RequestAsync(
+        Assert.Throws<InvalidOperationException>(() => broker.RequestAsync(
             "before-attach",
             CreateRequest(),
-            CancellationToken.None));
+            CancellationToken.None).GetAwaiter().GetResult());
 
         var host = new Window { Content = view, ShowActivated = false };
         host.Show();
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => broker.RequestAsync(
+                "after-attach",
+                CreateRequest(),
+                CancellationToken.None).GetAwaiter().GetResult());
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => broker.RequestAsync(
-            "after-attach",
-            CreateRequest(),
-            CancellationToken.None));
+            viewModel.Activate(); // 模拟 SendAsync 已进入真实请求边界。
+            var task = broker.RequestAsync("active-request", CreateRequest(), CancellationToken.None);
+            Assert.True(dialogStarted.Task.Wait(TimeSpan.FromSeconds(5)));
 
-        viewModel.Activate(); // 模拟 SendAsync 已进入真实请求边界。
-        var task = broker.RequestAsync("active-request", CreateRequest(), CancellationToken.None);
-        await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            host.Close();
+            var result = task.WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
 
-        host.Close();
-        var result = await task.WaitAsync(TimeSpan.FromSeconds(5));
-
-        Assert.True(result.Cancelled);
-        dialogCompletion.TrySetResult(true);
+            Assert.True(result.Cancelled);
+            dialogCompletion.TrySetResult(true);
+        }
+        finally
+        {
+            host.Close();
+        }
     }
 
     [Fact]
-    public async Task MainWindowViewModel_Dispose幂等释放Assistant并收敛已Claim请求()
+    public void MainWindowViewModel_Dispose幂等释放Assistant并收敛已Claim请求()
     {
         AvaloniaTestBootstrap.Ensure();
         var directory = Path.Combine(Path.GetTempPath(), "LoomXTests", Guid.NewGuid().ToString("N"));
@@ -67,7 +76,7 @@ public sealed class AssistantDecisionLifecycleTests
         var activityPath = Path.Combine(directory, "LoomX.Activity.db");
         try
         {
-            await InitializeConfigurationAsync(configPath);
+            InitializeConfigurationAsync(configPath).GetAwaiter().GetResult();
             using var configService = new ConfigSnapshotService(configPath);
             using var gatewayService = new GatewayProcessService();
             using var store = new AppDataStore(
@@ -75,7 +84,7 @@ public sealed class AssistantDecisionLifecycleTests
                 gatewayService,
                 NullLogger<AppDataStore>.Instance,
                 new ActivityQueryService(activityPath));
-            await store.InitializeAsync();
+            store.InitializeAsync().GetAwaiter().GetResult();
             using var broker = new UserDecisionBroker(NullLogger<UserDecisionBroker>.Instance);
             var dialogStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var dialogCompletion = new TaskCompletionSource<bool?>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -95,17 +104,14 @@ public sealed class AssistantDecisionLifecycleTests
                 dataStore: store,
                 assistantViewModel: assistant);
             var task = broker.RequestAsync("main-window", CreateRequest(), CancellationToken.None);
-            await dialogStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(dialogStarted.Task.Wait(TimeSpan.FromSeconds(5)));
 
             main.Dispose();
             main.Dispose();
-            var result = await task.WaitAsync(TimeSpan.FromSeconds(5));
+            var result = task.WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
 
             Assert.True(result.Cancelled);
             dialogCompletion.TrySetResult(true);
-            store.Dispose();
-            gatewayService.Dispose();
-            configService.Dispose();
         }
         finally
         {
@@ -113,7 +119,6 @@ public sealed class AssistantDecisionLifecycleTests
             DeleteDirectory(directory);
         }
     }
-
     private static UserDecisionRequest CreateRequest() => new(
         "确认",
         "请选择",
@@ -147,3 +152,4 @@ public sealed class AssistantDecisionLifecycleTests
         }
     }
 }
+#pragma warning restore xUnit1031

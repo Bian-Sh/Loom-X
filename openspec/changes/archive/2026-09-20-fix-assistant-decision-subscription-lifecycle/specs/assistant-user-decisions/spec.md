@@ -1,9 +1,4 @@
-# assistant-user-decisions Specification
-
-## Purpose
-为 AI 助手提供统一的用户决策交互，使 Profile 构建、重启提醒和资料歧义处理可以一次性收集单选、多选、数值与文本输入，而不是依赖自然语言猜测。
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Assistant 必须支持结构化用户决策请求
 系统 SHALL 支持由助手发起包含标题、问题、字段、选项、默认值、必填标记和可取消状态的结构化 AskUser 请求，并 SHALL 支持单选、多选、数字输入和自由文本字段。AskUser SHALL 通过 Assistant 输入框上方的应用内悬浮卡片展示，不得依赖独立模态 Window。
@@ -66,24 +61,7 @@
 - **WHEN** Assistant 请求完成、失败、取消或因页面离开而停止处理用户决策
 - **THEN** 系统解除 Broker 订阅，并对已领取的决策请求执行幂等取消，不能遗留等待项
 
-### Requirement: 资料收集必须优先复用已有能力且不绕过网站安全机制
-系统 SHALL 优先使用当前 Assistant 模型已经提供的搜索或资料能力；不可用时 SHALL 允许通过现有 Chrome Extension/Browser Bridge 读取用户明确打开并授权的页面；系统 MUST NOT 实现第三方搜索 API Key、验证码绕过、登录墙绕过、Cloudflare/JS challenge 绕过、Cookie 注入、TLS fingerprint 或浏览器指纹伪装。
-
-#### Scenario: 模型具备搜索能力
-- **WHEN** 当前 Assistant 模型提供可用的官方搜索能力
-- **THEN** 助手优先使用该能力获取资料，不要求用户配置新的搜索 API Key
-
-#### Scenario: 模型没有搜索能力但浏览器已连接
-- **WHEN** Assistant 没有搜索能力且 Chrome Extension 已连接
-- **THEN** 助手可以打开官方文档或 Provider 页面，并读取用户授权的页面内容
-
-#### Scenario: 页面需要用户处理障碍
-- **WHEN** 页面出现登录、验证码、Cloudflare 或 JS challenge
-- **THEN** 助手暂停并提示用户自行处理，处理完成后再继续读取，不尝试绕过页面安全机制
-
-#### Scenario: 没有任何资料通道
-- **WHEN** Assistant 没有搜索能力、Browser Bridge 未连接且用户未提供资料
-- **THEN** 助手明确说明无法验证资料，并通过 AskUser 请求用户提供结论或文档内容
+## ADDED Requirements
 
 ### Requirement: AskUser 必须显示为输入框上方的悬浮 Approval Card
 桌面端 SHALL 在 Assistant 输入框正上方使用与应用主题协调的悬浮卡片，一次展示一个字段。该卡片 SHALL 位于当前 Assistant 顶层窗口内部，不得进入消息历史，也不得占用固定消息流条目。

@@ -37,7 +37,7 @@ public static class AssistantTools
         registry.Register(new ToolDefinition
         {
             Name = "assistant.ask_user",
-            Description = "暂停当前步骤并向用户收集一组结构化业务决策；不得用于索取密钥或认证信息。",
+            Description = "通用 Human-in-the-loop 结构化交互，可直接用于测试、偏好收集、必要输入、歧义澄清和行动确认；无需加载 Skill，无需 Browser Bridge 或 Chrome；不得用于索取密钥或认证信息。",
             ParametersSchema = CreateAskUserSchema(),
             RiskLevel = ToolRiskLevel.Read,
             SafeArgumentsProjector = CreateSafeArgumentsProjection,

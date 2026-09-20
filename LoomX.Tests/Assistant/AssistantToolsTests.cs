@@ -31,6 +31,25 @@ public sealed class AssistantToolsTests
     }
 
     [Fact]
+    public void RegisterAll_AskUser描述为无需Skill或Bridge的通用交互()
+    {
+        using var broker = CreateBroker();
+        var registry = new ToolRegistry();
+
+        AssistantTools.RegisterAll(registry, broker);
+
+        Assert.True(registry.TryGet("assistant.ask_user", out var tool));
+        Assert.NotNull(tool);
+        Assert.Contains("通用", tool!.Description, StringComparison.Ordinal);
+        Assert.Contains("无需加载 Skill", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("无需 Browser Bridge 或 Chrome", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("测试", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("偏好", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("澄清", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("确认", tool.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AskUser_等待提交后返回字段Id映射并传递当前取消令牌()
     {
         using var broker = CreateBroker();

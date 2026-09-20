@@ -567,4 +567,13 @@
   <data name="providers.delete.dialog.message"><value>Delete Provider “{0}”?</value></data>
   <data name="providers.test.response.empty"><value>The response will appear here after you send a test request</value></data>
   <data name="providers.test.model.empty"><value>No models are enabled. Enable one in the Models tab first.</value></data>
+  <data name="assistant.decision.skip"><value>Skip</value></data>
+  <data name="assistant.decision.continue"><value>Continue</value></data>
+  <data name="assistant.decision.submit"><value>Submit</value></data>
+  <data name="assistant.decision.previous"><value>Previous</value></data>
+  <data name="assistant.decision.next"><value>Next</value></data>
+  <data name="assistant.decision.close"><value>Close</value></data>
+  <data name="assistant.decision.cancel_input"><value>Cancel this input</value></data>
+  <data name="assistant.queue.title"><value>Queued messages</value></data>
+  <data name="assistant.queue.delete"><value>Delete queued message</value></data>
 </root>

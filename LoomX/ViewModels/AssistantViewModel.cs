@@ -2,14 +2,11 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows.Input;
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using LoomX.Assistant;
 using LoomX.Assistant.UserDecisions;
 using LoomX.Localization;
 using LoomX.Services;
-using LoomX.Views;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.ViewModels;
@@ -48,7 +45,12 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     private AssistantPermissionOption selectedPermissionMode;
     private AssistantReasoningOption selectedReasoningEffort;
     private ApprovalRequestViewModel? pendingApproval;
+    private AskUserDialogViewModel? pendingAskUser;
     private IReadOnlyList<AssistantModelGroupViewModel> allModelGroups = [];
+    private string? activeRunSessionId;
+    private string? queueProjectionSessionId;
+    private bool processingQueue;
+    private bool currentTurnCancellationRequested;
     private IUserDecisionBroker? subscribedUserDecisionBroker;
     private string? ownedUserDecisionRequestId;
     private bool isUserDecisionActive;
@@ -68,9 +70,9 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         this.toastService = toastService;
         configuredUserDecisionBroker = userDecisionBroker;
         this.uiDispatcher = uiDispatcher ?? (action => Dispatcher.UIThread.Post(action));
-        this.showAskUserDialog = showAskUserDialog ?? ShowAskUserDialogAsync;
+        this.showAskUserDialog = showAskUserDialog ?? ShowAskUserCardAsync;
 
-        SendCommand = new AsyncCommand(SendAsync, () => !IsRunning && !string.IsNullOrWhiteSpace(InputText));
+        SendCommand = new AsyncCommand(SendAsync, () => !string.IsNullOrWhiteSpace(InputText), logger);
         CancelCommand = new DelegateCommand(Cancel);
         NewSessionCommand = new DelegateCommand(NewSession);
         LoadSessionCommand = new AsyncCommand(parameter => LoadSessionAsync(parameter as AssistantSessionItemViewModel));
@@ -125,6 +127,9 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     }
 
     public ObservableCollection<ChatMessageViewModel> Messages { get; } = [];
+
+    /// <summary>所有会话尚未发送的消息；UI 通过 IsCurrentSession 只投影当前会话。</summary>
+    public ObservableCollection<QueuedAssistantMessageViewModel> QueuedMessages { get; } = [];
 
     /// <summary>历史会话列表。条目是 ViewModel 包装，支持行内改名与删除。</summary>
     public ObservableCollection<AssistantSessionItemViewModel> Sessions { get; } = [];
@@ -247,6 +252,23 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         private set => SetProperty(ref pendingApproval, value);
     }
 
+    /// <summary>输入框上方当前显示的 AskUser 卡片。</summary>
+    public AskUserDialogViewModel? PendingAskUser
+    {
+        get => pendingAskUser;
+        private set
+        {
+            if (SetProperty(ref pendingAskUser, value))
+            {
+                OnPropertyChanged(nameof(HasComposerOverlay));
+            }
+        }
+    }
+
+    public bool HasQueuedMessages => QueuedMessages.Any(item => item.IsCurrentSession);
+
+    public bool HasComposerOverlay => PendingAskUser is not null || HasQueuedMessages;
+
     /// <summary>模型弹层是否没有任何分组（空态提示）。</summary>
     public bool HasNoModelGroups => ModelGroups.Count == 0;
 
@@ -306,6 +328,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     /// <summary>结束请求或离开页面时停用决策订阅，并取消当前已领取请求。</summary>
     public void Deactivate()
     {
+        PendingAskUser?.TryAbort();
         IUserDecisionBroker? broker;
         string? requestId;
         lock (userDecisionGate)
@@ -371,7 +394,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         logger.LogInformation("助手决策 Pending 已取得 Claim {RequestId}", pending.RequestId);
         try
         {
-            logger.LogDebug("助手决策准备调度 Dialog {RequestId}", pending.RequestId);
+            logger.LogDebug("助手决策准备调度卡片 {RequestId}", pending.RequestId);
             uiDispatcher(() => _ = HandlePendingUserDecisionAsync(broker, pending));
         }
         catch (Exception exception)
@@ -405,19 +428,19 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         AskUserDialogViewModel dialogViewModel;
         try
         {
-            logger.LogInformation("助手决策 Dialog 开始 {RequestId}", pending.RequestId);
+            logger.LogInformation("助手决策卡片开始 {RequestId}", pending.RequestId);
             dialogViewModel = new AskUserDialogViewModel(pending);
             submitted = await showAskUserDialog(dialogViewModel);
             logger.LogInformation(
-                "助手决策 Dialog 结束 {RequestId} {ResultKind}",
+                "助手决策卡片结束 {RequestId} {ResultKind}",
                 pending.RequestId,
                 submitted == true ? "Submit" : "Cancel");
         }
         catch (Exception exception)
         {
             logger.LogError(
-                CreateSafeUserDecisionException("助手决策 Dialog 失败。"),
-                "助手决策 Dialog 失败 {RequestId} {ErrorType}",
+                CreateSafeUserDecisionException("助手决策卡片失败。"),
+                "助手决策卡片失败 {RequestId} {ErrorType}",
                 pending.RequestId,
                 exception.GetType().Name);
             CancelOwnedUserDecision(broker, pending.RequestId, "assistant_ui_failed");
@@ -429,7 +452,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         {
             if (!dialogViewModel.TryBuildResult(out var values))
             {
-                logger.LogWarning("助手决策 Dialog 校验未通过 {RequestId}", pending.RequestId);
+                logger.LogWarning("助手决策卡片校验未通过 {RequestId}", pending.RequestId);
                 CancelOwnedUserDecision(broker, pending.RequestId, "assistant_ui_validation_failed");
                 toastService?.Show("助手决策内容无效，请检查后重试", ToastLevel.Error);
                 return;
@@ -518,75 +541,263 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     private static Exception CreateSafeUserDecisionException(string message) =>
         new InvalidOperationException(message);
 
-    private static async Task<bool?> ShowAskUserDialogAsync(AskUserDialogViewModel viewModel)
+    private async Task<bool?> ShowAskUserCardAsync(AskUserDialogViewModel viewModel)
     {
-        if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime
-            {
-                MainWindow: MainWindow owner,
-            })
+        PendingAskUser = viewModel;
+        try
         {
-            return null;
+            return await viewModel.Completion;
         }
-
-        var dialog = new AskUserDialog { DataContext = viewModel };
-        owner.AppearanceCoordinator.ApplyTo(dialog);
-        return await dialog.ShowDialog<bool?>(owner);
+        finally
+        {
+            if (ReferenceEquals(PendingAskUser, viewModel))
+            {
+                PendingAskUser = null;
+            }
+        }
     }
+
     private async Task SendAsync()
     {
         var text = InputText.Trim();
-        if (text.Length == 0) return;
+        if (text.Length == 0)
+        {
+            return;
+        }
 
         InputText = string.Empty;
+        if (IsRunning || processingQueue)
+        {
+            var runningSessionId = queueProjectionSessionId ?? activeRunSessionId ?? ResolveService()?.CurrentSession.Id;
+            if (!string.IsNullOrWhiteSpace(runningSessionId))
+            {
+                EnqueueMessage(runningSessionId, text);
+            }
+            return;
+        }
+
+        AssistantService? service;
+        try
+        {
+            service = await EnsureServiceAsync();
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "AI 助手服务初始化失败");
+            Messages.Add(ChatMessageViewModel.Error(ResourceLookup.Resolve("assistant.error.service_unavailable")));
+            return;
+        }
+
+        if (service is null)
+        {
+            Messages.Add(ChatMessageViewModel.Error(ResourceLookup.Resolve("assistant.error.service_unavailable")));
+            return;
+        }
+
+        var sessionId = service.CurrentSession.Id;
+        ShowQueueForSession(sessionId);
+        var hasPendingQueue = HasQueuedMessageFor(sessionId);
+        if (hasPendingQueue)
+        {
+            EnqueueMessage(sessionId, text);
+        }
+
+        processingQueue = true;
+        activeRunSessionId = sessionId;
+        try
+        {
+            var nextText = hasPendingQueue
+                ? TakeNextQueuedMessage(sessionId, previousTurnSucceeded: true)?.Text
+                : text;
+            while (nextText is not null)
+            {
+                var succeeded = await RunTurnAsync(service, sessionId, nextText);
+                if (!succeeded)
+                {
+                    TakeNextQueuedMessage(sessionId, previousTurnSucceeded: false);
+                    break;
+                }
+
+                if (!string.Equals(service.CurrentSession.Id, sessionId, StringComparison.Ordinal))
+                {
+                    TakeNextQueuedMessage(sessionId, previousTurnSucceeded: false);
+                    break;
+                }
+
+                nextText = TakeNextQueuedMessage(sessionId, previousTurnSucceeded: true)?.Text;
+            }
+        }
+        finally
+        {
+            processingQueue = false;
+            activeRunSessionId = null;
+        }
+    }
+
+    private async Task<bool> RunTurnAsync(AssistantService service, string sessionId, string text)
+    {
+        if (!string.Equals(service.CurrentSession.Id, sessionId, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        activeRunSessionId = sessionId;
+        currentTurnCancellationRequested = false;
         hasPersistenceWarning = false;
         Messages.Add(new ChatMessageViewModel(ChatRole.User, text));
         IsRunning = true;
         StatusText = ResourceLookup.Resolve("assistant.status.working");
-        AssistantService? service = null;
         var userDecisionSubscriptionActivated = false;
+        var succeeded = false;
 
         try
         {
-            service = await EnsureServiceAsync();
-            if (service is null)
-            {
-                Messages.Add(ChatMessageViewModel.Error(ResourceLookup.Resolve("assistant.error.service_unavailable")));
-                return;
-            }
-
             Activate();
             userDecisionSubscriptionActivated = true;
             service.ApprovalHandler = ShowApprovalAsync;
             await foreach (var agentEvent in service.SendAsync(text))
             {
-                await Dispatcher.UIThread.InvokeAsync(() => Project(agentEvent, service.CurrentSession.Id));
+                await Dispatcher.UIThread.InvokeAsync(() => Project(agentEvent, sessionId));
             }
+
+            succeeded = !currentTurnCancellationRequested;
+        }
+        catch (OperationCanceledException) when (currentTurnCancellationRequested)
+        {
+            logger.LogInformation("AI 助手请求已由用户停止 {SessionId}", sessionId);
         }
         catch (InvalidOperationException exception)
         {
             logger.LogWarning(exception, "AI 助手请求被拒绝");
-            Dispatcher.UIThread.Post(() => Messages.Add(ChatMessageViewModel.Error(exception.Message)));
+            await Dispatcher.UIThread.InvokeAsync(() => Messages.Add(ChatMessageViewModel.Error(exception.Message)));
         }
         catch (Exception exception)
         {
             logger.LogError(exception, "AI 助手运行失败");
-            Dispatcher.UIThread.Post(() => Messages.Add(ChatMessageViewModel.Error(ResourceLookup.Resolve("assistant.error.unexpected"))));
+            await Dispatcher.UIThread.InvokeAsync(() => Messages.Add(ChatMessageViewModel.Error(ResourceLookup.Resolve("assistant.error.unexpected"))));
         }
         finally
         {
-            if (userDecisionSubscriptionActivated) Deactivate();
-            if (service is not null) service.ApprovalHandler = null;
-            Dispatcher.UIThread.Post(() =>
+            if (userDecisionSubscriptionActivated)
+            {
+                Deactivate();
+            }
+            service.ApprovalHandler = null;
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 IsRunning = false;
                 if (!hasPersistenceWarning) StatusText = string.Empty;
                 streamingMessage = null;
                 currentGroup = null;
                 RefreshSessions();
-                _ = TryAutoTitleAsync(service);
+                if (string.Equals(service.CurrentSession.Id, sessionId, StringComparison.Ordinal))
+                {
+                    _ = TryAutoTitleAsync(service);
+                }
             });
         }
+
+        return succeeded;
     }
+
+    private void EnqueueMessage(string sessionId, string text)
+    {
+        if (queueProjectionSessionId is null)
+        {
+            queueProjectionSessionId = sessionId;
+        }
+
+        QueuedMessages.Add(new QueuedAssistantMessageViewModel(
+            sessionId,
+            text,
+            DeleteQueuedMessage));
+        RefreshQueueProjection();
+    }
+
+    private void DeleteQueuedMessage(QueuedAssistantMessageViewModel message)
+    {
+        if (message.State == QueuedAssistantMessageState.Dispatching)
+        {
+            return;
+        }
+
+        QueuedMessages.Remove(message);
+        RefreshQueueProjection();
+    }
+
+    private QueuedAssistantMessageViewModel? TakeNextQueuedMessage(
+        string sessionId,
+        bool previousTurnSucceeded)
+    {
+        var matching = QueuedMessages
+            .Where(item => string.Equals(item.SessionId, sessionId, StringComparison.Ordinal))
+            .ToArray();
+        if (!previousTurnSucceeded)
+        {
+            foreach (var item in matching)
+            {
+                item.State = QueuedAssistantMessageState.Paused;
+            }
+            RefreshQueueProjection();
+            return null;
+        }
+
+        var next = matching.FirstOrDefault(item =>
+            item.State is QueuedAssistantMessageState.Queued or QueuedAssistantMessageState.Paused);
+        if (next is null)
+        {
+            return null;
+        }
+
+        next.State = QueuedAssistantMessageState.Dispatching;
+        QueuedMessages.Remove(next);
+        RefreshQueueProjection();
+        return next;
+    }
+
+    private bool HasQueuedMessageFor(string sessionId) =>
+        QueuedMessages.Any(item =>
+            string.Equals(item.SessionId, sessionId, StringComparison.Ordinal)
+            && item.State is QueuedAssistantMessageState.Queued or QueuedAssistantMessageState.Paused);
+
+    private void ShowQueueForSession(string? sessionId)
+    {
+        queueProjectionSessionId = sessionId;
+        RefreshQueueProjection();
+    }
+
+    private void RefreshQueueProjection()
+    {
+        var order = 0;
+        foreach (var item in QueuedMessages)
+        {
+            item.IsCurrentSession = queueProjectionSessionId is not null
+                && string.Equals(item.SessionId, queueProjectionSessionId, StringComparison.Ordinal);
+            item.DisplayOrder = item.IsCurrentSession ? ++order : 0;
+        }
+
+        OnPropertyChanged(nameof(HasQueuedMessages));
+        OnPropertyChanged(nameof(HasComposerOverlay));
+    }
+
+    internal void SetActiveRunForTesting(string sessionId)
+    {
+        activeRunSessionId = sessionId;
+        ShowQueueForSession(sessionId);
+        IsRunning = true;
+    }
+
+    internal void EnqueueMessageForTesting(string sessionId, string text) =>
+        EnqueueMessage(sessionId, text);
+
+    internal void ShowQueueForSessionForTesting(string sessionId) =>
+        ShowQueueForSession(sessionId);
+
+    internal QueuedAssistantMessageViewModel? TakeNextQueuedMessageForTesting(
+        string sessionId,
+        bool previousTurnSucceeded) =>
+        TakeNextQueuedMessage(sessionId, previousTurnSucceeded);
 
     /// <summary>
     /// 一轮对话结束后给会话起标题：只有还没有自定义/摘要标题时才调模型，
@@ -887,13 +1098,28 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
 
     private void Cancel()
     {
+        currentTurnCancellationRequested = true;
+        PendingAskUser?.TryAbort();
         PendingApproval?.Resolve(false);
         ResolveService()?.Cancel();
     }
 
+    private void PrepareSessionSwitch()
+    {
+        currentTurnCancellationRequested = true;
+        PendingAskUser?.TryAbort();
+        PendingApproval?.Resolve(false);
+        ResolveService()?.Cancel();
+    }
+
+    internal void PrepareSessionSwitchForTesting() => PrepareSessionSwitch();
+
     private void NewSession()
     {
-        ResolveService()?.NewSession();
+        PrepareSessionSwitch();
+        var service = ResolveService();
+        service?.NewSession();
+        ShowQueueForSession(service?.CurrentSession.Id);
         hasPersistenceWarning = false;
         StatusText = string.Empty;
         Messages.Clear();
@@ -967,6 +1193,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         var service = await EnsureServiceAsync();
         if (service is null) return;
 
+        PrepareSessionSwitch();
         if (!await service.LoadSessionAsync(item.SessionId))
         {
             AddSystemMessage("会话载入失败（文件可能已损坏或删除）。");
@@ -976,6 +1203,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         // 载入成功后同步标题区：CurrentSessionTitle 是 SelectedSession 的派生属性，
         // 不写回就会一直显示上一个会话的标题，直到下次 RefreshSessions 才纠正。
         SyncCurrentSessionSelection(item);
+        ShowQueueForSession(item.SessionId);
 
         Messages.Clear();
         streamingMessage = null;
@@ -1133,6 +1361,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         }
 
         Deactivate();
+        PendingAskUser?.TryAbort();
         PendingApproval?.Resolve(false);
         elapsedTimer?.Stop();
         elapsedTimer = null;
@@ -1253,6 +1482,57 @@ public sealed class AssistantModelGroupViewModel : NotifyViewModel
         {
             if (SetProperty(ref isExpanded, value)) OnPropertyChanged(nameof(ExpandIconAngle));
         }
+    }
+}
+
+public enum QueuedAssistantMessageState
+{
+    Queued,
+    Dispatching,
+    Paused,
+}
+
+/// <summary>尚未发送的会话消息；保留稳定标识和状态，便于后续扩展编辑、排序与 Steer。</summary>
+public sealed class QueuedAssistantMessageViewModel : NotifyViewModel
+{
+    private QueuedAssistantMessageState state = QueuedAssistantMessageState.Queued;
+    private int displayOrder;
+    private bool isCurrentSession;
+
+    public QueuedAssistantMessageViewModel(
+        string sessionId,
+        string text,
+        Action<QueuedAssistantMessageViewModel> delete)
+    {
+        Id = Guid.NewGuid().ToString("N");
+        SessionId = sessionId;
+        Text = text;
+        CreatedAt = DateTimeOffset.UtcNow;
+        DeleteCommand = new DelegateCommand(() => delete(this));
+    }
+
+    public string Id { get; }
+    public string SessionId { get; }
+    public string Text { get; }
+    public DateTimeOffset CreatedAt { get; }
+    public ICommand DeleteCommand { get; }
+
+    public QueuedAssistantMessageState State
+    {
+        get => state;
+        internal set => SetProperty(ref state, value);
+    }
+
+    public int DisplayOrder
+    {
+        get => displayOrder;
+        internal set => SetProperty(ref displayOrder, value);
+    }
+
+    public bool IsCurrentSession
+    {
+        get => isCurrentSession;
+        internal set => SetProperty(ref isCurrentSession, value);
     }
 }
 

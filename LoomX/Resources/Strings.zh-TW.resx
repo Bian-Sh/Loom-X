@@ -1513,4 +1513,13 @@
   <data name="providers.delete.dialog.message"><value>確定刪除 Provider「{0}」嗎？</value></data>
   <data name="providers.test.response.empty"><value>傳送測試請求後，回應會顯示在這裡</value></data>
   <data name="providers.test.model.empty"><value>尚未啟用任何模型，請先前往模型分頁啟用。</value></data>
+  <data name="assistant.decision.skip"><value>略過</value></data>
+  <data name="assistant.decision.continue"><value>繼續</value></data>
+  <data name="assistant.decision.submit"><value>提交</value></data>
+  <data name="assistant.decision.previous"><value>上一項</value></data>
+  <data name="assistant.decision.next"><value>下一項</value></data>
+  <data name="assistant.decision.close"><value>關閉</value></data>
+  <data name="assistant.decision.cancel_input"><value>取消本次輸入</value></data>
+  <data name="assistant.queue.title"><value>排隊訊息</value></data>
+  <data name="assistant.queue.delete"><value>刪除排隊訊息</value></data>
 </root>
