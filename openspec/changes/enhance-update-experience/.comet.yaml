@@ -25,3 +25,4 @@ handoff_hash: afe58a3c8791e42191bb2d64e42afec5120e59edb4c22e09582ab2a6f6e42158
 classic_profile: full
 classic_migration: 1
 run_id: 51e487bc-6d5a-46f1-82cd-2365360e975d
+bound_branch: codex/merge-structured-config-assistant-decisions
