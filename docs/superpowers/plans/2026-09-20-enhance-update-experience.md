@@ -126,7 +126,7 @@ public interface IUpdateService
 }
 ~~~
 
-- [ ] **步骤 1：编写 Release 分页和可安装筛选失败测试**
+- [x] **步骤 1：编写 Release 分页和可安装筛选失败测试**
 
 在 UpdateServiceTests 中新增以下测试方法，并把 StubHandler 扩展为记录 RequestUri：
 
@@ -177,7 +177,7 @@ private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> r
 }
 ~~~
 
-- [ ] **步骤 2：运行定向测试并确认红灯**
+- [x] **步骤 2：运行定向测试并确认红灯**
 
 运行：
 
@@ -187,7 +187,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "Ful
 
 预期：FAIL，编译错误指出 IUpdateService、UpdateReleasePage 或 GetStableReleasesAsync 不存在；现有 CheckAsync 也会错误选择缺少安装资产的 v0.13.0。
 
-- [ ] **步骤 3：实现接口、正式分页和安全日志**
+- [x] **步骤 3：实现接口、正式分页和安全日志**
 
 将固定 ApiUrl 改为基础地址，并用 Link 响应头判断原始 GitHub 页是否还有下一页：
 
@@ -240,13 +240,13 @@ private static bool HasNextPage(HttpResponseMessage response) =>
 
 CheckAsync 调用第一页正式 Release 数据，按 StableVersion 降序选择 Version 高于 CurrentVersion 且 InstallerAsset、ChecksumAsset 均非空的条目。日志只能包含当前版本、目标版本、条目数和耗时，不记录 Body 或 URL 查询中的敏感值。
 
-- [ ] **步骤 4：运行服务测试并确认绿灯**
+- [x] **步骤 4：运行服务测试并确认绿灯**
 
 运行同一步骤 2 命令。
 
 预期：PASS；分页请求包含 page=1 和 page=2；历史结果包含无安装资产的正式版本；自动检查只选择兼容安装目标。
 
-- [ ] **步骤 5：勾选 OpenSpec 1.1、1.2 并提交**
+- [x] **步骤 5：勾选 OpenSpec 1.1、1.2 并提交**
 
 ~~~powershell
 git add LoomX/Services/UpdateService.cs LoomX.Tests/UpdateServiceTests.cs openspec/changes/enhance-update-experience/tasks.md
