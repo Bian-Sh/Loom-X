@@ -7,10 +7,10 @@
         MaxWidth="520">
   <UserControl.Styles>
     <Style Selector="Button.card-icon">
-      <Setter Property="Width" Value="28"/>
-      <Setter Property="Height" Value="28"/>
-      <Setter Property="MinWidth" Value="28"/>
-      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Width" Value="24"/>
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="MinWidth" Value="24"/>
+      <Setter Property="MinHeight" Value="24"/>
       <Setter Property="Padding" Value="0"/>
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
@@ -23,8 +23,8 @@
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
     <Style Selector="Button.card-action">
-      <Setter Property="MinHeight" Value="32"/>
-      <Setter Property="Padding" Value="10,5"/>
+      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Padding" Value="8,2"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
@@ -120,15 +120,7 @@
                     HorizontalScrollBarVisibility="Disabled"
                     VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="8">
-          <TextBlock Text="{Binding Title}"
-                     Margin="0,0,36,0"
-                     Foreground="{DynamicResource TextSecondaryBrush}"
-                     FontSize="12"
-                     FontWeight="SemiBold"
-                     TextTrimming="CharacterEllipsis"/>
-          <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap">
-            <Run Text="{Binding CurrentField.Label}"/><Run Text="{Binding CurrentField.RequiredSuffix}" Foreground="{DynamicResource DangerBrush}"/>
-          </TextBlock>
+
           <TextBlock Text="{Binding Question}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" TextWrapping="Wrap"/>
           <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" MaxLines="1" TextTrimming="CharacterEllipsis"/>
           <Border IsVisible="{Binding HasImpactSummary}"
@@ -157,17 +149,17 @@
               IsVisible="{Binding AllowCancel}"
               Click="CancelInputButton_OnClick"/>
 
-      <Border Grid.Row="1" Margin="16,10,16,14">
+      <Border Grid.Row="1" Margin="16,6,16,8">
         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
             <Button x:Name="PreviousButton"
                     Classes="card-icon"
                     Content="‹"
-                    FontSize="19"
+                    FontSize="17"
                     IsEnabled="{Binding HasPreviousField}"
                     ToolTip.Tip="{l:Locale assistant.decision.previous}"
                     Click="PreviousButton_OnClick"/>
-            <TextBlock MinWidth="42"
+            <TextBlock MinWidth="36"
                        Text="{Binding StepText}"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        FontSize="12"
@@ -177,7 +169,7 @@
             <Button x:Name="NextButton"
                     Classes="card-icon"
                     Content="›"
-                    FontSize="19"
+                    FontSize="17"
                     IsEnabled="{Binding HasNextField}"
                     ToolTip.Tip="{l:Locale assistant.decision.next}"
                     Click="NextButton_OnClick"/>
