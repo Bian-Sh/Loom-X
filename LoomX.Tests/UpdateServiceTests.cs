@@ -65,40 +65,55 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async Task DownloadAndInstallAsync_ShouldVerifyChecksumBeforeLaunchingInstaller()
+    public async Task PrepareUpdateAsync_校验成功但不会启动安装器()
     {
-        var bytes = Encoding.UTF8.GetBytes("测试安装包");
-        var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-        var handler = new StubHandler(request =>
-        {
-            if (request.RequestUri?.AbsoluteUri.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) == true)
-                return TextResponse($"{hash}  LoomX-0.12.7-setup.exe");
-            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) };
-        });
-        var launcher = new RecordingLauncher();
-        var root = Path.Combine(Path.GetTempPath(), "LoomX-UpdateTests", Guid.NewGuid().ToString("N"));
-        var release = new UpdateRelease(
-            "v0.12.7", "0.12.7", "稳定版", "修复", "https://github.com/Bian-Sh/Loom-X/releases/tag/v0.12.7", null,
-            [
-                new UpdateAsset("LoomX-0.12.7-setup.exe", "https://github.com/Bian-Sh/Loom-X/releases/download/v0.12.7/LoomX-0.12.7-setup.exe", bytes.Length, null),
-                new UpdateAsset("LoomX-0.12.7-setup.exe.sha256", "https://github.com/Bian-Sh/Loom-X/releases/download/v0.12.7/LoomX-0.12.7-setup.exe.sha256", hash.Length, "text/plain")
-            ],
-            null,
-            null);
-        release = release with { InstallerAsset = release.Assets[0], ChecksumAsset = release.Assets[1] };
-
+        var fixture = UpdateFixture.CreateValid();
         try
         {
-            var service = new UpdateService(_ => new HttpClient(handler), launcher, tempRoot: root, currentVersion: "0.12.6");
-            var result = await service.DownloadAndInstallAsync(release, DirectSettings);
-            Assert.Equal("0.12.7", result.Version);
-            Assert.Equal(result.InstallerPath, launcher.Path);
-            Assert.True(File.Exists(result.InstallerPath));
+            var prepared = await fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings);
+
+            Assert.Equal("0.12.7", prepared.Version);
+            Assert.True(File.Exists(prepared.InstallerPath));
+            Assert.Null(fixture.Launcher.Path);
+
+            fixture.Service.LaunchInstaller(prepared);
+            Assert.Equal(prepared.InstallerPath, fixture.Launcher.Path);
         }
-        finally
+        finally { fixture.Dispose(); }
+    }
+
+    [Fact]
+    public async Task PrepareUpdateAsync_有效缓存重新校验后不重复下载()
+    {
+        var fixture = UpdateFixture.CreateValid();
+        try
         {
-            if (Directory.Exists(root)) Directory.Delete(root, true);
+            var first = await fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings);
+            var requestCount = fixture.Handler.RequestUris.Count;
+            var second = await fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings);
+
+            Assert.Equal(first.InstallerPath, second.InstallerPath);
+            Assert.Equal(requestCount, fixture.Handler.RequestUris.Count);
+            Assert.Null(fixture.Launcher.Path);
         }
+        finally { fixture.Dispose(); }
+    }
+
+    [Fact]
+    public async Task PrepareUpdateAsync_校验失败删除当前版本临时文件()
+    {
+        var fixture = UpdateFixture.CreateWithChecksum("0000000000000000000000000000000000000000000000000000000000000000");
+        try
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings));
+
+            Assert.Empty(Directory.Exists(fixture.VersionDirectory)
+                ? Directory.EnumerateFiles(fixture.VersionDirectory, "*.partial")
+                : []);
+            Assert.Null(fixture.Launcher.Path);
+        }
+        finally { fixture.Dispose(); }
     }
 
     private static HttpResponseMessage TextResponse(string text) => new(HttpStatusCode.OK) { Content = new StringContent(text) };
@@ -182,6 +197,52 @@ public sealed class UpdateServiceTests
     {
         public string? Path { get; private set; }
         public void Launch(string installerPath) => Path = installerPath;
+    }
+
+    private sealed class UpdateFixture : IDisposable
+    {
+        private readonly string root;
+
+        private UpdateFixture(string checksum)
+        {
+            var bytes = Encoding.UTF8.GetBytes("测试安装包");
+            Handler = new StubHandler(request =>
+            {
+                if (request.RequestUri?.AbsoluteUri.EndsWith(".sha256", StringComparison.OrdinalIgnoreCase) == true)
+                    return TextResponse($"{checksum}  LoomX-0.12.7-setup.exe");
+                return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) };
+            });
+            Launcher = new RecordingLauncher();
+            root = Path.Combine(Path.GetTempPath(), "LoomX-UpdateTests", Guid.NewGuid().ToString("N"));
+            var assets = new[]
+            {
+                new UpdateAsset("LoomX-0.12.7-setup.exe", "https://github.com/Bian-Sh/Loom-X/releases/download/v0.12.7/LoomX-0.12.7-setup.exe", bytes.Length, null),
+                new UpdateAsset("LoomX-0.12.7-setup.exe.sha256", "https://github.com/Bian-Sh/Loom-X/releases/download/v0.12.7/LoomX-0.12.7-setup.exe.sha256", checksum.Length, "text/plain")
+            };
+            Release = new UpdateRelease(
+                "v0.12.7", "0.12.7", "稳定版", "修复", "https://github.com/Bian-Sh/Loom-X/releases/tag/v0.12.7", null,
+                assets, assets[0], assets[1]);
+            Service = new UpdateService(_ => new HttpClient(Handler), Launcher, tempRoot: root, currentVersion: "0.12.6");
+        }
+
+        public UpdateService Service { get; }
+        public UpdateRelease Release { get; }
+        public StubHandler Handler { get; }
+        public RecordingLauncher Launcher { get; }
+        public string VersionDirectory => Path.Combine(root, Release.Version);
+
+        public static UpdateFixture CreateValid()
+        {
+            var bytes = Encoding.UTF8.GetBytes("测试安装包");
+            return CreateWithChecksum(Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
+        }
+
+        public static UpdateFixture CreateWithChecksum(string checksum) => new(checksum);
+
+        public void Dispose()
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, true);
+        }
     }
 
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler

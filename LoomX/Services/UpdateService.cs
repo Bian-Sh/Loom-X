@@ -81,11 +81,23 @@ public sealed record UpdateCheckResult(string CurrentVersion, UpdateRelease? Lat
     public bool IsAvailable => Latest is not null;
 }
 
-public sealed record UpdateDownloadProgress(long Transferred, long Total, int Percent, long BytesPerSecond);
+public enum UpdatePreparationPhase
+{
+    Downloading,
+    Verifying
+}
 
-public sealed record PreparedUpdate(string InstallerPath, string Version);
+public sealed record UpdateDownloadProgress(
+    long Transferred,
+    long Total,
+    int Percent,
+    long BytesPerSecond,
+    UpdatePreparationPhase Phase = UpdatePreparationPhase.Downloading);
 
-public sealed record UpdateInstallResult(string InstallerPath, string Version);
+public sealed record PreparedUpdate(
+    string Version,
+    string InstallerPath,
+    DateTimeOffset VerifiedAt);
 
 public sealed record UpdateReleasePage(
     IReadOnlyList<UpdateRelease> Items,
@@ -164,7 +176,7 @@ public static class UpdateHttpClientFactory
     }
 }
 
-public sealed class UpdateService
+public sealed class UpdateService : IUpdateService
 {
     private const string Repository = "Bian-Sh/Loom-X";
     private const string ApiUrl = "https://api.github.com/repos/Bian-Sh/Loom-X/releases";
@@ -270,38 +282,80 @@ public sealed class UpdateService
         return new UpdateReleasePage(items, page, pageSize, hasMore);
     }
 
-    public async Task<UpdateInstallResult> DownloadAndInstallAsync(
+    public async Task<PreparedUpdate> PrepareUpdateAsync(
         UpdateRelease release,
-        UpdateProxySettings proxySettings,
+        UpdateProxySettings settings,
         IProgress<UpdateDownloadProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         if (release.InstallerAsset is null || release.ChecksumAsset is null)
             throw new InvalidOperationException("该版本缺少兼容的 LoomX 安装器或校验文件。");
 
-        Directory.CreateDirectory(tempRoot);
         var versionDirectory = Path.Combine(tempRoot, release.Version);
         Directory.CreateDirectory(versionDirectory);
         var installerPath = Path.Combine(versionDirectory, Path.GetFileName(release.InstallerAsset.Name));
         var checksumPath = Path.Combine(versionDirectory, Path.GetFileName(release.ChecksumAsset.Name));
+        var installerPartial = installerPath + ".partial";
+        var checksumPartial = checksumPath + ".partial";
 
+        if (File.Exists(installerPath) && File.Exists(checksumPath))
+        {
+            try
+            {
+                progress?.Report(new UpdateDownloadProgress(
+                    new FileInfo(installerPath).Length,
+                    new FileInfo(installerPath).Length,
+                    100,
+                    0,
+                    UpdatePreparationPhase.Verifying));
+                await VerifyChecksumAsync(installerPath, checksumPath, cancellationToken);
+                logger.LogInformation("更新包缓存校验完成 {Version} {Bytes}", release.Version, new FileInfo(installerPath).Length);
+                return new PreparedUpdate(release.Version, installerPath, DateTimeOffset.UtcNow);
+            }
+            catch (InvalidOperationException)
+            {
+                TryDelete(installerPath);
+                TryDelete(checksumPath);
+            }
+        }
+
+        TryDelete(installerPartial);
+        TryDelete(checksumPartial);
         try
         {
-            using var client = clientFactory(proxySettings);
-            await DownloadFileAsync(client, release.InstallerAsset.Url, installerPath, progress, cancellationToken);
-            await DownloadFileAsync(client, release.ChecksumAsset.Url, checksumPath, null, cancellationToken);
-            await VerifyChecksumAsync(installerPath, checksumPath, cancellationToken);
+            using var client = clientFactory(settings);
+            await DownloadFileAsync(client, release.InstallerAsset.Url, installerPartial, progress, cancellationToken);
+            await DownloadFileAsync(client, release.ChecksumAsset.Url, checksumPartial, null, cancellationToken);
+            progress?.Report(new UpdateDownloadProgress(
+                new FileInfo(installerPartial).Length,
+                new FileInfo(installerPartial).Length,
+                100,
+                0,
+                UpdatePreparationPhase.Verifying));
+            await VerifyChecksumAsync(installerPartial, checksumPartial, cancellationToken);
+            File.Move(installerPartial, installerPath, true);
+            File.Move(checksumPartial, checksumPath, true);
             logger.LogInformation("更新包校验完成 {Version} {Bytes}", release.Version, new FileInfo(installerPath).Length);
-            installerLauncher.Launch(installerPath);
-            logger.LogInformation("更新安装器已启动 {Version}", release.Version);
-            return new UpdateInstallResult(installerPath, release.Version);
+            return new PreparedUpdate(release.Version, installerPath, DateTimeOffset.UtcNow);
         }
         catch
         {
-            TryDelete(installerPath);
-            TryDelete(checksumPath);
+            TryDelete(installerPartial);
+            TryDelete(checksumPartial);
             throw;
         }
+    }
+
+    public void LaunchInstaller(PreparedUpdate preparedUpdate)
+    {
+        ArgumentNullException.ThrowIfNull(preparedUpdate);
+        if (string.IsNullOrWhiteSpace(preparedUpdate.Version)
+            || string.IsNullOrWhiteSpace(preparedUpdate.InstallerPath)
+            || !File.Exists(preparedUpdate.InstallerPath))
+            throw new InvalidOperationException("已验证更新包不可用，请重新下载。");
+
+        installerLauncher.Launch(preparedUpdate.InstallerPath);
+        logger.LogInformation("更新安装器已启动 {Version}", preparedUpdate.Version);
     }
 
     private async Task DownloadFileAsync(HttpClient client, string url, string path, IProgress<UpdateDownloadProgress>? progress, CancellationToken cancellationToken)
@@ -421,4 +475,15 @@ public sealed class UpdateService
         [property: JsonPropertyName("browser_download_url")] string BrowserDownloadUrl,
         long Size,
         [property: JsonPropertyName("content_type")] string? ContentType);
+}
+
+internal static class UpdateServiceCompatibilityExtensions
+{
+    public static Task<PreparedUpdate> DownloadAndInstallAsync(
+        this UpdateService service,
+        UpdateRelease release,
+        UpdateProxySettings settings,
+        IProgress<UpdateDownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default) =>
+        service.PrepareUpdateAsync(release, settings, progress, cancellationToken);
 }
