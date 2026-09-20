@@ -48,6 +48,18 @@ public sealed class AssistantToolsTests
     }
 
     [Fact]
+    public void RegisterAll_AskUser选择字段公开自由输入Schema()
+    {
+        using var broker = CreateBroker();
+        var tool = GetTool(broker);
+        var properties = tool.ParametersSchema["properties"]!["fields"]!["items"]!["properties"]!.AsObject();
+
+        Assert.Equal("boolean", properties["allow_custom_input"]!["type"]!.GetValue<string>());
+        Assert.False(properties["allow_custom_input"]!["default"]!.GetValue<bool>());
+        Assert.Equal(200, properties["custom_input_placeholder"]!["maxLength"]!.GetValue<int>());
+    }
+
+    [Fact]
     public void RegisterAll_AskUser描述为无需Skill或Bridge的通用交互()
     {
         using var broker = CreateBroker();
@@ -120,6 +132,9 @@ public sealed class AssistantToolsTests
                     ["type"] = "single_select",
                     ["options"] = new JsonArray(new JsonObject { ["id"] = "one", ["label"] = "一" }),
                     ["default_option_id"] = "one",
+                    ["allow_custom_input"] = true,
+                    ["custom_input_placeholder"] = "描述你的模式",
+                    ["max_length"] = 120,
                 },
                 new JsonObject
                 {
@@ -161,7 +176,13 @@ public sealed class AssistantToolsTests
         Assert.False(request.Request.AllowCancel);
         Assert.Collection(
             request.Request.Fields,
-            field => Assert.Equal("one", field.DefaultOptionId),
+            field =>
+            {
+                Assert.Equal("one", field.DefaultOptionId);
+                Assert.True(field.AllowCustomInput);
+                Assert.Equal("描述你的模式", field.CustomInputPlaceholder);
+                Assert.Equal(120, field.MaxLength);
+            },
             field =>
             {
                 Assert.Equal(["one"], field.DefaultOptionIds);
@@ -452,6 +473,8 @@ public sealed class AssistantToolsTests
         yield return ["field", "default_text", "42"];
         yield return ["field", "is_multiline", "\"false\""];
         yield return ["field", "max_length", "true"];
+        yield return ["field", "allow_custom_input", "1"];
+        yield return ["field", "custom_input_placeholder", "42"];
         yield return ["option", "description", "42"];
     }
 

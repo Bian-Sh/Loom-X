@@ -54,6 +54,8 @@ public sealed record UserDecisionField
         decimal? step = null,
         string? defaultText = null,
         bool isMultiline = false,
+        bool allowCustomInput = false,
+        string? customInputPlaceholder = null,
         int? maxLength = null)
     {
         Id = id;
@@ -71,6 +73,8 @@ public sealed record UserDecisionField
         Step = step;
         DefaultText = defaultText;
         IsMultiline = isMultiline;
+        AllowCustomInput = allowCustomInput;
+        CustomInputPlaceholder = customInputPlaceholder;
         MaxLength = maxLength;
     }
 
@@ -103,6 +107,10 @@ public sealed record UserDecisionField
     public string? DefaultText { get; }
 
     public bool IsMultiline { get; }
+
+    public bool AllowCustomInput { get; }
+
+    public string? CustomInputPlaceholder { get; }
 
     public int? MaxLength { get; }
 
@@ -202,6 +210,7 @@ public static class UserDecisionValidator
     private const int MaxOptionIdLength = 64;
     private const int MaxOptionLabelLength = 200;
     private const int MaxOptionDescriptionLength = 500;
+    private const int MaxCustomInputPlaceholderLength = 200;
     private const int DefaultTextMaxLength = 1000;
     private const int MaxTextLength = 4000;
 
@@ -367,10 +376,12 @@ public static class UserDecisionValidator
             || field.MinSelections is not null
             || field.MaxSelections is not null
             || HasNumberProperties(field)
-            || HasTextProperties(field))
+            || HasTextOnlyProperties(field))
         {
             AddInapplicablePropertyError(errors, fieldId);
         }
+
+        ValidateCustomInputProperties(errors, field, fieldId);
     }
 
     private static void ValidateMultiSelectProperties(
@@ -380,10 +391,12 @@ public static class UserDecisionValidator
     {
         if (field.DefaultOptionId is not null
             || HasNumberProperties(field)
-            || HasTextProperties(field))
+            || HasTextOnlyProperties(field))
         {
             AddInapplicablePropertyError(errors, fieldId);
         }
+
+        ValidateCustomInputProperties(errors, field, fieldId);
     }
 
     private static void ValidateNumberProperties(
@@ -391,7 +404,7 @@ public static class UserDecisionValidator
         UserDecisionField field,
         string fieldId)
     {
-        if (HasSelectionProperties(field) || HasTextProperties(field))
+        if (HasSelectionProperties(field) || HasTextProperties(field) || HasCustomInputProperties(field))
         {
             AddInapplicablePropertyError(errors, fieldId);
         }
@@ -402,7 +415,7 @@ public static class UserDecisionValidator
         UserDecisionField field,
         string fieldId)
     {
-        if (HasSelectionProperties(field) || HasNumberProperties(field))
+        if (HasSelectionProperties(field) || HasNumberProperties(field) || HasCustomInputProperties(field))
         {
             AddInapplicablePropertyError(errors, fieldId);
         }
@@ -421,10 +434,47 @@ public static class UserDecisionValidator
         || field.MaxNumber is not null
         || field.Step is not null;
 
-    private static bool HasTextProperties(UserDecisionField field) =>
+    private static bool HasTextOnlyProperties(UserDecisionField field) =>
         field.DefaultText is not null
-        || field.IsMultiline
+        || field.IsMultiline;
+
+    private static bool HasTextProperties(UserDecisionField field) =>
+        HasTextOnlyProperties(field)
         || field.MaxLength is not null;
+
+    private static bool HasCustomInputProperties(UserDecisionField field) =>
+        field.AllowCustomInput
+        || field.CustomInputPlaceholder is not null;
+
+    private static void ValidateCustomInputProperties(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        if (!field.AllowCustomInput)
+        {
+            if (field.CustomInputPlaceholder is not null || field.MaxLength is not null)
+            {
+                AddInapplicablePropertyError(errors, fieldId);
+            }
+
+            return;
+        }
+
+        ValidateDisplayText(
+            errors,
+            fieldId,
+            "自由输入提示",
+            field.CustomInputPlaceholder,
+            field.CustomInputPlaceholder is not null,
+            MaxCustomInputPlaceholderLength);
+
+        var maxLength = field.MaxLength ?? DefaultTextMaxLength;
+        if (maxLength <= 0 || maxLength > MaxTextLength)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "自由输入最大长度必须处于允许范围内。"));
+        }
+    }
 
     private static void AddInapplicablePropertyError(
         ICollection<UserDecisionValidationError> errors,

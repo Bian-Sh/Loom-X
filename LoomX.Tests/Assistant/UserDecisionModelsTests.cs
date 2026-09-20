@@ -100,6 +100,45 @@ public sealed class UserDecisionModelsTests
     }
 
     [Fact]
+    public void 选择字段校验_允许自由输入属性与长度限制()
+    {
+        var field = new UserDecisionField(
+            id: "mode",
+            label: "运行模式",
+            type: UserDecisionFieldType.SingleSelect,
+            options: [new UserDecisionOption("safe", "安全模式")],
+            allowCustomInput: true,
+            customInputPlaceholder: "描述你的模式",
+            maxLength: 120);
+
+        Assert.Empty(UserDecisionValidator.ValidateRequest(CreateRequest(field)));
+        Assert.True(field.AllowCustomInput);
+        Assert.Equal("描述你的模式", field.CustomInputPlaceholder);
+        Assert.Equal(120, field.MaxLength);
+    }
+
+    [Fact]
+    public void 选择字段校验_拒绝未启用时提供Placeholder及非选择字段启用自由输入()
+    {
+        var disabled = new UserDecisionField(
+            id: "mode",
+            label: "运行模式",
+            type: UserDecisionFieldType.SingleSelect,
+            options: [new UserDecisionOption("safe", "安全模式")],
+            customInputPlaceholder: "不应接受");
+        var number = new UserDecisionField(
+            id: "count",
+            label: "数量",
+            type: UserDecisionFieldType.Number,
+            allowCustomInput: true);
+
+        var errors = UserDecisionValidator.ValidateRequest(CreateRequest(disabled, number));
+
+        Assert.Contains(errors, error => error.FieldId == "mode" && error.Message.Contains("不适用"));
+        Assert.Contains(errors, error => error.FieldId == "count" && error.Message.Contains("不适用"));
+    }
+
+    [Fact]
     public void 提交校验_拒绝必填空文本()
     {
         var request = CreateRequest(CreateTextField("note", isRequired: true, maxLength: 20));

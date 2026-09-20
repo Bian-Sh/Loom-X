@@ -22,7 +22,7 @@ public static class AssistantTools
     {
         "id", "label", "type", "is_required", "options", "default_option_id", "default_option_ids",
         "min_selections", "max_selections", "default_number", "min_number", "max_number", "step",
-        "default_text", "is_multiline", "max_length",
+        "default_text", "is_multiline", "allow_custom_input", "custom_input_placeholder", "max_length",
     };
     private static readonly HashSet<string> OptionProperties = new(StringComparer.Ordinal)
     {
@@ -99,6 +99,9 @@ public static class AssistantTools
                     ["type"] = type,
                     ["required"] = required,
                     ["option_count"] = field?["options"] is JsonArray options ? options.Count : 0,
+                    ["custom_input_allowed"] = field?["allow_custom_input"] is JsonValue customInputValue
+                        && customInputValue.TryGetValue<bool>(out var allowCustomInput)
+                        && allowCustomInput,
                 });
             }
         }
@@ -161,6 +164,8 @@ public static class AssistantTools
             OptionalNullableValue<decimal>(field, "step"),
             OptionalString(field, "default_text"),
             OptionalValue(field, "is_multiline", false),
+            OptionalValue(field, "allow_custom_input", false),
+            OptionalString(field, "custom_input_placeholder"),
             OptionalNullableValue<int>(field, "max_length"));
     }
 
@@ -556,6 +561,8 @@ public static class AssistantTools
                   "step": { "type": "number", "exclusiveMinimum": 0 },
                   "default_text": { "type": "string" },
                   "is_multiline": { "type": "boolean", "default": false },
+                  "allow_custom_input": { "type": "boolean", "default": false },
+                  "custom_input_placeholder": { "type": "string", "maxLength": 200 },
                   "max_length": { "type": "integer", "minimum": 1, "maximum": 4000 }
                 },
                 "allOf": [
