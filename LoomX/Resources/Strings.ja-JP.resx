@@ -1492,4 +1492,13 @@
   <data name="providers.test.response.delete"><value>削除</value></data>
   <data name="providers.test.response.selectAll"><value>すべて選択</value></data>
   <data name="providers.test.response.empty"><value>テストリクエストを送信すると、ここに応答が表示されます</value></data>
+  <data name="assistant.decision.skip"><value>スキップ</value></data>
+  <data name="assistant.decision.continue"><value>続行</value></data>
+  <data name="assistant.decision.submit"><value>送信</value></data>
+  <data name="assistant.decision.previous"><value>前へ</value></data>
+  <data name="assistant.decision.next"><value>次へ</value></data>
+  <data name="assistant.decision.close"><value>閉じる</value></data>
+  <data name="assistant.decision.cancel"><value>キャンセル</value></data>
+  <data name="assistant.queue.title"><value>キュー内のメッセージ</value></data>
+  <data name="assistant.queue.delete"><value>キュー内のメッセージを削除</value></data>
 </root>

@@ -1,4 +1,4 @@
-﻿using LoomX.Assistant.UserDecisions;
+using LoomX.Assistant.UserDecisions;
 using LoomX.Localization;
 using LoomX.ViewModels;
 using Xunit;
@@ -148,6 +148,117 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
+    public void 分页状态_初始显示第一字段且不预先显示错误()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("first", "第一项", UserDecisionFieldType.Text, isRequired: true),
+            new UserDecisionField("second", "第二项", UserDecisionFieldType.Text, isRequired: true)));
+
+        Assert.Equal(0, ReadProperty<int>(viewModel, "CurrentFieldIndex"));
+        Assert.Same(viewModel.Fields[0], ReadProperty<AskUserFieldViewModel>(viewModel, "CurrentField"));
+        Assert.Equal("1 / 2", ReadProperty<string>(viewModel, "StepText"));
+        Assert.False(ReadProperty<bool>(viewModel, "HasPreviousField"));
+        Assert.True(ReadProperty<bool>(viewModel, "HasNextField"));
+        Assert.False(ReadProperty<bool>(viewModel, "IsLastField"));
+        Assert.False(ReadProperty<bool>(viewModel, "CanSkipCurrentField"));
+        Assert.False(viewModel.HasErrors);
+        Assert.All(viewModel.Fields, field => Assert.False(field.HasError));
+    }
+
+    [Fact]
+    public void 分页导航_前后切换会保留已输入值()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("first", "第一项", UserDecisionFieldType.Text),
+            new UserDecisionField("second", "第二项", UserDecisionFieldType.Number)));
+        var first = Assert.IsType<AskUserTextFieldViewModel>(viewModel.Fields[0]);
+        first.TextValue = "保留此值";
+
+        Invoke(viewModel, "MoveNextWithoutValidation");
+
+        Assert.Equal(1, ReadProperty<int>(viewModel, "CurrentFieldIndex"));
+        Assert.Same(viewModel.Fields[1], ReadProperty<AskUserFieldViewModel>(viewModel, "CurrentField"));
+
+        Invoke(viewModel, "MovePrevious");
+
+        Assert.Equal(0, ReadProperty<int>(viewModel, "CurrentFieldIndex"));
+        Assert.Equal("保留此值", first.TextValue);
+    }
+
+    [Fact]
+    public void TryAdvanceCurrentField_当前字段无效时停留并显示安全错误()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("required", "必填项", UserDecisionFieldType.Text, isRequired: true),
+            new UserDecisionField("later", "后续项", UserDecisionFieldType.Text, isRequired: true)));
+
+        var advanced = Invoke<bool>(viewModel, "TryAdvanceCurrentField");
+
+        Assert.False(advanced);
+        Assert.Equal(0, ReadProperty<int>(viewModel, "CurrentFieldIndex"));
+        Assert.True(viewModel.Fields[0].HasError);
+        Assert.False(viewModel.Fields[1].HasError);
+        Assert.True(viewModel.HasErrors);
+    }
+
+    [Fact]
+    public void TryAdvanceCurrentField_有效字段前进且末页通过后可构造结果()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("note", "说明", UserDecisionFieldType.Text, isRequired: true),
+            new UserDecisionField(
+                "mode",
+                "模式",
+                UserDecisionFieldType.SingleSelect,
+                isRequired: true,
+                options: [new("safe", "安全"), new("fast", "快速")])));
+        Assert.IsType<AskUserTextFieldViewModel>(viewModel.Fields[0]).TextValue = "已确认";
+
+        Assert.True(Invoke<bool>(viewModel, "TryAdvanceCurrentField"));
+        Assert.Equal(1, ReadProperty<int>(viewModel, "CurrentFieldIndex"));
+        Assert.True(ReadProperty<bool>(viewModel, "IsLastField"));
+
+        Assert.IsType<AskUserSingleSelectFieldViewModel>(viewModel.Fields[1]).SelectedOptionId = "fast";
+        Assert.True(Invoke<bool>(viewModel, "TryAdvanceCurrentField"));
+        Assert.Equal(1, ReadProperty<int>(viewModel, "CurrentFieldIndex"));
+        Assert.True(viewModel.TryBuildResult(out var values));
+        Assert.Equal("已确认", values["note"]);
+        Assert.Equal("fast", values["mode"]);
+    }
+
+    [Fact]
+    public void TrySkipCurrentField_仅可选字段可跳过并清空当前值()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("optional", "可选项", UserDecisionFieldType.Text, defaultText: "默认值"),
+            new UserDecisionField("required", "必填项", UserDecisionFieldType.Text, isRequired: true)));
+        var optional = Assert.IsType<AskUserTextFieldViewModel>(viewModel.Fields[0]);
+
+        var skipped = InvokeSkip(viewModel, out var shouldSubmit);
+
+        Assert.True(skipped);
+        Assert.False(shouldSubmit);
+        Assert.Equal(string.Empty, optional.TextValue);
+        Assert.Equal(1, ReadProperty<int>(viewModel, "CurrentFieldIndex"));
+        Assert.False(ReadProperty<bool>(viewModel, "CanSkipCurrentField"));
+        Assert.False(InvokeSkip(viewModel, out shouldSubmit));
+        Assert.False(shouldSubmit);
+        Assert.Equal(1, ReadProperty<int>(viewModel, "CurrentFieldIndex"));
+    }
+
+    [Fact]
+    public void TrySkipCurrentField_末页可选字段请求直接提交空值()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("optional", "可选项", UserDecisionFieldType.Number, defaultNumber: 3)));
+
+        Assert.True(InvokeSkip(viewModel, out var shouldSubmit));
+        Assert.True(shouldSubmit);
+        Assert.True(viewModel.TryBuildResult(out var values));
+        Assert.Null(values["optional"]);
+    }
+
+    [Fact]
     public void ErrorSummary_使用当前Locale资源()
     {
         var previousCulture = LocaleService.CurrentCulture.Name;
@@ -160,6 +271,8 @@ public sealed class AskUserDialogContractTests
                 UserDecisionFieldType.Text,
                 isRequired: true)));
 
+            Assert.Equal(string.Empty, viewModel.ErrorSummary);
+            Assert.False(Invoke<bool>(viewModel, "TryAdvanceCurrentField"));
             Assert.Equal(ResourceLookup.Resolve("assistant.decision.validation_failed"), viewModel.ErrorSummary);
             Assert.DoesNotContain("请检查", viewModel.ErrorSummary, StringComparison.Ordinal);
         }
@@ -170,30 +283,132 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
-    public void DialogXaml_使用动态玻璃资源滚动字段模板与安全错误区()
+    public void CardXaml_使用应用内悬浮ApprovalCard逐题布局()
     {
-        var source = ReadDesktopFile("Views", "AskUserDialog.axaml");
-        var code = ReadDesktopFile("Views", "AskUserDialog.axaml.cs");
+        var source = ReadDesktopFile("Views", "AskUserCard.axaml");
 
-        Assert.Contains("Background=\"Transparent\"", source, StringComparison.Ordinal);
-        Assert.Contains("{DynamicResource DialogBackgroundBrush}", source, StringComparison.Ordinal);
+        Assert.Contains("<UserControl", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Window", source, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"560\"", source, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{DynamicResource DialogBackgroundBrush}\"", source, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource BorderStrongBrush}", source, StringComparison.Ordinal);
-        Assert.Contains("CornerRadius=\"10\"", source, StringComparison.Ordinal);
-        Assert.Contains("<ScrollViewer", source, StringComparison.Ordinal);
+        Assert.Contains("{DynamicResource SurfaceSubtleBrush}", source, StringComparison.Ordinal);
+        Assert.Contains("{DynamicResource AccentBrush}", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"#", source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Content=\"{Binding CurrentField}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ItemsSource=\"{Binding Fields}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding CurrentField.Label}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding StepText}\"", source, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PreviousButton\"", source, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"NextButton\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"SkipButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding CanSkipCurrentField}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{Binding PrimaryActionText}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"PrimaryButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"CancelButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding AllowCancel}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CloseButton", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("AskUser 验收面板", source, StringComparison.Ordinal);
         Assert.Contains("AskUserSingleSelectFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("AskUserMultiSelectFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("AskUserNumberFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("AskUserTextFieldViewModel", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding Title}\"", source, StringComparison.Ordinal);
+        Assert.Contains("KeyDown=\"TextInput_OnKeyDown\"", source, StringComparison.Ordinal);
+        Assert.Contains("KeyDown=\"NumberInput_OnKeyDown\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Question}\"", source, StringComparison.Ordinal);
         Assert.Contains("Description", source, StringComparison.Ordinal);
         Assert.Contains("ImpactSummary", source, StringComparison.Ordinal);
         Assert.Contains("ErrorSummary", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"{l:Locale assistant.cancel}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"{l:Locale assistant.approval.approve}\"", source, StringComparison.Ordinal);
-        Assert.Contains("SubmitButton_OnClick", code, StringComparison.Ordinal);
-        Assert.Contains("TryBuildResult", code, StringComparison.Ordinal);
-        Assert.Contains("Close(false)", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CardCodeBehind_接通导航跳过自动前进键盘提交与取消()
+    {
+        var code = ReadDesktopFile("Views", "AskUserCard.axaml.cs");
+
+        Assert.Contains("PreviousButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("NextButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("SkipButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("PrimaryButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("CancelButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("SingleChoice_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("Task.Delay", code, StringComparison.Ordinal);
+        Assert.Contains("TryAdvanceCurrentField", code, StringComparison.Ordinal);
+        Assert.Contains("TrySkipCurrentField", code, StringComparison.Ordinal);
+        Assert.Contains("TryCompleteSubmission", code, StringComparison.Ordinal);
+        Assert.Contains("TryCancel", code, StringComparison.Ordinal);
+        Assert.Contains("Key.Enter", code, StringComparison.Ordinal);
+        Assert.Contains("KeyModifiers.Control", code, StringComparison.Ordinal);
+        Assert.Contains("AskUserTextFieldViewModel { IsMultiline: true }", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Close(true)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Close(false)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("protected override void OnKeyDown", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CardViewModel_提交取消只能完成一次()
+    {
+        var submit = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("answer", "回答", UserDecisionFieldType.Text, isRequired: true)));
+        Assert.IsType<AskUserTextFieldViewModel>(submit.CurrentField).TextValue = "确认";
+
+        Assert.True(submit.TryCompleteSubmission());
+        Assert.False(submit.TryCancel());
+        Assert.True(await submit.Completion);
+
+        var cancel = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("answer", "回答", UserDecisionFieldType.Text, isRequired: true)));
+        Assert.True(cancel.TryCancel());
+        Assert.False(cancel.TryCompleteSubmission());
+        Assert.False(await cancel.Completion);
+    }
+
+    [Theory]
+    [InlineData("Strings.resx")]
+    [InlineData("Strings.en-US.resx")]
+    [InlineData("Strings.ja-JP.resx")]
+    [InlineData("Strings.zh-TW.resx")]
+    public void ApprovalCard操作文案_覆盖全部Locale(string fileName)
+    {
+        var source = ReadDesktopFile("Resources", fileName);
+
+        Assert.Contains("name=\"assistant.decision.skip\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.continue\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.submit\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.previous\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.next\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.cancel\"", source, StringComparison.Ordinal);
+    }
+
+    private static T ReadProperty<T>(object target, string propertyName)
+    {
+        var property = target.GetType().GetProperty(propertyName);
+        Assert.NotNull(property);
+        return Assert.IsAssignableFrom<T>(property!.GetValue(target));
+    }
+
+    private static void Invoke(object target, string methodName)
+    {
+        var method = target.GetType().GetMethod(methodName, Type.EmptyTypes);
+        Assert.NotNull(method);
+        method!.Invoke(target, null);
+    }
+
+    private static T Invoke<T>(object target, string methodName)
+    {
+        var method = target.GetType().GetMethod(methodName, Type.EmptyTypes);
+        Assert.NotNull(method);
+        return Assert.IsType<T>(method!.Invoke(target, null));
+    }
+
+    private static bool InvokeSkip(object target, out bool shouldSubmit)
+    {
+        var method = target.GetType().GetMethod("TrySkipCurrentField");
+        Assert.NotNull(method);
+        object?[] arguments = [false];
+        var skipped = Assert.IsType<bool>(method!.Invoke(target, arguments));
+        shouldSubmit = Assert.IsType<bool>(arguments[0]);
+        return skipped;
     }
 
     private static PendingUserDecision CreatePending(params UserDecisionField[] fields) => new(

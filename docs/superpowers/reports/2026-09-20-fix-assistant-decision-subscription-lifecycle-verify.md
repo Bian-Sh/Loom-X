@@ -1,52 +1,66 @@
-# AI 助手决策订阅生命周期验证报告
+# AI 助手决策订阅生命周期、AskUser 悬浮卡片与消息队列验证报告
 
 - 日期：2026-09-20
 - Change：`fix-assistant-decision-subscription-lifecycle`
 - 结论：PASS
 
-## 规格线索与根因
+## 规格线索与生命周期结论
 
-- `openspec/specs/assistant-user-decisions/spec.md` 将 AskUser 限定为高影响配置决策，并明确普通内部步骤不应额外询问。
-- `openspec/changes/archive/2026-09-17-structured-config-assistant-decisions/tasks.md` 只要求 ViewModel 处理 pending request 与页面卸载，不要求页面挂载即订阅。
-- `openspec/changes/fix-browser-bridge-connectivity/specs/browser-bridge-lifecycle/spec.md` 规定由 AI 判断任务需要 Browser Bridge 后申请 Session 租约。
-- 根因是 `AssistantView.AttachedToVisualTree` 和 DataContext 挂载路径调用 `AssistantViewModel.Activate()`，同时 `EnsureServiceAsync()` 在模型选择等通用初始化路径隐式尝试订阅，使导航行为早于用户请求激活 Broker。
+- 旧规格只要求 Assistant 在真实请求边界处理 pending decision，不要求页面挂载、供应商页切换或控制台导航时激活订阅。
+- Browser Bridge 仍应在 AI 理解任务确实需要浏览器能力并按 Skill 申请租约后启动；AskUser 自身是通用 Human-in-the-loop 工具，不依赖 Skill、Bridge 或 Chrome。
+- 当前实现仅在单次 Assistant 轮次进入 AgentLoop 前调用 `Activate()`，并在轮次完成、失败或取消时通过 `Deactivate()` 收敛；页面挂载和普通导航不会激活订阅。
 
-## 完整性
+## AskUser 悬浮卡片
 
-- `tasks.md`：3/3 完成。
-- Delta spec：`assistant-user-decisions` 已补充页面导航、用户请求开始和请求结束场景。
-- 实现、测试、规格与发布产物均已生成。
+- 原独立 `Window` 已替换为 `AskUserCard : UserControl`，由 `AssistantView` 的 `Popup` 锚定在 `inputCard` 正上方。
+- Popup 使用 `ShouldUseOverlayLayer="True"`，因此卡片属于应用顶层窗口内部的 OverlayLayer，不创建第二个 HWND。
+- 卡片无独立标题栏和右上角关闭按钮；`allow_cancel=true` 时底部显示低强调“取消”。
+- 单选、多选、数字、单行文本、多行文本、逐题导航、跳过、校验和结果类型保持原契约。
+- 默认产品链路通过 `PendingAskUser` 和 `Completion` 完成 Broker 提交或取消，不再调用 `ShowDialog`。
 
-## 正确性
+## 简版消息队列
 
-- `AssistantView` 挂载与 DataContext 切换不再调用 `Activate()`；导航不会产生订阅。
-- `AssistantViewModel.EnsureServiceAsync()` 不再包含订阅副作用；打开模型选择器、历史等非发送路径不会激活决策通道。
-- `AssistantViewModel.SendAsync()` 在服务就绪后、AgentLoop 开始前激活订阅，并在 `finally` 中停用；失败、取消和正常完成路径统一收敛。
-- 页面卸载仍调用幂等 `Deactivate()`，可取消已领取的 pending request。
-- Skill/Browser Bridge 契约未改动：Provider/中转站由模型按系统提示加载 Skill，Bridge 仍由 AI 按 Skill 和 Session 租约规则调用。
+- Assistant 运行或等待 AskUser 时，输入框和发送按钮仍可使用；发送内容进入当前 Session 队列。
+- 队列项具有稳定 `Id`、`SessionId`、创建时间、状态和显示顺序，为后续编辑、排序、Steer、Stop-and-Send 和持久化保留扩展空间。
+- 当前版本实现 Session 内 FIFO、未发送消息删除、失败/停止时暂停、Session 隔离和当前会话投影。
+- AskUser 提交或取消本身不是出队边界；只有当前 Assistant 轮次完整结束并成功后才继续出队。
+- 完整 Codex 风格体验已记录在 `docs/superpowers/specs/2026-09-20-assistant-message-queue-requirements.md`，建议后续以独立 change `enhance-assistant-message-queue` 推进。
 
-## 场景覆盖
+## 生命周期测试稳定性
 
-- 页面挂载不订阅：`AssistantDecisionLifecycleTests.AssistantView_挂载不订阅且活动请求在卸载时取消已Claim请求`。
-- 活动请求可以提交/取消：`AssistantViewModelUserDecisionTests` 全部通过。
-- 页面离开取消已领取请求、重复完成和多 ViewModel Claim 竞态：既有测试继续通过。
+- 根因是 `AppBuilder.SetupWithoutStarting()` 把 Avalonia UI 线程绑定到初始化测试线程，而异步数据库准备后的 continuation 可能切换线程。
+- 完整验证时发现历史会话切换尚未终止活动 AskUser；已增加统一的会话切换收敛入口，在 NewSession/LoadSession 前终止卡片、审批和当前运行，并补充回归测试。
+- 生命周期测试改为在初始化线程同步等待异步准备和 Broker 结果，使 UI 对象创建、显示、关闭和释放不跨线程，消除执行顺序依赖。
 
-## 验证命令
+## 自动验证
 
-- `dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~AssistantViewModelUserDecisionTests|FullyQualifiedName~AssistantDecisionLifecycleTests" --no-restore`：9/9 通过。
-- 默认并行执行 `dotnet test LoomX.slnx --no-restore` 时，46 个既有 Avalonia UI 测试因 `Call from invalid thread` 失败；失败跨多个未改模块，属于测试并行线程约束。
-- 使用 xUnit 串行设置重跑完整套件：1063/1063 通过。
-- `dotnet build LoomX.slnx -c Release --no-restore`：通过，0 error。
-- `openspec validate fix-assistant-decision-subscription-lifecycle --strict`：通过。
-- `scripts/publish-desktop.ps1 -Configuration Release -OutputDirectory outputs\\2026-09-20-1914-assistant-decision-subscription-lifecycle`：通过，目录仅包含应用入口 `LoomX.exe`。
+- RED 证据：新增契约与队列测试最初因缺少 `PendingAskUser`、卡片文件、队列 API 和完成信号而编译失败。
+- 定向测试：36/36 通过，覆盖 AskUser、队列、默认卡片链路、UI 契约与生命周期。
+- 完整测试：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore`，1084/1084 通过。
+- Release 构建：`dotnet build LoomX.slnx -c Release --no-restore`，0 error。
+- OpenSpec：`openspec validate fix-assistant-decision-subscription-lifecycle --strict` 通过。
+- 发布：`scripts/publish-desktop.ps1 -Configuration Release -OutputDirectory outputs/2026-09-20-225645-assistant-ask-user-queue` 通过。
+
+## `cua-driver` 顶层窗口验收
+
+- 使用本地 `cua-driver 0.28.2`，后台 UIA 和应用顶层窗口截图完成验收；未使用 Codex auth token 内核，也未抢占系统鼠标。
+- 在真实 AI 请求中直接要求调用 `assistant.ask_user`，卡片成功出现在输入框正上方，且没有独立窗口标题栏或关闭按钮。
+- AskUser 等待期间输入框仍可编辑和发送；第二条消息显示为“排队消息”，删除按钮可用，删除后队列卡片消失。
+- CUA 截图：
+  - `outputs/2026-09-20-223553-assistant-ask-user-queue/cua-askuser-card-12s.png`
+  - `outputs/2026-09-20-223553-assistant-ask-user-queue/cua-queue-visible.png`
+  - `outputs/2026-09-20-223553-assistant-ask-user-queue/cua-queue-deleted.png`
+  - `outputs/2026-09-20-225645-assistant-ask-user-queue/cua-final-assistant.png`
+- UIA 树始终只包含一个顶层 `Window "Loom-X"`；AskUser 和队列均作为该窗口内元素出现。
 
 ## 已知警告
 
-- NuGet 报告 `SQLitePCLRaw.lib.e_sqlite3 2.1.11` 的既有 `NU1903` 安全警告。
-- 既有 `SettingsViewModel` 空值警告、`AnthropicResponseMapper` CA2024 和测试 CS8602 警告仍存在，本次未改动。
+- NuGet 继续报告既有 `SQLitePCLRaw.lib.e_sqlite3 2.1.11` 的 `NU1903` 安全警告。
+- 既有 `SettingsViewModel` CS8618、`AnthropicResponseMapper` CA2024 和测试 CS8602 警告仍存在，本次未改动。
+- 透明主题下截图颜色受系统合成影响；本次只据截图验证布局、层级、可见性和交互，不据此武断判断主题色值。
 
 ## 安全与一致性
 
-- 未新增或记录 API Key、Authorization、用户 prompt、请求正文或工具参数。
-- 未改变数据库路径、Broker 并发协议、Skill 工具协议或 Browser Bridge 租约协议。
-- 代码实现与 proposal、design、delta spec 一致，无未接受偏差。
+- 未新增 API Key、Authorization、请求正文或工具参数日志。
+- 未改变数据库路径、Broker Claim 并发协议、Skill 工具协议或 Browser Bridge 租约协议。
+- 实现、测试、proposal、design、delta spec、需求记录和验证报告一致，无未接受偏差。

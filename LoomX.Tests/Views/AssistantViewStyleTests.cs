@@ -445,7 +445,7 @@ public sealed class AssistantViewStyleTests
             "..", "..", "..", "..", "LoomX", "Views", "AssistantView.axaml"));
         var source = File.ReadAllText(path);
 
-        Assert.Contains("Classes=\"model-search input-transparent\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"model-search input-transparent search\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("TextBox.model-search:pointerover", source, StringComparison.Ordinal);
         Assert.DoesNotContain("TextBox.model-search:focus", source, StringComparison.Ordinal);
         Assert.Contains("<Grid ColumnDefinitions=\"*,Auto\" ColumnSpacing=\"10\">", source, StringComparison.Ordinal);
@@ -590,6 +590,23 @@ public sealed class AssistantViewStyleTests
             .Select(value => value ?? double.NaN)
             .ToArray();
         Assert.Equal(leftEdges[0], leftEdges[1], 6);
+    }
+
+    [Fact]
+    public void AskUser与消息队列使用输入框锚定的应用内悬浮层()
+    {
+        var source = ReadDesktopFile("Views", "AssistantView.axaml");
+
+        Assert.Contains("x:Name=\"assistantInteractionOverlay\"", source, StringComparison.Ordinal);
+        Assert.Contains("PlacementTarget=\"{Binding #inputCard}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ShouldUseOverlayLayer=\"True\"", source, StringComparison.Ordinal);
+        Assert.Contains("<views:AskUserCard", source, StringComparison.Ordinal);
+        Assert.Contains("DataContext=\"{Binding PendingAskUser}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding QueuedMessages}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding DeleteCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"760\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("new AskUserDialog {", ReadDesktopFile("ViewModels", "AssistantViewModel.cs"), StringComparison.Ordinal);
+        Assert.DoesNotContain("ShowDialog<bool?>", ReadDesktopFile("ViewModels", "AssistantViewModel.cs"), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -933,6 +950,11 @@ public sealed class AssistantViewStyleTests
         {
             host.Close();
         }
+    }
+    private static string ReadDesktopFile(params string[] segments)
+    {
+        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);
+        return File.ReadAllText(path);
     }
     private static IPointer CreateTestPointer()
     {

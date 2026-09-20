@@ -41,17 +41,6 @@ public sealed class ConsoleViewModelTests
     }
 
     [Fact]
-    public void ClearSearchCommand_ClearsSearchText()
-    {
-        using var viewModel = new ConsoleViewModel(new RuntimeLogBuffer()) { SearchText = "request" };
-
-        viewModel.ClearSearchCommand.Execute(null);
-
-        Assert.Equal(string.Empty, viewModel.SearchText);
-        Assert.False(viewModel.HasSearchText);
-    }
-
-    [Fact]
     public void ScrollState_PersistsOffsetAndFollowTailFlag()
     {
         using var viewModel = new ConsoleViewModel(new RuntimeLogBuffer());

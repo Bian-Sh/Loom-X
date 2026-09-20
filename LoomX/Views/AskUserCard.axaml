@@ -1,0 +1,191 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LoomX.ViewModels"
+        xmlns:l="using:LoomX.Localization"
+        x:Class="LoomX.Views.AskUserCard"
+        Width="560"
+        MaxWidth="560">
+  <UserControl.Styles>
+    <Style Selector="Button.card-icon">
+      <Setter Property="Width" Value="30"/>
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="MinWidth" Value="30"/>
+      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.card-icon:pointerover">
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style Selector="Button.card-secondary">
+      <Setter Property="MinHeight" Value="34"/>
+      <Setter Property="Padding" Value="14,7"/>
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+    </Style>
+    <Style Selector="Border.choice-row:pointerover">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="{x:Type vm:AskUserSingleSelectFieldViewModel}">
+      <StackPanel Spacing="8">
+        <ItemsControl ItemsSource="{Binding Options}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Classes="choice-row" Margin="0,0,0,7" Padding="11,9" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8">
+                <RadioButton IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="SingleChoice_OnClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </RadioButton>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap"/>
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:AskUserMultiSelectFieldViewModel}">
+      <StackPanel Spacing="8">
+        <ItemsControl ItemsSource="{Binding Options}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Classes="choice-row" Margin="0,0,0,7" Padding="11,9" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8">
+                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                  <StackPanel Spacing="3">
+                    <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                  </StackPanel>
+                </CheckBox>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap"/>
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:AskUserNumberFieldViewModel}">
+      <StackPanel Spacing="8">
+        <NumericUpDown Value="{Binding NumberValue, Mode=TwoWay}"
+                       Minimum="{Binding Minimum}"
+                       Maximum="{Binding Maximum}"
+                       Increment="{Binding Increment}"
+                       HorizontalAlignment="Stretch"
+                       KeyDown="NumberInput_OnKeyDown"/>
+        <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap"/>
+      </StackPanel>
+    </DataTemplate>
+
+    <DataTemplate DataType="{x:Type vm:AskUserTextFieldViewModel}">
+      <StackPanel Spacing="8">
+        <TextBox x:Name="DecisionTextInput"
+                 Text="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                 AcceptsReturn="{Binding IsMultiline}"
+                 MaxLength="{Binding MaxLength}"
+                 MinHeight="42"
+                 MaxHeight="160"
+                 TextWrapping="Wrap"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 KeyDown="TextInput_OnKeyDown"/>
+        <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap"/>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.DataTemplates>
+
+  <Border Background="{DynamicResource DialogBackgroundBrush}"
+          BorderBrush="{DynamicResource BorderStrongBrush}"
+          BorderThickness="1"
+          CornerRadius="12"
+          ClipToBounds="True">
+    <Grid RowDefinitions="Auto,Auto">
+      <ScrollViewer Grid.Row="0"
+                    Margin="20,18,20,0"
+                    MaxHeight="500"
+                    HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="12">
+          <TextBlock Text="{Binding Title}"
+                     Foreground="{DynamicResource TextSecondaryBrush}"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     TextTrimming="CharacterEllipsis"/>
+          <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap">
+            <Run Text="{Binding CurrentField.Label}"/><Run Text="{Binding CurrentField.RequiredSuffix}" Foreground="{DynamicResource DangerBrush}"/>
+          </TextBlock>
+          <TextBlock Text="{Binding Question}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+          <Border IsVisible="{Binding HasImpactSummary}"
+                  Padding="10,8"
+                  Background="{DynamicResource WarningSoftBrush}"
+                  BorderBrush="{DynamicResource WarningBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="8">
+            <TextBlock Text="{Binding ImpactSummary}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+          </Border>
+          <ContentControl Content="{Binding CurrentField}" Margin="0,2,0,0"/>
+          <TextBlock Text="{Binding ErrorSummary}" IsVisible="{Binding HasErrors}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap"/>
+        </StackPanel>
+      </ScrollViewer>
+
+      <Border Grid.Row="1" Margin="20,16,20,18">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+            <Button x:Name="PreviousButton"
+                    Classes="card-icon"
+                    Content="‹"
+                    FontSize="19"
+                    IsEnabled="{Binding HasPreviousField}"
+                    ToolTip.Tip="{l:Locale assistant.decision.previous}"
+                    Click="PreviousButton_OnClick"/>
+            <TextBlock MinWidth="42"
+                       Text="{Binding StepText}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       FontSize="12"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       TextAlignment="Center"/>
+            <Button x:Name="NextButton"
+                    Classes="card-icon"
+                    Content="›"
+                    FontSize="19"
+                    IsEnabled="{Binding HasNextField}"
+                    ToolTip.Tip="{l:Locale assistant.decision.next}"
+                    Click="NextButton_OnClick"/>
+          </StackPanel>
+
+          <Button Grid.Column="2"
+                  Margin="0,0,8,0"
+                  Classes="card-secondary"
+                  Content="{l:Locale assistant.decision.cancel}"
+                  IsVisible="{Binding AllowCancel}"
+                  Click="CancelButton_OnClick"/>
+          <Button Grid.Column="3"
+                  Margin="0,0,8,0"
+                  Classes="card-secondary"
+                  Content="{l:Locale assistant.decision.skip}"
+                  IsVisible="{Binding CanSkipCurrentField}"
+                  Click="SkipButton_OnClick"/>
+          <Button Grid.Column="4"
+                  MinWidth="92"
+                  MinHeight="34"
+                  Padding="16,7"
+                  Classes="accent"
+                  Content="{Binding PrimaryActionText}"
+                  Click="PrimaryButton_OnClick"/>
+        </Grid>
+      </Border>
+    </Grid>
+  </Border>
+</UserControl>

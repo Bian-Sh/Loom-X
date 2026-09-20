@@ -60,6 +60,21 @@ public sealed class AssistantServiceTests : IDisposable
 
 
     [Fact]
+    public void NewSession_SystemPrompt_允许直接测试AskUser且不依赖外部能力()
+    {
+        var service = CreateService(new StubModelClientFactory(null));
+
+        var prompt = Assert.IsType<string>(service.CurrentSession.Options.SystemPrompt);
+
+        Assert.Contains("用户明确要求测试 AskUser 时直接调用", prompt, StringComparison.Ordinal);
+        Assert.Contains("不需要加载 Skill", prompt, StringComparison.Ordinal);
+        Assert.Contains("不需要 Browser Bridge 或 Chrome", prompt, StringComparison.Ordinal);
+        Assert.Contains("偏好收集", prompt, StringComparison.Ordinal);
+        Assert.Contains("歧义澄清", prompt, StringComparison.Ordinal);
+        Assert.Contains("行动确认", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task 删除Session会被动清理意外残留的Bridge租约()
     {
         var lifecycle = new FakeBrowserBridgeLifecycle();

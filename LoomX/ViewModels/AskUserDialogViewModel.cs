@@ -1,16 +1,19 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using LoomX.Assistant.UserDecisions;
 using LoomX.Localization;
 
 namespace LoomX.ViewModels;
 
-/// <summary>把挂起的用户决策请求投影为可绑定表单，并在提交前执行安全校验。</summary>
+/// <summary>把挂起的用户决策请求投影为逐题表单，并在前进或提交时执行安全校验。</summary>
 public sealed class AskUserDialogViewModel : NotifyViewModel
 {
     private static readonly IReadOnlyDictionary<string, object?> EmptyValues =
         new ReadOnlyDictionary<string, object?>(new Dictionary<string, object?>());
 
     private readonly UserDecisionRequest request;
+    private readonly TaskCompletionSource<bool?> completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private int currentFieldIndex;
     private string errorSummary = string.Empty;
 
     public AskUserDialogViewModel(PendingUserDecision pending)
@@ -19,7 +22,10 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
         RequestId = pending.RequestId;
         request = pending.Request;
         Fields = request.Fields.Select(CreateField).ToArray();
-        ValidateFields();
+        if (Fields.Count == 0)
+        {
+            throw new ArgumentException("用户决策请求至少需要一个字段。", nameof(pending));
+        }
     }
 
     public string RequestId { get; }
@@ -38,7 +44,28 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
 
     public bool AllowCancel => request.AllowCancel;
 
+    public Task<bool?> Completion => completion.Task;
+
     public IReadOnlyList<AskUserFieldViewModel> Fields { get; }
+
+    public int CurrentFieldIndex => currentFieldIndex;
+
+    public AskUserFieldViewModel CurrentField => Fields[CurrentFieldIndex];
+
+    public string StepText => $"{CurrentFieldIndex + 1} / {Fields.Count}";
+
+    public bool HasPreviousField => CurrentFieldIndex > 0;
+
+    public bool HasNextField => CurrentFieldIndex < Fields.Count - 1;
+
+    public bool IsLastField => !HasNextField;
+
+    public bool CanSkipCurrentField => !CurrentField.IsRequired;
+
+    public bool CanContinueCurrentField => FindCurrentError() is null;
+
+    public string PrimaryActionText => ResourceLookup.Resolve(
+        IsLastField ? "assistant.decision.submit" : "assistant.decision.continue");
 
     public string ErrorSummary
     {
@@ -53,6 +80,78 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
     }
 
     public bool HasErrors => ErrorSummary.Length > 0;
+
+    public void MovePrevious()
+    {
+        if (!HasPreviousField)
+        {
+            return;
+        }
+
+        currentFieldIndex--;
+        NotifyCurrentFieldChanged();
+    }
+
+    public void MoveNextWithoutValidation()
+    {
+        if (!HasNextField)
+        {
+            return;
+        }
+
+        currentFieldIndex++;
+        NotifyCurrentFieldChanged();
+    }
+
+    public bool TryAdvanceCurrentField()
+    {
+        if (!ValidateCurrentField(showError: true))
+        {
+            return false;
+        }
+
+        if (HasNextField)
+        {
+            MoveNextWithoutValidation();
+            return true;
+        }
+
+        return ValidateFields(BuildValues());
+    }
+
+    public bool TrySkipCurrentField(out bool shouldSubmit)
+    {
+        shouldSubmit = false;
+        if (!CanSkipCurrentField)
+        {
+            return false;
+        }
+
+        CurrentField.ClearValue();
+        if (HasNextField)
+        {
+            MoveNextWithoutValidation();
+            return true;
+        }
+
+        shouldSubmit = ValidateFields(BuildValues());
+        return shouldSubmit;
+    }
+
+    public bool TryCompleteSubmission()
+    {
+        if (!TryBuildResult(out _))
+        {
+            return false;
+        }
+
+        return completion.TrySetResult(true);
+    }
+
+    public bool TryCancel() =>
+        AllowCancel && completion.TrySetResult(false);
+
+    internal bool TryAbort() => completion.TrySetResult(null);
 
     public bool TryBuildResult(out IReadOnlyDictionary<string, object?> values)
     {
@@ -69,10 +168,10 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
 
     private AskUserFieldViewModel CreateField(UserDecisionField field) => field.Type switch
     {
-        UserDecisionFieldType.SingleSelect => new AskUserSingleSelectFieldViewModel(field, ValidateFields),
-        UserDecisionFieldType.MultiSelect => new AskUserMultiSelectFieldViewModel(field, ValidateFields),
-        UserDecisionFieldType.Number => new AskUserNumberFieldViewModel(field, ValidateFields),
-        UserDecisionFieldType.Text => new AskUserTextFieldViewModel(field, ValidateFields),
+        UserDecisionFieldType.SingleSelect => new AskUserSingleSelectFieldViewModel(field, OnFieldChanged),
+        UserDecisionFieldType.MultiSelect => new AskUserMultiSelectFieldViewModel(field, OnFieldChanged),
+        UserDecisionFieldType.Number => new AskUserNumberFieldViewModel(field, OnFieldChanged),
+        UserDecisionFieldType.Text => new AskUserTextFieldViewModel(field, OnFieldChanged),
         _ => throw new ArgumentOutOfRangeException(nameof(field), "不支持的用户决策字段类型。"),
     };
 
@@ -87,7 +186,29 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
         return values;
     }
 
-    private void ValidateFields() => ValidateFields(BuildValues());
+    private void OnFieldChanged()
+    {
+        ValidateCurrentField(showError: true);
+        OnPropertyChanged(nameof(CanContinueCurrentField));
+    }
+
+    private UserDecisionValidationError? FindCurrentError() =>
+        UserDecisionValidator.ValidateSubmission(request, BuildValues())
+            .FirstOrDefault(error => string.Equals(error.FieldId, CurrentField.Id, StringComparison.Ordinal));
+
+    private bool ValidateCurrentField(bool showError)
+    {
+        var error = FindCurrentError();
+        if (showError)
+        {
+            CurrentField.ErrorMessage = error?.Message ?? string.Empty;
+            ErrorSummary = error is null
+                ? string.Empty
+                : ResourceLookup.Resolve("assistant.decision.validation_failed");
+        }
+
+        return error is null;
+    }
 
     private bool ValidateFields(IReadOnlyDictionary<string, object?> values)
     {
@@ -101,13 +222,32 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
         ErrorSummary = errors.Count == 0
             ? string.Empty
             : ResourceLookup.Resolve("assistant.decision.validation_failed");
+        OnPropertyChanged(nameof(CanContinueCurrentField));
         return errors.Count == 0;
+    }
+
+    private void NotifyCurrentFieldChanged()
+    {
+        ErrorSummary = CurrentField.HasError
+            ? ResourceLookup.Resolve("assistant.decision.validation_failed")
+            : string.Empty;
+        OnPropertyChanged(nameof(CurrentFieldIndex));
+        OnPropertyChanged(nameof(CurrentField));
+        OnPropertyChanged(nameof(StepText));
+        OnPropertyChanged(nameof(HasPreviousField));
+        OnPropertyChanged(nameof(HasNextField));
+        OnPropertyChanged(nameof(IsLastField));
+        OnPropertyChanged(nameof(CanSkipCurrentField));
+        OnPropertyChanged(nameof(CanContinueCurrentField));
+        OnPropertyChanged(nameof(PrimaryActionText));
     }
 }
 
 public abstract class AskUserFieldViewModel : NotifyViewModel
 {
     private string errorMessage = string.Empty;
+    private bool clearingValue;
+    private bool isSkipped;
 
     protected AskUserFieldViewModel(UserDecisionField field, Action changed)
     {
@@ -141,7 +281,39 @@ public abstract class AskUserFieldViewModel : NotifyViewModel
 
     public bool HasError => ErrorMessage.Length > 0;
 
-    internal abstract object? GetValue();
+    internal object? GetValue() => isSkipped ? null : GetValueCore();
+
+    internal void ClearValue()
+    {
+        clearingValue = true;
+        try
+        {
+            ClearValueCore();
+        }
+        finally
+        {
+            clearingValue = false;
+        }
+
+        isSkipped = true;
+        ErrorMessage = string.Empty;
+        Changed();
+    }
+
+    protected void NotifyValueChanged()
+    {
+        if (clearingValue)
+        {
+            return;
+        }
+
+        isSkipped = false;
+        Changed();
+    }
+
+    protected abstract object? GetValueCore();
+
+    protected abstract void ClearValueCore();
 }
 
 public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
@@ -180,11 +352,13 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
             }
 
             OnPropertyChanged();
-            Changed();
+            NotifyValueChanged();
         }
     }
 
-    internal override object? GetValue() => SelectedOptionId;
+    protected override object? GetValueCore() => SelectedOptionId;
+
+    protected override void ClearValueCore() => SelectedOptionId = null;
 
     private void OnOptionChanged(AskUserOptionViewModel selected)
     {
@@ -213,7 +387,7 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
         }
 
         OnPropertyChanged(nameof(SelectedOptionId));
-        Changed();
+        NotifyValueChanged();
     }
 }
 
@@ -224,14 +398,22 @@ public sealed class AskUserMultiSelectFieldViewModel : AskUserFieldViewModel
     {
         var defaults = field.DefaultOptionIds.ToHashSet(StringComparer.Ordinal);
         Options = field.Options
-            .Select(option => new AskUserOptionViewModel(option, defaults.Contains(option.Id), _ => Changed()))
+            .Select(option => new AskUserOptionViewModel(option, defaults.Contains(option.Id), _ => NotifyValueChanged()))
             .ToArray();
     }
 
     public IReadOnlyList<AskUserOptionViewModel> Options { get; }
 
-    internal override object GetValue() =>
+    protected override object GetValueCore() =>
         Array.AsReadOnly(Options.Where(option => option.IsSelected).Select(option => option.Id).ToArray());
+
+    protected override void ClearValueCore()
+    {
+        foreach (var option in Options)
+        {
+            option.IsSelected = false;
+        }
+    }
 }
 
 public sealed class AskUserNumberFieldViewModel : AskUserFieldViewModel
@@ -251,7 +433,7 @@ public sealed class AskUserNumberFieldViewModel : AskUserFieldViewModel
         {
             if (SetProperty(ref numberValue, value))
             {
-                Changed();
+                NotifyValueChanged();
             }
         }
     }
@@ -262,7 +444,9 @@ public sealed class AskUserNumberFieldViewModel : AskUserFieldViewModel
 
     public decimal Increment => Field.Step ?? 1;
 
-    internal override object? GetValue() => NumberValue;
+    protected override object? GetValueCore() => NumberValue;
+
+    protected override void ClearValueCore() => NumberValue = null;
 }
 
 public sealed class AskUserTextFieldViewModel : AskUserFieldViewModel
@@ -283,7 +467,7 @@ public sealed class AskUserTextFieldViewModel : AskUserFieldViewModel
             value ??= string.Empty;
             if (SetProperty(ref textValue, value))
             {
-                Changed();
+                NotifyValueChanged();
             }
         }
     }
@@ -292,7 +476,9 @@ public sealed class AskUserTextFieldViewModel : AskUserFieldViewModel
 
     public int MaxLength => Field.MaxLength ?? 1000;
 
-    internal override object GetValue() => TextValue;
+    protected override object GetValueCore() => TextValue;
+
+    protected override void ClearValueCore() => TextValue = string.Empty;
 }
 
 public sealed class AskUserOptionViewModel : NotifyViewModel

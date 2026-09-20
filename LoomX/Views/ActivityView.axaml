@@ -24,7 +24,7 @@
       <Border Grid.Column="0" Classes="panel">
         <Grid RowDefinitions="Auto,*">
           <Grid Row="0" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8" Margin="10">
-            <TextBox Classes="filter" Watermark="{l:Locale activity.search.placeholder}" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+            <TextBox Classes="filter search" Watermark="{l:Locale activity.search.placeholder}" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
             <ComboBox Grid.Column="1" Classes="filter" ItemsSource="{Binding StatusOptions}" ItemTemplate="{StaticResource ActivityFilterTemplate}" SelectionBoxItemTemplate="{StaticResource ActivityFilterTemplate}" SelectedItem="{Binding SelectedStatus}"/>
             <ComboBox Grid.Column="2" Classes="filter" ItemsSource="{Binding ProtocolOptions}" ItemTemplate="{StaticResource ActivityFilterTemplate}" SelectionBoxItemTemplate="{StaticResource ActivityFilterTemplate}" SelectedItem="{Binding SelectedProtocol}"/>
             <Button Grid.Column="3" Classes="outline" Content="{Binding PendingActivityLabel}" Command="{Binding ReturnToLatestCommand}" IsVisible="{Binding IsHistoryMode}"/>

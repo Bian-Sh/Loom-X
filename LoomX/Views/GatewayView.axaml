@@ -127,7 +127,7 @@
       <Border x:Name="modelPickerPanel" Width="360" MaxHeight="420" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="8" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*" RowSpacing="8">
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
-            <TextBox x:Name="modelSearch" Classes="input-transparent" Watermark="{l:Locale gateway.combo.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
+            <TextBox x:Name="modelSearch" Classes="input-transparent search" Watermark="{l:Locale gateway.combo.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
             <Button Grid.Column="1" Classes="icon" Click="ModelSort_OnClick" ToolTip.Tip="{Binding ModelSortToolTip}" AutomationProperties.Name="{Binding ModelSortToolTip}">
               <Panel Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Path Classes="icon-glyph" Data="M 5,6 L 18,6 M 5,12 L 15,12 M 5,18 L 12,18 M 26,5 L 26,24 M 21,19 L 26,24 L 31,19" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsModelSortAscending}"/>

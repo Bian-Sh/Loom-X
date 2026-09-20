@@ -58,7 +58,7 @@
               </Grid>
             </Border>
             <Border Grid.Row="1" Padding="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
-              <TextBox Text="{Binding ProviderSearchQuery, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.search.watermark}"/>
+              <TextBox Classes="search" Text="{Binding ProviderSearchQuery, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.search.watermark}"/>
             </Border>
             <ListBox Grid.Row="2" Classes="provider-list" ItemsSource="{Binding FilteredProviders}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate>
@@ -158,7 +158,7 @@
                     <ScrollViewer Classes="provider-tab-scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                       <StackPanel Spacing="12" Margin="0,16,0,18">
                         <StackPanel Spacing="4"><TextBlock Text="{l:Locale providers.models.url.label}" FontWeight="SemiBold"/><TextBox Text="{Binding SelectedProvider.ModelListUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.models.url.watermark}"/><TextBlock Text="{l:Locale providers.models.url.hint}" Classes="muted" TextWrapping="Wrap"/></StackPanel>
-                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding ModelSearchQuery, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.models.search.watermark}"/><Button Grid.Column="1" Command="{Binding SyncModelsCommand}" Classes="small-button" AutomationProperties.Name="{l:Locale providers.models.sync.tooltip}"><StackPanel Orientation="Horizontal" Spacing="6"><Path Classes="icon-glyph" Data="M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6" Width="12" Height="12" RenderTransformOrigin="50%,50%"><Path.RenderTransform><RotateTransform Angle="{Binding SyncIconAngle}"/></Path.RenderTransform></Path><TextBlock Text="{l:Locale providers.models.sync.button}" VerticalAlignment="Center"/></StackPanel></Button></Grid>
+                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Classes="search" Text="{Binding ModelSearchQuery, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.models.search.watermark}"/><Button Grid.Column="1" Command="{Binding SyncModelsCommand}" Classes="small-button" AutomationProperties.Name="{l:Locale providers.models.sync.tooltip}"><StackPanel Orientation="Horizontal" Spacing="6"><Path Classes="icon-glyph" Data="M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6" Width="12" Height="12" RenderTransformOrigin="50%,50%"><Path.RenderTransform><RotateTransform Angle="{Binding SyncIconAngle}"/></Path.RenderTransform></Path><TextBlock Text="{l:Locale providers.models.sync.button}" VerticalAlignment="Center"/></StackPanel></Button></Grid>
                         <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" ClipToBounds="True">
                           <Grid>
                             <Grid RowDefinitions="Auto,*">
