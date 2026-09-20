@@ -3,14 +3,14 @@
         xmlns:vm="using:LoomX.ViewModels"
         xmlns:l="using:LoomX.Localization"
         x:Class="LoomX.Views.AskUserCard"
-        Width="560"
-        MaxWidth="560">
+        Width="520"
+        MaxWidth="520">
   <UserControl.Styles>
     <Style Selector="Button.card-icon">
-      <Setter Property="Width" Value="30"/>
-      <Setter Property="Height" Value="30"/>
-      <Setter Property="MinWidth" Value="30"/>
-      <Setter Property="MinHeight" Value="30"/>
+      <Setter Property="Width" Value="28"/>
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="MinWidth" Value="28"/>
+      <Setter Property="MinHeight" Value="28"/>
       <Setter Property="Padding" Value="0"/>
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
@@ -23,8 +23,8 @@
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
     </Style>
     <Style Selector="Button.card-action">
-      <Setter Property="MinHeight" Value="34"/>
-      <Setter Property="Padding" Value="14,7"/>
+      <Setter Property="MinHeight" Value="32"/>
+      <Setter Property="Padding" Value="10,5"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
@@ -45,11 +45,11 @@
         <ItemsControl ItemsSource="{Binding Options}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Border Classes="choice-row" Margin="0,0,0,7" Padding="11,9" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8">
-                <RadioButton IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="SingleChoice_OnClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+              <Border Classes="choice-row" Margin="0,0,0,4" Padding="8,4" MinHeight="30" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                <RadioButton IsChecked="{Binding IsSelected, Mode=TwoWay}" Click="SingleChoice_OnClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" MinHeight="0" Padding="0">
                   <StackPanel Spacing="3">
-                    <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
-                    <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" MaxLines="1" TextTrimming="CharacterEllipsis"/>
                   </StackPanel>
                 </RadioButton>
               </Border>
@@ -65,11 +65,11 @@
         <ItemsControl ItemsSource="{Binding Options}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Border Classes="choice-row" Margin="0,0,0,7" Padding="11,9" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8">
-                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+              <Border Classes="choice-row" Margin="0,0,0,4" Padding="8,4" MinHeight="30" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" MinHeight="0" Padding="0">
                   <StackPanel Spacing="3">
-                    <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
-                    <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" MaxLines="1" TextTrimming="CharacterEllipsis"/>
                   </StackPanel>
                 </CheckBox>
               </Border>
@@ -98,8 +98,8 @@
                  Text="{Binding TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                  AcceptsReturn="{Binding IsMultiline}"
                  MaxLength="{Binding MaxLength}"
-                 MinHeight="42"
-                 MaxHeight="160"
+                 MinHeight="36"
+                 MaxHeight="120"
                  TextWrapping="Wrap"
                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                  KeyDown="TextInput_OnKeyDown"/>
@@ -115,31 +115,31 @@
           ClipToBounds="True">
     <Grid RowDefinitions="Auto,Auto">
       <ScrollViewer Grid.Row="0"
-                    Margin="20,18,20,0"
-                    MaxHeight="500"
+                    Margin="16,14,16,0"
+                    MaxHeight="440"
                     HorizontalScrollBarVisibility="Disabled"
                     VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="12">
+        <StackPanel Spacing="8">
           <TextBlock Text="{Binding Title}"
                      Margin="0,0,36,0"
                      Foreground="{DynamicResource TextSecondaryBrush}"
                      FontSize="12"
                      FontWeight="SemiBold"
                      TextTrimming="CharacterEllipsis"/>
-          <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap">
+          <TextBlock FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap">
             <Run Text="{Binding CurrentField.Label}"/><Run Text="{Binding CurrentField.RequiredSuffix}" Foreground="{DynamicResource DangerBrush}"/>
           </TextBlock>
           <TextBlock Text="{Binding Question}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="13" TextWrapping="Wrap"/>
-          <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+          <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" MaxLines="1" TextTrimming="CharacterEllipsis"/>
           <Border IsVisible="{Binding HasImpactSummary}"
-                  Padding="10,8"
+                  Padding="8,6"
                   Background="{DynamicResource WarningSoftBrush}"
                   BorderBrush="{DynamicResource WarningBorderBrush}"
                   BorderThickness="1"
-                  CornerRadius="8">
+                  CornerRadius="6">
             <TextBlock Text="{Binding ImpactSummary}" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" TextWrapping="Wrap"/>
           </Border>
-          <ContentControl Content="{Binding CurrentField}" Margin="0,2,0,0"/>
+          <ContentControl Content="{Binding CurrentField}" Margin="0,0,0,0"/>
           <TextBlock Text="{Binding ErrorSummary}" IsVisible="{Binding HasErrors}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap"/>
         </StackPanel>
       </ScrollViewer>
@@ -151,13 +151,13 @@
               FontSize="18"
               HorizontalAlignment="Right"
               VerticalAlignment="Top"
-              Margin="0,10,10,0"
+              Margin="0,8,8,0"
               ToolTip.Tip="{l:Locale assistant.decision.cancel_input}"
               AutomationProperties.Name="{l:Locale assistant.decision.cancel_input}"
               IsVisible="{Binding AllowCancel}"
               Click="CancelInputButton_OnClick"/>
 
-      <Border Grid.Row="1" Margin="20,16,20,18">
+      <Border Grid.Row="1" Margin="16,10,16,14">
         <Grid ColumnDefinitions="Auto,*,Auto,Auto">
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
             <Button x:Name="PreviousButton"
