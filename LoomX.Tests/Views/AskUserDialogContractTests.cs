@@ -55,6 +55,100 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
+    public void 单选自由输入_展示默认提示并与预设选项互斥()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(new UserDecisionField(
+            "mode",
+            "模式",
+            UserDecisionFieldType.SingleSelect,
+            isRequired: true,
+            options: [new("safe", "安全"), new("fast", "快速")],
+            defaultOptionId: "safe",
+            allowCustomInput: true,
+            maxLength: 120)));
+        var field = Assert.IsType<AskUserSingleSelectFieldViewModel>(viewModel.CurrentField);
+
+        Assert.True(field.AllowsCustomInput);
+        Assert.Equal("我有其他想法...", field.CustomInputPlaceholder);
+        Assert.Equal(120, field.CustomInputMaxLength);
+
+        field.CustomInput = "我想逐步确认";
+        Assert.Null(field.SelectedOptionId);
+
+        field.Options.Single(option => option.Id == "safe").IsSelected = true;
+        Assert.Equal(string.Empty, field.CustomInput);
+    }
+
+    [Fact]
+    public void 单选自由输入_使用请求提供的提示与长度()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(new UserDecisionField(
+            "mode",
+            "模式",
+            UserDecisionFieldType.SingleSelect,
+            options: [new("safe", "安全")],
+            allowCustomInput: true,
+            customInputPlaceholder: "描述你的模式",
+            maxLength: 64)));
+        var field = Assert.IsType<AskUserSingleSelectFieldViewModel>(viewModel.CurrentField);
+
+        Assert.Equal("描述你的模式", field.CustomInputPlaceholder);
+        Assert.Equal(64, field.CustomInputMaxLength);
+    }
+
+    [Fact]
+    public void 多选自由输入_与预设项互斥并投影到独立映射()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(new UserDecisionField(
+            "features",
+            "功能",
+            UserDecisionFieldType.MultiSelect,
+            isRequired: true,
+            options: [new("cloud", "云同步"), new("local", "本地索引")],
+            defaultOptionIds: ["cloud", "local"],
+            minSelections: 2,
+            maxSelections: 2,
+            allowCustomInput: true,
+            maxLength: 100)));
+        var field = Assert.IsType<AskUserMultiSelectFieldViewModel>(viewModel.CurrentField);
+
+        field.CustomInput = "只启用本地索引";
+        Assert.All(field.Options, option => Assert.False(option.IsSelected));
+
+        field.Options[0].IsSelected = true;
+        Assert.Equal(string.Empty, field.CustomInput);
+
+        field.CustomInput = "只启用本地索引";
+        Assert.True(viewModel.TryBuildResult(out var values, out var customInputs));
+        Assert.Empty(Assert.IsAssignableFrom<IEnumerable<string>>(values["features"]));
+        Assert.Equal("只启用本地索引", customInputs["features"]);
+    }
+
+    [Fact]
+    public void 多页自由输入_前后切换保留且跳过时同时清空()
+    {
+        var viewModel = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField(
+                "mode",
+                "模式",
+                UserDecisionFieldType.SingleSelect,
+                options: [new("safe", "安全")],
+                allowCustomInput: true),
+            new UserDecisionField("note", "备注", UserDecisionFieldType.Text)));
+        var field = Assert.IsType<AskUserSingleSelectFieldViewModel>(viewModel.CurrentField);
+        field.CustomInput = "保留这条想法";
+
+        viewModel.MoveNextWithoutValidation();
+        viewModel.MovePrevious();
+
+        Assert.Equal("保留这条想法", field.CustomInput);
+        Assert.True(viewModel.TrySkipCurrentField(out var shouldSubmit));
+        Assert.False(shouldSubmit);
+        Assert.Equal(string.Empty, field.CustomInput);
+        Assert.Null(field.SelectedOptionId);
+    }
+
+    [Fact]
     public void TryBuildResult_必填字段为空时即时显示安全错误()
     {
         var pending = CreatePending(new UserDecisionField(

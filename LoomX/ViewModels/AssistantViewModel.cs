@@ -472,7 +472,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
 
         if (submitted == true)
         {
-            if (!dialogViewModel.TryBuildResult(out var values))
+            if (!dialogViewModel.TryBuildResult(out var values, out var customInputs))
             {
                 logger.LogWarning("助手决策卡片校验未通过 {RequestId}", pending.RequestId);
                 CancelOwnedUserDecision(broker, pending.RequestId, "assistant_ui_validation_failed");
@@ -480,7 +480,11 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
                 return;
             }
 
-            var submitSucceeded = SubmitOwnedUserDecision(broker, pending.RequestId, values);
+            var submitSucceeded = SubmitOwnedUserDecision(
+                broker,
+                pending.RequestId,
+                values,
+                customInputs);
             if (submitSucceeded is null)
             {
                 logger.LogDebug("助手决策提交结果因 Ownership 已结束被忽略 {RequestId}", pending.RequestId);
@@ -523,7 +527,8 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     private bool? SubmitOwnedUserDecision(
         IUserDecisionBroker broker,
         string requestId,
-        IReadOnlyDictionary<string, object?> values)
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlyDictionary<string, string> customInputs)
     {
         lock (userDecisionGate)
         {
@@ -533,7 +538,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             }
 
             logger.LogInformation("助手决策开始提交 {RequestId}", requestId);
-            var submitted = broker.Submit(requestId, userDecisionClaimantId, values);
+            var submitted = broker.Submit(requestId, userDecisionClaimantId, values, customInputs);
             if (!submitted)
             {
                 broker.Cancel(requestId, userDecisionClaimantId, "assistant_ui_submit_failed");

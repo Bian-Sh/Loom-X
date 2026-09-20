@@ -403,6 +403,41 @@ public sealed class AssistantViewModelUserDecisionTests
     }
 
     [Fact]
+    public async Task PendingRequested_选择题自由输入提交Values与CustomInputs()
+    {
+        var broker = new RecordingUserDecisionBroker();
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            userDecisionBroker: broker,
+            uiDispatcher: action => action(),
+            showAskUserDialog: dialog =>
+            {
+                Assert.IsType<AskUserSingleSelectFieldViewModel>(dialog.CurrentField).CustomInput = "我想逐步确认";
+                return Task.FromResult<bool?>(true);
+            });
+
+        viewModel.Activate();
+        broker.Raise(new PendingUserDecision(
+            "custom-input-id",
+            "owner-sensitive-id",
+            new UserDecisionRequest(
+                "确认",
+                "选择运行模式",
+                [new UserDecisionField(
+                    "mode",
+                    "模式",
+                    UserDecisionFieldType.SingleSelect,
+                    isRequired: true,
+                    options: [new("safe", "安全")],
+                    allowCustomInput: true)])));
+        await broker.WaitForCompletionAsync();
+
+        Assert.Equal("custom-input-id", broker.SubmittedRequestId);
+        Assert.Null(broker.SubmittedValues!["mode"]);
+        Assert.Equal("我想逐步确认", broker.SubmittedCustomInputs!["mode"]);
+    }
+
+    [Fact]
     public async Task Dialog关闭_按请求Id取消且不提交默认值()
     {
         var broker = new RecordingUserDecisionBroker();
@@ -786,6 +821,7 @@ public sealed class AssistantViewModelUserDecisionTests
         public bool CancelResult { get; init; } = true;
         public string? SubmittedRequestId { get; private set; }
         public IReadOnlyDictionary<string, object?>? SubmittedValues { get; private set; }
+        public IReadOnlyDictionary<string, string>? SubmittedCustomInputs { get; private set; }
         public string? CancelledRequestId { get; private set; }
 
         public event EventHandler<PendingUserDecision>? PendingRequested
@@ -842,6 +878,7 @@ public sealed class AssistantViewModelUserDecisionTests
 
             SubmittedRequestId = requestId;
             SubmittedValues = values;
+            SubmittedCustomInputs = customInputs;
             completion.TrySetResult();
             return SubmitResult;
         }
