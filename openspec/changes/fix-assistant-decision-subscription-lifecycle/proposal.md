@@ -1,13 +1,14 @@
 ## Why
 
-当前 AssistantView 在挂载到可视树时就激活 `IUserDecisionBroker` 订阅，导致单纯进入或切换页面也写出“助手决策订阅已激活”日志；页面被重新挂载时还会重复出现。这个生命周期早于任何用户请求、Skill 加载或 `assistant.ask_user` 工具调用，与已有规格限定的“按需要询问”及“由 AI 判断后启用 Browser Bridge”不一致。
+AskUser 已经具备结构化收集单选、多选、数字和文本的底层能力，但当前规格与系统提示把它过度关联到高影响配置决策、资料兜底、Skill 和 Browser Bridge，容易让模型拒绝用户明确要求的 AskUser 测试，也让功能显得依赖 Chrome。现有大型表单 Dialog 同时展示全部字段，缺少逐题引导、跳过、步骤导航和紧凑反馈，不符合用户指定的 Approval Card 体验。
 
 ## What Changes
 
-- 将助手决策订阅从 AssistantView 可视树挂载生命周期迁移到单次用户请求生命周期。
-- 只有用户发送请求且 AssistantService 已就绪后，才在 AgentLoop/工具执行前订阅 Broker；请求完成、失败或取消时解除订阅。
-- 保留页面离开时取消已领取决策请求的安全收敛，但页面挂载、打开模型选择器、切换 Provider 或控制台本身不再激活订阅。
-- 保持既有 Skill 与 Browser Bridge 契约：AI 先判断任务是否涉及 Provider/中转站并加载 Skill，再由 Skill 指引按需调用 `browser.bridge_start`，导航行为不得启动 Bridge。
+- 将 `assistant.ask_user` 明确为通用 Human-in-the-loop 工具：用户明确要求测试、收集偏好、澄清歧义、确认行动或输入结构化数据时均可直接调用。
+- 明确 AskUser 不依赖任何 Skill、Browser Bridge、Chrome Extension、搜索或资料通道；只有真实网页任务才按 Skill 指引启用 Bridge。
+- 保留决策订阅的请求级生命周期：导航不激活，真实 Assistant 请求开始后订阅，请求结束后解除。
+- 将 AskUser Dialog 重做为主题协调的紧凑 Approval Card：一页一个字段、步骤导航、跳过、继续/提交、关闭和键盘操作。
+- 继续支持现有四种字段类型和 Broker Submit/Cancel 契约，不把网页参考中的 React 实现或固定配色直接移植到 Avalonia。
 
 ## Capabilities
 
@@ -17,10 +18,10 @@
 
 ### Modified Capabilities
 
-- `assistant-user-decisions`: 明确 Broker UI 订阅属于活动 Assistant 请求，而不是页面可见性；补充导航空操作、请求开始和请求结束场景。
+- `assistant-user-decisions`: 扩展 AskUser 的通用可用性，并定义 Approval Card 的分页、导航、跳过、取消、验证与提交行为。
 
 ## Impact
 
-- 影响 `AssistantViewModel` 的 Broker 订阅入口与请求收尾。
-- 影响 `AssistantView` 的挂载/卸载职责：挂载只维护视图行为，卸载仅负责活动决策的取消收敛。
-- 更新 Assistant 决策生命周期测试与 OpenSpec 验收场景；不改变 Broker、Skill、Browser Bridge、工具协议或数据库结构。
+- 影响 Assistant 系统提示、`assistant.ask_user` 工具描述和相关契约测试。
+- 影响 `AskUserDialogViewModel`、字段 ViewModel、`AskUserDialog.axaml` 与代码后置。
+- 增加本地化资源、分页与交互测试；不改变数据库、Browser Bridge、SkillStore 或 UserDecisionBroker 的外部协议。

@@ -1,0 +1,14 @@
+{
+  "change": "fix-assistant-decision-subscription-lifecycle",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "60317dc656bb09c75f866cea85f6a5b9bcc95be68681d4c90b2290ded12a6302",
+  "files": [
+    { "path": "openspec/changes/fix-assistant-decision-subscription-lifecycle/proposal.md", "sha256": "36f16195e947b31770685728e33f6e7c0b81a928655052cc51684be5d57748e1" },
+    { "path": "openspec/changes/fix-assistant-decision-subscription-lifecycle/design.md", "sha256": "69b4a635dd47eb68e2160d752a8c9d2367bd528509336db6251219e009284083" },
+    { "path": "openspec/changes/fix-assistant-decision-subscription-lifecycle/tasks.md", "sha256": "98e52f07b07e4d886f51cdfb9f30ae41a2243f9a3875f61de079cb6904895d8a" },
+    { "path": "openspec/changes/fix-assistant-decision-subscription-lifecycle/specs/assistant-user-decisions/spec.md", "sha256": "78b69d96128cf09e075b10253b4da026df8e3e9d807b5021dff81502b1f0a81a" }
+  ]
+}
