@@ -46,8 +46,7 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
     private bool followTail = true;
 
     public ObservableCollection<ConsoleLogEntry> VisibleLogs { get; } = [];
-    public string SearchText { get => searchText; set { if (SetProperty(ref searchText, value ?? "")) { OnPropertyChanged(nameof(HasSearchText)); ApplyFilter(); } } }
-    public bool HasSearchText => !string.IsNullOrWhiteSpace(SearchText);
+    public string SearchText { get => searchText; set { if (SetProperty(ref searchText, value ?? "")) ApplyFilter(); } }
     public bool ShowInfo { get => showInfo; set { if (SetProperty(ref showInfo, value)) ApplyFilter(); } }
     public bool ShowWarning { get => showWarning; set { if (SetProperty(ref showWarning, value)) ApplyFilter(); } }
     public bool ShowError { get => showError; set { if (SetProperty(ref showError, value)) ApplyFilter(); } }
@@ -59,7 +58,6 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
     public string CountLabel => LocFormat("console.count.format", VisibleLogs.Count);
     public bool HasLogs => VisibleLogs.Count > 0;
     public ICommand ClearCommand { get; }
-    public ICommand ClearSearchCommand { get; }
 
     public ConsoleViewModel(RuntimeLogBuffer? buffer = null, ToastService? toastService = null, IStringLocalizer<ConsoleViewModel>? localizer = null, ILogger<ConsoleViewModel>? logger = null)
     {
@@ -70,7 +68,6 @@ public sealed class ConsoleViewModel : NotifyViewModel, IDisposable
         entryHandler = (_, entry) => EnqueueRuntimeEntry(entry);
         this.buffer.EntryAdded += entryHandler;
         ClearCommand = new DelegateCommand(Clear);
-        ClearSearchCommand = new DelegateCommand(() => SearchText = "");
         foreach (var entry in this.buffer.Snapshot())
         {
             var log = FromRuntime(entry);

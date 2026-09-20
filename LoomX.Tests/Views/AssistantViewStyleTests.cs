@@ -445,7 +445,7 @@ public sealed class AssistantViewStyleTests
             "..", "..", "..", "..", "LoomX", "Views", "AssistantView.axaml"));
         var source = File.ReadAllText(path);
 
-        Assert.Contains("Classes=\"model-search input-transparent\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"model-search input-transparent search\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("TextBox.model-search:pointerover", source, StringComparison.Ordinal);
         Assert.DoesNotContain("TextBox.model-search:focus", source, StringComparison.Ordinal);
         Assert.Contains("<Grid ColumnDefinitions=\"*,Auto\" ColumnSpacing=\"10\">", source, StringComparison.Ordinal);

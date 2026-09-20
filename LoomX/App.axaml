@@ -143,6 +143,31 @@
     <Style Selector="TextBox.input-embedded, ComboBox.input-embedded, NumericUpDown.input-embedded">
       <Setter Property="Background" Value="Transparent" />
     </Style>
+    <Style Selector="TextBox.search">
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox.search:not(:empty)">
+      <Setter Property="InnerRightContent">
+        <Template>
+          <Button Classes="search-clear" Command="{Binding $parent[TextBox].Clear}" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Path Classes="icon-glyph" Data="M 7,7 L 25,25 M 25,7 L 7,25" Width="13" Height="13" />
+          </Button>
+        </Template>
+      </Setter>
+    </Style>
+    <Style Selector="Button.search-clear">
+      <Setter Property="Width" Value="30" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,0,4,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
     <Style Selector="ListBoxItem:pointerover">
       <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
     </Style>
