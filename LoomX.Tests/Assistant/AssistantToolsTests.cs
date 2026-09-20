@@ -31,6 +31,23 @@ public sealed class AssistantToolsTests
     }
 
     [Fact]
+    public void RegisterAll_AskUser选择字段Schema要求非空Options()
+    {
+        using var broker = CreateBroker();
+        var tool = GetTool(broker);
+        var fieldSchema = tool.ParametersSchema["properties"]!["fields"]!["items"]!.AsObject();
+        var constraints = fieldSchema["allOf"]!.AsArray();
+
+        Assert.Equal(2, constraints.Count);
+        Assert.All(constraints, constraint =>
+        {
+            var then = constraint!["then"]!.AsObject();
+            Assert.Contains("options", then["required"]!.AsArray().Select(item => item!.GetValue<string>()));
+            Assert.Equal(1, then["properties"]!["options"]!["minItems"]!.GetValue<int>());
+        });
+    }
+
+    [Fact]
     public void RegisterAll_AskUser描述为无需Skill或Bridge的通用交互()
     {
         using var broker = CreateBroker();
@@ -179,6 +196,28 @@ public sealed class AssistantToolsTests
         Assert.Equal(5m, result["values"]!["count"]!.GetValue<decimal>());
         Assert.True(result["values"]!["note"]!["provided"]!.GetValue<bool>());
         Assert.DoesNotContain("完成", toolResult.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AskUser_选择字段缺少选项返回安全可修复问题()
+    {
+        using var broker = CreateBroker();
+        var tool = GetTool(broker);
+        var arguments = CreateValidArguments();
+        var field = arguments["fields"]![0]!.AsObject();
+        field.Remove("options");
+        field.Remove("default_option_id");
+
+        var result = await tool.Handler(arguments, CancellationToken.None);
+        var content = JsonNode.Parse(result.Content)!.AsObject();
+        var issue = Assert.Single(content["issues"]!.AsArray());
+
+        Assert.False(result.Success);
+        Assert.Equal("invalid_request", content["error"]!.GetValue<string>());
+        Assert.Equal("options_required", issue!["code"]!.GetValue<string>());
+        Assert.Equal(0, issue["field_index"]!.GetValue<int>());
+        Assert.DoesNotContain("模式", result.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("配置方式", result.Content, StringComparison.Ordinal);
     }
 
     [Theory]

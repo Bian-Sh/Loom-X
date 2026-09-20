@@ -1347,6 +1347,7 @@
   <data name="assistant.cancel">
     <value>取消</value>
   </data>
+  <data name="assistant.stop"><value>停止生成</value></data>
   <data name="assistant.copy.tooltip"><value>複製訊息</value></data>
   <data name="assistant.copied"><value>訊息已複製</value></data>
   <data name="assistant.jump.tooltip"><value>跳至最新訊息</value></data>

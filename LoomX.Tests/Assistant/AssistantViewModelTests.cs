@@ -611,6 +611,51 @@ public sealed class AssistantViewModelUserDecisionTests
     }
 
     [Fact]
+    public void 输入区单按钮根据运行状态与输入内容切换发送和停止()
+    {
+        using var viewModel = new AssistantViewModel(new GatewayProcessService());
+
+        Assert.False(viewModel.IsComposerStopAction);
+        Assert.False(viewModel.IsComposerActionEnabled);
+
+        viewModel.InputText = "排队消息";
+        Assert.False(viewModel.IsComposerStopAction);
+        Assert.True(viewModel.IsComposerActionEnabled);
+
+        SetPrivateField(viewModel, "isRunning", true);
+        viewModel.InputText = string.Empty;
+        Assert.True(viewModel.IsComposerStopAction);
+        Assert.True(viewModel.IsComposerActionEnabled);
+
+        viewModel.InputText = "运行中追加消息";
+        Assert.False(viewModel.IsComposerStopAction);
+        Assert.True(viewModel.IsComposerActionEnabled);
+    }
+
+    [Fact]
+    public async Task 输入区停止状态会关闭活动AskUser并取消已Claim请求()
+    {
+        var broker = new RecordingUserDecisionBroker();
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            userDecisionBroker: broker,
+            uiDispatcher: action => action());
+        viewModel.Activate();
+        SetPrivateField(viewModel, "isRunning", true);
+
+        broker.Raise(CreatePending("composer-stop", "停止前问题"));
+        Assert.True(SpinWait.SpinUntil(() => viewModel.PendingAskUser is not null, TimeSpan.FromSeconds(2)));
+        Assert.True(viewModel.IsComposerStopAction);
+
+        viewModel.ComposerActionCommand.Execute(null);
+        await broker.WaitForCompletionAsync();
+
+        Assert.Equal("composer-stop", broker.CancelledRequestId);
+        Assert.Null(broker.SubmittedRequestId);
+        Assert.True(SpinWait.SpinUntil(() => viewModel.PendingAskUser is null, TimeSpan.FromSeconds(2)));
+    }
+
+    [Fact]
     public async Task PendingRequested_默认投影到输入框上方卡片并由卡片完成提交()
     {
         var broker = new RecordingUserDecisionBroker();
@@ -652,6 +697,15 @@ public sealed class AssistantViewModelUserDecisionTests
         Assert.Null(broker.SubmittedRequestId);
         Assert.True(SpinWait.SpinUntil(() => viewModel.PendingAskUser is null, TimeSpan.FromSeconds(2)));
     }
+    private static void SetPrivateField(object target, string fieldName, object value)
+    {
+        var field = target.GetType().GetField(
+            fieldName,
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(target, value);
+    }
+
     private static PendingUserDecision CreatePending(string requestId, string question) => new(
         requestId,
         "owner-sensitive-id",

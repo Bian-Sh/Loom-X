@@ -623,6 +623,25 @@ public sealed class AssistantViewStyleTests
     }
 
     [Fact]
+    public void 输入区只使用一个可切换发送与停止状态的按钮()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "LoomX.slnx"))) directory = directory.Parent;
+        Assert.NotNull(directory);
+
+        var document = XDocument.Load(Path.Combine(directory.FullName, "LoomX", "Views", "AssistantView.axaml"));
+        var buttons = document.Descendants().Where(item => item.Name.LocalName == "Button").ToArray();
+        static string? GetName(XElement item) => item.Attributes().FirstOrDefault(attribute => attribute.Name.LocalName == "Name")?.Value;
+        var actionButton = Assert.Single(buttons, item => GetName(item) == "composerActionButton");
+
+        Assert.Equal("{Binding ComposerActionCommand}", (string?)actionButton.Attribute("Command"));
+        Assert.Equal("{Binding IsComposerActionEnabled}", (string?)actionButton.Attribute("IsEnabled"));
+        Assert.Equal("{Binding IsComposerStopAction}", (string?)actionButton.Attribute("Classes.stop"));
+        Assert.DoesNotContain(buttons, item => (string?)item.Attribute("Command") == "{Binding CancelCommand}");
+        Assert.DoesNotContain(buttons, item => GetName(item) == "sendButton");
+    }
+
+    [Fact]
     public void PlainEnterIsInterceptedBeforeMultilineTextBoxHandlesIt()
     {
         AvaloniaTestBootstrap.Ensure();

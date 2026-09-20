@@ -55,9 +55,9 @@ public static class AssistantTools
                 {
                     throw;
                 }
-                catch (UserDecisionValidationException)
+                catch (UserDecisionValidationException exception)
                 {
-                    return Fail("invalid_request", "用户决策请求无效。");
+                    return FailInvalidRequest(arguments, exception);
                 }
                 catch (Exception)
                 {
@@ -307,6 +307,73 @@ public static class AssistantTools
             or '^' or '_' or '`' or '|' or '~');
     }
 
+    private static ToolResult FailInvalidRequest(
+        JsonNode? arguments,
+        UserDecisionValidationException exception)
+    {
+        var issues = new JsonArray();
+        foreach (var error in exception.Errors)
+        {
+            var issue = new JsonObject
+            {
+                ["code"] = ToSafeIssueCode(error.Message),
+            };
+            if (ResolveFieldIndex(arguments, error.FieldId) is { } fieldIndex)
+            {
+                issue["field_index"] = fieldIndex;
+            }
+
+            issues.Add(issue);
+        }
+
+        if (issues.Count == 0)
+        {
+            issues.Add(new JsonObject { ["code"] = "invalid_request" });
+        }
+
+        return ToolResult.SafeFail(new JsonObject
+        {
+            ["error"] = "invalid_request",
+            ["message"] = "用户决策请求无效。",
+            ["issues"] = issues,
+        }.ToJsonString(OutputJsonOptions));
+    }
+
+    private static int? ResolveFieldIndex(JsonNode? arguments, string fieldId)
+    {
+        if (fieldId == UserDecisionValidationError.RequestFieldId
+            || arguments?["fields"] is not JsonArray fields)
+        {
+            return null;
+        }
+
+        for (var index = 0; index < fields.Count; index++)
+        {
+            if (fields[index]?["id"] is JsonValue value
+                && value.TryGetValue<string>(out var candidate)
+                && string.Equals(candidate, fieldId, StringComparison.Ordinal))
+            {
+                return index;
+            }
+        }
+
+        return null;
+    }
+
+    private static string ToSafeIssueCode(string message) => message switch
+    {
+        "选择字段至少需要一个选项。" => "options_required",
+        "最少选择数不能小于零。" or
+        "最少选择数不能大于最多选择数。" or
+        "最多选择数不能超过选项数量。" or
+        "多选字段的默认值不符合选择数量限制。" => "selection_limit_invalid",
+        "字段包含当前类型不适用的属性。" => "field_property_not_applicable",
+        "用户决策请求包含未知属性。" => "unknown_property",
+        "用户决策可选属性类型无效。" => "invalid_property_type",
+        "用户决策请求包含禁止的正文或配置内容。" => "prohibited_content",
+        _ => "invalid_field",
+    };
+
     private static UserDecisionValidationException InvalidRequest(string message) =>
         new([new UserDecisionValidationError(UserDecisionValidationError.RequestFieldId, message)]);
 
@@ -464,7 +531,7 @@ public static class AssistantTools
                 "properties": {
                   "id": { "type": "string", "maxLength": 64 },
                   "label": { "type": "string", "maxLength": 200 },
-                  "type": { "type": "string", "enum": ["single_select", "multi_select", "number", "text"] },
+                  "type": { "type": "string", "enum": ["single_select", "multi_select", "number", "text"], "description": "single_select 和 multi_select 必须提供至少一个 options。" },
                   "is_required": { "type": "boolean", "default": false },
                   "options": {
                     "type": "array",
@@ -490,7 +557,17 @@ public static class AssistantTools
                   "default_text": { "type": "string" },
                   "is_multiline": { "type": "boolean", "default": false },
                   "max_length": { "type": "integer", "minimum": 1, "maximum": 4000 }
-                }
+                },
+                "allOf": [
+                  {
+                    "if": { "properties": { "type": { "const": "single_select" } }, "required": ["type"] },
+                    "then": { "required": ["options"], "properties": { "options": { "minItems": 1 } } }
+                  },
+                  {
+                    "if": { "properties": { "type": { "const": "multi_select" } }, "required": ["type"] },
+                    "then": { "required": ["options"], "properties": { "options": { "minItems": 1 } } }
+                  }
+                ]
               }
             }
           }

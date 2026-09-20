@@ -74,6 +74,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
 
         SendCommand = new AsyncCommand(SendAsync, () => !string.IsNullOrWhiteSpace(InputText), logger);
         CancelCommand = new DelegateCommand(Cancel);
+        ComposerActionCommand = new DelegateCommand(ExecuteComposerAction);
         NewSessionCommand = new DelegateCommand(NewSession);
         LoadSessionCommand = new AsyncCommand(parameter => LoadSessionAsync(parameter as AssistantSessionItemViewModel));
 
@@ -139,6 +140,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
 
     public ICommand SendCommand { get; }
     public ICommand CancelCommand { get; }
+    public ICommand ComposerActionCommand { get; }
     public ICommand NewSessionCommand { get; }
     public ICommand LoadSessionCommand { get; }
 
@@ -152,7 +154,13 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         get => inputText;
         set
         {
-            if (SetProperty(ref inputText, value)) (SendCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+            if (!SetProperty(ref inputText, value))
+            {
+                return;
+            }
+
+            (SendCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+            NotifyComposerActionStateChanged();
         }
     }
 
@@ -170,9 +178,17 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             if (SetProperty(ref isRunning, value))
             {
                 (SendCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+                NotifyComposerActionStateChanged();
             }
         }
     }
+
+    public bool IsComposerStopAction => IsRunning && string.IsNullOrWhiteSpace(InputText);
+
+    public bool IsComposerActionEnabled => IsRunning || !string.IsNullOrWhiteSpace(InputText);
+
+    public string ComposerActionLabel => ResourceLookup.Resolve(
+        IsComposerStopAction ? "assistant.stop" : "assistant.send");
 
     /// <summary>历史会话选择；选中即载入。</summary>
     public AssistantSessionItemViewModel? SelectedSession
@@ -1094,6 +1110,27 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             PendingApproval = new ApprovalRequestViewModel(request, completion);
         });
         return completion.Task;
+    }
+
+    private void ExecuteComposerAction()
+    {
+        if (IsComposerStopAction)
+        {
+            Cancel();
+            return;
+        }
+
+        if (SendCommand.CanExecute(null))
+        {
+            SendCommand.Execute(null);
+        }
+    }
+
+    private void NotifyComposerActionStateChanged()
+    {
+        OnPropertyChanged(nameof(IsComposerStopAction));
+        OnPropertyChanged(nameof(IsComposerActionEnabled));
+        OnPropertyChanged(nameof(ComposerActionLabel));
     }
 
     private void Cancel()

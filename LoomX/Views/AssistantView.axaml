@@ -44,6 +44,21 @@
     <Style Selector="Button.icon:pointerover">
       <Setter Property="Background" Value="{DynamicResource NavigationHoverBrush}"/>
     </Style>
+    <Style Selector="Button.composer-action">
+      <Setter Property="Width" Value="28"/>
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="MinWidth" Value="0"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="CornerRadius" Value="14"/>
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.composer-action.stop">
+      <Setter Property="Background" Value="{DynamicResource WarningBrush}"/>
+    </Style>
 
     <!-- 过程区只保留文字与淡竖线；所有交互状态均透明，箭头仅在划入时出现。 -->
     <Style Selector="Button.process">
@@ -626,7 +641,7 @@
                  Padding="12,10"
                  GotFocus="InputTextBox_OnGotFocus"
                  LostFocus="InputTextBox_OnLostFocus"/>
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" Margin="8,0,8,6">
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="8,0,8,6">
           <!-- 修改权限：沉浸在功能区里，没有自己的背景 -->
           <ComboBox Grid.Column="0" Classes="bare"
                     ItemsSource="{Binding PermissionModeOptions}"
@@ -646,21 +661,26 @@
               <PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="11" Height="11" VerticalAlignment="Center"/>
             </Grid>
           </Button>
-          <!-- 运行中保留发送入口用于排队，并额外提供停止当前轮次。 -->
-          <Button Grid.Column="2" Width="28" Height="28" CornerRadius="14" Padding="0"
-                  Background="{DynamicResource WarningBrush}" BorderThickness="0" Margin="6,0,0,0"
-                  MinHeight="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                  Command="{Binding CancelCommand}" IsVisible="{Binding IsRunning}"
-                  ToolTip.Tip="{l:Locale assistant.cancel}" AutomationProperties.Name="{l:Locale assistant.cancel}">
-            <Path Classes="icon-glyph" Data="M 9,9 H 23 V 23 H 9 Z" Width="12" Height="12" Stroke="White"/>
-          </Button>
-          <Button Grid.Column="3" x:Name="sendButton" Width="28" Height="28" CornerRadius="14" Padding="0"
-                  Background="{DynamicResource AccentBrush}" BorderThickness="0" Margin="6,0,0,0"
-                  MinHeight="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                  Command="{Binding SendCommand}"
-                  ToolTip.Tip="{l:Locale assistant.send}" AutomationProperties.Name="{l:Locale assistant.send}">
-            <Path Classes="icon-glyph" Data="M 21,3 L 10.5,13.5 M 21,3 L 14.5,21 L 10.5,13.5 M 10.5,13.5 L 3,10.2 L 21,3"
-                  Width="14" Height="14" Stroke="White"/>
+          <!-- 单一状态按钮：运行中且输入为空时停止；有输入时发送或加入队列。 -->
+          <Button Grid.Column="2"
+                  x:Name="composerActionButton"
+                  Classes="composer-action"
+                  Classes.stop="{Binding IsComposerStopAction}"
+                  Margin="6,0,0,0"
+                  Command="{Binding ComposerActionCommand}"
+                  IsEnabled="{Binding IsComposerActionEnabled}"
+                  ToolTip.Tip="{Binding ComposerActionLabel}"
+                  AutomationProperties.Name="{Binding ComposerActionLabel}">
+            <Grid>
+              <Path Classes="icon-glyph"
+                    IsVisible="{Binding IsComposerStopAction}"
+                    Data="M 9,9 H 23 V 23 H 9 Z"
+                    Width="12" Height="12" Stroke="White"/>
+              <Path Classes="icon-glyph"
+                    IsVisible="{Binding !IsComposerStopAction}"
+                    Data="M 21,3 L 10.5,13.5 M 21,3 L 14.5,21 L 10.5,13.5 M 10.5,13.5 L 3,10.2 L 21,3"
+                    Width="14" Height="14" Stroke="White"/>
+            </Grid>
           </Button>
         </Grid>
       </Grid>

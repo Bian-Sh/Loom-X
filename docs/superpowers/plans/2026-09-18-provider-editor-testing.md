@@ -6,6 +6,8 @@ base-ref: 1aab9a75f9e698651f3797e57959c2cf47445a4b
 
 # Provider 编辑器与真实请求测试器实施计划
 
+> **2026-09-20 对账记录：** OpenSpec 任务已完成 30/30；本计划中因实施期间未同步勾选的步骤已按实际代码、测试、发布包和 CUA 证据统一标记完成。
+
 > 2026-09-19 用户反馈调整：测试 Tab 不提供停止、重试或独立复制按钮；发送期间显示不可交互的动态等待状态；摘要仅展示当前页不可见的最终端点、代理、Header 数量与 CLI 身份并实时更新；失败响应展示原始上游内容或安全错误 JSON；完整生命周期通过注入的 ILogger 写入控制台。
 
 > **供代理执行者使用：** 必须按任务逐项执行；推荐使用 `subagent-driven-development`，也可使用 `executing-plans`。所有步骤使用复选框追踪。
@@ -306,25 +308,25 @@ data: {"type":"message_stop"}
 - 消费：`IProviderTestService`、`ProviderTestPanelViewModel.BindProvider`。
 - 产出：`ProvidersViewModel.TestPanel`。
 
-- [ ] **步骤 1：写集成失败测试**
+- [x] **步骤 1：写集成失败测试**
 
 验证构造时创建测试面板、`SelectedProvider` 变化时绑定并取消旧请求、内存中未保存的 Base URL/API Key/Header/兼容类型进入服务请求快照、Dispose 会取消请求。
 
-- [ ] **步骤 2：运行测试并确认红灯**
+- [x] **步骤 2：运行测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~ProvidersViewModel|FullyQualifiedName~ProviderEditorViewModelTests"`
 
 预期：FAIL，`TestPanel` 不存在。
 
-- [ ] **步骤 3：接入测试面板**
+- [x] **步骤 3：接入测试面板**
 
 扩展构造函数可选参数 `IProviderTestService? providerTestService = null`，默认创建真实服务；在 `SelectedProvider` setter、文化变化和 Dispose 中转发生命周期。
 
-- [ ] **步骤 4：删除旧编辑面板连接命令状态**
+- [x] **步骤 4：删除旧编辑面板连接命令状态**
 
 删除仅服务于旧区块的 `TestConnectionCommand`、`connectionCancellation`、`ConnectionStatus` 等成员和 `TestConnectionAsync`；保留 `ProviderHealthService`、顶部统计和 `VerifyAllProvidersCommand`。
 
-- [ ] **步骤 5：运行现有 Provider 测试并提交**
+- [x] **步骤 5：运行现有 Provider 测试并提交**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~ProviderEditorViewModelTests|FullyQualifiedName~ProviderHealthServiceTests|FullyQualifiedName~ProvidersViewModel"`
 
@@ -349,35 +351,35 @@ data: {"type":"message_stop"}
 - 消费：`SelectedProvider.SelectedCompatibility` 和 `TestPanel.*`。
 - 产出：Response 使用只读可选择文本控件和系统原生右键复制，无独立复制代码后置。
 
-- [ ] **步骤 1：写 XAML 契约失败测试**
+- [x] **步骤 1：写 XAML 契约失败测试**
 
 断言：恰有基础/高级/模型/测试四个 Tab；XAML 不再绑定 `SelectedProvider.BusinessId`；API Key 位于基础 Tab；高级 Tab 包含代理/Header/CLI 且不含 `TestConnectionCommand`；测试 Tab 绑定模型、模式、单行 Prompt、实时摘要、内嵌发送等待、清空和可选择 Response。
 
-- [ ] **步骤 2：运行契约测试并确认红灯**
+- [x] **步骤 2：运行契约测试并确认红灯**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter FullyQualifiedName~ProvidersViewContractTests`
 
 预期：FAIL，仍为三个 Tab 且旧连接区块存在。
 
-- [ ] **步骤 3：重构基础和高级 Tab**
+- [x] **步骤 3：重构基础和高级 Tab**
 
 基础 Tab 使用三张可选卡片绑定 `SelectedCompatibility`，保留名称、Base URL、API Key；删除 ID 输入框。请求 Tab 文案改为高级并只保留代理、自定义 Header、CLI/UA。
 
-- [ ] **步骤 4：新增测试 Tab**
+- [x] **步骤 4：新增测试 Tab**
 
 布局固定为模型/模式、紧凑实时摘要、内嵌发送的单行输入框和 Response 面板；所有颜色使用动态资源。进行中发送按钮显示动态等待且不可操作；Response 仅保留清空并支持文本原生复制；无模型时显示本地化空态。
 
-- [ ] **步骤 5：实现复制反馈**
+- [x] **步骤 5：实现复制反馈**
 
 在 `ProvidersView.axaml.cs` 中读取 `DataContext.TestPanel.ResponseText`，写入 Avalonia Clipboard，成功后调用 MainWindow 注入的 `ToastService`；不得复制请求摘要中的敏感信息。
 
-- [ ] **步骤 6：补齐三套资源并运行测试**
+- [x] **步骤 6：补齐三套资源并运行测试**
 
 运行：`dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~ProvidersViewContractTests|FullyQualifiedName~Localization"`
 
 预期：PASS，且硬编码文案测试无新增失败。
 
-- [ ] **步骤 7：提交 UI**
+- [x] **步骤 7：提交 UI**
 
 提交：`git add LoomX/Views/ProvidersView.axaml LoomX/Views/ProvidersView.axaml.cs LoomX/Resources/Strings*.resx LoomX.Tests/Views/ProvidersViewContractTests.cs && git commit -m "重构提供商面板并新增测试页"`。
 
@@ -389,7 +391,7 @@ data: {"type":"message_stop"}
 - 修改：`openspec/changes/enhance-provider-editor-testing/tasks.md`
 - 仅在发现小范围规格遗漏时修改：对应 delta spec 和 `design.md`。
 
-- [ ] **步骤 1：运行定向测试**
+- [x] **步骤 1：运行定向测试**
 
 运行：
 
@@ -399,7 +401,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj --filter "FullyQualifiedName~Provider
 
 预期：PASS。
 
-- [ ] **步骤 2：运行完整测试和 Release 构建**
+- [x] **步骤 2：运行完整测试和 Release 构建**
 
 运行：
 
@@ -410,13 +412,13 @@ dotnet build LoomX.slnx -c Release --no-restore
 
 预期：退出码 0；不以终端中文显示异常推断源文件编码损坏。
 
-- [ ] **步骤 3：运行 OpenSpec 严格验证**
+- [x] **步骤 3：运行 OpenSpec 严格验证**
 
 运行：`openspec validate enhance-provider-editor-testing --strict`
 
 预期：`Change 'enhance-provider-editor-testing' is valid`。
 
-- [ ] **步骤 4：勾选已验证任务并提交**
+- [x] **步骤 4：勾选已验证任务并提交**
 
 只有对应测试证据存在时才把 `tasks.md` 的项目改为 `[x]`。提交：`git add openspec/changes/enhance-provider-editor-testing/tasks.md && git commit -m "记录提供商测试器实施验证"`。
 
@@ -428,7 +430,7 @@ dotnet build LoomX.slnx -c Release --no-restore
 - 新建：`outputs/<YYYY-MM-DD_HH-mm-ss>/` 发布目录。
 - 按项目既有方式生成发布文件，不删除其他 Session 的 outputs。
 
-- [ ] **步骤 1：发布桌面应用**
+- [x] **步骤 1：发布桌面应用**
 
 先从项目现有发布脚本或 csproj RuntimeIdentifier 确认正式命令；若无专用脚本，运行：
 
@@ -439,18 +441,18 @@ dotnet publish LoomX/LoomX.csproj -c Release -r win-x64 --self-contained false -
 
 预期：发布目录包含可执行文件和依赖。
 
-- [ ] **步骤 2：隐藏启动并校验进程路径**
+- [x] **步骤 2：隐藏启动并校验进程路径**
 
 使用 `Start-Process -FilePath <绝对exe路径> -WindowStyle Hidden -PassThru`，再读取进程 `Path`，确认路径位于本次 `outputs/<stamp>`。
 
-- [ ] **步骤 3：使用 CUA 仅截取应用验证**
+- [x] **步骤 3：使用 CUA 仅截取应用验证**
 
 后台验证：四个 Tab；三种兼容卡片；ID 不可见；API Key 在基础页；高级页无旧测试连接；选择模型；默认“每日一言”；普通/流式发送；动态等待；实时摘要；401/429 或可控错误原文展示；文本选择和清空；透明主题下不根据截图颜色武断判定配色。
 
-- [ ] **步骤 4：记录验证结果并提交交付元数据**
+- [x] **步骤 4：记录验证结果并提交交付元数据**
 
 如验证发现实现问题，先按 systematic-debugging 找根因并补失败测试；修复后重新执行任务 7 和本任务。不得提交二进制发布目录，除非仓库现有规则明确跟踪 outputs。
 
-- [ ] **步骤 5：推送实现分支**
+- [x] **步骤 5：推送实现分支**
 
 确认 `git status` 仅保留用户/其他 Session 的既有无关改动，随后 `git push`。不要 reset、stash、clean 或删除无关未跟踪项。
