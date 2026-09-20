@@ -417,7 +417,12 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("AskUserTextFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("KeyDown=\"TextInput_OnKeyDown\"", source, StringComparison.Ordinal);
         Assert.Contains("KeyDown=\"NumberInput_OnKeyDown\"", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{Binding CustomInput, Mode=TwoWay}\"", source, StringComparison.Ordinal);         Assert.Contains("Watermark=\"{Binding CustomInputPlaceholder}\"", source, StringComparison.Ordinal);         Assert.Contains("MaxLength=\"{Binding CustomInputMaxLength}\"", source, StringComparison.Ordinal);         Assert.Contains("IsVisible=\"{Binding AllowsCustomInput}\"", source, StringComparison.Ordinal);         Assert.Contains("KeyDown=\"SelectionCustomInput_OnKeyDown\"", source, StringComparison.Ordinal);         Assert.DoesNotContain("其他（可选）", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding CustomInput, Mode=TwoWay}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Watermark=\"{Binding CustomInputPlaceholder}\"", source, StringComparison.Ordinal);
+        Assert.Contains("MaxLength=\"{Binding CustomInputMaxLength}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding AllowsCustomInput}\"", source, StringComparison.Ordinal);
+        Assert.Contains("KeyDown=\"SelectionCustomInput_OnKeyDown\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("其他（可选）", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Question}\"", source, StringComparison.Ordinal);
         Assert.Contains("Description", source, StringComparison.Ordinal);
         Assert.Contains("ImpactSummary", source, StringComparison.Ordinal);
