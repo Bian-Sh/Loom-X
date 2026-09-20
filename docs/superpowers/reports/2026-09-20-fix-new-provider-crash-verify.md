@@ -11,11 +11,11 @@
 ## 验证证据
 
 - 根因复现：新增回归测试在修复前抛出 `UriFormatException`，调用链为 `BindProvider` → `RefreshRequestSummary` → `ResolveEndpoint`。
-- 回归测试：`ProviderTestPanelViewModelTests` 18/18 通过；相关本地化回归合并验证 19/19 通过。
-- 完整测试：曾在与最终 HEAD 内容完全相同的源码树上得到 1058/1058 通过；`git diff ca297da..HEAD` 为空，后续合并仅整合远端提交图。
+- 回归测试：`ProviderTestPanelViewModelTests` 18/18 通过；在 force-push 后的 `origin/master`（`8e756ff`）上与 `ProvidersViewContractTests` 组合验证 55/55 通过。
+- 完整测试：修复分支早期源码树曾得到 1058/1058 通过；后续重复运行暴露下述既有 Avalonia 线程波动。源仓库 force-push 后，本次以仅移植两个修复提交的方式重放到新 `origin/master`，未把旧合并/Revert 历史带回。
 - 构建：`dotnet build LoomX.slnx -c Release --no-restore` 通过，0 错误。
-- 发布：`outputs/20260920-041817-fix-new-provider-crash` 已生成，发布目录 `LoomX.dll` 与 Release 产物哈希一致。
-- 手动验证：通过 CUA 启动并校验上述发布包进程路径，点击“新增 Provider”后进程保持存活；进入“测试”Tab 后显示 `POST · direct · 0 Headers`。
+- 发布：基于 force-push 后新 `master` 的 `outputs/20260920-054553-fix-new-provider-crash-master` 已生成。
+- 手动验证：通过 Codex Computer Use 启动并校验上述发布包进程路径，使用鼠标光标坐标点击“新增 Provider”；Provider 数量从 7 增至 8，新 Provider 被选中且进程保持存活。早期修复包进入“测试”Tab 后还验证了 `POST · direct · 0 Headers`。
 - 安全检查：改动未新增日志、密钥、请求正文或用户 prompt 输出。
 
 ## 实现映射
