@@ -509,6 +509,18 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
+    public void TestModelAndModeSelectorsWrapWhenSpaceIsInsufficient()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var testTab = ReadTab(source, "providers.tab.test");
+
+        Assert.Contains("<WrapPanel Orientation=\"Horizontal\" ItemSpacing=\"12\" LineSpacing=\"9\">", testTab, StringComparison.Ordinal);
+        Assert.Equal(2, testTab.Split("<StackPanel Width=\"220\" Spacing=\"5\">", StringSplitOptions.None).Length - 1);
+        Assert.Contains("<WrapPanel Width=\"220\" Orientation=\"Horizontal\" ItemSpacing=\"12\" LineSpacing=\"4\">", testTab, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Grid ColumnDefinitions=\"*,*\" ColumnSpacing=\"12\">", testTab, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TestModelSelectorUsesFixedEllipsizedTooltipLayout()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
