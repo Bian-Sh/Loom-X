@@ -84,7 +84,12 @@ public partial class AskUserDialog : Window
         }
 
         var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-        if ((field.IsMultiline && controlPressed) || (!field.IsMultiline && !controlPressed))
+        var shouldAdvance = field switch
+        {
+            AskUserTextFieldViewModel { IsMultiline: true } => controlPressed,
+            _ => !controlPressed,
+        };
+        if (shouldAdvance)
         {
             AdvanceOrSubmit();
             e.Handled = true;
@@ -108,28 +113,8 @@ public partial class AskUserDialog : Window
             return;
         }
 
-        if (e.Key == Key.Enter && ViewModel is { } viewModel)
-        {
-            var controlPressed = e.KeyModifiers.HasFlag(KeyModifiers.Control);
-            var shouldAdvance = viewModel.CurrentField switch
-            {
-                AskUserTextFieldViewModel { IsMultiline: true } => controlPressed,
-                AskUserTextFieldViewModel => !controlPressed,
-                AskUserNumberFieldViewModel => !controlPressed,
-                _ => false,
-            };
-
-            if (shouldAdvance)
-            {
-                AdvanceOrSubmit();
-                e.Handled = true;
-                return;
-            }
-        }
-
         base.OnKeyDown(e);
     }
-
     private void AdvanceOrSubmit()
     {
         if (ViewModel is not { } viewModel)
@@ -149,4 +134,3 @@ public partial class AskUserDialog : Window
         }
     }
 }
-

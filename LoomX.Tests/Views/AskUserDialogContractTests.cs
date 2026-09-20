@@ -342,6 +342,19 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("Close(false)", code, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void DialogCodeBehind_窗口级键盘只处理取消避免输入控件重复前进()
+    {
+        var code = ReadDesktopFile("Views", "AskUserDialog.axaml.cs");
+        var start = code.IndexOf("protected override void OnKeyDown", StringComparison.Ordinal);
+        var end = code.IndexOf("private void AdvanceOrSubmit", start, StringComparison.Ordinal);
+
+        Assert.True(start >= 0 && end > start);
+        var windowKeyHandler = code[start..end];
+        Assert.Contains("Key.Escape", windowKeyHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("Key.Enter", windowKeyHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("AdvanceOrSubmit", windowKeyHandler, StringComparison.Ordinal);
+    }
     [Theory]
     [InlineData("Strings.resx")]
     [InlineData("Strings.en-US.resx")]
@@ -406,4 +419,3 @@ public sealed class AskUserDialogContractTests
         return File.ReadAllText(path);
     }
 }
-
