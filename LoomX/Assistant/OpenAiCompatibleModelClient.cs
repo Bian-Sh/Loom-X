@@ -248,7 +248,12 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                     builder.Id = item["call_id"]?.GetValue<string>() ?? itemId;
                     builder.Name = item["name"]?.GetValue<string>() ?? builder.Name;
                     if (item["arguments"]?.GetValue<string>() is { Length: > 0 } arguments)
-                        builder.AppendArguments(arguments);
+                    {
+                        if (type == "response.output_item.done")
+                            builder.SetArgumentsSnapshot(arguments);
+                        else
+                            builder.AppendArguments(arguments);
+                    }
                 }
                 return [];
             case "response.function_call_arguments.delta":
@@ -257,7 +262,12 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 if (payload["item_id"]?.GetValue<string>() is { Length: > 0 } callId
                     && toolCalls.TryGetValue(callId, out var callBuilder)
                     && fragment is { Length: > 0 })
-                    callBuilder.AppendArguments(fragment);
+                {
+                    if (type == "response.function_call_arguments.done")
+                        callBuilder.SetArgumentsSnapshot(fragment);
+                    else
+                        callBuilder.AppendArguments(fragment);
+                }
                 return [];
             case "response.completed":
                 completed = true;
@@ -930,6 +940,13 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             if (current.StartsWith(fragment, StringComparison.Ordinal)) return;
 
             Arguments.Append(fragment);
+        }
+
+        // Responses 的 done 事件是权威最终快照，不能与此前增量继续拼接。
+        public void SetArgumentsSnapshot(string arguments)
+        {
+            Arguments.Clear();
+            Arguments.Append(arguments);
         }
 
         public ToolCall ToToolCall()

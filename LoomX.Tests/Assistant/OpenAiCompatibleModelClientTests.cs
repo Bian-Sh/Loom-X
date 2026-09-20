@@ -193,6 +193,40 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public async Task StreamAsync_Responses参数Done使用最终快照而不是拼接增量()
+    {
+        const string responsesSse = """
+        event: response.output_item.added
+        data: {"type":"response.output_item.added","item":{"id":"fc_snapshot","type":"function_call","call_id":"call_snapshot","name":"mock_list_providers"}}
+
+        event: response.function_call_arguments.delta
+        data: {"type":"response.function_call_arguments.delta","item_id":"fc_snapshot","delta":"{\"key\": \"openai\""}
+
+        event: response.function_call_arguments.done
+        data: {"type":"response.function_call_arguments.done","item_id":"fc_snapshot","arguments":"{\"key\":\"openai\"}"}
+
+        event: response.completed
+        data: {"type":"response.completed","response":{"id":"resp_snapshot"}}
+
+        data: [DONE]
+
+        """;
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, responsesSse);
+        var client = new OpenAiCompatibleModelClient(
+            new HttpClient(handler), "https://api.example.com/v1", "test-model",
+            endpointFormat: "responses");
+
+        var events = await CollectAsync(client.StreamAsync(
+            new ModelRequest([ChatMessage.User("检查")], [CreateTool()]),
+            CancellationToken.None));
+
+        var toolCall = Assert.IsType<ModelToolCallEvent>(events[0]).ToolCall;
+        Assert.Equal("mock.list_providers", toolCall.Name);
+        Assert.Equal("openai", JsonNode.Parse(toolCall.ArgumentsJson)!["key"]!.GetValue<string>());
+        Assert.Equal("tool_calls", Assert.IsType<ModelCompletedEvent>(events[1]).FinishReason);
+    }
+
+    [Fact]
     public async Task StreamAsync_GzipResponsesJson_EmitsToolCallAndCompletion()
     {
         const string responsesJson = """
