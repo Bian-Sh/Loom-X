@@ -289,7 +289,8 @@ public sealed class AskUserDialogContractTests
 
         Assert.Contains("<UserControl", source, StringComparison.Ordinal);
         Assert.DoesNotContain("<Window", source, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth=\"560\"", source, StringComparison.Ordinal);
+        Assert.Contains("Width=\"520\"", source, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"520\"", source, StringComparison.Ordinal);
         Assert.Contains("Background=\"{DynamicResource DialogBackgroundBrush}\"", source, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource BorderStrongBrush}", source, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource SurfaceSubtleBrush}", source, StringComparison.Ordinal);
@@ -328,6 +329,19 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("ErrorSummary", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void CardXaml_使用紧凑间距并限制选项最多两行()
+    {
+        var source = ReadDesktopFile("Views", "AskUserCard.axaml");
+
+        Assert.Contains("<StackPanel Spacing=\"8\">", source, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"16,14,16,0\"", source, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"440\"", source, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"30\"", source, StringComparison.Ordinal);
+        Assert.Contains("Padding=\"8,4\"", source, StringComparison.Ordinal);
+        Assert.Contains("MaxLines=\"2\"", source, StringComparison.Ordinal);
+        Assert.Contains("TextTrimming=\"CharacterEllipsis\"", source, StringComparison.Ordinal);
+    }
     [Fact]
     public void CardCodeBehind_接通右上角取消输入与其余交互()
     {
