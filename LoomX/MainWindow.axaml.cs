@@ -12,6 +12,7 @@ using LoomX.ViewModels;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Windows.Input;
 
 namespace LoomX;
 public partial class MainWindow : Window
@@ -23,6 +24,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer toastTimer;
     private readonly WindowAppearanceCoordinator appearanceCoordinator;
     private MainWindowViewModel? navigationViewModel;
+    private UpdateCoordinator? observedUpdateCoordinator;
+    private readonly UpdateWindowPresentation updatePresentation = new();
     private readonly DispatcherTimer navigationSelectionAnimationTimer;
     private readonly TranslateTransform navigationSelectionIndicatorTransform = new();
     private readonly TranslateTransform navigationSelectionOutlineTransform = new();
@@ -34,6 +37,7 @@ public partial class MainWindow : Window
     private static readonly CubicEaseOut NavigationSelectionEasing = new();
 
     public ToastService ToastService => toastService;
+    public UpdateWindowPresentation UpdatePresentation => updatePresentation;
     internal WindowAppearanceCoordinator AppearanceCoordinator => appearanceCoordinator;
 
     public MainWindow() : this(new ToastService(), null) { }
@@ -64,13 +68,17 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             toastService.Requested -= ToastServiceOnRequested;
+            DetachUpdateCoordinator();
             DetachNavigationViewModel();
+            updatePresentation.Dispose();
         };
     }
 
     private void MainWindow_OnDataContextChanged(object? sender, EventArgs e)
     {
-        AttachNavigationViewModel(DataContext as MainWindowViewModel);
+        var viewModel = DataContext as MainWindowViewModel;
+        AttachNavigationViewModel(viewModel);
+        AttachUpdateCoordinator(viewModel?.Update);
     }
 
     private void AttachNavigationViewModel(MainWindowViewModel? viewModel)
@@ -97,6 +105,55 @@ public partial class MainWindow : Window
         navigationViewModel = null;
         navigationSelectionAnimationTimer.Stop();
         navigationSelectionAnimationStopwatch = null;
+    }
+
+    private void AttachUpdateCoordinator(UpdateCoordinator? coordinator)
+    {
+        if (ReferenceEquals(observedUpdateCoordinator, coordinator)) return;
+
+        DetachUpdateCoordinator();
+        observedUpdateCoordinator = coordinator;
+        updatePresentation.Attach(coordinator);
+        if (observedUpdateCoordinator is null) return;
+
+        observedUpdateCoordinator.PropertyChanged += UpdateCoordinator_OnPropertyChanged;
+        if (observedUpdateCoordinator.IsDialogVisible)
+            Dispatcher.UIThread.Post(FocusUpdateDialogAction, DispatcherPriority.Background);
+    }
+
+    private void DetachUpdateCoordinator()
+    {
+        if (observedUpdateCoordinator is not null)
+            observedUpdateCoordinator.PropertyChanged -= UpdateCoordinator_OnPropertyChanged;
+        observedUpdateCoordinator = null;
+        updatePresentation.Attach(null);
+    }
+
+    private void UpdateCoordinator_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(UpdateCoordinator.IsDialogVisible)
+            || sender is not UpdateCoordinator { IsDialogVisible: true }) return;
+
+        Dispatcher.UIThread.Post(FocusUpdateDialogAction, DispatcherPriority.Background);
+    }
+
+    private void FocusUpdateDialogAction()
+    {
+        if (observedUpdateCoordinator?.IsDialogVisible != true) return;
+
+        if (updateInstallButton.IsVisible && updateInstallButton.IsEnabled)
+        {
+            updateInstallButton.Focus();
+            return;
+        }
+
+        if (updateRetryButton.IsVisible && updateRetryButton.IsEnabled)
+        {
+            updateRetryButton.Focus();
+            return;
+        }
+
+        updateDialogCloseButton.Focus();
     }
 
     private void NavigationViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -184,6 +241,18 @@ public partial class MainWindow : Window
 
         if (Dispatcher.UIThread.CheckAccess()) ShowToast();
         else Dispatcher.UIThread.Post(ShowToast);
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && observedUpdateCoordinator?.IsDialogVisible == true)
+        {
+            observedUpdateCoordinator.DismissDialogCommand.Execute(null);
+            e.Handled = true;
+            return;
+        }
+
+        base.OnKeyDown(e);
     }
 
     private void WindowChrome_OnPointerPressed(object? sender, PointerPressedEventArgs e)
@@ -341,6 +410,84 @@ public partial class MainWindow : Window
     internal static SolidColorBrush CreateOpaqueCopy(IBrush brush) => brush is SolidColorBrush solid
         ? new SolidColorBrush(Color.FromArgb(255, solid.Color.R, solid.Color.G, solid.Color.B))
         : new SolidColorBrush(Color.FromArgb(255, 230, 240, 243));
+}
+
+public sealed class UpdateWindowPresentation : IDisposable
+{
+    public UpdateWindowPresentationAdapter Update { get; } = new();
+
+    internal void Attach(UpdateCoordinator? coordinator) => Update.Attach(coordinator);
+
+    public void Dispose() => Update.Dispose();
+}
+
+public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, IDisposable
+{
+    private UpdateCoordinator? coordinator;
+    private ReleaseNotesContentViewModel? releaseNotesContent;
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public ReleaseNotesContentViewModel? ReleaseNotesContent => releaseNotesContent;
+    public string LatestVersion => coordinator?.LatestVersion ?? string.Empty;
+    public string StatusText => coordinator?.StatusText ?? string.Empty;
+    public string ErrorMessage => coordinator?.ErrorMessage ?? string.Empty;
+    public string UpdateEntryText => coordinator?.UpdateEntryText ?? string.Empty;
+    public string ProgressText => coordinator?.ProgressText ?? string.Empty;
+    public string SpeedText => coordinator?.SpeedText ?? string.Empty;
+    public int DownloadPercent => coordinator?.DownloadPercent ?? 0;
+    public bool IsUpdateEntryVisible => coordinator?.IsUpdateEntryVisible == true;
+    public bool IsDialogVisible => coordinator?.IsDialogVisible == true;
+    public bool IsDownloading => coordinator?.Stage == UpdateStage.Downloading;
+    public bool IsVerifying => coordinator?.Stage == UpdateStage.Verifying;
+    public bool IsPreparing => coordinator?.Stage is UpdateStage.Downloading or UpdateStage.Verifying;
+    public bool IsReady => coordinator?.Stage == UpdateStage.Ready;
+    public bool IsError => coordinator?.Stage == UpdateStage.Error;
+    public bool CanInstall => coordinator?.CanInstall == true;
+    public bool CanRetry => coordinator?.CanRetry == true;
+    public ICommand? ToggleDialogCommand => coordinator?.ToggleDialogCommand;
+    public ICommand? DismissDialogCommand => coordinator?.DismissDialogCommand;
+    public ICommand? RetryCommand => coordinator?.RetryCommand;
+    public ICommand? InstallAndRestartCommand => coordinator?.InstallAndRestartCommand;
+
+    internal void Attach(UpdateCoordinator? value)
+    {
+        if (ReferenceEquals(coordinator, value)) return;
+
+        if (coordinator is not null) coordinator.PropertyChanged -= Coordinator_OnPropertyChanged;
+        coordinator = value;
+        if (coordinator is not null) coordinator.PropertyChanged += Coordinator_OnPropertyChanged;
+
+        if (coordinator is null)
+        {
+            releaseNotesContent?.Dispose();
+            releaseNotesContent = null;
+        }
+        else
+        {
+            releaseNotesContent ??= new ReleaseNotesContentViewModel();
+            releaseNotesContent.SetRelease(coordinator.Release);
+        }
+        RaiseAllPropertiesChanged();
+    }
+
+    private void Coordinator_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(UpdateCoordinator.Release))
+            releaseNotesContent?.SetRelease(coordinator?.Release);
+        RaiseAllPropertiesChanged();
+    }
+
+    private void RaiseAllPropertiesChanged() =>
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
+
+    public void Dispose()
+    {
+        if (coordinator is not null) coordinator.PropertyChanged -= Coordinator_OnPropertyChanged;
+        coordinator = null;
+        releaseNotesContent?.Dispose();
+        releaseNotesContent = null;
+    }
 }
 
 internal static class NativeWindowActivation

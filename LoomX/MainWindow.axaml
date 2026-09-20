@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Icon="/Assets/app.ico" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" xmlns:views="using:LoomX.Views" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Icon="/Assets/app.ico" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
   <Window.Styles>
     <Style Selector="Button.nav-button">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -125,6 +125,43 @@
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
     </Style>
+    <Style Selector="Button.update-entry">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="MinWidth" Value="32" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector="Button.update-entry /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="Border.update-entry-text">
+      <Setter Property="Width" Value="0" />
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Width" Duration="0:0:0.18" Easing="CubicEaseOut" />
+          <DoubleTransition Property="Opacity" Duration="0:0:0.14" Easing="CubicEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.update-entry:pointerover Border.update-entry-text">
+      <Setter Property="Width" Value="220" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.update-entry:focus Border.update-entry-text">
+      <Setter Property="Width" Value="220" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
   </Window.Styles>
   <Grid Background="{DynamicResource WindowBackgroundBrush}">
     <Grid ColumnDefinitions="228,*">
@@ -188,55 +225,113 @@
       </Grid>
       <!-- 标题栏覆盖两列，品牌区与内容区都可拖动；按钮位于同一层避免命中区被遮挡。 -->
       <Border Grid.ColumnSpan="2" Classes="window-chrome" Height="32" VerticalAlignment="Top" PointerPressed="WindowChrome_OnPointerPressed">
-        <Grid ColumnDefinitions="*,42,42,42" ColumnSpacing="0" Margin="0">
-          <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="{l:Locale window.minimize}" AutomationProperties.Name="{l:Locale window.minimize}">
+        <Grid ColumnDefinitions="*,Auto,42,42,42" ColumnSpacing="0" Margin="0">
+          <Button x:Name="updateEntryButton" Grid.Column="1" Classes="update-entry" Height="32" MinWidth="32"
+                  DataContext="{Binding $parent[Window].UpdatePresentation}"
+                  IsVisible="{Binding Update.IsUpdateEntryVisible}"
+                  Command="{Binding Update.ToggleDialogCommand}"
+                  ToolTip.Tip="{Binding Update.UpdateEntryText}"
+                  AutomationProperties.Name="{Binding Update.UpdateEntryText}">
+            <Grid ClipToBounds="True">
+              <Border Background="{DynamicResource SurfaceMutedBrush}" IsVisible="{Binding Update.IsPreparing}" CornerRadius="8" IsHitTestVisible="False" />
+              <Border Background="{DynamicResource AccentSoftBrush}" IsVisible="{Binding Update.IsReady}" CornerRadius="8" IsHitTestVisible="False" />
+              <Border Background="{DynamicResource DangerSoftBrush}" IsVisible="{Binding Update.IsError}" CornerRadius="8" IsHitTestVisible="False" />
+              <Grid ColumnDefinitions="32,Auto">
+                <PathIcon Data="M 12,2 L 12,14 M 7,9 L 12,14 L 17,9 M 4,16 L 20,16 L 20,20 L 4,20 Z"
+                          Foreground="{DynamicResource TextPrimaryBrush}" Width="16" Height="16"
+                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Border Grid.Column="1" Classes="update-entry-text" ClipToBounds="True">
+                  <TextBlock Text="{Binding Update.UpdateEntryText}" Margin="0,0,12,0"
+                             Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                </Border>
+              </Grid>
+            </Grid>
+          </Button>
+          <Button Grid.Column="2" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="{l:Locale window.minimize}" AutomationProperties.Name="{l:Locale window.minimize}">
             <Border Width="12" Height="1" Background="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0" />
           </Button>
-          <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="{l:Locale window.maximize}" AutomationProperties.Name="{l:Locale window.maximize}">
+          <Button Grid.Column="3" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="{l:Locale window.maximize}" AutomationProperties.Name="{l:Locale window.maximize}">
             <Path Data="M 5,5 L 19,5 L 19,19 L 5,19 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
-          <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="{l:Locale window.close}" AutomationProperties.Name="{l:Locale window.close}">
+          <Button Grid.Column="4" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="{l:Locale window.close}" AutomationProperties.Name="{l:Locale window.close}">
             <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
         </Grid>
       </Border>
     </Grid>
-    <Border IsVisible="{Binding Update.CardVisible}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Width="330" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="16" BoxShadow="0 8 24 #40000000">
-      <StackPanel Spacing="10">
-        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-          <PathIcon Data="M 12,2 L 12,14 M 7,9 L 12,14 L 17,9 M 4,16 L 20,16 L 20,20 L 4,20 Z" Foreground="{DynamicResource AccentBrush}" Width="18" Height="18" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Text="{l:Locale update.card.title}" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <Button Grid.Column="2" Content="×" Command="{Binding Update.LaterCommand}" Padding="5,0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="{l:Locale update.card.later.tip}" />
-        </Grid>
-        <TextBlock Text="{Binding Update.VersionComparison}" Foreground="{DynamicResource TextSecondaryBrush}" />
-        <Button Content="{l:Locale update.card.release.notes}" Command="{Binding Update.OpenReleaseNotesCommand}" HorizontalAlignment="Left" Padding="0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" Foreground="{DynamicResource AccentBrush}" />
-        <ProgressBar IsVisible="{Binding Update.IsBusy}" Value="{Binding Update.DownloadPercent}" Minimum="0" Maximum="100" Height="6" />
-        <Grid IsVisible="{Binding Update.IsBusy}" ColumnDefinitions="*,*" ColumnSpacing="8">
-          <TextBlock Text="{Binding Update.ProgressText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
-          <TextBlock Grid.Column="1" Text="{Binding Update.SpeedText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" HorizontalAlignment="Right" />
-        </Grid>
-        <TextBlock IsVisible="{Binding Update.CanRetry}" Text="{Binding Update.ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap" FontSize="11" />
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-          <Button Content="{l:Locale update.card.later}" Command="{Binding Update.LaterCommand}" />
-          <Button Grid.Column="1" Content="{l:Locale update.card.download}" Command="{Binding Update.DownloadCommand}" IsEnabled="{Binding Update.CanDownload}" Classes="primary" />
-        </Grid>
-      </StackPanel>
-    </Border>
-    <Border IsVisible="{Binding Update.ReleaseNotesVisible}" Background="#99000000" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="40">
-      <Border Width="650" MaxHeight="620" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
-        <Grid RowDefinitions="Auto,*" RowSpacing="14">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="{l:Locale update.card.release.notes}" FontSize="18" FontWeight="SemiBold" />
-            <Button Grid.Column="1" Content="×" Command="{Binding Update.CloseReleaseNotesCommand}" Padding="6,0" MinHeight="28" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="{l:Locale update.card.close}" />
-          </Grid>
-          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <TextBlock Text="{Binding Update.ReleaseNotes}" TextWrapping="Wrap" LineHeight="22" />
-          </ScrollViewer>
-        </Grid>
-      </Border>
-    </Border>
     <Border x:Name="toastBorder" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Background="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="14,11" MaxWidth="420">
       <TextBlock x:Name="toastText" Foreground="White" TextWrapping="Wrap" />
+    </Border>
+    <Border x:Name="updateDialogOverlay" DataContext="{Binding $parent[Window].UpdatePresentation}"
+            IsVisible="{Binding Update.IsDialogVisible}" Background="{DynamicResource SurfaceMutedBrush}"
+            HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="48,56">
+      <Border MaxWidth="760" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+              Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderStrongBrush}"
+              BorderThickness="1" CornerRadius="12" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,1,*,1,Auto">
+          <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14" Margin="22,18">
+            <Border Width="36" Height="36" CornerRadius="9" Background="{DynamicResource AccentSoftBrush}" VerticalAlignment="Center">
+              <PathIcon Data="M 12,2 L 12,14 M 7,9 L 12,14 L 17,9 M 4,16 L 20,16 L 20,20 L 4,20 Z"
+                        Foreground="{DynamicResource AccentBrush}" Width="18" Height="18"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="{Binding Update.LatestVersion}" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Update.ReleaseNotesContent.PublishedAtText}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+              </StackPanel>
+              <TextBlock Text="{Binding Update.StatusText}" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button x:Name="updateDialogCloseButton" Grid.Column="2" Width="32" Height="32" MinHeight="32"
+                    Padding="0" Background="Transparent" BorderBrush="Transparent"
+                    Command="{Binding Update.DismissDialogCommand}" ToolTip.Tip="{l:Locale window.close}"
+                    AutomationProperties.Name="{l:Locale window.close}">
+              <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}"
+                    StrokeThickness="1" Stretch="Uniform" Width="12" Height="12" />
+            </Button>
+          </Grid>
+          <Border Grid.Row="1" Background="{DynamicResource BorderBrush}" />
+          <views:ReleaseNotesView DataContext="{Binding Update.ReleaseNotesContent}" Grid.Row="2" Margin="22,18" />
+          <Border Grid.Row="3" Background="{DynamicResource BorderBrush}" />
+          <Grid Grid.Row="4" Margin="22,16">
+            <Grid IsVisible="{Binding Update.IsDownloading}" RowDefinitions="Auto,Auto" RowSpacing="10">
+              <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <TextBlock Text="{Binding Update.ProgressText}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Update.SpeedText}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Update.DownloadPercent}" FontWeight="SemiBold" />
+                  <TextBlock Text="%" FontWeight="SemiBold" />
+                </StackPanel>
+              </Grid>
+              <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                <ProgressBar Value="{Binding Update.DownloadPercent}" Minimum="0" Maximum="100" Height="7" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="{l:Locale update.card.later}" Command="{Binding Update.DismissDialogCommand}" />
+              </Grid>
+            </Grid>
+            <Grid IsVisible="{Binding Update.IsVerifying}" ColumnDefinitions="*,Auto" ColumnSpacing="14">
+              <StackPanel Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Update.StatusText}" Foreground="{DynamicResource TextSecondaryBrush}" />
+                <ProgressBar IsIndeterminate="True" Height="7" />
+              </StackPanel>
+              <Button Grid.Column="1" Content="{l:Locale update.card.later}" Command="{Binding Update.DismissDialogCommand}" />
+            </Grid>
+            <Grid IsVisible="{Binding Update.CanInstall}" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+              <Button Grid.Column="1" Content="{l:Locale update.card.later}" Command="{Binding Update.DismissDialogCommand}" />
+              <Button x:Name="updateInstallButton" Grid.Column="2" Classes="primary" Content="重启并安装"
+                      Command="{Binding Update.InstallAndRestartCommand}" />
+            </Grid>
+            <Grid IsVisible="{Binding Update.CanRetry}" RowDefinitions="Auto,Auto" RowSpacing="12">
+              <TextBlock Text="{Binding Update.ErrorMessage}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />
+              <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                <Button Grid.Column="1" Content="{l:Locale update.card.later}" Command="{Binding Update.DismissDialogCommand}" />
+                <Button x:Name="updateRetryButton" Grid.Column="2" Classes="primary" Content="{l:Locale assistant.error.retry}"
+                        Command="{Binding Update.RetryCommand}" />
+              </Grid>
+            </Grid>
+          </Grid>
+        </Grid>
+      </Border>
     </Border>
   </Grid>
 </Window>

@@ -27,7 +27,7 @@ public sealed class MainWindowChromeContractTests
         Assert.Contains("<Setter Property=\"VerticalAlignment\" Value=\"Top\" />", baseStyle, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"Padding\" Value=\"0\" />", baseStyle, StringComparison.Ordinal);
         Assert.Contains("Height=\"32\" VerticalAlignment=\"Top\"", source, StringComparison.Ordinal);
-        Assert.Contains("ColumnDefinitions=\"*,42,42,42\"", source, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"*,Auto,42,42,42\"", source, StringComparison.Ordinal);
         Assert.Contains("Margin=\"0\"", source, StringComparison.Ordinal);
         Assert.Contains("StrokeThickness=\"0.8\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("StrokeThickness=\"1.1\"", source, StringComparison.Ordinal);
@@ -35,6 +35,35 @@ public sealed class MainWindowChromeContractTests
         Assert.Contains("<Border Width=\"12\" Height=\"1\"", source, StringComparison.Ordinal);
         Assert.Contains("RowDefinitions=\"104,*\"", source, StringComparison.Ordinal);
         Assert.Contains("FontSize=\"26\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 更新入口位于最小化按钮左侧并支持悬停与焦点展开()
+    {
+        var source = ReadDesktopFile("MainWindow.axaml");
+        var entryStart = source.IndexOf("x:Name=\"updateEntryButton\"", StringComparison.Ordinal);
+        var minimizeStart = source.IndexOf("Click=\"MinimizeButton_OnClick\"", StringComparison.Ordinal);
+
+        Assert.Contains("ColumnDefinitions=\"*,Auto,42,42,42\"", source, StringComparison.Ordinal);
+        Assert.True(entryStart >= 0 && minimizeStart > entryStart, "更新入口必须位于最小化按钮左侧。");
+        Assert.Contains("Grid.Column=\"1\"", source[entryStart..minimizeStart], StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding Update.IsUpdateEntryVisible}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding Update.ToggleDialogCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{Binding Update.UpdateEntryText}\"", source, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"{Binding Update.UpdateEntryText}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Height=\"32\" MinWidth=\"32\"", source, StringComparison.Ordinal);
+        Assert.Contains("Style Selector=\"Border.update-entry-text\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Width\" Value=\"0\" />", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Opacity\" Value=\"0\" />", source, StringComparison.Ordinal);
+        Assert.Contains("Button.update-entry:pointerover Border.update-entry-text", source, StringComparison.Ordinal);
+        Assert.Contains("Button.update-entry:focus Border.update-entry-text", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Width\" Value=\"220\" />", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Opacity\" Value=\"1\" />", source, StringComparison.Ordinal);
+        Assert.Contains("<DoubleTransition Property=\"Width\"", source, StringComparison.Ordinal);
+        Assert.Contains("<DoubleTransition Property=\"Opacity\"", source, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{DynamicResource AccentSoftBrush}\" IsVisible=\"{Binding Update.IsReady}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{DynamicResource DangerSoftBrush}\" IsVisible=\"{Binding Update.IsError}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{DynamicResource SurfaceMutedBrush}\" IsVisible=\"{Binding Update.IsPreparing}\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
