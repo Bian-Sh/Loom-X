@@ -391,7 +391,11 @@ public sealed class ProvidersViewContractTests
         var responseStart = test.IndexOf("<TextBox x:Name=\"TestResponseTextBox\"", StringComparison.Ordinal);
         var responseEnd = test.IndexOf('>', responseStart);
         var responseTag = test[responseStart..responseEnd];
-        Assert.Contains("MaxHeight=\"320\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("<ScrollViewer Classes=\"provider-tab-scroll\" VerticalScrollBarVisibility=\"Auto\" HorizontalScrollBarVisibility=\"Disabled\">", test, StringComparison.Ordinal);
+        Assert.Contains("<Border x:Name=\"TestResponsePanel\" Grid.Row=\"1\" Classes=\"panel\" Padding=\"14\" MinHeight=\"150\"", test, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"{Binding #TestResponsePanel.Bounds.Height}\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Stretch\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("VerticalAlignment=\"Stretch\"", responseTag, StringComparison.Ordinal);
         Assert.Contains("TextWrapping=\"NoWrap\"", responseTag, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Auto\"", responseTag, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer.HorizontalScrollBarVisibility=\"Auto\"", responseTag, StringComparison.Ordinal);
