@@ -2,6 +2,8 @@
 comet_change: fix-assistant-decision-subscription-lifecycle
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-20-fix-assistant-decision-subscription-lifecycle
+status: final
 ---
 
 # LoomX AskUser 悬浮卡片与简版消息队列设计
