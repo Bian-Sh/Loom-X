@@ -417,6 +417,7 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("AskUserTextFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("KeyDown=\"TextInput_OnKeyDown\"", source, StringComparison.Ordinal);
         Assert.Contains("KeyDown=\"NumberInput_OnKeyDown\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding CustomInput, Mode=TwoWay}\"", source, StringComparison.Ordinal);         Assert.Contains("Watermark=\"{Binding CustomInputPlaceholder}\"", source, StringComparison.Ordinal);         Assert.Contains("MaxLength=\"{Binding CustomInputMaxLength}\"", source, StringComparison.Ordinal);         Assert.Contains("IsVisible=\"{Binding AllowsCustomInput}\"", source, StringComparison.Ordinal);         Assert.Contains("KeyDown=\"SelectionCustomInput_OnKeyDown\"", source, StringComparison.Ordinal);         Assert.DoesNotContain("其他（可选）", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Question}\"", source, StringComparison.Ordinal);
         Assert.Contains("Description", source, StringComparison.Ordinal);
         Assert.Contains("ImpactSummary", source, StringComparison.Ordinal);
@@ -469,6 +470,7 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("TryCancel", code, StringComparison.Ordinal);
         Assert.Contains("Key.Enter", code, StringComparison.Ordinal);
         Assert.Contains("KeyModifiers.Control", code, StringComparison.Ordinal);
+        Assert.Contains("SelectionCustomInput_OnKeyDown", code, StringComparison.Ordinal);
         Assert.Contains("AskUserTextFieldViewModel { IsMultiline: true }", code, StringComparison.Ordinal);
         Assert.DoesNotContain("Close(true)", code, StringComparison.Ordinal);
         Assert.DoesNotContain("Close(false)", code, StringComparison.Ordinal);
@@ -494,11 +496,11 @@ public sealed class AskUserDialogContractTests
     }
 
     [Theory]
-    [InlineData("Strings.resx")]
-    [InlineData("Strings.en-US.resx")]
-    [InlineData("Strings.ja-JP.resx")]
-    [InlineData("Strings.zh-TW.resx")]
-    public void ApprovalCard操作文案_覆盖全部Locale(string fileName)
+    [InlineData("Strings.resx", "我有其他想法...")]
+    [InlineData("Strings.en-US.resx", "I have another idea...")]
+    [InlineData("Strings.ja-JP.resx", "ほかの考えがあります...")]
+    [InlineData("Strings.zh-TW.resx", "我有其他想法...")]
+    public void ApprovalCard操作文案_覆盖全部Locale(string fileName, string customInputPlaceholder)
     {
         var source = ReadDesktopFile("Resources", fileName);
 
@@ -508,6 +510,7 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("name=\"assistant.decision.previous\"", source, StringComparison.Ordinal);
         Assert.Contains("name=\"assistant.decision.next\"", source, StringComparison.Ordinal);
         Assert.Contains("name=\"assistant.decision.cancel_input\"", source, StringComparison.Ordinal);
+        Assert.Contains($"<data name=\"assistant.decision.custom_input_placeholder\"><value>{customInputPlaceholder}</value></data>", source, StringComparison.Ordinal);
         Assert.DoesNotContain("name=\"assistant.decision.cancel\"", source, StringComparison.Ordinal);
     }
 

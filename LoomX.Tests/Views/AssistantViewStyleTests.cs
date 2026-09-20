@@ -594,6 +594,44 @@ public sealed class AssistantViewStyleTests
     }
 
     [Fact]
+    public void AskUser选择题自由输入框使用绑定提示与长度()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var viewModel = new AskUserDialogViewModel(new PendingUserDecision(
+            "request-id",
+            "owner-id",
+            new UserDecisionRequest(
+                "确认",
+                "请选择运行模式",
+                [new UserDecisionField(
+                    "mode",
+                    "模式",
+                    UserDecisionFieldType.SingleSelect,
+                    options: [new("safe", "安全")],
+                    allowCustomInput: true,
+                    maxLength: 64)])));
+        var card = new AskUserCard { DataContext = viewModel };
+        var host = new Window { Content = card, Width = 520, Height = 480, ShowActivated = false };
+        host.Show();
+        try
+        {
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            host.UpdateLayout();
+
+            var input = Assert.Single(
+                card.GetVisualDescendants().OfType<TextBox>(),
+                item => item.IsEffectivelyVisible);
+            Assert.Equal("我有其他想法...", input.Watermark);
+            Assert.Equal(64, input.MaxLength);
+        }
+        finally
+        {
+            host.Close();
+        }
+    }
+
+    [Fact]
     public void AskUser结束后排队消息仍保留时不会残留旧卡片()
     {
         AvaloniaTestBootstrap.Ensure();

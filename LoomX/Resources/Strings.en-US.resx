@@ -575,6 +575,7 @@
   <data name="assistant.decision.next"><value>Next</value></data>
   <data name="assistant.decision.close"><value>Close</value></data>
   <data name="assistant.decision.cancel_input"><value>Cancel this input</value></data>
+  <data name="assistant.decision.custom_input_placeholder"><value>I have another idea...</value></data>
   <data name="assistant.queue.title"><value>Queued messages</value></data>
   <data name="assistant.queue.delete"><value>Delete queued message</value></data>
 </root>

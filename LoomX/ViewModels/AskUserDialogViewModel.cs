@@ -366,7 +366,7 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
 
     public bool AllowsCustomInput => Field.AllowCustomInput;
 
-    public string CustomInputPlaceholder => Field.CustomInputPlaceholder ?? "我有其他想法...";
+    public string CustomInputPlaceholder => Field.CustomInputPlaceholder ?? ResourceLookup.Resolve("assistant.decision.custom_input_placeholder");
 
     public int CustomInputMaxLength => Field.MaxLength ?? 1000;
 
@@ -503,7 +503,7 @@ public sealed class AskUserMultiSelectFieldViewModel : AskUserFieldViewModel
 
     public bool AllowsCustomInput => Field.AllowCustomInput;
 
-    public string CustomInputPlaceholder => Field.CustomInputPlaceholder ?? "我有其他想法...";
+    public string CustomInputPlaceholder => Field.CustomInputPlaceholder ?? ResourceLookup.Resolve("assistant.decision.custom_input_placeholder");
 
     public int CustomInputMaxLength => Field.MaxLength ?? 1000;
 
