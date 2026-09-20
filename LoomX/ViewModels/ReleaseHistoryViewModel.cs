@@ -13,6 +13,7 @@ namespace LoomX.ViewModels;
 public sealed class ReleaseHistoryItemViewModel : NotifyViewModel
 {
     private readonly Func<string, string, string> localize;
+    private bool isLatest;
     private string publishedAtText = string.Empty;
     private string latestBadgeText = string.Empty;
     private string currentBadgeText = string.Empty;
@@ -25,7 +26,7 @@ public sealed class ReleaseHistoryItemViewModel : NotifyViewModel
         CultureInfo culture)
     {
         Release = release;
-        IsLatest = isLatest;
+        this.isLatest = isLatest;
         IsCurrent = isCurrent;
         this.localize = localize;
         RefreshLocalizedText(culture);
@@ -33,11 +34,13 @@ public sealed class ReleaseHistoryItemViewModel : NotifyViewModel
 
     public UpdateRelease Release { get; }
     public string VersionText => $"v{NormalizeVersion(Release.Version)}";
-    public bool IsLatest { get; }
+    public bool IsLatest { get => isLatest; private set => SetProperty(ref isLatest, value); }
     public bool IsCurrent { get; }
     public string PublishedAtText { get => publishedAtText; private set => SetProperty(ref publishedAtText, value); }
     public string LatestBadgeText { get => latestBadgeText; private set => SetProperty(ref latestBadgeText, value); }
     public string CurrentBadgeText { get => currentBadgeText; private set => SetProperty(ref currentBadgeText, value); }
+
+    internal void SetLatest(bool value) => IsLatest = value;
 
     internal void RefreshLocalizedText(CultureInfo culture)
     {
@@ -63,6 +66,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
     private readonly IStringLocalizer<ReleaseHistoryViewModel> localizer;
     private readonly Action<Action> dispatch;
     private readonly SemaphoreSlim operationGate = new(1, 1);
+    private readonly CancellationTokenSource lifetime = new();
     private ObservableCollection<ReleaseHistoryItemViewModel> releases = [];
     private ReleaseHistoryItemViewModel? selectedRelease;
     private bool isInitialLoading;
@@ -73,7 +77,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
     private bool hasCachedContent;
     private bool hasMore;
     private bool hasLoaded;
-    private bool disposed;
+    private volatile bool disposed;
     private int currentPage;
     private string errorText = string.Empty;
 
@@ -91,9 +95,9 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         this.dispatch = dispatch ?? DispatchToUiThread;
 
         Content = new ReleaseNotesContentViewModel();
-        LoadCommand = new AsyncCommand(() => EnsureLoadedAsync(), () => !HasLoadedContent && !IsBusy, this.logger);
-        RefreshCommand = new AsyncCommand(RefreshAsync, () => !IsBusy, this.logger);
-        LoadMoreCommand = new AsyncCommand(LoadMoreAsync, () => HasMore && !IsBusy, this.logger);
+        LoadCommand = new AsyncCommand(() => EnsureLoadedAsync(), () => !disposed && !HasLoadedContent && !IsBusy, this.logger);
+        RefreshCommand = new AsyncCommand(RefreshAsync, () => !disposed && !IsBusy, this.logger);
+        LoadMoreCommand = new AsyncCommand(LoadMoreAsync, () => !disposed && HasMore && !IsBusy, this.logger);
         LocaleService.CultureChanged += OnCultureChanged;
     }
 
@@ -106,7 +110,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
     public ReleaseHistoryItemViewModel? SelectedRelease
     {
         get => selectedRelease;
-        set => dispatch(() => SelectRelease(value, updateContent: true));
+        set => DispatchIfActive(() => SelectRelease(value, updateContent: true));
     }
 
     public ReleaseNotesContentViewModel Content { get; }
@@ -125,36 +129,44 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
     public ICommand RefreshCommand { get; }
     public ICommand LoadMoreCommand { get; }
 
-    public async Task EnsureLoadedAsync(CancellationToken cancellationToken = default)
-    {
-        await operationGate.WaitAsync(cancellationToken);
-        try
-        {
-            if (hasLoaded) return;
-            await LoadFirstPageAsync(isRefresh: false, cancellationToken);
-        }
-        finally
-        {
-            operationGate.Release();
-        }
-    }
+    public Task EnsureLoadedAsync(CancellationToken cancellationToken = default) =>
+        RunSerializedAsync(
+            token => hasLoaded ? Task.CompletedTask : LoadFirstPageAsync(isRefresh: false, token),
+            cancellationToken);
 
-    private async Task RefreshAsync()
+    private Task RefreshAsync() =>
+        RunSerializedAsync(token => LoadFirstPageAsync(isRefresh: true, token));
+
+    private Task LoadMoreAsync() =>
+        RunSerializedAsync(LoadMoreCoreAsync);
+
+    private async Task RunSerializedAsync(
+        Func<CancellationToken, Task> operation,
+        CancellationToken cancellationToken = default)
     {
-        await operationGate.WaitAsync();
+        if (disposed) return;
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
+        var entered = false;
         try
         {
-            await LoadFirstPageAsync(isRefresh: true, CancellationToken.None);
+            await operationGate.WaitAsync(linked.Token);
+            entered = true;
+            linked.Token.ThrowIfCancellationRequested();
+            if (disposed) return;
+            await operation(linked.Token);
+        }
+        catch (OperationCanceledException) when (linked.IsCancellationRequested)
+        {
         }
         finally
         {
-            operationGate.Release();
+            if (entered) operationGate.Release();
         }
     }
 
     private async Task LoadFirstPageAsync(bool isRefresh, CancellationToken cancellationToken)
     {
-        dispatch(() =>
+        DispatchIfActive(() =>
         {
             if (isRefresh) IsRefreshing = true;
             else IsInitialLoading = true;
@@ -166,11 +178,13 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         try
         {
             var settings = await proxySettingsReader(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             var page = await updateService.GetStableReleasesAsync(settings, 1, PageSize, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             var previousVersion = ReleaseHistoryItemViewModel.NormalizeVersion(SelectedRelease?.Release.Version);
             var nextItems = BuildItems(page.Items);
 
-            dispatch(() =>
+            DispatchIfActive(() =>
             {
                 Releases = new ObservableCollection<ReleaseHistoryItemViewModel>(nextItems);
                 currentPage = page.Page;
@@ -202,7 +216,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         }
         catch (Exception exception)
         {
-            dispatch(() => ApplyFailure());
+            DispatchIfActive(ApplyFailure);
             logger.LogWarning(
                 exception,
                 "正式版本历史加载失败 {Operation} {HasCachedContent}",
@@ -211,7 +225,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         }
         finally
         {
-            dispatch(() =>
+            DispatchIfActive(() =>
             {
                 if (isRefresh) IsRefreshing = false;
                 else IsInitialLoading = false;
@@ -220,61 +234,60 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         }
     }
 
-    private async Task LoadMoreAsync()
+    private async Task LoadMoreCoreAsync(CancellationToken cancellationToken)
     {
-        await operationGate.WaitAsync();
+        if (!HasMore || !hasLoaded) return;
+        DispatchIfActive(() =>
+        {
+            IsLoadingMore = true;
+            ClearError();
+        });
+
+        var nextPage = currentPage + 1;
+        logger.LogInformation("正式版本历史加载更多开始 {Page} {PageSize}", nextPage, PageSize);
         try
         {
-            if (!HasMore || !hasLoaded) return;
-            dispatch(() =>
+            var settings = await proxySettingsReader(cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var page = await updateService.GetStableReleasesAsync(settings, nextPage, PageSize, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            var existingVersions = Releases
+                .Select(item => ReleaseHistoryItemViewModel.NormalizeVersion(item.Release.Version))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var additions = BuildItemsForAppend(page.Items, existingVersions);
+
+            DispatchIfActive(() =>
             {
-                IsLoadingMore = true;
+                foreach (var item in additions) Releases.Add(item);
+                RecalculateLatestFlags();
+                currentPage = page.Page;
+                HasMore = page.HasMore;
                 ClearError();
+                RaiseCommandStates();
             });
 
-            var nextPage = currentPage + 1;
-            logger.LogInformation("正式版本历史加载更多开始 {Page} {PageSize}", nextPage, PageSize);
-            try
-            {
-                var settings = await proxySettingsReader(CancellationToken.None);
-                var page = await updateService.GetStableReleasesAsync(settings, nextPage, PageSize, CancellationToken.None);
-                var existingVersions = Releases
-                    .Select(item => ReleaseHistoryItemViewModel.NormalizeVersion(item.Release.Version))
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-                var additions = BuildItemsForAppend(page.Items, existingVersions);
-
-                dispatch(() =>
-                {
-                    foreach (var item in additions) Releases.Add(item);
-                    currentPage = page.Page;
-                    HasMore = page.HasMore;
-                    ClearError();
-                    RaiseCommandStates();
-                });
-
-                logger.LogInformation(
-                    "正式版本历史加载更多完成 {Page} {AddedCount} {HasMore}",
-                    page.Page,
-                    additions.Count,
-                    page.HasMore);
-            }
-            catch (Exception exception)
-            {
-                dispatch(() => ApplyFailure());
-                logger.LogWarning(exception, "正式版本历史加载更多失败 {Page} {HasCachedContent}", nextPage, Releases.Count > 0);
-            }
-            finally
-            {
-                dispatch(() =>
-                {
-                    IsLoadingMore = false;
-                    RaiseCommandStates();
-                });
-            }
+            logger.LogInformation(
+                "正式版本历史加载更多完成 {Page} {AddedCount} {HasMore}",
+                page.Page,
+                additions.Count,
+                page.HasMore);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            logger.LogDebug("正式版本历史加载更多已取消 {Page}", nextPage);
+        }
+        catch (Exception exception)
+        {
+            DispatchIfActive(ApplyFailure);
+            logger.LogWarning(exception, "正式版本历史加载更多失败 {Page} {HasCachedContent}", nextPage, Releases.Count > 0);
         }
         finally
         {
-            operationGate.Release();
+            DispatchIfActive(() =>
+            {
+                IsLoadingMore = false;
+                RaiseCommandStates();
+            });
         }
     }
 
@@ -306,9 +319,6 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         IReadOnlyList<UpdateRelease> source,
         HashSet<string> existingVersions)
     {
-        var latestKey = Releases.FirstOrDefault(item => item.IsLatest) is { } latest
-            ? ReleaseHistoryItemViewModel.NormalizeVersion(latest.Release.Version)
-            : string.Empty;
         var currentKey = ReleaseHistoryItemViewModel.NormalizeVersion(AppVersion.Current);
         var additions = new List<ReleaseHistoryItemViewModel>(source.Count);
 
@@ -316,10 +326,28 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         {
             var key = ReleaseHistoryItemViewModel.NormalizeVersion(release.Version);
             if (!existingVersions.Add(key)) continue;
-            additions.Add(CreateItem(release, key, latestKey, currentKey));
+            additions.Add(CreateItem(release, key, string.Empty, currentKey));
         }
 
         return additions;
+    }
+
+    private void RecalculateLatestFlags()
+    {
+        StableVersion? latest = null;
+        foreach (var item in Releases)
+        {
+            if (!AppVersion.TryParse(item.Release.Version, out var version)) continue;
+            if (!latest.HasValue || version.CompareTo(latest.Value) > 0) latest = version;
+        }
+
+        foreach (var item in Releases)
+        {
+            var isLatest = latest.HasValue
+                && AppVersion.TryParse(item.Release.Version, out var version)
+                && version.CompareTo(latest.Value) == 0;
+            item.SetLatest(isLatest);
+        }
     }
 
     private ReleaseHistoryItemViewModel CreateItem(
@@ -364,7 +392,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
             : value.Value;
     }
 
-    private void OnCultureChanged(object? sender, CultureInfo culture) => dispatch(() =>
+    private void OnCultureChanged(object? sender, CultureInfo culture) => DispatchIfActive(() =>
     {
         foreach (var item in Releases) item.RefreshLocalizedText(culture);
         if (HasError) ErrorText = Loc("update.history.error.load", "无法加载版本历史，请重试。");
@@ -384,6 +412,15 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         (LoadMoreCommand as AsyncCommand)?.RaiseCanExecuteChanged();
     }
 
+    private void DispatchIfActive(Action action)
+    {
+        if (disposed) return;
+        dispatch(() =>
+        {
+            if (!disposed) action();
+        });
+    }
+
     private static void DispatchToUiThread(Action action)
     {
         if (Dispatcher.UIThread.CheckAccess()) action();
@@ -395,7 +432,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
         if (disposed) return;
         disposed = true;
         LocaleService.CultureChanged -= OnCultureChanged;
+        lifetime.Cancel();
         Content.Dispose();
-        operationGate.Dispose();
     }
 }

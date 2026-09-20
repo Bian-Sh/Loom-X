@@ -90,6 +90,53 @@ public sealed class ReleaseHistoryViewModelTests
     }
 
     [Fact]
+    public async Task 后续页出现更高版本时重算全局最新徽标并保持选择和正文()
+    {
+        var service = FakeUpdateService.WithPages(
+            Page(1, true, Release("0.12.9", "第一页正文")),
+            Page(2, false, Release("0.13.0", "后续页正文")));
+        using var vm = CreateHistory(service);
+        await vm.EnsureLoadedAsync();
+        var selected = vm.SelectedRelease;
+        var builder = vm.Content.Markdown;
+
+        vm.LoadMoreCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+        await WaitForAsync(() => !vm.IsLoadingMore);
+
+        Assert.False(vm.Releases.Single(item => item.Release.Version == "0.12.9").IsLatest);
+        Assert.True(vm.Releases.Single(item => item.Release.Version == "0.13.0").IsLatest);
+        Assert.Same(selected, vm.SelectedRelease);
+        Assert.Same(builder, vm.Content.Markdown);
+        Assert.Equal("第一页正文", vm.Content.Markdown.ToString());
+    }
+
+    [Fact]
+    public async Task 延迟响应期间销毁会取消请求且不再更新状态或抛后台异常()
+    {
+        var service = new DelayedUpdateService();
+        var vm = CreateHistory(service);
+        var loadTask = vm.EnsureLoadedAsync();
+        await service.Requested.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var collection = vm.Releases;
+        var builder = vm.Content.Markdown;
+        var notifications = 0;
+        vm.PropertyChanged += (_, _) => notifications++;
+
+        vm.Dispose();
+        service.Complete(Page(1, false, Release("0.13.0", "销毁后正文")));
+        var exception = await Record.ExceptionAsync(() => loadTask.WaitAsync(TimeSpan.FromSeconds(2)));
+
+        Assert.True(service.ObservedCancellationToken.IsCancellationRequested);
+        Assert.Null(exception);
+        Assert.Equal(0, notifications);
+        Assert.Same(collection, vm.Releases);
+        Assert.Same(builder, vm.Content.Markdown);
+        Assert.Empty(vm.Releases);
+        Assert.Equal(string.Empty, vm.Content.Markdown.ToString());
+    }
+
+    [Fact]
     public async Task 刷新失败保留集合选择和正文并标记缓存内容()
     {
         const string secret = "不应出现在用户文案中的上游正文";
@@ -221,7 +268,7 @@ public sealed class ReleaseHistoryViewModelTests
     }
 
     private static ReleaseHistoryViewModel CreateHistory(
-        FakeUpdateService service,
+        IUpdateService service,
         IStringLocalizer<ReleaseHistoryViewModel>? localizer = null,
         Action<Action>? dispatch = null) =>
         new(
@@ -257,6 +304,40 @@ public sealed class ReleaseHistoryViewModelTests
             if (DateTime.UtcNow >= timeout) throw new TimeoutException("等待 ViewModel 状态超时。");
             await Task.Delay(10);
         }
+    }
+
+    private sealed class DelayedUpdateService : IUpdateService
+    {
+        private readonly TaskCompletionSource<UpdateReleasePage> response = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Requested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public CancellationToken ObservedCancellationToken { get; private set; }
+
+        public Task<UpdateReleasePage> GetStableReleasesAsync(
+            UpdateProxySettings settings,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            ObservedCancellationToken = cancellationToken;
+            cancellationToken.Register(() => response.TrySetCanceled(cancellationToken));
+            Requested.TrySetResult();
+            return response.Task;
+        }
+
+        public void Complete(UpdateReleasePage page) => response.TrySetResult(page);
+
+        public Task<UpdateCheckResult> CheckAsync(UpdateProxySettings settings, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<PreparedUpdate> PrepareUpdateAsync(
+            UpdateRelease release,
+            UpdateProxySettings settings,
+            IProgress<UpdateDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void LaunchInstaller(PreparedUpdate preparedUpdate) => throw new NotSupportedException();
     }
 
     private sealed class FakeUpdateService : IUpdateService
