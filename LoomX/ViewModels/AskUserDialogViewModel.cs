@@ -11,6 +11,8 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
         new ReadOnlyDictionary<string, object?>(new Dictionary<string, object?>());
 
     private readonly UserDecisionRequest request;
+    private readonly TaskCompletionSource<bool?> completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private int currentFieldIndex;
     private string errorSummary = string.Empty;
 
@@ -41,6 +43,8 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
     public bool HasImpactSummary => !string.IsNullOrWhiteSpace(ImpactSummary);
 
     public bool AllowCancel => request.AllowCancel;
+
+    public Task<bool?> Completion => completion.Task;
 
     public IReadOnlyList<AskUserFieldViewModel> Fields { get; }
 
@@ -133,6 +137,21 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
         shouldSubmit = ValidateFields(BuildValues());
         return shouldSubmit;
     }
+
+    public bool TryCompleteSubmission()
+    {
+        if (!TryBuildResult(out _))
+        {
+            return false;
+        }
+
+        return completion.TrySetResult(true);
+    }
+
+    public bool TryCancel() =>
+        AllowCancel && completion.TrySetResult(false);
+
+    internal bool TryAbort() => completion.TrySetResult(null);
 
     public bool TryBuildResult(out IReadOnlyDictionary<string, object?> values)
     {

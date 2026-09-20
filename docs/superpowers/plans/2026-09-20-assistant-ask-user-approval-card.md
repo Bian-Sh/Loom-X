@@ -18,7 +18,7 @@ base-ref: e0e1dde
 - 修改 `LoomX/Views/AssistantView.axaml(.cs)`：overlay、队列、输入宽度和卡片交互。
 - 修改 `LoomX/Resources/Strings*.resx`：队列、取消和等待状态文案。
 - 修改 `LoomX.Tests/Views/AskUserDialogContractTests.cs`、`AssistantViewStyleTests.cs` 与 Assistant ViewModel 测试。
-- 修改 `LoomX.Tests/Views/AssistantDecisionLifecycleTests.cs`：显式 UI 线程调度。
+- 修改 `LoomX.Tests/Views/AssistantDecisionLifecycleTests.cs`：保持 Avalonia UI 对象不跨初始化线程。
 
 ## Task 1：悬浮卡片契约（TDD）
 
@@ -37,7 +37,7 @@ base-ref: e0e1dde
 ## Task 3：生命周期与线程稳定性（TDD）
 
 1. 使用现有 `AssistantDecisionLifecycleTests.MainWindowViewModel_Dispose幂等释放Assistant并收敛已Claim请求` 复现 UI 线程失败。
-2. 把所有 Avalonia UI 对象创建和关闭显式调度到 `Dispatcher.UIThread`。
+2. 保持所有 Avalonia UI 对象的创建、显示、关闭和释放都在 `SetupWithoutStarting` 绑定的初始化线程，避免测试在 `await` 后换线程。
 3. 重复运行该测试和相关生命周期测试，确认不依赖执行顺序。
 
 ## Task 4：集成与交付
@@ -47,3 +47,7 @@ base-ref: e0e1dde
 3. 发布到新的 `outputs/2026-09-20-<time>-assistant-ask-user-floating-card`。
 4. 使用本地 `cua-driver` 获取 LoomX 顶层窗口，验证悬浮卡片、输入共存、队列删除和顺序出队；优先后台 UIA/虚拟光标，必要时才使用系统鼠标。
 5. 更新验证报告并进入 Comet verify。
+
+## 执行决策记录
+
+- `review_mode: off`：本次按已确认的 direct 模式实施，不派发自动代码审查；以 TDD、完整测试、Release 构建、OpenSpec strict validate 和 `cua-driver` 顶层窗口验收作为质量门禁。

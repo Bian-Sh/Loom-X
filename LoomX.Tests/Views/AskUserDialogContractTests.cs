@@ -283,16 +283,14 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
-    public void DialogXaml_使用紧凑主题化ApprovalCard逐题布局()
+    public void CardXaml_使用应用内悬浮ApprovalCard逐题布局()
     {
-        var source = ReadDesktopFile("Views", "AskUserDialog.axaml");
+        var source = ReadDesktopFile("Views", "AskUserCard.axaml");
 
-        Assert.Contains("Width=\"460\"", source, StringComparison.Ordinal);
-        Assert.Contains("MinWidth=\"420\"", source, StringComparison.Ordinal);
-        Assert.Contains("SizeToContent=\"Height\"", source, StringComparison.Ordinal);
-        Assert.Contains("CanResize=\"False\"", source, StringComparison.Ordinal);
-        Assert.Contains("Background=\"Transparent\"", source, StringComparison.Ordinal);
-        Assert.Contains("{DynamicResource DialogBackgroundBrush}", source, StringComparison.Ordinal);
+        Assert.Contains("<UserControl", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Window", source, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"560\"", source, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{DynamicResource DialogBackgroundBrush}\"", source, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource BorderStrongBrush}", source, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource SurfaceSubtleBrush}", source, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource AccentBrush}", source, StringComparison.Ordinal);
@@ -307,8 +305,10 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("IsVisible=\"{Binding CanSkipCurrentField}\"", source, StringComparison.Ordinal);
         Assert.Contains("Content=\"{Binding PrimaryActionText}\"", source, StringComparison.Ordinal);
         Assert.Contains("Click=\"PrimaryButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"CancelButton_OnClick\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding AllowCancel}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Click=\"CloseButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CloseButton", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("AskUser 验收面板", source, StringComparison.Ordinal);
         Assert.Contains("AskUserSingleSelectFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("AskUserMultiSelectFieldViewModel", source, StringComparison.Ordinal);
         Assert.Contains("AskUserNumberFieldViewModel", source, StringComparison.Ordinal);
@@ -322,39 +322,47 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
-    public void DialogCodeBehind_接通导航跳过自动前进键盘提交与取消()
+    public void CardCodeBehind_接通导航跳过自动前进键盘提交与取消()
     {
-        var code = ReadDesktopFile("Views", "AskUserDialog.axaml.cs");
+        var code = ReadDesktopFile("Views", "AskUserCard.axaml.cs");
 
         Assert.Contains("PreviousButton_OnClick", code, StringComparison.Ordinal);
         Assert.Contains("NextButton_OnClick", code, StringComparison.Ordinal);
         Assert.Contains("SkipButton_OnClick", code, StringComparison.Ordinal);
         Assert.Contains("PrimaryButton_OnClick", code, StringComparison.Ordinal);
-        Assert.Contains("CloseButton_OnClick", code, StringComparison.Ordinal);
+        Assert.Contains("CancelButton_OnClick", code, StringComparison.Ordinal);
         Assert.Contains("SingleChoice_OnClick", code, StringComparison.Ordinal);
         Assert.Contains("Task.Delay", code, StringComparison.Ordinal);
         Assert.Contains("TryAdvanceCurrentField", code, StringComparison.Ordinal);
         Assert.Contains("TrySkipCurrentField", code, StringComparison.Ordinal);
+        Assert.Contains("TryCompleteSubmission", code, StringComparison.Ordinal);
+        Assert.Contains("TryCancel", code, StringComparison.Ordinal);
         Assert.Contains("Key.Enter", code, StringComparison.Ordinal);
         Assert.Contains("KeyModifiers.Control", code, StringComparison.Ordinal);
         Assert.Contains("AskUserTextFieldViewModel { IsMultiline: true }", code, StringComparison.Ordinal);
-        Assert.Contains("Close(true)", code, StringComparison.Ordinal);
-        Assert.Contains("Close(false)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Close(true)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Close(false)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("protected override void OnKeyDown", code, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void DialogCodeBehind_窗口级键盘只处理取消避免输入控件重复前进()
+    public async Task CardViewModel_提交取消只能完成一次()
     {
-        var code = ReadDesktopFile("Views", "AskUserDialog.axaml.cs");
-        var start = code.IndexOf("protected override void OnKeyDown", StringComparison.Ordinal);
-        var end = code.IndexOf("private void AdvanceOrSubmit", start, StringComparison.Ordinal);
+        var submit = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("answer", "回答", UserDecisionFieldType.Text, isRequired: true)));
+        Assert.IsType<AskUserTextFieldViewModel>(submit.CurrentField).TextValue = "确认";
 
-        Assert.True(start >= 0 && end > start);
-        var windowKeyHandler = code[start..end];
-        Assert.Contains("Key.Escape", windowKeyHandler, StringComparison.Ordinal);
-        Assert.DoesNotContain("Key.Enter", windowKeyHandler, StringComparison.Ordinal);
-        Assert.DoesNotContain("AdvanceOrSubmit", windowKeyHandler, StringComparison.Ordinal);
+        Assert.True(submit.TryCompleteSubmission());
+        Assert.False(submit.TryCancel());
+        Assert.True(await submit.Completion);
+
+        var cancel = new AskUserDialogViewModel(CreatePending(
+            new UserDecisionField("answer", "回答", UserDecisionFieldType.Text, isRequired: true)));
+        Assert.True(cancel.TryCancel());
+        Assert.False(cancel.TryCompleteSubmission());
+        Assert.False(await cancel.Completion);
     }
+
     [Theory]
     [InlineData("Strings.resx")]
     [InlineData("Strings.en-US.resx")]
@@ -369,7 +377,7 @@ public sealed class AskUserDialogContractTests
         Assert.Contains("name=\"assistant.decision.submit\"", source, StringComparison.Ordinal);
         Assert.Contains("name=\"assistant.decision.previous\"", source, StringComparison.Ordinal);
         Assert.Contains("name=\"assistant.decision.next\"", source, StringComparison.Ordinal);
-        Assert.Contains("name=\"assistant.decision.close\"", source, StringComparison.Ordinal);
+        Assert.Contains("name=\"assistant.decision.cancel\"", source, StringComparison.Ordinal);
     }
 
     private static T ReadProperty<T>(object target, string propertyName)

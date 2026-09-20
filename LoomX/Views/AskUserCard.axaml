@@ -1,25 +1,11 @@
-<Window xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:LoomX.ViewModels"
         xmlns:l="using:LoomX.Localization"
-        x:Class="LoomX.Views.AskUserDialog"
-        Width="460"
-        MinWidth="420"
-        MaxWidth="520"
-        MinHeight="260"
-        MaxHeight="720"
-        SizeToContent="Height"
-        Background="Transparent"
-        TransparencyLevelHint="AcrylicBlur,Blur,Transparent"
-        TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}"
-        SystemDecorations="None"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
-        ExtendClientAreaTitleBarHeightHint="0"
-        ShowInTaskbar="False"
-        CanResize="False"
-        WindowStartupLocation="CenterOwner">
-  <Window.Styles>
+        x:Class="LoomX.Views.AskUserCard"
+        Width="560"
+        MaxWidth="560">
+  <UserControl.Styles>
     <Style Selector="Button.card-icon">
       <Setter Property="Width" Value="30"/>
       <Setter Property="Height" Value="30"/>
@@ -47,9 +33,9 @@
       <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
       <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
     </Style>
-  </Window.Styles>
+  </UserControl.Styles>
 
-  <Window.DataTemplates>
+  <UserControl.DataTemplates>
     <DataTemplate DataType="{x:Type vm:AskUserSingleSelectFieldViewModel}">
       <StackPanel Spacing="8">
         <ItemsControl ItemsSource="{Binding Options}">
@@ -116,38 +102,25 @@
         <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap"/>
       </StackPanel>
     </DataTemplate>
-  </Window.DataTemplates>
+  </UserControl.DataTemplates>
 
   <Border Background="{DynamicResource DialogBackgroundBrush}"
           BorderBrush="{DynamicResource BorderStrongBrush}"
           BorderThickness="1"
           CornerRadius="12"
           ClipToBounds="True">
-    <Grid RowDefinitions="Auto,Auto,Auto">
-      <Border Grid.Row="0" Background="Transparent" PointerPressed="TitleBar_OnPointerPressed">
-        <Grid Margin="18,12,12,0" ColumnDefinitions="*,Auto">
-          <TextBlock Text="{Binding Title}"
-                     Foreground="{DynamicResource TextSecondaryBrush}"
-                     FontSize="12"
-                     FontWeight="SemiBold"
-                     VerticalAlignment="Center"
-                     TextTrimming="CharacterEllipsis"/>
-          <Button Grid.Column="1"
-                  Classes="card-icon"
-                  Content="×"
-                  FontSize="17"
-                  IsVisible="{Binding AllowCancel}"
-                  ToolTip.Tip="{l:Locale assistant.decision.close}"
-                  Click="CloseButton_OnClick"/>
-        </Grid>
-      </Border>
-
-      <ScrollViewer Grid.Row="1"
-                    Margin="20,12,20,0"
+    <Grid RowDefinitions="Auto,Auto">
+      <ScrollViewer Grid.Row="0"
+                    Margin="20,18,20,0"
                     MaxHeight="500"
                     HorizontalScrollBarVisibility="Disabled"
                     VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="12">
+          <TextBlock Text="{Binding Title}"
+                     Foreground="{DynamicResource TextSecondaryBrush}"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     TextTrimming="CharacterEllipsis"/>
           <TextBlock FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap">
             <Run Text="{Binding CurrentField.Label}"/><Run Text="{Binding CurrentField.RequiredSuffix}" Foreground="{DynamicResource DangerBrush}"/>
           </TextBlock>
@@ -166,8 +139,8 @@
         </StackPanel>
       </ScrollViewer>
 
-      <Border Grid.Row="2" Margin="20,16,20,18">
-        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+      <Border Grid.Row="1" Margin="20,16,20,18">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
             <Button x:Name="PreviousButton"
                     Classes="card-icon"
@@ -195,10 +168,16 @@
           <Button Grid.Column="2"
                   Margin="0,0,8,0"
                   Classes="card-secondary"
+                  Content="{l:Locale assistant.decision.cancel}"
+                  IsVisible="{Binding AllowCancel}"
+                  Click="CancelButton_OnClick"/>
+          <Button Grid.Column="3"
+                  Margin="0,0,8,0"
+                  Classes="card-secondary"
                   Content="{l:Locale assistant.decision.skip}"
                   IsVisible="{Binding CanSkipCurrentField}"
                   Click="SkipButton_OnClick"/>
-          <Button Grid.Column="3"
+          <Button Grid.Column="4"
                   MinWidth="92"
                   MinHeight="34"
                   Padding="16,7"
@@ -209,7 +188,4 @@
       </Border>
     </Grid>
   </Border>
-</Window>
-
-
-
+</UserControl>

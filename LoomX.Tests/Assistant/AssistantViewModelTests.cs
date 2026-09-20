@@ -610,6 +610,28 @@ public sealed class AssistantViewModelUserDecisionTests
         Assert.DoesNotContain("owner-sensitive-id", logText, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PendingRequested_默认投影到输入框上方卡片并由卡片完成提交()
+    {
+        var broker = new RecordingUserDecisionBroker();
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            userDecisionBroker: broker,
+            uiDispatcher: action => action());
+        viewModel.Activate();
+
+        broker.Raise(CreatePending("card-id", "卡片问题"));
+        Assert.True(SpinWait.SpinUntil(() => viewModel.PendingAskUser is not null, TimeSpan.FromSeconds(2)));
+        var card = Assert.IsType<AskUserDialogViewModel>(viewModel.PendingAskUser);
+        Assert.IsType<AskUserTextFieldViewModel>(card.CurrentField).TextValue = "确认";
+        Assert.True(card.TryCompleteSubmission());
+        await broker.WaitForCompletionAsync();
+
+        Assert.Equal("card-id", broker.SubmittedRequestId);
+        Assert.Equal("确认", broker.SubmittedValues!["answer"]);
+        Assert.True(SpinWait.SpinUntil(() => viewModel.PendingAskUser is null, TimeSpan.FromSeconds(2)));
+    }
+
     private static PendingUserDecision CreatePending(string requestId, string question) => new(
         requestId,
         "owner-sensitive-id",

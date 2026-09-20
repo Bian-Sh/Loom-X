@@ -5,29 +5,16 @@ using LoomX.ViewModels;
 
 namespace LoomX.Views;
 
-public partial class AskUserDialog : Window
+public partial class AskUserCard : UserControl
 {
     private static readonly TimeSpan SingleChoiceAdvanceDelay = TimeSpan.FromMilliseconds(180);
 
-    public AskUserDialog() => InitializeComponent();
+    public AskUserCard() => InitializeComponent();
 
     private AskUserDialogViewModel? ViewModel => DataContext as AskUserDialogViewModel;
 
-    private void TitleBar_OnPointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (e.GetCurrentPoint(this).Properties.PointerUpdateKind == PointerUpdateKind.LeftButtonPressed)
-        {
-            BeginMoveDrag(e);
-        }
-    }
-
-    private void CloseButton_OnClick(object? sender, RoutedEventArgs e)
-    {
-        if (ViewModel is { AllowCancel: true })
-        {
-            Close(false);
-        }
-    }
+    private void CancelButton_OnClick(object? sender, RoutedEventArgs e) =>
+        ViewModel?.TryCancel();
 
     private void PreviousButton_OnClick(object? sender, RoutedEventArgs e) =>
         ViewModel?.MovePrevious();
@@ -43,9 +30,9 @@ public partial class AskUserDialog : Window
             return;
         }
 
-        if (shouldSubmit && viewModel.TryBuildResult(out _))
+        if (shouldSubmit)
         {
-            Close(true);
+            viewModel.TryCompleteSubmission();
         }
     }
 
@@ -104,17 +91,7 @@ public partial class AskUserDialog : Window
             e.Handled = true;
         }
     }
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape && ViewModel is { AllowCancel: true })
-        {
-            Close(false);
-            e.Handled = true;
-            return;
-        }
 
-        base.OnKeyDown(e);
-    }
     private void AdvanceOrSubmit()
     {
         if (ViewModel is not { } viewModel)
@@ -128,9 +105,9 @@ public partial class AskUserDialog : Window
             return;
         }
 
-        if (shouldSubmit && viewModel.TryBuildResult(out _))
+        if (shouldSubmit)
         {
-            Close(true);
+            viewModel.TryCompleteSubmission();
         }
     }
 }

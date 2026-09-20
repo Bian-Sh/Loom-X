@@ -609,6 +609,7 @@
 
     <!-- 输入区：上输入框 + 下功能区（权限 / 模型 / 发送）。整张卡一个外框，内部控件不再各自描边 -->
     <Border Grid.Row="3" ZIndex="1" x:Name="inputCard" Classes="input-card" Margin="0,0,32,20"
+            MaxWidth="760" HorizontalAlignment="Stretch"
             Background="{DynamicResource SurfaceBrush}"
             CornerRadius="14"
             ClipToBounds="True">
@@ -625,16 +626,18 @@
                  Padding="12,10"
                  GotFocus="InputTextBox_OnGotFocus"
                  LostFocus="InputTextBox_OnLostFocus"/>
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Margin="8,0,8,6">
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto" Margin="8,0,8,6">
           <!-- 修改权限：沉浸在功能区里，没有自己的背景 -->
           <ComboBox Grid.Column="0" Classes="bare"
                     ItemsSource="{Binding PermissionModeOptions}"
                     SelectedItem="{Binding SelectedPermissionMode, Mode=TwoWay}"
+                    IsEnabled="{Binding !IsRunning}"
                     VerticalAlignment="Center"/>
           <!-- 模型指定（foldout 弹层，只走 Provider 模型） -->
           <Button Grid.Column="1" x:Name="modelPickerButton" Classes="bare"
                   HorizontalContentAlignment="Stretch" HorizontalAlignment="Right"
                   MinWidth="160" MaxWidth="320"
+                  IsEnabled="{Binding !IsRunning}"
                   Click="ModelPicker_OnClick"
                   ToolTip.Tip="{l:Locale assistant.model.select.tooltip}"
                   AutomationProperties.Name="{l:Locale assistant.model.select.tooltip}">
@@ -643,15 +646,7 @@
               <PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="11" Height="11" VerticalAlignment="Center"/>
             </Grid>
           </Button>
-          <!-- 发送 / 取消：主色圆形按钮，一屏唯一主动作 -->
-          <Button Grid.Column="2" x:Name="sendButton" Width="28" Height="28" CornerRadius="14" Padding="0"
-                  Background="{DynamicResource AccentBrush}" BorderThickness="0" Margin="6,0,0,0"
-                  MinHeight="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                  Command="{Binding SendCommand}" IsVisible="{Binding !IsRunning}"
-                  ToolTip.Tip="{l:Locale assistant.send}" AutomationProperties.Name="{l:Locale assistant.send}">
-            <Path Classes="icon-glyph" Data="M 21,3 L 10.5,13.5 M 21,3 L 14.5,21 L 10.5,13.5 M 10.5,13.5 L 3,10.2 L 21,3"
-                  Width="14" Height="14" Stroke="White"/>
-          </Button>
+          <!-- 运行中保留发送入口用于排队，并额外提供停止当前轮次。 -->
           <Button Grid.Column="2" Width="28" Height="28" CornerRadius="14" Padding="0"
                   Background="{DynamicResource WarningBrush}" BorderThickness="0" Margin="6,0,0,0"
                   MinHeight="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
@@ -659,9 +654,70 @@
                   ToolTip.Tip="{l:Locale assistant.cancel}" AutomationProperties.Name="{l:Locale assistant.cancel}">
             <Path Classes="icon-glyph" Data="M 9,9 H 23 V 23 H 9 Z" Width="12" Height="12" Stroke="White"/>
           </Button>
+          <Button Grid.Column="3" x:Name="sendButton" Width="28" Height="28" CornerRadius="14" Padding="0"
+                  Background="{DynamicResource AccentBrush}" BorderThickness="0" Margin="6,0,0,0"
+                  MinHeight="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  Command="{Binding SendCommand}"
+                  ToolTip.Tip="{l:Locale assistant.send}" AutomationProperties.Name="{l:Locale assistant.send}">
+            <Path Classes="icon-glyph" Data="M 21,3 L 10.5,13.5 M 21,3 L 14.5,21 L 10.5,13.5 M 10.5,13.5 L 3,10.2 L 21,3"
+                  Width="14" Height="14" Stroke="White"/>
+          </Button>
         </Grid>
       </Grid>
     </Border>
+
+
+    <!-- AskUser 与消息队列锚定输入框上方，使用同一应用 OverlayLayer，不创建第二个顶层窗口。 -->
+    <Popup x:Name="assistantInteractionOverlay"
+           PlacementTarget="{Binding #inputCard}"
+           Placement="Top"
+           VerticalOffset="-8"
+           ShouldUseOverlayLayer="True"
+           IsLightDismissEnabled="False"
+           IsOpen="{Binding HasComposerOverlay}">
+      <StackPanel Width="560" MaxWidth="560" Spacing="8">
+        <views:AskUserCard DataContext="{Binding PendingAskUser}"
+                           IsVisible="{Binding PendingAskUser, Converter={x:Static conv:ObjectConverters.IsNotNull}}"/>
+        <Border IsVisible="{Binding HasQueuedMessages}"
+                Background="{DynamicResource DialogBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="14,12">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{l:Locale assistant.queue.title}"
+                       FontSize="12" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+            <ItemsControl ItemsSource="{Binding QueuedMessages}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:QueuedAssistantMessageViewModel}">
+                  <Border IsVisible="{Binding IsCurrentSession}"
+                          Background="{DynamicResource SurfaceSubtleBrush}"
+                          CornerRadius="8" Padding="10,8" Margin="0,0,0,6">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                      <TextBlock Text="{Binding DisplayOrder}"
+                                 Foreground="{DynamicResource TextTertiaryBrush}"
+                                 FontSize="11" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="1" Text="{Binding Text}"
+                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                 TextWrapping="Wrap" MaxLines="2"
+                                 TextTrimming="CharacterEllipsis"/>
+                      <Button Grid.Column="2" Width="26" Height="26" Padding="0"
+                              Background="Transparent" BorderThickness="0"
+                              Command="{Binding DeleteCommand}"
+                              ToolTip.Tip="{l:Locale assistant.queue.delete}"
+                              AutomationProperties.Name="{l:Locale assistant.queue.delete}">
+                        <TextBlock Text="×" FontSize="16"/>
+                      </Button>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Popup>
 
     <!-- 历史会话使用平台 Popup：可浮出主窗口边界，同时不参与应用窗口激活切换。 -->
     <Popup x:Name="historyPopup"
