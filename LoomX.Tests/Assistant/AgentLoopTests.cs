@@ -188,6 +188,28 @@ public sealed class AgentLoopTests
     }
 
     [Fact]
+    public async Task RunAsync_发送前修复历史中未闭合的工具调用()
+    {
+        var call = new ToolCall("ask_stale", "assistant.ask_user", "{}") { ArgumentsAreSafe = true };
+        var session = new AgentSession();
+        session.RestoreMessage(ChatMessage.User("旧问题"));
+        session.RestoreMessage(ChatMessage.AssistantToolCalls([call]));
+        session.RestoreMessage(ChatMessage.User("取消后的追问"));
+        var modelClient = new ScriptedModelClient(
+            [new TextDeltaEvent("已恢复。"), new ModelCompletedEvent("stop")]);
+
+        await CollectAsync(CreateLoop(modelClient).RunAsync(session, "继续"));
+
+        var request = Assert.Single(modelClient.Requests);
+        var assistantIndex = request.Messages.ToList().FindIndex(message => message.ToolCalls.Count > 0);
+        Assert.True(assistantIndex >= 0);
+        var toolResult = request.Messages[assistantIndex + 1];
+        Assert.Equal(ChatRole.Tool, toolResult.Role);
+        Assert.Equal("ask_stale", toolResult.ToolCallId);
+        Assert.Contains("\"cancelled\":true", toolResult.Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CancellationDuringStream_CancelsSession()
     {
         var session = new AgentSession();

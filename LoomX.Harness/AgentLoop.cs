@@ -16,6 +16,7 @@ public delegate Task<bool> ToolApprovalGate(ToolCall toolCall, ToolDefinition to
 /// </summary>
 public sealed class AgentLoop
 {
+    private const string CancelledToolResult = "{\"cancelled\":true,\"reason\":\"assistant_run_cancelled\"}";
     private readonly IModelClient modelClient;
     private readonly ToolRegistry toolRegistry;
     private readonly ILogger<AgentLoop> logger;
@@ -51,6 +52,12 @@ public sealed class AgentLoop
         if (session.State == AgentSessionState.Running)
         {
             throw new InvalidOperationException("会话正在运行中。");
+        }
+
+        var repairedBeforeRun = session.RepairDanglingToolCalls(CancelledToolResult);
+        if (repairedBeforeRun > 0)
+        {
+            logger.LogWarning("Agent 发送前修复未闭合工具调用 {SessionId} {Count}", session.Id, repairedBeforeRun);
         }
 
         session.MarkRunning();
@@ -246,6 +253,12 @@ public sealed class AgentLoop
 
         if (cancelled)
         {
+            var repairedOnCancel = session.RepairDanglingToolCalls(CancelledToolResult);
+            if (repairedOnCancel > 0)
+            {
+                logger.LogInformation("Agent 取消时补齐未闭合工具调用 {SessionId} {Count}", session.Id, repairedOnCancel);
+            }
+
             session.MarkCancelled();
             yield return AgentEvent.Create(session.Id, AgentEventKind.TaskCancelled);
             yield break;

@@ -393,6 +393,9 @@ public sealed class AssistantServiceTests : IDisposable
         await runTask.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.Equal(AgentSessionState.Cancelled, runningSession.State);
+        var cancelledToolResult = Assert.Single(runningSession.Messages, message => message.Role == ChatRole.Tool);
+        Assert.Equal("ask_1", cancelledToolResult.ToolCallId);
+        Assert.Contains("\"cancelled\":true", cancelledToolResult.Content, StringComparison.Ordinal);
         Assert.False(broker.Submit(request.RequestId, new Dictionary<string, object?> { ["mode"] = "safe" }));
     }
 

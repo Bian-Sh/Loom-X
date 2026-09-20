@@ -414,7 +414,7 @@ public sealed class AssistantViewModelUserDecisionTests
             toastService: toast,
             userDecisionBroker: broker,
             uiDispatcher: action => action(),
-            showAskUserDialog: _ => Task.FromResult<bool?>(null));
+            showAskUserDialog: _ => Task.FromResult<bool?>(false));
 
         viewModel.Activate();
 
@@ -428,6 +428,28 @@ public sealed class AssistantViewModelUserDecisionTests
         Assert.Equal("已取消助手决策", notification.Message);
         Assert.Equal(ToastLevel.Info, notification.Level);
         Assert.DoesNotContain("Secret", notification.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task 宿主中止AskUser_不重复取消也不显示失败Toast()
+    {
+        var broker = new RecordingUserDecisionBroker { CancelResult = false };
+        var toast = new ToastService();
+        var notifications = new List<ToastNotification>();
+        toast.Requested += (_, notification) => notifications.Add(notification);
+        using var viewModel = new AssistantViewModel(
+            new GatewayProcessService(),
+            toastService: toast,
+            userDecisionBroker: broker,
+            uiDispatcher: action => action(),
+            showAskUserDialog: _ => Task.FromResult<bool?>(null));
+        viewModel.Activate();
+
+        broker.Raise(CreatePending("abort-id", "宿主中止问题"));
+        await Task.Delay(100);
+
+        Assert.Null(broker.CancelledRequestId);
+        Assert.DoesNotContain(notifications, notification => notification.Level == ToastLevel.Error);
     }
 
     [Fact]
@@ -761,6 +783,7 @@ public sealed class AssistantViewModelUserDecisionTests
 
         public int SubscriberCount { get; private set; }
         public bool SubmitResult { get; init; } = true;
+        public bool CancelResult { get; init; } = true;
         public string? SubmittedRequestId { get; private set; }
         public IReadOnlyDictionary<string, object?>? SubmittedValues { get; private set; }
         public string? CancelledRequestId { get; private set; }
@@ -825,6 +848,11 @@ public sealed class AssistantViewModelUserDecisionTests
         public bool Cancel(string requestId, string candidate, string reason)
         {
             if (!string.Equals(claimantId, candidate, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (!CancelResult)
             {
                 return false;
             }

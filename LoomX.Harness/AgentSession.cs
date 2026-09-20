@@ -55,6 +55,53 @@ public sealed class AgentSession
 
     internal void AddMessage(ChatMessage message) => messages.Add(ToolArgumentSafety.EnsureSafe(message));
 
+    /// <summary>补齐中断运行遗留的工具结果，保证下一次请求仍满足工具调用协议。</summary>
+    internal int RepairDanglingToolCalls(string cancelledResult)
+    {
+        var repaired = 0;
+        for (var index = 0; index < messages.Count; index++)
+        {
+            var assistantMessage = messages[index];
+            if (assistantMessage.Role != ChatRole.Assistant || assistantMessage.ToolCalls.Count == 0)
+            {
+                continue;
+            }
+
+            var insertIndex = index + 1;
+            var respondedCallIds = new HashSet<string>(StringComparer.Ordinal);
+            while (insertIndex < messages.Count && messages[insertIndex].Role == ChatRole.Tool)
+            {
+                if (messages[insertIndex].ToolCallId is { Length: > 0 } toolCallId)
+                {
+                    respondedCallIds.Add(toolCallId);
+                }
+
+                insertIndex++;
+            }
+
+            foreach (var toolCall in assistantMessage.ToolCalls)
+            {
+                if (!string.IsNullOrEmpty(toolCall.Id) && respondedCallIds.Contains(toolCall.Id))
+                {
+                    continue;
+                }
+
+                messages.Insert(
+                    insertIndex++,
+                    ToolArgumentSafety.EnsureSafe(ChatMessage.ToolResult(toolCall, cancelledResult)));
+                if (!string.IsNullOrEmpty(toolCall.Id))
+                {
+                    respondedCallIds.Add(toolCall.Id);
+                }
+                repaired++;
+            }
+
+            index = insertIndex - 1;
+        }
+
+        return repaired;
+    }
+
     /// <summary>应用宿主当前系统策略；替换历史策略并保留原消息标识，避免追加重复策略消息。</summary>
     internal void ApplySystemPrompt(string systemPrompt)
     {

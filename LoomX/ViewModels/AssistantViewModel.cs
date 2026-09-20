@@ -464,6 +464,12 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             return;
         }
 
+        if (submitted is null)
+        {
+            logger.LogDebug("助手决策卡片由宿主中止 {RequestId}", pending.RequestId);
+            return;
+        }
+
         if (submitted == true)
         {
             if (!dialogViewModel.TryBuildResult(out var values))
@@ -1133,10 +1139,28 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         OnPropertyChanged(nameof(ComposerActionLabel));
     }
 
+    private void AbortPendingUserDecision(string reason)
+    {
+        IUserDecisionBroker? broker;
+        string? requestId;
+        lock (userDecisionGate)
+        {
+            broker = subscribedUserDecisionBroker;
+            requestId = ownedUserDecisionRequestId;
+        }
+
+        if (broker is not null && requestId is not null)
+        {
+            CancelOwnedUserDecision(broker, requestId, reason);
+        }
+
+        PendingAskUser?.TryAbort();
+    }
+
     private void Cancel()
     {
         currentTurnCancellationRequested = true;
-        PendingAskUser?.TryAbort();
+        AbortPendingUserDecision("assistant_run_cancelled");
         PendingApproval?.Resolve(false);
         ResolveService()?.Cancel();
     }
@@ -1144,7 +1168,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     private void PrepareSessionSwitch()
     {
         currentTurnCancellationRequested = true;
-        PendingAskUser?.TryAbort();
+        AbortPendingUserDecision("assistant_run_cancelled");
         PendingApproval?.Resolve(false);
         ResolveService()?.Cancel();
     }
