@@ -513,13 +513,15 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
-    public void EmptyTestResponseAlignsToTopWithoutChangingHorizontalCentering()
+    public void EmptyTestResponseUsesIndependentCenteredLayer()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
         var testTab = ReadTab(source, "providers.tab.test");
 
-        Assert.Contains("Text=\"{l:Locale providers.test.response.empty}\" Classes=\"muted\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Top\"", testTab, StringComparison.Ordinal);
-        Assert.DoesNotContain("Text=\"{l:Locale providers.test.response.empty}\" Classes=\"muted\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\"", testTab, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale providers.test.response.empty}\" Classes=\"muted\" FontSize=\"13\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" TextAlignment=\"Center\"", testTab, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding TestPanel.HasResponseText, Converter={StaticResource ProviderBooleanNotConverter}}\"", testTab, StringComparison.Ordinal);
+        Assert.Contains("<TextBox x:Name=\"TestResponseTextBox\"", testTab, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"{Binding #TestResponsePanel.Bounds.Height}\" HorizontalAlignment=\"Stretch\" VerticalAlignment=\"Stretch\"", testTab, StringComparison.Ordinal);
     }
 
     [Fact]
