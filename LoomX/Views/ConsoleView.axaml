@@ -8,7 +8,6 @@
     <Style Selector="ListBox.log-list ListBoxItem"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Padding" Value="0"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
     <Style Selector="ListBox.log-list ListBoxItem:selected"><Setter Property="Background" Value="Transparent"/></Style>
     <Style Selector="TextBox.filter"><Setter Property="MinHeight" Value="38"/><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="HorizontalContentAlignment" Value="Left"/></Style>
-    <Style Selector="Button.clear-search"><Setter Property="Width" Value="30"/><Setter Property="Height" Value="30"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
     <Style Selector="ToggleButton.log-toggle"><Setter Property="MinWidth" Value="76"/><Setter Property="Height" Value="38"/><Setter Property="MinHeight" Value="38"/><Setter Property="Padding" Value="8,4"/><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
     <Style Selector="ToggleButton.log-toggle:checked /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
     <Style Selector="ToggleButton.log-toggle.info:checked"><Setter Property="Background" Value="{DynamicResource SuccessSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource SuccessBorderBrush}"/></Style>
@@ -33,10 +32,7 @@
   <Grid RowDefinitions="Auto,*,Auto" MinHeight="420">
     <Border Classes="toolbar" Padding="10" Grid.Row="0">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="9">
-        <Grid ColumnDefinitions="*,Auto">
-          <TextBox Classes="filter" Watermark="{l:Locale console.search.placeholder}" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Padding="12,4,38,4"/>
-          <Button Classes="clear-search" Command="{Binding ClearSearchCommand}" IsVisible="{Binding HasSearchText}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"><Path Classes="icon-glyph" Data="M 7,7 L 25,25 M 25,7 L 7,25" Width="13" Height="13"/></Button>
-        </Grid>
+        <TextBox Classes="filter search" Watermark="{l:Locale console.search.placeholder}" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
           <ToggleButton Classes="log-toggle info" IsChecked="{Binding ShowInfo}" ToolTip.Tip="{l:Locale console.toggle.info}" AutomationProperties.Name="{l:Locale console.toggle.info}">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="2"><Path Classes="icon-glyph log-icon info" Data="M 16,3 A 13,13 0 1,0 16,29 A 13,13 0 1,0 16,3 Z M 16,12 L 16,22 M 16,8 L 16,8" Width="18" Height="18" HorizontalAlignment="Left" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding InfoCount}" Foreground="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>

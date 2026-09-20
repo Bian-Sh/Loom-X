@@ -697,7 +697,7 @@
       <Border Width="256" MaxHeight="360" Background="{DynamicResource PopupBackgroundBrush}"
               BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="6" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*,Auto" RowSpacing="6">
-          <TextBox x:Name="modelSearch" Classes="model-search input-transparent" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
+          <TextBox x:Name="modelSearch" Classes="model-search input-transparent search" Watermark="{l:Locale assistant.model.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="1">
               <ItemsControl ItemsSource="{Binding ModelGroups}">
