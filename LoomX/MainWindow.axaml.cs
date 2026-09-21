@@ -444,6 +444,7 @@ public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, ID
         nameof(StatusText),
         nameof(ErrorMessage),
         nameof(UpdateEntryText),
+        nameof(UpdateEntryHint),
         nameof(ProgressText),
         nameof(SpeedText),
         nameof(DownloadPercent),
@@ -480,6 +481,7 @@ public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, ID
     public string StatusText => coordinator?.StatusText ?? string.Empty;
     public string ErrorMessage => coordinator?.ErrorMessage ?? string.Empty;
     public string UpdateEntryText => coordinator?.UpdateEntryText ?? string.Empty;
+    public string UpdateEntryHint => coordinator?.UpdateEntryHint ?? string.Empty;
     public string ProgressText => coordinator?.ProgressText ?? string.Empty;
     public string SpeedText => coordinator?.SpeedText ?? string.Empty;
     public int DownloadPercent => coordinator?.DownloadPercent ?? 0;
@@ -548,6 +550,9 @@ public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, ID
                 break;
             case nameof(UpdateCoordinator.UpdateEntryText):
                 RaisePropertyChanged(nameof(UpdateEntryText));
+                break;
+            case nameof(UpdateCoordinator.UpdateEntryHint):
+                RaisePropertyChanged(nameof(UpdateEntryHint));
                 break;
             case nameof(UpdateCoordinator.IsUpdateEntryVisible):
                 RaisePropertyChanged(nameof(IsUpdateEntryVisible));

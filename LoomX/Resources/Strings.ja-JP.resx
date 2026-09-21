@@ -1506,6 +1506,8 @@
   <data name="update.entry.verifying"><value>更新を検証中</value></data>
   <data name="update.entry.ready"><value>{0} の準備ができました</value></data>
   <data name="update.entry.error"><value>更新の確認が必要です</value></data>
+  <data name="update.entry.install"><value>インストール</value></data>
+  <data name="update.entry.retry"><value>再試行</value></data>
   <data name="update.dialog.close"><value>閉じる</value></data>
   <data name="update.dialog.later"><value>後で</value></data>
   <data name="update.dialog.install"><value>再起動してインストール</value></data>

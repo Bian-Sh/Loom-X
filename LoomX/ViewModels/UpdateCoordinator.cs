@@ -96,6 +96,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     public string StatusText => ResolveStatusText();
     public string ErrorMessage => ResolveErrorText();
     public string UpdateEntryText => ResolveEntryText();
+    public string UpdateEntryHint => ResolveEntryHint();
     public int DownloadPercent => downloadPercent;
     public string DownloadedText => FormatBytes(downloadedBytes);
     public string TotalText => totalBytes > 0 ? FormatBytes(totalBytes) : Loc("update.progress.unknown");
@@ -143,6 +144,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(ErrorMessage));
         OnPropertyChanged(nameof(UpdateEntryText));
+        OnPropertyChanged(nameof(UpdateEntryHint));
         OnPropertyChanged(nameof(TotalText));
         OnPropertyChanged(nameof(ProgressText));
         OnPropertyChanged(nameof(SpeedText));
@@ -255,6 +257,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         bytesPerSecond = value.BytesPerSecond;
         downloadPercent = value.Percent;
         OnPropertyChanged(nameof(DownloadPercent));
+        OnPropertyChanged(nameof(UpdateEntryHint));
         OnPropertyChanged(nameof(DownloadedText));
         OnPropertyChanged(nameof(TotalText));
         OnPropertyChanged(nameof(ProgressText));
@@ -419,6 +422,14 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         _ => string.Empty
     };
 
+    private string ResolveEntryHint() => Stage switch
+    {
+        UpdateStage.Downloading or UpdateStage.Verifying => $"{downloadPercent}%",
+        UpdateStage.Ready => Loc("update.entry.install"),
+        UpdateStage.Error when Release is not null => Loc("update.entry.retry"),
+        _ => string.Empty
+    };
+
     private string ResolveErrorText() => ErrorKind switch
     {
         UpdateErrorKind.Check => Loc("update.error.check"),
@@ -441,6 +452,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         bytesPerSecond = 0;
         downloadPercent = 0;
         OnPropertyChanged(nameof(DownloadPercent));
+        OnPropertyChanged(nameof(UpdateEntryHint));
         OnPropertyChanged(nameof(DownloadedText));
         OnPropertyChanged(nameof(TotalText));
         OnPropertyChanged(nameof(ProgressText));

@@ -1677,6 +1677,8 @@
   <data name="update.entry.verifying"><value>正在校验更新</value></data>
   <data name="update.entry.ready"><value>{0} 已准备好</value></data>
   <data name="update.entry.error"><value>更新需要处理</value></data>
+  <data name="update.entry.install"><value>安装</value></data>
+  <data name="update.entry.retry"><value>重试</value></data>
   <data name="update.dialog.close"><value>关闭</value></data>
   <data name="update.dialog.later"><value>稍后</value></data>
   <data name="update.dialog.install"><value>重启并安装</value></data>

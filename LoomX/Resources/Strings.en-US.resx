@@ -581,6 +581,8 @@
   <data name="update.entry.verifying"><value>Verifying update</value></data>
   <data name="update.entry.ready"><value>{0} is ready</value></data>
   <data name="update.entry.error"><value>Update needs attention</value></data>
+  <data name="update.entry.install"><value>Install</value></data>
+  <data name="update.entry.retry"><value>Retry</value></data>
   <data name="update.dialog.close"><value>Close</value></data>
   <data name="update.dialog.later"><value>Later</value></data>
   <data name="update.dialog.install"><value>Restart and install</value></data>

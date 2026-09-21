@@ -49,26 +49,33 @@ public sealed class MainWindowChromeContractTests
         Assert.Contains("Grid.Column=\"1\"", source[entryStart..minimizeStart], StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding Update.IsUpdateEntryVisible}\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding Update.ToggleDialogCommand}\"", source, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"{Binding Update.UpdateEntryText}\"", source, StringComparison.Ordinal);
-        Assert.Contains("AutomationProperties.Name=\"{Binding Update.UpdateEntryText}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{Binding Update.UpdateEntryHint}\"", source, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.Name=\"{Binding Update.UpdateEntryHint}\"", source, StringComparison.Ordinal);
         Assert.Contains("Height=\"32\" MinWidth=\"32\"", source, StringComparison.Ordinal);
         Assert.Contains("Style Selector=\"Button.update-entry\"", source, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"Width\" Value=\"32\" />", source, StringComparison.Ordinal);
         Assert.Contains("Style Selector=\"Button.update-entry:pointerover\"", source, StringComparison.Ordinal);
         Assert.Contains("Style Selector=\"Button.update-entry:focus\"", source, StringComparison.Ordinal);
-        Assert.Contains("<Setter Property=\"Width\" Value=\"252\" />", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Width\" Value=\"96\" />", source, StringComparison.Ordinal);
         Assert.Contains("Style Selector=\"Border.update-entry-text\"", source, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"Width\" Value=\"0\" />", source, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"Opacity\" Value=\"0\" />", source, StringComparison.Ordinal);
         Assert.Contains("Button.update-entry:pointerover Border.update-entry-text", source, StringComparison.Ordinal);
         Assert.Contains("Button.update-entry:focus Border.update-entry-text", source, StringComparison.Ordinal);
-        Assert.Contains("<Setter Property=\"Width\" Value=\"220\" />", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Width\" Value=\"64\" />", source, StringComparison.Ordinal);
         Assert.Contains("<Setter Property=\"Opacity\" Value=\"1\" />", source, StringComparison.Ordinal);
         Assert.Contains("<DoubleTransition Property=\"Width\"", source, StringComparison.Ordinal);
         Assert.Contains("<DoubleTransition Property=\"Opacity\"", source, StringComparison.Ordinal);
         Assert.Contains("Background=\"{DynamicResource AccentSoftBrush}\" IsVisible=\"{Binding Update.IsReady}\"", source, StringComparison.Ordinal);
         Assert.Contains("Background=\"{DynamicResource DangerSoftBrush}\" IsVisible=\"{Binding Update.IsError}\"", source, StringComparison.Ordinal);
         Assert.Contains("Background=\"{DynamicResource SurfaceMutedBrush}\" IsVisible=\"{Binding Update.IsPreparing}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding Update.IsPreparing}\">", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding Update.IsReady}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"update-entry-arrow\"", source, StringComparison.Ordinal);
+        Assert.Contains("Style Selector=\"Path.update-entry-arrow\"", source, StringComparison.Ordinal);
+        Assert.Contains("IterationCount=\"Infinite\"", source, StringComparison.Ordinal);
+        Assert.Contains("TranslateTransform.Y", source, StringComparison.Ordinal);
+        Assert.Contains("M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z", source, StringComparison.Ordinal);
     }
 
     [Fact]
