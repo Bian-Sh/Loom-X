@@ -213,7 +213,8 @@
                     </ScrollViewer>
                   </TabItem>
                   <TabItem Header="{l:Locale providers.tab.test}">
-                    <ScrollViewer Classes="provider-tab-scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid>
+                      <ScrollViewer x:Name="TestTabScrollViewer" Classes="provider-tab-scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                       <Grid RowDefinitions="Auto,*" RowSpacing="12" Margin="0,16,0,18">
                         <Border Classes="panel" Padding="14" Background="{DynamicResource SurfaceSubtleBrush}">
                           <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="9">
@@ -240,7 +241,7 @@
                         <Border x:Name="TestResponsePanel" Grid.Row="1" Classes="panel" Padding="14" MinHeight="150" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}">
                           <Grid>
                             <TextBlock Text="{l:Locale providers.test.response.empty}" Classes="muted" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" IsVisible="{Binding TestPanel.HasResponseText, Converter={StaticResource ProviderBooleanNotConverter}}"/>
-                            <TextBox x:Name="TestResponseTextBox" Text="{Binding TestPanel.ResponseText}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Background="Transparent" BorderThickness="0" Padding="0" VerticalContentAlignment="Top" IsVisible="{Binding TestPanel.HasResponseText}" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <TextBox x:Name="TestResponseTextBox" Text="{Binding TestPanel.ResponseText}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Background="Transparent" BorderThickness="0" Padding="0" VerticalContentAlignment="Top" IsVisible="{Binding TestPanel.HasResponseText}" ScrollViewer.VerticalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollBarVisibility="Auto">
                               <TextBox.ContextMenu>
                                 <ContextMenu Opening="TestResponseContextMenu_OnOpening">
                                   <MenuItem x:Name="CopyTestResponseMenuItem" Header="{l:Locale providers.test.response.copy}" Click="CopyTestResponseMenuItem_OnClick"/>
@@ -253,6 +254,29 @@
                         </Border>
                       </Grid>
                     </ScrollViewer>
+                      <!-- 中键启动二维无极滚动：水平驱动响应文本，垂直驱动测试 Tab 外层内容。 -->
+                      <Canvas x:Name="TestResponseAutoScrollOverlay" IsHitTestVisible="False" ZIndex="8">
+                        <Border x:Name="TestResponseAutoScrollAnchor" Width="40" Height="40" IsVisible="False"
+                                CornerRadius="20" Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                                BoxShadow="0 3 10 0 #40000000">
+                          <Grid RowDefinitions="*,Auto,*" ColumnDefinitions="*,Auto,*">
+                            <Path x:Name="TestResponseAutoScrollUpGlyph" Grid.Row="0" Grid.Column="1" Data="M 4,6 L 8,2 L 12,6 Z"
+                                  Width="16" Height="8" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  Fill="{DynamicResource TextSecondaryBrush}"/>
+                            <Path x:Name="TestResponseAutoScrollLeftGlyph" Grid.Row="1" Grid.Column="0" Data="M 6,4 L 2,8 L 6,12 Z"
+                                  Width="8" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  Fill="{DynamicResource TextSecondaryBrush}"/>
+                            <Path x:Name="TestResponseAutoScrollRightGlyph" Grid.Row="1" Grid.Column="2" Data="M 2,4 L 6,8 L 2,12 Z"
+                                  Width="8" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  Fill="{DynamicResource TextSecondaryBrush}"/>
+                            <Path x:Name="TestResponseAutoScrollDownGlyph" Grid.Row="2" Grid.Column="1" Data="M 4,2 L 8,6 L 12,2 Z"
+                                  Width="16" Height="8" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  Fill="{DynamicResource TextSecondaryBrush}"/>
+                          </Grid>
+                        </Border>
+                      </Canvas>
+                    </Grid>
                   </TabItem>
                 </TabControl>
               </Grid>

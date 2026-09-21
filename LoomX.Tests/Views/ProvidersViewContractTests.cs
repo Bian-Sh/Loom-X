@@ -1,4 +1,5 @@
 using System.IO;
+using System.Reflection;
 using Avalonia.Input;
 using LoomX.Views;
 using Xunit;
@@ -391,14 +392,76 @@ public sealed class ProvidersViewContractTests
         var responseStart = test.IndexOf("<TextBox x:Name=\"TestResponseTextBox\"", StringComparison.Ordinal);
         var responseEnd = test.IndexOf('>', responseStart);
         var responseTag = test[responseStart..responseEnd];
-        Assert.Contains("<ScrollViewer Classes=\"provider-tab-scroll\" VerticalScrollBarVisibility=\"Auto\" HorizontalScrollBarVisibility=\"Disabled\">", test, StringComparison.Ordinal);
+        Assert.Contains("<ScrollViewer x:Name=\"TestTabScrollViewer\" Classes=\"provider-tab-scroll\" VerticalScrollBarVisibility=\"Auto\" HorizontalScrollBarVisibility=\"Disabled\">", test, StringComparison.Ordinal);
         Assert.Contains("<Border x:Name=\"TestResponsePanel\" Grid.Row=\"1\" Classes=\"panel\" Padding=\"14\" MinHeight=\"150\"", test, StringComparison.Ordinal);
         Assert.DoesNotContain("MaxHeight=", responseTag, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Stretch\"", responseTag, StringComparison.Ordinal);
         Assert.Contains("VerticalAlignment=\"Stretch\"", responseTag, StringComparison.Ordinal);
         Assert.Contains("TextWrapping=\"NoWrap\"", responseTag, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer.VerticalScrollBarVisibility=\"Disabled\"", responseTag, StringComparison.Ordinal);
-        Assert.Contains("ScrollViewer.HorizontalScrollBarVisibility=\"Disabled\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer.HorizontalScrollBarVisibility=\"Auto\"", responseTag, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TestResponseAutoScrollOverlay\"", test, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TestResponseAutoScrollAnchor\"", test, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TestResponseAutoScrollLeftGlyph\"", test, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TestResponseAutoScrollRightGlyph\"", test, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TestResponseAutoScrollUpGlyph\"", test, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TestResponseAutoScrollDownGlyph\"", test, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"TestTabScrollViewer\"", test, StringComparison.Ordinal);
+        Assert.True(
+            test.IndexOf("<Canvas x:Name=\"TestResponseAutoScrollOverlay\"", StringComparison.Ordinal) >
+            test.IndexOf("</ScrollViewer>", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void ResponseHorizontalAutoScrollUsesDeadZoneDirectionAndMaximumSpeed()
+    {
+        var method = typeof(ProvidersView).GetMethod(
+            "CalculateTestResponseAutoScrollVelocity",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(method);
+
+        double Calculate(double displacement) => (double)method.Invoke(null, [displacement])!;
+
+        Assert.Equal(0, Calculate(0));
+        Assert.Equal(0, Calculate(10));
+        Assert.True(Calculate(-40) < 0);
+        Assert.True(Calculate(40) > 0);
+        Assert.True(Math.Abs(Calculate(120)) > Math.Abs(Calculate(40)));
+        Assert.Equal(1800, Calculate(1000));
+        Assert.Equal(-1800, Calculate(-1000));
+    }
+
+    [Fact]
+    public void ResponseHorizontalAutoScrollOffsetStaysWithinViewportBounds()
+    {
+        var method = typeof(ProvidersView).GetMethod(
+            "CalculateTestResponseAutoScrollOffset",
+            BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+        Assert.NotNull(method);
+
+        double Calculate(double current, double velocity, double elapsed, double maximum) =>
+            (double)method.Invoke(null, [current, velocity, elapsed, maximum])!;
+
+        Assert.Equal(70, Calculate(50, 100, 0.2, 200), 6);
+        Assert.Equal(0, Calculate(10, -100, 1, 200), 6);
+        Assert.Equal(200, Calculate(190, 100, 1, 200), 6);
+        Assert.Equal(50, Calculate(50, 100, -1, 200), 6);
+        Assert.Equal(0, Calculate(50, 100, 1, -20), 6);
+    }
+
+    [Fact]
+    public void ResponseHorizontalAutoScrollHooksMiddlePointerInteraction()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml.cs");
+
+        Assert.Contains("TestResponseTextBox.AddHandler(InputElement.PointerPressedEvent", source, StringComparison.Ordinal);
+        Assert.Contains("TestResponseTextBox.AddHandler(InputElement.PointerMovedEvent", source, StringComparison.Ordinal);
+        Assert.Contains("TestResponseTextBox.AddHandler(InputElement.PointerCaptureLostEvent", source, StringComparison.Ordinal);
+        Assert.Contains("PointerUpdateKind.MiddleButtonPressed", source, StringComparison.Ordinal);
+        Assert.Contains("StartTestResponseAutoScroll", source, StringComparison.Ordinal);
+        Assert.Contains("StopTestResponseAutoScroll", source, StringComparison.Ordinal);
+        Assert.Contains("testResponseScrollViewer.Offset = new Vector(nextHorizontalOffset", source, StringComparison.Ordinal);
+        Assert.Contains("TestTabScrollViewer.Offset = new Vector(TestTabScrollViewer.Offset.X, nextVerticalOffset)", source, StringComparison.Ordinal);
     }
     [Theory]
     [InlineData(Key.Delete, false, 6, 0, 6, true)]
@@ -445,10 +508,12 @@ public sealed class ProvidersViewContractTests
         Assert.Contains("<Border Padding=\"18,16,0,0\"", source, StringComparison.Ordinal);
         Assert.Contains("<Grid ColumnDefinitions=\"*\" Margin=\"0,0,18,0\">", source, StringComparison.Ordinal);
 
-        foreach (var tabKey in new[] { "providers.tab.basic", "providers.tab.advanced", "providers.tab.models", "providers.tab.test" })
+        foreach (var tabKey in new[] { "providers.tab.basic", "providers.tab.advanced", "providers.tab.models" })
         {
             Assert.Contains("<ScrollViewer Classes=\"provider-tab-scroll\" VerticalScrollBarVisibility=\"Auto\" HorizontalScrollBarVisibility=\"Disabled\">", ReadTab(source, tabKey), StringComparison.Ordinal);
         }
+
+        Assert.Contains("<ScrollViewer x:Name=\"TestTabScrollViewer\" Classes=\"provider-tab-scroll\" VerticalScrollBarVisibility=\"Auto\" HorizontalScrollBarVisibility=\"Disabled\">", ReadTab(source, "providers.tab.test"), StringComparison.Ordinal);
     }
 
     [Fact]
