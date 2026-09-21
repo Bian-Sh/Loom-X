@@ -1,0 +1,45 @@
+namespace LoomX.Plugins;
+
+/// <summary>Pipeline 执行结果：原样通过、已修改、被阻止（fail closed）。</summary>
+public enum PipelineOutcome
+{
+    Passed,
+    Modified,
+    Blocked,
+}
+
+/// <summary>
+/// Pipeline 处理结果。Blocked 时 Payload 为空且调用方必须映射为安全失败，
+/// 原始数据不得继续流动。Diagnostic 只允许安全摘要，不得包含原始敏感值。
+/// </summary>
+public sealed record PipelineResult(PipelineOutcome Outcome, string Payload, string? Diagnostic = null)
+{
+    public static PipelineResult Pass(string payload) => new(PipelineOutcome.Passed, payload);
+
+    public static PipelineResult Modify(string payload, string? diagnostic = null) =>
+        new(PipelineOutcome.Modified, payload, diagnostic);
+
+    public static PipelineResult Block(string diagnostic) =>
+        new(PipelineOutcome.Blocked, string.Empty, diagnostic);
+}
+
+/// <summary>单次 Pipeline 执行的上下文。</summary>
+public sealed record PipelineContext(
+    string PipelineId,
+    string? PluginId = null,
+    string? EntryId = null,
+    IReadOnlyDictionary<string, string>? Metadata = null);
+
+/// <summary>
+/// 宿主侧 Pipeline 抽象：调用方（AgentLoop、会话存储）只依赖本接口，
+/// Pipeline 为空时调用方保持原行为。
+/// </summary>
+public interface IPipeline
+{
+    string PipelineId { get; }
+
+    ExtensionKind Kind { get; }
+
+    /// <summary>按配置顺序执行启用的 Entry，返回最终处理结果。</summary>
+    ValueTask<PipelineResult> ExecuteAsync(string payload, CancellationToken cancellationToken = default);
+}

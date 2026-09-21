@@ -126,8 +126,20 @@ public static class LoomXHost
             return registry;
         });
 
+        // Router Plugin Pipeline：启动时完成插件发现、ALC 加载与 Pipeline 注册。
+        // 插件目录为应用输出下的 plugins/；插件自有数据（如脱敏规则）落在 %LOCALAPPDATA%\LoomX\plugins。
+        builder.Services.AddSingleton(services => LoomX.Plugins.Host.PluginRuntime.Start(
+            new LoomX.Plugins.Host.PluginRuntimeOptions
+            {
+                PluginDirectory = Path.Combine(AppContext.BaseDirectory, "plugins"),
+                DataRootDirectory = Path.Combine(AppDataPaths.RootDirectory, "plugins"),
+            },
+            services.GetRequiredService<ILoggerFactory>()));
+
         // 小助手（Phase 4）：会话门面与持久化
-        builder.Services.AddSingleton<Assistant.AssistantSessionStore>();
+        builder.Services.AddSingleton(services => new Assistant.AssistantSessionStore(
+            logger: services.GetRequiredService<ILogger<Assistant.AssistantSessionStore>>(),
+            persistencePipeline: services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>().GetPipeline("persistence")));
         builder.Services.AddSingleton(services => new Assistant.AssistantPreferencesStore(
             services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
             services.GetRequiredService<ILogger<Assistant.AssistantPreferencesStore>>()));

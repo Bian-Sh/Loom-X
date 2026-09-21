@@ -21,6 +21,7 @@ public sealed class AgentLoop
     private readonly ToolRegistry toolRegistry;
     private readonly ILogger<AgentLoop> logger;
     private readonly ToolApprovalGate? approvalGate;
+    private readonly LoomX.Plugins.IPipeline? toolResultPipeline;
     private readonly Func<Exception, string> failureFormatter;
     private readonly Func<int, string> maxStepsFormatter;
     private readonly Func<TimeSpan, CancellationToken, Task> retryDelay;
@@ -32,12 +33,14 @@ public sealed class AgentLoop
         ToolApprovalGate? approvalGate = null,
         Func<Exception, string>? failureFormatter = null,
         Func<int, string>? maxStepsFormatter = null,
-        Func<TimeSpan, CancellationToken, Task>? retryDelay = null)
+        Func<TimeSpan, CancellationToken, Task>? retryDelay = null,
+        LoomX.Plugins.IPipeline? toolResultPipeline = null)
     {
         this.modelClient = modelClient;
         this.toolRegistry = toolRegistry;
         this.logger = logger;
         this.approvalGate = approvalGate;
+        this.toolResultPipeline = toolResultPipeline;
         this.failureFormatter = failureFormatter ?? (exception => exception.Message);
         this.maxStepsFormatter = maxStepsFormatter ?? (steps => $"超过最大步骤数：{steps}");
         this.retryDelay = retryDelay ?? ((delay, token) => Task.Delay(delay, token));
@@ -238,6 +241,13 @@ public sealed class AgentLoop
                 }
 
                 result = result!.EnsureSafeFailure();
+                // Router Plugin Pipeline 挂载点：ToolResult 进入会话历史（进而推送模型）前脱敏。
+                // Pipeline 为空时行为与现状一致；数据安全处理失败 fail closed，原始内容不放行。
+                if (toolResultPipeline is not null)
+                {
+                    result = await ApplyToolResultPipelineAsync(result, safeToolCall, cancellationToken);
+                }
+
                 session.AddMessage(ChatMessage.ToolResult(safeToolCall, result.Content));
                 yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1] };
 
@@ -276,6 +286,39 @@ public sealed class AgentLoop
         {
             Detail = failedDetail ?? maxStepsFormatter(session.Options.MaxSteps),
         };
+    }
+
+    /// <summary>
+    /// Tool Result Pipeline：脱敏后返回替换结果；Pipeline 阻止或自身故障时 fail closed，
+    /// 原始内容不进入会话历史。
+    /// </summary>
+    private async Task<ToolResult> ApplyToolResultPipelineAsync(
+        ToolResult result, ToolCall safeToolCall, CancellationToken cancellationToken)
+    {
+        LoomX.Plugins.PipelineResult pipelineResult;
+        try
+        {
+            pipelineResult = await toolResultPipeline!.ExecuteAsync(result.Content, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Agent 工具结果 Pipeline 执行失败 {ToolName}", safeToolCall.Name);
+            return ToolResult.SafeFail("工具结果未通过数据安全处理。");
+        }
+
+        if (pipelineResult.Outcome == LoomX.Plugins.PipelineOutcome.Blocked)
+        {
+            logger.LogWarning("Agent 工具结果被数据安全 Pipeline 阻止 {ToolName}", safeToolCall.Name);
+            return ToolResult.SafeFail("工具结果未通过数据安全处理。");
+        }
+
+        return pipelineResult.Outcome == LoomX.Plugins.PipelineOutcome.Modified
+            ? result.WithSanitizedContent(pipelineResult.Payload)
+            : result;
     }
 
     /// <summary>仅在尚未产生流式事件时重试模型步骤；首次请求计入五次总尝试。</summary>

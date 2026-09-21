@@ -28,6 +28,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\LoomX\LoomX.csproj" />
+    <ProjectReference Include="..\LoomX.PluginHost\LoomX.PluginHost.csproj" />
+    <ProjectReference Include="..\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- 保留流程探针文件，但不纳入自动化测试，避免访问真实用户数据库。 -->

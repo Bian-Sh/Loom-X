@@ -37,6 +37,7 @@
     <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="3.119.0" />
     <PackageReference Include="Tomlyn" Version="2.10.1" />
     <ProjectReference Include="..\LoomX.Harness\LoomX.Harness.csproj" />
+    <ProjectReference Include="..\LoomX.PluginHost\LoomX.PluginHost.csproj" />
     <PackageReference Include="Avalonia" Version="11.3.20" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.20" />
@@ -52,4 +53,22 @@
     <Content Include="BrowserExtension\**\*.json" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="BrowserExtension\**\*.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- 第一方插件只作为负载拷贝到输出 plugins 目录供运行时动态发现，不做静态引用（验证 ALC 加载路径）。 -->
+    <ProjectReference Include="..\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="FirstPartyPlugin"
+                      PrivateAssets="all" />
+  </ItemGroup>
+  <Target Name="CopyFirstPartyPlugins" AfterTargets="Build">
+    <PropertyGroup>
+      <_PluginOutputDir>@(FirstPartyPlugin->'%(RootDir)%(Directory)')</_PluginOutputDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PluginPayload Include="$(_PluginOutputDir)*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PluginPayload)"
+          DestinationFolder="$(OutputPath)plugins\loomx.credential-protection\"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>

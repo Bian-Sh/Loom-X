@@ -37,6 +37,9 @@ public sealed record ToolResult
 
     public static ToolResult SafeFail(string error) => new(false, error, true);
 
+    /// <summary>用脱敏后的安全内容替换结果内容（保持 Success 语义；仅供 Pipeline 挂载点使用）。</summary>
+    internal ToolResult WithSanitizedContent(string content) => new(Success, content, FailureContentIsSafe);
+
     internal ToolResult EnsureSafeFailure() =>
         Success || FailureContentIsSafe ? this : SafeFail(UnsafeFailureMessage);
 }
