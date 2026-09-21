@@ -1530,6 +1530,7 @@
   <data name="release.notes.empty"><value>このバージョンにはリリースノートがありません。</value></data>
   <data name="settings.update.history.title"><value>リリース履歴</value></data>
   <data name="settings.update.history.refresh"><value>更新</value></data>
+  <data name="settings.update.history.open.release.tip"><value>このバージョンのリリースページを開きます。カードの他の部分をクリックすると更新内容を切り替えます</value></data>
   <data name="settings.update.history.loading"><value>リリース履歴を読み込んでいます…</value></data>
   <data name="settings.update.history.empty"><value>安定版リリースはありません。</value></data>
   <data name="settings.update.history.error.load"><value>リリース履歴を読み込めませんでした。もう一度お試しください。</value></data>

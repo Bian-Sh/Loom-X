@@ -1551,6 +1551,7 @@
   <data name="release.notes.empty"><value>此版本暫無發行說明。</value></data>
   <data name="settings.update.history.title"><value>版本歷史</value></data>
   <data name="settings.update.history.refresh"><value>重新整理</value></data>
+  <data name="settings.update.history.open.release.tip"><value>點擊前往此版本的發布頁；點擊卡片其他區域可切換更新說明</value></data>
   <data name="settings.update.history.loading"><value>正在載入版本歷史…</value></data>
   <data name="settings.update.history.empty"><value>暫無正式版本</value></data>
   <data name="settings.update.history.error.load"><value>無法載入版本歷史，請重試。</value></data>

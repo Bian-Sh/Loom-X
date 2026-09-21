@@ -272,21 +272,45 @@ public sealed class SettingsViewContractTests
         Assert.Contains("Command=\"{Binding CheckUpdateCommand}\"", source, StringComparison.Ordinal);
         Assert.Contains("Height=\"430\"", source, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"200,*\"", source, StringComparison.Ordinal);
-        Assert.Contains("Command=\"{Binding ReleaseHistory.RefreshCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsRefreshing}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Command=\"{Binding ReleaseHistory.RefreshCommand}\"", source, StringComparison.Ordinal);
         Assert.Contains("ItemsSource=\"{Binding ReleaseHistory.Releases}\"", source, StringComparison.Ordinal);
         Assert.Contains("SelectedItem=\"{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.CanShowLoadMore}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\" IsVisible=\"{Binding ReleaseHistory.HasMore}\"", source, StringComparison.Ordinal);
         Assert.Contains("<views:ReleaseNotesView DataContext=\"{Binding ReleaseHistory.Content}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"{l:Locale update.dialog.open_release}\"", source, StringComparison.Ordinal);
-        Assert.Contains("CommandParameter=\"{Binding ReleaseHistory.Content.ReleaseUrl}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Click=\"SelectedReleasePageButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("Cursor=\"Hand\"", source, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale settings.update.history.open.release.tip}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Tag=\"{Binding Release.HtmlUrl}\"", source, StringComparison.Ordinal);
+        Assert.Contains("PointerPressed=\"ReleaseVersion_OnPointerPressed\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"{l:Locale update.dialog.open_release}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectedReleasePageButton_OnClick", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsInitialLoading}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsEmpty}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.HasError}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.HasCachedContent}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsLoadingMore}\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 检查更新同时刷新版本历史()
+    {
+        var settingsViewModel = ReadDesktopFile("ViewModels", "SettingsViewModel.cs");
+        var releaseHistoryViewModel = ReadDesktopFile("ViewModels", "ReleaseHistoryViewModel.cs");
+
+        Assert.Contains("await ReleaseHistory.RefreshAsync();", settingsViewModel, StringComparison.Ordinal);
+        Assert.Contains("public Task RefreshAsync()", releaseHistoryViewModel, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 更新页压缩当前版本与历史标题区域()
+    {
+        var source = ReadDesktopFile("Views", "SettingsView.axaml");
+
+        Assert.Contains("<Border Classes=\"panel\" Padding=\"16,12\">", source, StringComparison.Ordinal);
+        Assert.Contains("<StackPanel Spacing=\"9\">", source, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"16,8\"", source, StringComparison.Ordinal);
     }
 
     private static void EnsureAvaloniaSetup()

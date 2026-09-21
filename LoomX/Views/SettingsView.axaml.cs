@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using System.Diagnostics;
 
@@ -14,9 +15,10 @@ public partial class SettingsView : UserControl
         catch { }
     }
 
-    private void SelectedReleasePageButton_OnClick(object? sender, RoutedEventArgs e)
+    private void ReleaseVersion_OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is Button { CommandParameter: string url }
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+        if (sender is Control { Tag: string url }
             && Uri.TryCreate(url, UriKind.Absolute, out var uri)
             && uri.Scheme == Uri.UriSchemeHttps)
             OpenLink(uri.AbsoluteUri);

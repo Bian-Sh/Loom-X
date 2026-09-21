@@ -605,6 +605,7 @@
   <data name="release.notes.empty"><value>No release notes are available for this version.</value></data>
   <data name="settings.update.history.title"><value>Release history</value></data>
   <data name="settings.update.history.refresh"><value>Refresh</value></data>
+  <data name="settings.update.history.open.release.tip"><value>Open this release page; click elsewhere on the card to switch release notes</value></data>
   <data name="settings.update.history.loading"><value>Loading release history…</value></data>
   <data name="settings.update.history.empty"><value>No stable releases are available.</value></data>
   <data name="settings.update.history.error.load"><value>Unable to load release history. Try again.</value></data>

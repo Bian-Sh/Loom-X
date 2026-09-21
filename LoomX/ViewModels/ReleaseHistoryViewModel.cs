@@ -138,7 +138,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
             token => hasLoaded ? Task.CompletedTask : LoadFirstPageAsync(isRefresh: false, token),
             cancellationToken);
 
-    private Task RefreshAsync() =>
+    public Task RefreshAsync() =>
         RunSerializedAsync(token => LoadFirstPageAsync(isRefresh: true, token));
 
     private Task LoadMoreAsync() =>

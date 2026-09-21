@@ -357,6 +357,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         try
         {
             var result = await updateCoordinator.CheckNowAsync(true);
+            await ReleaseHistory.RefreshAsync();
             Status = result?.Latest is null
                 ? string.Format(Loc("settings.update.check.status.latest"), VersionLabel)
                 : string.Format(Loc("settings.update.check.status.found"), result.Latest.Version);

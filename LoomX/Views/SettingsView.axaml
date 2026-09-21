@@ -57,25 +57,22 @@
       <TabItem Header="{l:Locale settings.tab.updates}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="12" Margin="0,14,8,20">
-            <Border Classes="panel" Padding="18">
-              <StackPanel Spacing="14">
-                <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="3"><TextBlock Text="{l:Locale settings.update.version.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.update.version.hint}" Classes="hint"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding VersionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
-                <CheckBox Content="{l:Locale settings.update.auto.check}" IsChecked="{Binding AutoCheckUpdates}"/><TextBlock Text="{l:Locale settings.update.auto.check.hint}" Classes="hint" Margin="24,-10,0,0"/>
-                <CheckBox Content="{l:Locale settings.update.use.proxy}" IsChecked="{Binding UseProxyForUpdates}"/><TextBlock Text="{l:Locale settings.update.use.proxy.hint}" Classes="hint" Margin="24,-10,0,0"/>
+            <Border Classes="panel" Padding="16,12">
+              <StackPanel Spacing="9">
+                <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="2"><TextBlock Text="{l:Locale settings.update.version.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.update.version.hint}" Classes="hint"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding VersionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
+                <CheckBox Content="{l:Locale settings.update.auto.check}" IsChecked="{Binding AutoCheckUpdates}"/><TextBlock Text="{l:Locale settings.update.auto.check.hint}" Classes="hint" Margin="24,-7,0,0"/>
+                <CheckBox Content="{l:Locale settings.update.use.proxy}" IsChecked="{Binding UseProxyForUpdates}"/><TextBlock Text="{l:Locale settings.update.use.proxy.hint}" Classes="hint" Margin="24,-7,0,0"/>
                 <Button Content="{l:Locale settings.update.check.button}" Command="{Binding CheckUpdateCommand}" Classes="outline" HorizontalAlignment="Left" IsEnabled="{Binding IsNotBusy}"/>
               </StackPanel>
             </Border>
             <Border Classes="panel" Height="430" ClipToBounds="True">
               <Grid RowDefinitions="Auto,1,*">
-                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="16,12">
-                  <StackPanel Spacing="3">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="16,8">
+                  <StackPanel Spacing="2">
                     <TextBlock Text="{l:Locale settings.update.history.title}" FontWeight="SemiBold"/>
                     <TextBlock Text="{Binding ReleaseHistory.ErrorText}" IsVisible="{Binding ReleaseHistory.HasCachedContent}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"/>
                   </StackPanel>
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <ProgressBar Width="70" IsIndeterminate="True" IsVisible="{Binding ReleaseHistory.IsRefreshing}"/>
-                    <Button Content="{l:Locale settings.update.history.refresh}" Command="{Binding ReleaseHistory.RefreshCommand}" Classes="outline"/>
-                  </StackPanel>
+                  <ProgressBar Grid.Column="1" Width="70" IsIndeterminate="True" IsVisible="{Binding ReleaseHistory.IsRefreshing}" VerticalAlignment="Center"/>
                 </Grid>
                 <Border Grid.Row="1" Background="{DynamicResource BorderBrush}"/>
                 <Grid Grid.Row="2">
@@ -85,7 +82,12 @@
                         <ListBox.ItemTemplate>
                           <DataTemplate>
                             <Grid RowDefinitions="Auto,Auto" Margin="4,6" ColumnDefinitions="*,Auto">
-                              <TextBlock Text="{Binding VersionText}" FontWeight="SemiBold"/>
+                              <TextBlock Text="{Binding VersionText}"
+                                         FontWeight="SemiBold"
+                                         Cursor="Hand"
+                                         Tag="{Binding Release.HtmlUrl}"
+                                         ToolTip.Tip="{l:Locale settings.update.history.open.release.tip}"
+                                         PointerPressed="ReleaseVersion_OnPointerPressed"/>
                               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
                                 <Border IsVisible="{Binding IsLatest}" Background="{DynamicResource AccentSoftBrush}" CornerRadius="5" Padding="5,1"><TextBlock Text="{Binding LatestBadgeText}" Foreground="{DynamicResource AccentBrush}" FontSize="10"/></Border>
                                 <Border IsVisible="{Binding IsCurrent}" Background="{DynamicResource SuccessSoftBrush}" CornerRadius="5" Padding="5,1"><TextBlock Text="{Binding CurrentBadgeText}" Foreground="{DynamicResource SuccessBrush}" FontSize="10"/></Border>
@@ -101,18 +103,11 @@
                       </StackPanel>
                     </Grid>
                     <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="16,12,16,16">
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,10">
-                        <StackPanel Spacing="3">
+                      <Grid Margin="0,0,0,8">
+                        <StackPanel Spacing="2">
                           <TextBlock Text="{Binding ReleaseHistory.Content.Title}" FontSize="16" FontWeight="SemiBold"/>
                           <TextBlock Text="{Binding ReleaseHistory.Content.PublishedAtText}" Classes="hint"/>
                         </StackPanel>
-                        <Button Grid.Column="1"
-                                Content="{l:Locale update.dialog.open_release}"
-                                CommandParameter="{Binding ReleaseHistory.Content.ReleaseUrl}"
-                                Click="SelectedReleasePageButton_OnClick"
-                                IsVisible="{Binding ReleaseHistory.Content.HasContent}"
-                                Classes="outline"
-                                VerticalAlignment="Top"/>
                       </Grid>
                       <views:ReleaseNotesView DataContext="{Binding ReleaseHistory.Content}" Grid.Row="1"/>
                     </Grid>
