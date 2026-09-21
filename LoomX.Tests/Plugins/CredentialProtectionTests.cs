@@ -207,11 +207,11 @@ public sealed class CredentialProtectionTests : IDisposable
     [Fact]
     public async Task ProcessingFailure_BlocksRawData()
     {
-        var extension = new CredentialToolResultExtension(new ThrowingEngine(dataDirectory));
+        var extension = new CredentialRequestExtension(new ThrowingEngine(dataDirectory));
         const string payload = "raw sk-abcdefghij0123456789abcd";
 
-        var result = await extension.ProcessToolResultAsync(
-            new PipelineContext("tool-result"), payload, CancellationToken.None);
+        var result = await extension.ProcessRequestAsync(
+            new PipelineContext("request"), payload, CancellationToken.None);
 
         Assert.Equal(PipelineOutcome.Blocked, result.Outcome);
         Assert.Empty(result.Payload);

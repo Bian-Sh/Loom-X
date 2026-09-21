@@ -6,7 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <ProjectReference Include="..\LoomX.Plugin.Abstractions\LoomX.Plugin.Abstractions.csproj" />
     <InternalsVisibleTo Include="LoomX" />
     <InternalsVisibleTo Include="LoomX.Tests" />
   </ItemGroup>

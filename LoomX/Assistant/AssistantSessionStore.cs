@@ -38,18 +38,15 @@ public sealed class AssistantSessionStore
 
     private readonly string rootDirectory;
     private readonly ILogger<AssistantSessionStore>? logger;
-    private readonly LoomX.Plugins.IPipeline? persistencePipeline;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> writeLocks = new();
     private readonly SemaphoreSlim titleLock = new(1, 1);
 
     public AssistantSessionStore(
         string? rootDirectory = null,
-        ILogger<AssistantSessionStore>? logger = null,
-        LoomX.Plugins.IPipeline? persistencePipeline = null)
+        ILogger<AssistantSessionStore>? logger = null)
     {
         this.rootDirectory = rootDirectory ?? Path.Combine(AppDataPaths.RootDirectory, "AssistantSessions");
         this.logger = logger;
-        this.persistencePipeline = persistencePipeline;
     }
 
     /// <summary>
@@ -211,34 +208,6 @@ public sealed class AssistantSessionStore
                 item["parent_id"] = parentId;
                 parentId = item["id"]?.GetValue<string>();
                 pending[index] = item.ToJsonString(StoreJsonOptions);
-            }
-
-            // Router Plugin Pipeline 挂载点：落盘前持久化清理（每条 JSONL 单独过 Pipeline，
-            // 保留单行 JSON 语义）。数据安全处理失败 fail closed：跳过本次落盘，原始内容不写入。
-            if (persistencePipeline is not null)
-            {
-                for (var index = 0; index < pending.Count; index++)
-                {
-                    LoomX.Plugins.PipelineResult pipelineResult;
-                    try
-                    {
-                        pipelineResult = await persistencePipeline.ExecuteAsync(pending[index], cancellationToken);
-                    }
-                    catch (OperationCanceledException) { throw; }
-                    catch (Exception exception)
-                    {
-                        logger?.LogError(exception, "AI 助手会话 {SessionId} 持久化 Pipeline 执行失败，已跳过落盘", session.Id);
-                        throw new InvalidOperationException("会话内容未完成数据安全处理，已拒绝保存。");
-                    }
-
-                    if (pipelineResult.Outcome == LoomX.Plugins.PipelineOutcome.Blocked)
-                    {
-                        logger?.LogError("AI 助手会话 {SessionId} 被持久化 Pipeline 阻止落盘", session.Id);
-                        throw new InvalidOperationException("会话内容未通过数据安全处理，已拒绝保存。");
-                    }
-
-                    pending[index] = pipelineResult.Payload;
-                }
             }
 
             var append = string.Join('\n', pending) + '\n';

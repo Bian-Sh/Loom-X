@@ -3,8 +3,8 @@ using LoomX.Plugins;
 namespace LoomX.CredentialProtection;
 
 /// <summary>
-/// 第一方 Credential Protection 插件：在数据进入 LLM 上下文、持久化或日志边界前
-/// 完成凭据检测与脱敏。规则数据 Plugin-owned，脱敏失败 fail closed。
+/// 第一方 Credential Protection Router 插件：在请求正文离开本地安全边界、
+/// 发送给外部 Provider 前完成凭据检测与脱敏。规则数据 Plugin-owned，脱敏失败 fail closed。
 /// </summary>
 public sealed class CredentialProtectionPlugin : ILoomXPlugin
 {
@@ -30,8 +30,7 @@ public sealed class CredentialProtectionPlugin : ILoomXPlugin
         var store = ruleStore ?? new SensitiveRuleStore(
             Path.Combine(Path.GetTempPath(), PluginId));
         var engine = new CredentialEngine(store);
-        yield return new CredentialToolResultExtension(engine);
-        yield return new CredentialPersistenceExtension(engine);
+        yield return new CredentialRequestExtension(engine);
     }
 }
 
@@ -65,28 +64,15 @@ public abstract class CredentialExtensionBase(CredentialEngine engine) : IPipeli
     }
 }
 
-/// <summary>工具结果扩展点：ToolResult 进入会话历史前脱敏。</summary>
-public sealed class CredentialToolResultExtension(CredentialEngine engine)
-    : CredentialExtensionBase(engine), IToolResultExtension
+/// <summary>Router 请求扩展点：请求正文发送给外部 Provider 前脱敏。</summary>
+public sealed class CredentialRequestExtension(CredentialEngine engine)
+    : CredentialExtensionBase(engine), IRequestExtension
 {
-    public override string ExtensionId => "credential.tool-result";
+    public override string ExtensionId => "credential.request";
 
-    public override ExtensionKind Kind => ExtensionKind.ToolResult;
+    public override ExtensionKind Kind => ExtensionKind.Request;
 
-    public ValueTask<PipelineResult> ProcessToolResultAsync(
-        PipelineContext context, string payload, CancellationToken cancellationToken) =>
-        Process(payload);
-}
-
-/// <summary>持久化扩展点：会话内容写入存储前清理。</summary>
-public sealed class CredentialPersistenceExtension(CredentialEngine engine)
-    : CredentialExtensionBase(engine), IPersistenceExtension
-{
-    public override string ExtensionId => "credential.persistence";
-
-    public override ExtensionKind Kind => ExtensionKind.Persistence;
-
-    public ValueTask<PipelineResult> ProcessPersistenceAsync(
+    public ValueTask<PipelineResult> ProcessRequestAsync(
         PipelineContext context, string payload, CancellationToken cancellationToken) =>
         Process(payload);
 }

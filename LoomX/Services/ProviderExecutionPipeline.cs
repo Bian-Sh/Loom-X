@@ -4,6 +4,8 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using LoomX.Plugins;
+using Microsoft.Extensions.Logging;
 
 namespace LoomX.Services;
 
@@ -68,7 +70,9 @@ public interface IProviderExecutionPipeline
 /// 统一的 Provider 请求后半段：发送、读取响应、收集元数据和协议级轻量规范化。
 /// 不记录请求或响应正文，调用方负责将结果映射到自己的入口协议。
 /// </summary>
-public sealed class ProviderExecutionPipeline : IProviderExecutionPipeline
+public sealed class ProviderExecutionPipeline(
+    ILogger<ProviderExecutionPipeline>? logger = null,
+    IPipeline? requestPipeline = null) : IProviderExecutionPipeline
 {
     public async Task<ProviderStreamingResult> ExecuteStreamingAsync(
         HttpClient httpClient,
@@ -80,6 +84,7 @@ public sealed class ProviderExecutionPipeline : IProviderExecutionPipeline
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(context);
 
+        await ApplyRequestPipelineAsync(request, context, cancellationToken);
         var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         try
         {
@@ -114,6 +119,7 @@ public sealed class ProviderExecutionPipeline : IProviderExecutionPipeline
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(context);
 
+        await ApplyRequestPipelineAsync(request, context, cancellationToken);
         using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         var headers = CaptureHeaders(response);
         var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
@@ -132,6 +138,87 @@ public sealed class ProviderExecutionPipeline : IProviderExecutionPipeline
         }
 
         return new ProviderExecutionResult(response.StatusCode, contentType, headers, body, normalized);
+    }
+
+    /// <summary>
+    /// Router Request Pipeline：只处理请求正文，不向插件暴露或修改 Router 管理的认证 Header。
+    /// Blocked 或执行异常时 fail closed，原始正文不会发送给上游。
+    /// </summary>
+    private async Task ApplyRequestPipelineAsync(
+        HttpRequestMessage request,
+        ProviderExecutionContext context,
+        CancellationToken cancellationToken)
+    {
+        if (requestPipeline is null || request.Content is null) return;
+
+        string payload;
+        try
+        {
+            payload = await request.Content.ReadAsStringAsync(cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(
+                exception,
+                "Router 请求正文读取失败，已阻止发送 {ProviderId}/{ModelId} {Path}",
+                context.ProviderId,
+                context.ModelId,
+                context.UpstreamPath);
+            throw new InvalidOperationException("Router 请求正文未完成数据安全处理，已阻止发送。", exception);
+        }
+
+        PipelineResult result;
+        try
+        {
+            result = await requestPipeline.ExecuteAsync(payload, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(
+                exception,
+                "Router Request Pipeline 执行失败，已阻止发送 {ProviderId}/{ModelId} {Path}",
+                context.ProviderId,
+                context.ModelId,
+                context.UpstreamPath);
+            throw new InvalidOperationException("Router 请求未完成数据安全处理，已阻止发送。", exception);
+        }
+
+        if (result.Outcome == PipelineOutcome.Blocked)
+        {
+            logger?.LogWarning(
+                "Router Request Pipeline 阻止请求发送 {ProviderId}/{ModelId} {Path}",
+                context.ProviderId,
+                context.ModelId,
+                context.UpstreamPath);
+            throw new InvalidOperationException("Router 请求未通过数据安全处理，已阻止发送。");
+        }
+
+        if (result.Outcome != PipelineOutcome.Modified) return;
+
+        var originalContent = request.Content;
+        var replacement = new ByteArrayContent(Encoding.UTF8.GetBytes(result.Payload));
+        foreach (var header in originalContent.Headers)
+        {
+            if (string.Equals(header.Key, "Content-Length", StringComparison.OrdinalIgnoreCase)) continue;
+            replacement.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+
+        request.Content = replacement;
+        originalContent.Dispose();
+        logger?.LogInformation(
+            "Router Request Pipeline 已处理请求正文 {ProviderId}/{ModelId} {Path} {PayloadBytes}",
+            context.ProviderId,
+            context.ModelId,
+            context.UpstreamPath,
+            Encoding.UTF8.GetByteCount(result.Payload));
     }
 
     private static bool TryDecompress(

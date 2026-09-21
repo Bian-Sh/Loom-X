@@ -19,21 +19,21 @@ public interface IPipelineExtension
     IReadOnlyList<string> Capabilities { get; }
 }
 
-/// <summary>Provider 请求扩展点（首版只声明不挂载）。</summary>
+/// <summary>Router Provider 请求正文扩展点：完整请求构造后、发送给外部 Provider 前执行。</summary>
 public interface IRequestExtension : IPipelineExtension
 {
     ValueTask<PipelineResult> ProcessRequestAsync(
         PipelineContext context, string payload, CancellationToken cancellationToken);
 }
 
-/// <summary>工具结果扩展点：ToolResult 进入会话历史前执行。</summary>
+/// <summary>Router 结构化 Tool Result 扩展点（候选契约，生产挂载留待后续 change）。</summary>
 public interface IToolResultExtension : IPipelineExtension
 {
     ValueTask<PipelineResult> ProcessToolResultAsync(
         PipelineContext context, string payload, CancellationToken cancellationToken);
 }
 
-/// <summary>持久化扩展点：会话内容写入存储前执行。</summary>
+/// <summary>Router 持久化扩展点（候选契约，待 Router audit/cache/trace 存储出现后挂载）。</summary>
 public interface IPersistenceExtension : IPipelineExtension
 {
     ValueTask<PipelineResult> ProcessPersistenceAsync(

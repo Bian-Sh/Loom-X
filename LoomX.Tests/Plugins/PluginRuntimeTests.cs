@@ -69,16 +69,15 @@ public sealed class PluginRuntimeTests : IDisposable
 
         var info = Assert.Single(runtime.PluginInfos);
         Assert.Equal("loomx.credential-protection", info.Id);
-        Assert.Equal(2, info.ExtensionCount);
+        Assert.Equal(1, info.ExtensionCount);
         Assert.Empty(runtime.Diagnostics);
-        Assert.NotNull(runtime.GetPipeline("tool-result"));
-        Assert.NotNull(runtime.GetPipeline("persistence"));
+        Assert.NotNull(runtime.GetPipeline("request"));
 
         // 契约隔离：插件程序集加载在独立 ALC（与静态引用副本不同），
         // 但契约类型身份共享——extension 可直接 cast 到宿主侧契约接口。
-        var extension = runtime.Pipelines["tool-result"].Entries[0].Extension;
+        var extension = runtime.Pipelines["request"].Entries[0].Extension;
         Assert.NotSame(typeof(CredentialProtectionPlugin).Assembly, extension.GetType().Assembly);
-        Assert.IsAssignableFrom<IToolResultExtension>(extension);
+        Assert.IsAssignableFrom<IRequestExtension>(extension);
     }
 
     [Fact]
@@ -101,7 +100,7 @@ public sealed class PluginRuntimeTests : IDisposable
     {
         StageCredentialProtectionPlugin();
         var runtime = StartRuntime();
-        var pipeline = runtime.GetPipeline("tool-result")!;
+        var pipeline = runtime.GetPipeline("request")!;
         const string payload = """{"api_key":"sk-abcdefghij0123456789abcd"}""";
 
         runtime.SetPluginEnabled("loomx.credential-protection", false);
@@ -120,14 +119,14 @@ public sealed class PluginRuntimeTests : IDisposable
     {
         StageCredentialProtectionPlugin();
         var runtime = StartRuntime();
-        var pipeline = runtime.GetPipeline("tool-result")!;
+        var pipeline = runtime.GetPipeline("request")!;
         const string payload = """{"api_key":"sk-abcdefghij0123456789abcd"}""";
 
-        runtime.SetEntryEnabled("loomx.credential-protection", "credential.tool-result", false);
+        runtime.SetEntryEnabled("loomx.credential-protection", "credential.request", false);
         var result = await pipeline.ExecuteAsync(payload);
         Assert.Equal(PipelineOutcome.Passed, result.Outcome);
 
-        runtime.SetEntryEnabled("loomx.credential-protection", "credential.tool-result", true);
+        runtime.SetEntryEnabled("loomx.credential-protection", "credential.request", true);
         var reenabled = await pipeline.ExecuteAsync(payload);
         Assert.Equal(PipelineOutcome.Modified, reenabled.Outcome);
     }

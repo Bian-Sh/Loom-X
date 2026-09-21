@@ -50,7 +50,6 @@ public static class LoomXHost
         builder.Services.AddSingleton<Assistant.Configuration.ITomlDocumentService, Assistant.Configuration.TomlDocumentService>();
         builder.Services.AddSingleton<IAnthropicRequestFactory, AnthropicRequestFactory>();
         builder.Services.AddSingleton<IAnthropicResponseMapper, AnthropicResponseMapper>();
-        builder.Services.AddSingleton<IProviderExecutionPipeline, ProviderExecutionPipeline>();
         builder.Services.AddHttpClient<IAnthropicProxyClient, AnthropicProxyClient>();
         builder.Services.AddHttpClient<IProtocolPassthroughClient, ProtocolPassthroughClient>();
         builder.Services.AddSingleton<ActivityStore>();
@@ -135,11 +134,13 @@ public static class LoomXHost
                 DataRootDirectory = Path.Combine(AppDataPaths.RootDirectory, "plugins"),
             },
             services.GetRequiredService<ILoggerFactory>()));
+        builder.Services.AddSingleton<IProviderExecutionPipeline>(services => new ProviderExecutionPipeline(
+            services.GetRequiredService<ILogger<ProviderExecutionPipeline>>(),
+            services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>().GetPipeline("request")));
 
-        // 小助手（Phase 4）：会话门面与持久化
-        builder.Services.AddSingleton(services => new Assistant.AssistantSessionStore(
-            logger: services.GetRequiredService<ILogger<Assistant.AssistantSessionStore>>(),
-            persistencePipeline: services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>().GetPipeline("persistence")));
+        // 小助手（Phase 4）：会话门面与持久化。小助手作为 Router 客户，通过
+        // IProviderExecutionPipeline 自动获得 Router 插件收益，不直接依赖 PluginRuntime。
+        builder.Services.AddSingleton<Assistant.AssistantSessionStore>();
         builder.Services.AddSingleton(services => new Assistant.AssistantPreferencesStore(
             services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
             services.GetRequiredService<ILogger<Assistant.AssistantPreferencesStore>>()));

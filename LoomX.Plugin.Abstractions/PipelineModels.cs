@@ -31,8 +31,8 @@ public sealed record PipelineContext(
     IReadOnlyDictionary<string, string>? Metadata = null);
 
 /// <summary>
-/// 宿主侧 Pipeline 抽象：调用方（AgentLoop、会话存储）只依赖本接口，
-/// Pipeline 为空时调用方保持原行为。
+/// Router 宿主侧 Pipeline 抽象。具体 Router 生命周期边界只依赖本接口；
+/// Pipeline 为空时保持原行为。
 /// </summary>
 public interface IPipeline
 {

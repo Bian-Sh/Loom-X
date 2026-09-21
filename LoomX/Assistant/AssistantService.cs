@@ -33,7 +33,6 @@ public sealed class AssistantService
     private readonly AssistantPreferencesStore? preferencesStore;
     private readonly IUserDecisionBroker userDecisionBroker;
     private readonly BrowserBridgeLeaseManager? browserBridgeLeaseManager;
-    private readonly LoomX.Plugins.Host.PluginRuntime? pluginRuntime;
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantService> logger;
     private readonly SemaphoreSlim runLock = new(1, 1);
@@ -48,8 +47,7 @@ public sealed class AssistantService
         ILoggerFactory loggerFactory,
         AssistantPreferencesStore? preferencesStore,
         IUserDecisionBroker userDecisionBroker,
-        BrowserBridgeLeaseManager? browserBridgeLeaseManager = null,
-        LoomX.Plugins.Host.PluginRuntime? pluginRuntime = null)
+        BrowserBridgeLeaseManager? browserBridgeLeaseManager = null)
     {
         this.modelClientFactory = modelClientFactory;
         this.toolRegistry = toolRegistry;
@@ -58,7 +56,6 @@ public sealed class AssistantService
         this.preferencesStore = preferencesStore;
         this.userDecisionBroker = userDecisionBroker;
         this.browserBridgeLeaseManager = browserBridgeLeaseManager;
-        this.pluginRuntime = pluginRuntime;
         logger = loggerFactory.CreateLogger<AssistantService>();
         CurrentSession = CreateSession();
     }
@@ -288,8 +285,7 @@ public sealed class AssistantService
                     ? BuildApprovalGate()
                     : null;
                 var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate,
-                    ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded,
-                    toolResultPipeline: pluginRuntime?.GetPipeline("tool-result"));
+                    ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded);
                 await using var enumerator = loop
                     .RunAsync(runSession, userMessage, runCancellation.Token)
                     .GetAsyncEnumerator(runCancellation.Token);
