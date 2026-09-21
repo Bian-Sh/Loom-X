@@ -138,7 +138,7 @@
     <value>測試連接</value>
   </data>
   <data name="settings.update.version.label">
-    <value>當前版本</value>
+    <value>當前版本：</value>
   </data>
   <data name="settings.update.version.hint">
     <value>本地桌面端版本信息。</value>

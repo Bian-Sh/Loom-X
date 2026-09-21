@@ -138,7 +138,7 @@
     <value>接続テスト</value>
   </data>
   <data name="settings.update.version.label">
-    <value>現在のバージョン</value>
+    <value>現在のバージョン：</value>
   </data>
   <data name="settings.update.version.hint">
     <value>ローカルデスクトップアプリのバージョン情報。</value>

@@ -48,7 +48,7 @@
   <data name="settings.proxy.password.clear"><value>Clear saved password</value></data>
   <data name="settings.proxy.status.label"><value>Proxy status</value></data>
   <data name="settings.proxy.test.button"><value>Test proxy</value></data>
-  <data name="settings.update.version.label"><value>Current version</value></data>
+  <data name="settings.update.version.label"><value>Current version:</value></data>
   <data name="settings.update.version.hint"><value>Version information for the local desktop app.</value></data>
   <data name="settings.update.auto.check"><value>Check for updates automatically</value></data>
   <data name="settings.update.auto.check.hint"><value>Check on startup and every 24 hours while the app is running. Compatible updates download in the background and wait for your confirmation to install.</value></data>

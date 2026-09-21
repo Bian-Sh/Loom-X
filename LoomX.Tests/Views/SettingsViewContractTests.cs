@@ -341,6 +341,29 @@ public sealed class SettingsViewContractTests
         Assert.Contains("Margin=\"16,8\"", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void 更新页当前版本与检查按钮使用紧凑对齐布局()
+    {
+        var source = ReadDesktopFile("Views", "SettingsView.axaml");
+        var zhCn = ReadDesktopFile("Resources", "Strings.resx");
+        var zhTw = ReadDesktopFile("Resources", "Strings.zh-TW.resx");
+        var enUs = ReadDesktopFile("Resources", "Strings.en-US.resx");
+        var jaJp = ReadDesktopFile("Resources", "Strings.ja-JP.resx");
+
+        Assert.Contains("<Grid ColumnDefinitions=\"Auto,*\" ColumnSpacing=\"4\">", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.update.version.hint}\" Classes=\"hint\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid ColumnDefinitions=\"*,Auto\" ColumnSpacing=\"12\">", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.update.use.proxy.hint}\" Classes=\"hint\" Margin=\"24,-7,0,0\" VerticalAlignment=\"Bottom\"", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"1\" Content=\"{l:Locale settings.update.check.button}\"", source, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Right\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsEnabled=\"{Binding IsNotBusy}\"", source, StringComparison.Ordinal);
+        Assert.Contains("VerticalAlignment=\"Bottom\"", source, StringComparison.Ordinal);
+        Assert.Contains("<value>当前版本：</value>", zhCn, StringComparison.Ordinal);
+        Assert.Contains("<value>當前版本：</value>", zhTw, StringComparison.Ordinal);
+        Assert.Contains("<value>Current version:</value>", enUs, StringComparison.Ordinal);
+        Assert.Contains("<value>現在のバージョン：</value>", jaJp, StringComparison.Ordinal);
+    }
+
     private static void EnsureAvaloniaSetup()
     {
         AvaloniaTestBootstrap.Ensure();
