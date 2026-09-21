@@ -1,4 +1,6 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 using System.Text.Json.Nodes;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
@@ -27,7 +29,12 @@ public sealed record AssistantSessionSummary(
 /// </summary>
 public sealed class AssistantSessionStore
 {
-    private static readonly JsonSerializerOptions StoreJsonOptions = new() { WriteIndented = false };
+    private static readonly JsonSerializerOptions StoreJsonOptions = new()
+    {
+        WriteIndented = false,
+        // JSONL 是独立 UTF-8 文件，不需要为嵌入 HTML 转义中文；保留 JSON 必需的控制字符转义。
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+    };
 
     private readonly string rootDirectory;
     private readonly ILogger<AssistantSessionStore>? logger;

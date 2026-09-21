@@ -48,6 +48,42 @@ public sealed class AssistantSessionStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Save_JsonlUsesReadableUtf8ChineseAndKeepsSensitiveToolArgumentsHidden()
+    {
+        const string secret = "private-tool-secret";
+        var session = new AgentSession();
+        session.RestoreMessage(ChatMessage.User("用户主动测试"));
+        session.RestoreMessage(ChatMessage.AssistantToolCalls(
+            [new ToolCall("call-1", "loomx.inspect", $$"""{"api_key":"{{secret}}"}""")],
+            "准备调用工具"));
+        session.RecordActivity(AgentEvent.Create(session.Id, AgentEventKind.ToolCallCompleted) with
+        {
+            ToolName = "loomx.inspect",
+            Success = false,
+            Detail = "工具调用失败：连接超时",
+        });
+        session.RestoreMessage(ChatMessage.Assistant("已确认失败原因。"));
+        session.MarkFailed();
+
+        await store.SaveAsync(session);
+
+        var path = Path.Combine(rootDirectory, session.Id + ".jsonl");
+        var jsonl = await File.ReadAllTextAsync(path);
+        Assert.Contains("用户主动测试", jsonl, StringComparison.Ordinal);
+        Assert.Contains("准备调用工具", jsonl, StringComparison.Ordinal);
+        Assert.Contains("工具调用失败：连接超时", jsonl, StringComparison.Ordinal);
+        Assert.Contains("已确认失败原因。", jsonl, StringComparison.Ordinal);
+        Assert.Contains("参数已隐藏", jsonl, StringComparison.Ordinal);
+        Assert.DoesNotContain("\\u7528\\u6237", jsonl, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(secret, jsonl, StringComparison.Ordinal);
+
+        var loaded = await store.LoadAsync(session.Id);
+        Assert.NotNull(loaded);
+        Assert.Equal("用户主动测试", loaded.Messages[0].Content);
+        Assert.Equal("已确认失败原因。", loaded.Messages[^1].Content);
+    }
+
+    [Fact]
     public async Task SaveLoad_RunningState_RestoredAsCancelled()
     {
         var session = new AgentSession();
