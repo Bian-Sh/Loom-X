@@ -964,10 +964,58 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
             var arguments = Arguments.Length == 0 ? "{}" : Arguments.ToString();
             if (!IsCompleteJsonObject(arguments))
             {
-                throw InvalidResponsesException("模型工具调用参数不完整，未进入工具执行。");
+                if (TryRecoverCompleteJsonObject(arguments, out var recovered))
+                {
+                    arguments = recovered;
+                }
+                else
+                {
+                    var errorPosition = GetJsonErrorPosition(arguments);
+                    var firstCode = arguments.Length == 0 ? -1 : arguments[0];
+                    var lastCode = arguments.Length == 0 ? -1 : arguments[^1];
+                    throw InvalidResponsesException(
+                        $"模型工具调用参数不完整，未进入工具执行（长度 {arguments.Length}，错误位置 {errorPosition}，首尾字符 {firstCode}/{lastCode}）。");
+                }
             }
 
             return new ToolCall(Id, Name, arguments);
+        }
+
+        private static bool TryRecoverCompleteJsonObject(string value, out string recovered)
+        {
+            for (var start = 1; start < value.Length; start++)
+            {
+                if (value[start] != '{') continue;
+                var candidate = value[start..].Trim();
+                if (!IsCompleteJsonObject(candidate)) continue;
+                recovered = candidate;
+                return true;
+            }
+
+            for (var end = value.Length - 1; end > 0; end--)
+            {
+                if (value[end - 1] != '}') continue;
+                var candidate = value[..end].Trim();
+                if (!IsCompleteJsonObject(candidate)) continue;
+                recovered = candidate;
+                return true;
+            }
+
+            recovered = string.Empty;
+            return false;
+        }
+
+        private static long GetJsonErrorPosition(string value)
+        {
+            try
+            {
+                JsonNode.Parse(value);
+                return -1;
+            }
+            catch (JsonException exception)
+            {
+                return exception.BytePositionInLine ?? -1;
+            }
         }
 
         private static bool IsCompleteJsonObject(string value)
