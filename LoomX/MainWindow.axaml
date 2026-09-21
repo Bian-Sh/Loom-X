@@ -146,10 +146,10 @@
       <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
     <Style Selector="Button.update-entry:pointerover">
-      <Setter Property="Width" Value="96" />
+      <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Button.update-entry:focus">
-      <Setter Property="Width" Value="96" />
+      <Setter Property="Width" Value="NaN" />
     </Style>
     <Style Selector="Button.update-entry /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
@@ -158,21 +158,21 @@
       <Setter Property="CornerRadius" Value="8" />
     </Style>
     <Style Selector="Border.update-entry-text">
-      <Setter Property="Width" Value="0" />
+      <Setter Property="MaxWidth" Value="0" />
       <Setter Property="Opacity" Value="0" />
       <Setter Property="Transitions">
         <Transitions>
-          <DoubleTransition Property="Width" Duration="0:0:0.18" Easing="CubicEaseOut" />
+          <DoubleTransition Property="MaxWidth" Duration="0:0:0.18" Easing="CubicEaseOut" />
           <DoubleTransition Property="Opacity" Duration="0:0:0.14" Easing="CubicEaseOut" />
         </Transitions>
       </Setter>
     </Style>
     <Style Selector="Button.update-entry:pointerover Border.update-entry-text">
-      <Setter Property="Width" Value="64" />
+      <Setter Property="MaxWidth" Value="200" />
       <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Button.update-entry:focus Border.update-entry-text">
-      <Setter Property="Width" Value="64" />
+      <Setter Property="MaxWidth" Value="200" />
       <Setter Property="Opacity" Value="1" />
     </Style>
     <Style Selector="Path.update-entry-arrow">
@@ -270,7 +270,7 @@
                   ToolTip.Tip="{Binding Update.UpdateEntryHint}"
                   AutomationProperties.Name="{Binding Update.UpdateEntryHint}">
             <Grid ClipToBounds="True">
-              <Border Background="{DynamicResource SurfaceMutedBrush}" IsVisible="{Binding Update.IsPreparing}" CornerRadius="8" IsHitTestVisible="False" />
+              <Border Background="{DynamicResource UpdateEntryActiveBrush}" IsVisible="{Binding Update.IsPreparing}" CornerRadius="8" IsHitTestVisible="False" />
               <Border Background="{DynamicResource AccentSoftBrush}" IsVisible="{Binding Update.IsReady}" CornerRadius="8" IsHitTestVisible="False" />
               <Border Background="{DynamicResource DangerSoftBrush}" IsVisible="{Binding Update.IsError}" CornerRadius="8" IsHitTestVisible="False" />
               <Grid ColumnDefinitions="32,Auto">
@@ -294,7 +294,7 @@
                           HorizontalAlignment="Center" VerticalAlignment="Center"
                           IsVisible="{Binding Update.IsError}" />
                 <Border Grid.Column="1" Classes="update-entry-text" ClipToBounds="True">
-                  <TextBlock Text="{Binding Update.UpdateEntryHint}" Margin="0,0,12,0"
+                  <TextBlock Text="{Binding Update.UpdateEntryHint}" MinWidth="28" Margin="0,0,12,0"
                              Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"
                              TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
                 </Border>

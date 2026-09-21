@@ -20,6 +20,7 @@
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#8A969B" />
       <SolidColorBrush x:Key="AccentBrush" Color="#287C83" />
       <SolidColorBrush x:Key="AccentSoftBrush" Color="#DCEEEF" />
+      <SolidColorBrush x:Key="UpdateEntryActiveBrush" Color="#FF5FB8EA" />
       <SolidColorBrush x:Key="SuccessBrush" Color="#2D8666" />
       <SolidColorBrush x:Key="SuccessSoftBrush" Color="#E8F4EE" />
       <SolidColorBrush x:Key="SuccessBorderBrush" Color="#B8DCC8" />
@@ -54,6 +55,7 @@
       <SolidColorBrush x:Key="TextTertiaryBrush" Color="#819096" />
       <SolidColorBrush x:Key="AccentBrush" Color="#53A7AD" />
       <SolidColorBrush x:Key="AccentSoftBrush" Color="#3A25474C" />
+      <SolidColorBrush x:Key="UpdateEntryActiveBrush" Color="#FF2F6FA3" />
       <SolidColorBrush x:Key="SuccessBrush" Color="#66C69A" />
       <SolidColorBrush x:Key="SuccessSoftBrush" Color="#3A1F4538" />
       <SolidColorBrush x:Key="SuccessBorderBrush" Color="#A04A806A" />
