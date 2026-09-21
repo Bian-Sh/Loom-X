@@ -54,6 +54,8 @@ public sealed record UserDecisionField
         decimal? step = null,
         string? defaultText = null,
         bool isMultiline = false,
+        bool allowCustomInput = false,
+        string? customInputPlaceholder = null,
         int? maxLength = null)
     {
         Id = id;
@@ -71,6 +73,8 @@ public sealed record UserDecisionField
         Step = step;
         DefaultText = defaultText;
         IsMultiline = isMultiline;
+        AllowCustomInput = allowCustomInput;
+        CustomInputPlaceholder = customInputPlaceholder;
         MaxLength = maxLength;
     }
 
@@ -103,6 +107,10 @@ public sealed record UserDecisionField
     public string? DefaultText { get; }
 
     public bool IsMultiline { get; }
+
+    public bool AllowCustomInput { get; }
+
+    public string? CustomInputPlaceholder { get; }
 
     public int? MaxLength { get; }
 
@@ -202,6 +210,7 @@ public static class UserDecisionValidator
     private const int MaxOptionIdLength = 64;
     private const int MaxOptionLabelLength = 200;
     private const int MaxOptionDescriptionLength = 500;
+    private const int MaxCustomInputPlaceholderLength = 200;
     private const int DefaultTextMaxLength = 1000;
     private const int MaxTextLength = 4000;
 
@@ -246,14 +255,21 @@ public static class UserDecisionValidator
 
     public static IReadOnlyList<UserDecisionValidationError> ValidateSubmission(
         UserDecisionRequest request,
-        IReadOnlyDictionary<string, object?> values)
+        IReadOnlyDictionary<string, object?> values) =>
+        ValidateSubmission(request, values, new Dictionary<string, string>());
+
+    public static IReadOnlyList<UserDecisionValidationError> ValidateSubmission(
+        UserDecisionRequest request,
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlyDictionary<string, string> customInputs)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(values);
+        ArgumentNullException.ThrowIfNull(customInputs);
         var errors = new List<UserDecisionValidationError>();
         var fields = request.Fields.ToDictionary(field => field.Id, StringComparer.Ordinal);
 
-        foreach (var key in values.Keys)
+        foreach (var key in values.Keys.Concat(customInputs.Keys))
         {
             if (!fields.ContainsKey(key))
             {
@@ -266,7 +282,8 @@ public static class UserDecisionValidator
         foreach (var field in request.Fields)
         {
             values.TryGetValue(field.Id, out var value);
-            ValidateSubmittedValue(errors, field, value);
+            customInputs.TryGetValue(field.Id, out var customInput);
+            ValidateSubmittedValue(errors, field, value, customInput, customInputs.ContainsKey(field.Id));
         }
 
         return errors.AsReadOnly();
@@ -367,10 +384,12 @@ public static class UserDecisionValidator
             || field.MinSelections is not null
             || field.MaxSelections is not null
             || HasNumberProperties(field)
-            || HasTextProperties(field))
+            || HasTextOnlyProperties(field))
         {
             AddInapplicablePropertyError(errors, fieldId);
         }
+
+        ValidateCustomInputProperties(errors, field, fieldId);
     }
 
     private static void ValidateMultiSelectProperties(
@@ -380,10 +399,12 @@ public static class UserDecisionValidator
     {
         if (field.DefaultOptionId is not null
             || HasNumberProperties(field)
-            || HasTextProperties(field))
+            || HasTextOnlyProperties(field))
         {
             AddInapplicablePropertyError(errors, fieldId);
         }
+
+        ValidateCustomInputProperties(errors, field, fieldId);
     }
 
     private static void ValidateNumberProperties(
@@ -391,7 +412,7 @@ public static class UserDecisionValidator
         UserDecisionField field,
         string fieldId)
     {
-        if (HasSelectionProperties(field) || HasTextProperties(field))
+        if (HasSelectionProperties(field) || HasTextProperties(field) || HasCustomInputProperties(field))
         {
             AddInapplicablePropertyError(errors, fieldId);
         }
@@ -402,7 +423,7 @@ public static class UserDecisionValidator
         UserDecisionField field,
         string fieldId)
     {
-        if (HasSelectionProperties(field) || HasNumberProperties(field))
+        if (HasSelectionProperties(field) || HasNumberProperties(field) || HasCustomInputProperties(field))
         {
             AddInapplicablePropertyError(errors, fieldId);
         }
@@ -421,10 +442,47 @@ public static class UserDecisionValidator
         || field.MaxNumber is not null
         || field.Step is not null;
 
-    private static bool HasTextProperties(UserDecisionField field) =>
+    private static bool HasTextOnlyProperties(UserDecisionField field) =>
         field.DefaultText is not null
-        || field.IsMultiline
+        || field.IsMultiline;
+
+    private static bool HasTextProperties(UserDecisionField field) =>
+        HasTextOnlyProperties(field)
         || field.MaxLength is not null;
+
+    private static bool HasCustomInputProperties(UserDecisionField field) =>
+        field.AllowCustomInput
+        || field.CustomInputPlaceholder is not null;
+
+    private static void ValidateCustomInputProperties(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string fieldId)
+    {
+        if (!field.AllowCustomInput)
+        {
+            if (field.CustomInputPlaceholder is not null || field.MaxLength is not null)
+            {
+                AddInapplicablePropertyError(errors, fieldId);
+            }
+
+            return;
+        }
+
+        ValidateDisplayText(
+            errors,
+            fieldId,
+            "自由输入提示",
+            field.CustomInputPlaceholder,
+            field.CustomInputPlaceholder is not null,
+            MaxCustomInputPlaceholderLength);
+
+        var maxLength = field.MaxLength ?? DefaultTextMaxLength;
+        if (maxLength <= 0 || maxLength > MaxTextLength)
+        {
+            errors.Add(new UserDecisionValidationError(fieldId, "自由输入最大长度必须处于允许范围内。"));
+        }
+    }
 
     private static void AddInapplicablePropertyError(
         ICollection<UserDecisionValidationError> errors,
@@ -525,8 +583,17 @@ public static class UserDecisionValidator
     private static void ValidateSubmittedValue(
         ICollection<UserDecisionValidationError> errors,
         UserDecisionField field,
-        object? value)
+        object? value,
+        string? customInput,
+        bool hasCustomInputEntry)
     {
+        if (hasCustomInputEntry)
+        {
+            ValidateSubmittedCustomInput(errors, field, customInput);
+            ValidateSubmittedSelectionWithCustomInput(errors, field, value);
+            return;
+        }
+
         if (value is null)
         {
             if (field.IsRequired)
@@ -557,6 +624,54 @@ public static class UserDecisionValidator
         }
     }
 
+    private static void ValidateSubmittedCustomInput(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        string? customInput)
+    {
+        if (!field.AllowCustomInput
+            || field.Type is not (UserDecisionFieldType.SingleSelect or UserDecisionFieldType.MultiSelect))
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "该字段不允许自由输入。"));
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(customInput))
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "自由输入不能为空白。"));
+            return;
+        }
+
+        var maxLength = field.MaxLength ?? DefaultTextMaxLength;
+        if (customInput.Length > maxLength)
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "自由输入长度超过最大限制。"));
+            return;
+        }
+
+        if (SensitiveKeyPolicy.ContainsSensitiveContent(customInput))
+        {
+            errors.Add(new UserDecisionValidationError(field.Id, "自由输入包含敏感信息。"));
+            return;
+        }
+    }
+
+    private static void ValidateSubmittedSelectionWithCustomInput(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        object? value)
+    {
+        switch (field.Type)
+        {
+            case UserDecisionFieldType.SingleSelect when value is not null:
+                ValidateSubmittedSingle(errors, field, value);
+                break;
+            case UserDecisionFieldType.MultiSelect when value is not null:
+                ValidateSubmittedMulti(errors, field, value, enforceMinimum: false);
+                break;
+        }
+    }
+
     private static void ValidateSubmittedSingle(
         ICollection<UserDecisionValidationError> errors,
         UserDecisionField field,
@@ -577,7 +692,8 @@ public static class UserDecisionValidator
     private static void ValidateSubmittedMulti(
         ICollection<UserDecisionValidationError> errors,
         UserDecisionField field,
-        object value)
+        object value,
+        bool enforceMinimum = true)
     {
         if (value is not IEnumerable<string> selectedValues || value is string)
         {
@@ -607,7 +723,7 @@ public static class UserDecisionValidator
 
         var minimum = field.MinSelections ?? (field.IsRequired ? 1 : 0);
         var maximum = field.MaxSelections ?? field.Options.Count;
-        if (selected.Length < minimum || selected.Length > maximum)
+        if ((enforceMinimum && selected.Length < minimum) || selected.Length > maximum)
         {
             errors.Add(new UserDecisionValidationError(field.Id, "多选字段的选择数量无效。"));
         }
@@ -769,15 +885,18 @@ public static class UserDecisionValidator
 public sealed record UserDecisionResult
 {
     private readonly ReadOnlyDictionary<string, object?> values;
+    private readonly ReadOnlyDictionary<string, string> customInputs;
 
     private UserDecisionResult(
         bool cancelled,
         string? cancellationReason,
-        IReadOnlyDictionary<string, object?> values)
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlyDictionary<string, string> customInputs)
     {
         Cancelled = cancelled;
         CancellationReason = cancellationReason;
         this.values = CopyValues(values);
+        this.customInputs = CopyCustomInputs(customInputs);
     }
 
     public bool Cancelled { get; }
@@ -786,10 +905,14 @@ public sealed record UserDecisionResult
 
     public IReadOnlyDictionary<string, object?> Values => values;
 
-    public static UserDecisionResult Submit(IReadOnlyDictionary<string, object?> values)
+    public IReadOnlyDictionary<string, string> CustomInputs => customInputs;
+
+    public static UserDecisionResult Submit(
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlyDictionary<string, string>? customInputs = null)
     {
         ArgumentNullException.ThrowIfNull(values);
-        return new UserDecisionResult(false, null, values);
+        return new UserDecisionResult(false, null, values, customInputs ?? new Dictionary<string, string>());
     }
 
     public static UserDecisionResult Cancel(string reason)
@@ -799,7 +922,11 @@ public sealed record UserDecisionResult
             throw new ArgumentException("取消原因不能为空。", nameof(reason));
         }
 
-        return new UserDecisionResult(true, reason, new Dictionary<string, object?>());
+        return new UserDecisionResult(
+            true,
+            reason,
+            new Dictionary<string, object?>(),
+            new Dictionary<string, string>());
     }
 
     private static ReadOnlyDictionary<string, object?> CopyValues(
@@ -819,6 +946,24 @@ public sealed record UserDecisionResult
         return new ReadOnlyDictionary<string, object?>(copy);
     }
 
+    private static ReadOnlyDictionary<string, string> CopyCustomInputs(
+        IReadOnlyDictionary<string, string> customInputs)
+    {
+        var copy = new Dictionary<string, string>(customInputs.Count, StringComparer.Ordinal);
+        foreach (var pair in customInputs)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key))
+            {
+                throw new ArgumentException("用户决策自由输入字段 id 不能为空。", nameof(customInputs));
+            }
+
+            copy.Add(pair.Key, pair.Value
+                ?? throw new ArgumentException("用户决策自由输入不能为 null。", nameof(customInputs)));
+        }
+
+        return new ReadOnlyDictionary<string, string>(copy);
+    }
+
     private static object? CopyValue(object? value) => value switch
     {
         IReadOnlyList<string> items => Array.AsReadOnly(items.ToArray()),
@@ -826,5 +971,4 @@ public sealed record UserDecisionResult
         _ => value,
     };
 }
-
 public sealed record PendingUserDecision(string RequestId, string OwnerId, UserDecisionRequest Request);

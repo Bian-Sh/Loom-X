@@ -1,4 +1,4 @@
-﻿using System.Text.Json.Nodes;
+using System.Text.Json.Nodes;
 using LoomX.Assistant;
 using LoomX.Assistant.UserDecisions;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -48,6 +48,39 @@ public sealed class AssistantToolsTests
     }
 
     [Fact]
+    public void RegisterAll_AskUser选择字段公开自由输入Schema()
+    {
+        using var broker = CreateBroker();
+        var tool = GetTool(broker);
+        var properties = tool.ParametersSchema["properties"]!["fields"]!["items"]!["properties"]!.AsObject();
+
+        Assert.Equal("boolean", properties["allow_custom_input"]!["type"]!.GetValue<string>());
+        Assert.False(properties["allow_custom_input"]!["default"]!.GetValue<bool>());
+        Assert.Equal(200, properties["custom_input_placeholder"]!["maxLength"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public void RegisterAll_AskUser明确选择题同页自由输入建模规则()
+    {
+        using var broker = CreateBroker();
+        var tool = GetTool(broker);
+        var fieldsSchema = tool.ParametersSchema["properties"]!["fields"]!.AsObject();
+        var fieldProperties = fieldsSchema["items"]!["properties"]!.AsObject();
+        var fieldsDescription = fieldsSchema["description"]?.GetValue<string>() ?? string.Empty;
+        var customInputDescription = fieldProperties["allow_custom_input"]!["description"]?.GetValue<string>() ?? string.Empty;
+        var maxLengthDescription = fieldProperties["max_length"]!["description"]?.GetValue<string>() ?? string.Empty;
+
+        Assert.Contains("每个字段独立分页", fieldsDescription, StringComparison.Ordinal);
+        Assert.Contains("选项下方", customInputDescription, StringComparison.Ordinal);
+        Assert.Contains("同一页", customInputDescription, StringComparison.Ordinal);
+        Assert.Contains("不要新增 text 字段", customInputDescription, StringComparison.Ordinal);
+        Assert.Contains("allow_custom_input", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("不要创建独立 text 字段", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("自由输入", maxLengthDescription, StringComparison.Ordinal);
+        Assert.Contains("输入框80字", maxLengthDescription, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RegisterAll_AskUser描述为无需Skill或Bridge的通用交互()
     {
         using var broker = CreateBroker();
@@ -87,16 +120,24 @@ public sealed class AssistantToolsTests
         var field = Assert.Single(request.Request.Fields);
         Assert.Equal("mode", field.Id);
         Assert.Equal(UserDecisionFieldType.SingleSelect, field.Type);
-        Assert.True(broker.Submit(request.RequestId, new Dictionary<string, object?>
-        {
-            ["mode"] = "safe",
-        }));
+        Assert.True(broker.Submit(
+            request.RequestId,
+            UserDecisionBrokerTestExtensions.ClaimantId,
+            new Dictionary<string, object?>
+            {
+                ["mode"] = "safe",
+            },
+            new Dictionary<string, string>
+            {
+                ["mode"] = "请优先保证安全性",
+            }));
 
         var result = await execution.WaitAsync(TimeSpan.FromSeconds(2));
         var json = JsonNode.Parse(result.Content)!.AsObject();
         Assert.True(result.Success);
         Assert.False(json["cancelled"]!.GetValue<bool>());
         Assert.Equal("safe", json["values"]!["mode"]!.GetValue<string>());
+        Assert.Equal("请优先保证安全性", json["custom_inputs"]!["mode"]!.GetValue<string>());
     }
 
     [Fact]
@@ -120,6 +161,9 @@ public sealed class AssistantToolsTests
                     ["type"] = "single_select",
                     ["options"] = new JsonArray(new JsonObject { ["id"] = "one", ["label"] = "一" }),
                     ["default_option_id"] = "one",
+                    ["allow_custom_input"] = true,
+                    ["custom_input_placeholder"] = "描述你的模式",
+                    ["max_length"] = 120,
                 },
                 new JsonObject
                 {
@@ -161,7 +205,13 @@ public sealed class AssistantToolsTests
         Assert.False(request.Request.AllowCancel);
         Assert.Collection(
             request.Request.Fields,
-            field => Assert.Equal("one", field.DefaultOptionId),
+            field =>
+            {
+                Assert.Equal("one", field.DefaultOptionId);
+                Assert.True(field.AllowCustomInput);
+                Assert.Equal("描述你的模式", field.CustomInputPlaceholder);
+                Assert.Equal(120, field.MaxLength);
+            },
             field =>
             {
                 Assert.Equal(["one"], field.DefaultOptionIds);
@@ -194,8 +244,31 @@ public sealed class AssistantToolsTests
         Assert.Equal("one", result["values"]!["single"]!.GetValue<string>());
         Assert.Equal(["one", "two"], result["values"]!["multi"]!.AsArray().Select(item => item!.GetValue<string>()));
         Assert.Equal(5m, result["values"]!["count"]!.GetValue<decimal>());
-        Assert.True(result["values"]!["note"]!["provided"]!.GetValue<bool>());
-        Assert.DoesNotContain("完成", toolResult.Content, StringComparison.Ordinal);
+        Assert.Equal("完成", result["values"]!["note"]!.GetValue<string>());
+        Assert.Empty(result["custom_inputs"]!.AsObject());
+    }
+
+    [Fact]
+    public async Task AskUser_选择题自由输入返回CustomInputs原文()
+    {
+        using var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var tool = GetTool(broker);
+        using var ownerScope = AssistantTools.BeginRun("assistant-run-test");
+        var arguments = CreateValidArguments();
+        arguments["fields"]![0]!["allow_custom_input"] = true;
+
+        var execution = tool.Handler(arguments, CancellationToken.None);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(broker.Submit(
+            request.RequestId,
+            UserDecisionBrokerTestExtensions.ClaimantId,
+            new Dictionary<string, object?> { ["mode"] = null },
+            new Dictionary<string, string> { ["mode"] = "我想逐步确认" }));
+
+        var result = JsonNode.Parse((await execution).Content)!;
+        Assert.Null(result["values"]!["mode"]);
+        Assert.Equal("我想逐步确认", result["custom_inputs"]!["mode"]!.GetValue<string>());
     }
 
     [Fact]
@@ -368,7 +441,7 @@ public sealed class AssistantToolsTests
 
         var result = await execution.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.True(result.Success);
-        Assert.Equal("{\"cancelled\":true,\"values\":{}}", result.Content);
+        Assert.Equal("{\"cancelled\":true,\"values\":{},\"custom_inputs\":{}}", result.Content);
         Assert.DoesNotContain(cancellationReason, result.Content, StringComparison.Ordinal);
     }
 
@@ -452,6 +525,8 @@ public sealed class AssistantToolsTests
         yield return ["field", "default_text", "42"];
         yield return ["field", "is_multiline", "\"false\""];
         yield return ["field", "max_length", "true"];
+        yield return ["field", "allow_custom_input", "1"];
+        yield return ["field", "custom_input_placeholder", "42"];
         yield return ["option", "description", "42"];
     }
 
@@ -539,6 +614,7 @@ public sealed class AssistantToolsTests
                     },
                 },
                 ["default_option_id"] = "safe",
+                ["allow_custom_input"] = true,
             },
         },
     };

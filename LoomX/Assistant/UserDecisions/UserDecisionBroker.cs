@@ -17,7 +17,11 @@ public interface IUserDecisionBroker : IDisposable
 
     bool Release(string requestId, string claimantId);
 
-    bool Submit(string requestId, string claimantId, IReadOnlyDictionary<string, object?> values);
+    bool Submit(
+        string requestId,
+        string claimantId,
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlyDictionary<string, string>? customInputs = null);
 
     bool Cancel(string requestId, string claimantId, string reason);
 
@@ -183,7 +187,8 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
     public bool Submit(
         string requestId,
         string claimantId,
-        IReadOnlyDictionary<string, object?> values)
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlyDictionary<string, string>? customInputs = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(requestId);
         ArgumentException.ThrowIfNullOrWhiteSpace(claimantId);
@@ -196,9 +201,11 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
         }
 
         IReadOnlyDictionary<string, object?> snapshot;
+        IReadOnlyDictionary<string, string> customInputSnapshot;
         try
         {
             snapshot = CreateSubmissionSnapshot(values);
+            customInputSnapshot = CreateCustomInputSnapshot(customInputs);
         }
         catch (Exception exception)
         {
@@ -210,7 +217,10 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
             return false;
         }
 
-        var validationErrors = UserDecisionValidator.ValidateSubmission(entry.Request, snapshot);
+        var validationErrors = UserDecisionValidator.ValidateSubmission(
+            entry.Request,
+            snapshot,
+            customInputSnapshot);
         if (validationErrors.Count > 0)
         {
             entry.EndCompletion();
@@ -221,7 +231,7 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
             return false;
         }
 
-        var result = UserDecisionResult.Submit(snapshot);
+        var result = UserDecisionResult.Submit(snapshot, customInputSnapshot);
         if (!pendingEntries.TryRemove(requestId, out var removed))
         {
             entry.EndCompletion();
@@ -231,9 +241,10 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
 
         CompleteEntry(removed, () => removed.Completion.TrySetResult(result));
         logger.LogInformation(
-            "用户决策请求已提交 {RequestId} {FieldCount}",
+            "用户决策请求已提交 {RequestId} {FieldCount} {CustomInputCount}",
             requestId,
-            result.Values.Count);
+            result.Values.Count,
+            result.CustomInputs.Count);
         return true;
     }
 
@@ -334,6 +345,29 @@ public sealed class UserDecisionBroker(ILogger<UserDecisionBroker> logger) : IUs
         }
 
         return new ReadOnlyDictionary<string, object?>(snapshot);
+    }
+
+    private static IReadOnlyDictionary<string, string> CreateCustomInputSnapshot(
+        IReadOnlyDictionary<string, string>? customInputs)
+    {
+        var snapshot = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (customInputs is null)
+        {
+            return new ReadOnlyDictionary<string, string>(snapshot);
+        }
+
+        foreach (var pair in customInputs)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key))
+            {
+                throw new ArgumentException("用户决策自由输入字段 id 不能为空。", nameof(customInputs));
+            }
+
+            snapshot.Add(pair.Key, pair.Value
+                ?? throw new ArgumentException("用户决策自由输入不能为 null。", nameof(customInputs)));
+        }
+
+        return new ReadOnlyDictionary<string, string>(snapshot);
     }
 
     private static object? CopySubmissionValue(object? value) => value switch
