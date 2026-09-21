@@ -37,3 +37,21 @@
 - [x] 6.3 使用 CUA 验证浅色、深色和关闭透明效果后的标题栏 Hover、浮窗进度/Ready 状态、版本切换及错误/空态可读性；透明主题截图仅作为辅助证据。 <!-- comet-task:306b389c-d609-49e5-85d2-8aa1c9a769cd -->
 - [x] 6.4 重新发布桌面应用，并将可运行产物放入 `outputs/` 下以 `yyyyMMdd-HHmmss-enhance-update-experience` 格式命名的目录，校验启动进程路径与发布文件完整性。 <!-- comet-task:1e00806c-1003-4407-bb4b-28ecc4d00719 -->
 - [x] 6.5 更新 Comet 任务状态和验证报告，确认实现与 `desktop-update-experience` delta spec 一致且未改动无关 session 产物。 <!-- comet-task:aa115763-31df-42d5-af5a-87774b46be6a -->
+
+## 7. 归档前 Release Notes 验收修正
+
+- [ ] 7.1 为三个约定模块的切分、默认展开、独立折叠和旧正文回退补充失败优先测试。 <!-- comet-task:a8424e08-e7a4-49e4-9471-267eb7d13514 -->
+- [ ] 7.2 实现 Release Notes 分段 ViewModel 与 Foldout 渲染，继续复用安全 Markdown 策略。 <!-- comet-task:0e29205f-2c44-4631-ac35-9122cc63c40e -->
+- [ ] 7.3 将更新说明遮罩固定为纯黑 65%，使用独立磨砂容器并相对于完整主窗口居中；右上角改为“前往发布页”。 <!-- comet-task:498183c6-ffa5-460b-91da-e7539296171f -->
+
+## 8. Ready 安装确认与安装器修正
+
+- [ ] 8.1 集成通用应用内 `AppModalHost`，补充 Ready 入口和安装按钮的确认、取消与一次性启动测试。 <!-- comet-task:632cb215-6a6b-4ea2-aef0-ac2613eecd13 -->
+- [ ] 8.2 将 Inno Setup 桌面快捷方式改为无条件创建，并增加安装脚本契约测试。 <!-- comet-task:05e3eaa0-bb65-4b61-ae4a-2b16583311bb -->
+- [ ] 8.3 将 GitHub Release `v0.12.7` 正文更新为三个约定模块的安全测试数据，并核对 API 抓取结果。 <!-- comet-task:4ecfd11c-09a6-434e-a09e-d74784c2cfad -->
+
+## 9. 补充验证与发布
+
+- [ ] 9.1 运行更新协调器、Release Notes、主窗口、安装器和本地化相关测试，再执行完整 Release 构建与测试。 <!-- comet-task:bfe6c322-d777-4332-b68e-7cb5bc644c7f -->
+- [ ] 9.2 使用 CUA 验证透明/非透明模式的遮罩、磨砂、全窗口居中、Foldout 与安装风险确认模态。 <!-- comet-task:fc1ab8c3-338c-454d-9e62-8d59b9aad60b -->
+- [ ] 9.3 重新发布桌面应用到 `outputs/` 下可读时间目录，校验启动进程路径和产物完整性，并更新验证报告。 <!-- comet-task:64fd542b-9cc6-4e80-b551-7cd3a4771992 -->

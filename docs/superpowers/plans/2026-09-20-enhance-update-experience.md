@@ -1003,3 +1003,23 @@ git commit -m "完成更新体验集成验证与发布"
 - **占位符扫描：** 未发现禁止占位词、延后实现表述或跨任务模糊引用；每个实现任务均给出文件、接口、红灯、绿灯、命令和中文提交消息。
 - **类型一致性：** IUpdateService、UpdateReleasePage、PreparedUpdate、UpdateDownloadProgress、UpdateStage、UpdateErrorKind、ReleaseNotesContentViewModel、ReleaseHistoryViewModel 的签名在生产接线、测试和视图任务中保持一致。
 - **流程边界：** Unity 不参与；Avalonia 资产不执行 Reimport；最终发布目录唯一且先验证不存在；CUA 只操作 Loom-X 窗口；正常退出仍由 desktop.Exit 完成。
+
+## 14. 归档前验收补充设计
+
+2026-09-21 的验收反馈扩大了更新体验的最终交付范围，以下内容覆盖此前“Ready 时重新打开 Release Notes 并直接安装”的交互：
+
+1. `updateDialogOverlay` 改为完整窗口覆盖层，遮罩固定 `#A6000000`，不进入 `WindowAppearanceCoordinator` 的透明度资源缩放。弹窗相对于完整窗口居中，不再为左侧导航栏保留 `228px` 偏移。
+2. 更新说明容器使用独立的 `ExperimentalAcrylicBorder` 材质；Avalonia 不支持 Acrylic 时使用高不透明度主题表面回退。磨砂材料只负责内容容器，外层遮罩始终固定纯黑 65%。
+3. `ReleaseNotesContentViewModel` 在完成安全清洗后，将三个约定的二级标题切分为独立 section。每个 section 持有自己的 `ObservableStringBuilder` 与默认 `IsExpanded = true`；旧正文没有约定标题时回退为单一兼容 section。
+4. 右上角关闭按钮替换为“前往发布页”，通过当前 `UpdateRelease.HtmlUrl` 打开 HTTPS 页面；关闭动作继续由 Footer 的“稍后”承担。
+5. Ready 状态下，标题栏入口和浮窗安装按钮统一调用应用内确认流程。确认流程由可复用 `AppModalHost` 提供，不创建独立 Window；正文明确提示应用重启、路由服务短暂中断和进行中请求可能失败。取消后保持 Ready，确认后才调用现有一次性安装命令。
+6. Inno Setup 桌面快捷方式从默认未勾选任务改为无条件创建，覆盖全新安装与升级。
+7. 使用真实 GitHub Release `v0.12.7` 的测试正文验证三段结构；正文只包含虚构的安全测试信息，不包含敏感信息。
+
+### 14.1 补充测试顺序
+
+1. 先补 Release Notes 分段、默认展开、旧正文回退测试，并确认旧实现失败。
+2. 补主窗口固定遮罩、完整窗口居中、发布页按钮和 Acrylic 容器契约测试。
+3. 补 Ready 入口不再打开 Release Notes、确认/取消安装风险模态的协调器测试。
+4. 补安装器桌面快捷方式无条件创建的文本契约测试。
+5. 完成实现后运行相关测试、完整 Release 构建、透明/非透明 CUA 验证，并重新发布到可读时间目录。
