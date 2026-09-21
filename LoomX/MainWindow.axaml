@@ -125,44 +125,6 @@
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
     </Style>
-    <Style Selector="Border.update-dialog-layer">
-      <Setter Property="Panel.ZIndex" Value="1" />
-    </Style>
-    <Style Selector="Button.update-dialog-link">
-      <Setter Property="MinHeight" Value="30" />
-      <Setter Property="Padding" Value="8,4" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-      <Setter Property="CornerRadius" Value="6" />
-    </Style>
-    <Style Selector="Button.update-dialog-link:pointerover">
-      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-    </Style>
-    <Style Selector="Button.update-dialog-link /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-    </Style>
-    <Style Selector="Button.update-dialog-secondary">
-      <Setter Property="MinHeight" Value="30" />
-      <Setter Property="Padding" Value="10,5" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
-      <Setter Property="CornerRadius" Value="6" />
-    </Style>
-    <Style Selector="Button.update-dialog-secondary:pointerover">
-      <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-    </Style>
-    <Style Selector="Button.update-dialog-secondary /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-    </Style>
     <Style Selector="Border.toast-layer">
       <Setter Property="Panel.ZIndex" Value="2" />
     </Style>
@@ -301,7 +263,9 @@
           <Button x:Name="updateEntryButton" Grid.Column="1" Classes="update-entry" Height="32" MinWidth="32"
                   DataContext="{Binding $parent[Window].UpdatePresentation}"
                   IsVisible="{Binding Update.IsUpdateEntryVisible}"
-                  Command="{Binding Update.ToggleDialogCommand}"
+                  Command="{Binding Update.ActivateUpdateEntryCommand}"
+                  PointerEntered="UpdateEntryButton_OnPointerEntered"
+                  PointerExited="UpdateEntryButton_OnPointerExited"
                   ToolTip.Tip="{Binding Update.UpdateEntryHint}"
                   AutomationProperties.Name="{Binding Update.UpdateEntryHint}">
             <Grid ClipToBounds="True">
@@ -336,6 +300,38 @@
               </Grid>
             </Grid>
           </Button>
+          <Popup x:Name="updateReleasePreviewPopup"
+                 DataContext="{Binding $parent[Window].UpdatePresentation}"
+                 PlacementTarget="{Binding #updateEntryButton}"
+                 Placement="BottomEdgeAlignedRight"
+                 IsLightDismissEnabled="False"
+                 VerticalOffset="-2">
+            <Border Padding="16,8,16,24" Background="Transparent"
+                    PointerEntered="UpdateReleasePreview_OnPointerEntered"
+                    PointerExited="UpdateReleasePreview_OnPointerExited">
+              <Border Width="380" MaxHeight="420"
+                      Padding="16,14"
+                      Background="{DynamicResource PopupBackgroundBrush}"
+                      BorderBrush="{DynamicResource BorderStrongBrush}"
+                      BorderThickness="1"
+                      CornerRadius="12"
+                      BoxShadow="0 8 24 0 #40000000">
+                <Grid RowDefinitions="Auto,1,*">
+                  <StackPanel Spacing="3" Margin="0,0,0,10">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <TextBlock Text="{Binding Update.LatestVersion}" FontSize="12" />
+                      <TextBlock Text="{l:Locale update.card.release.notes}" FontSize="12" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding Update.ReleaseNotesContent.PublishedAtText}"
+                               FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  </StackPanel>
+                  <Border Grid.Row="1" Background="{DynamicResource BorderSoftBrush}" />
+                  <views:ReleaseNotesView DataContext="{Binding Update.ReleaseNotesContent}"
+                                          Grid.Row="2" Margin="0,8,0,0" />
+                </Grid>
+              </Border>
+            </Border>
+          </Popup>
           <Button Grid.Column="2" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="{l:Locale window.minimize}" AutomationProperties.Name="{l:Locale window.minimize}">
             <Border Width="12" Height="1" Background="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0" />
           </Button>
@@ -350,83 +346,6 @@
     </Grid>
     <Border x:Name="toastBorder" Classes="toast-layer" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,24" Background="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="14,11" MaxWidth="196">
       <TextBlock x:Name="toastText" Foreground="White" TextWrapping="Wrap" />
-    </Border>
-    <Border x:Name="updateDialogOverlay" Classes="update-dialog-layer" DataContext="{Binding $parent[Window].UpdatePresentation}"
-            IsVisible="{Binding Update.IsDialogVisible}" Background="#A6000000"
-            HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-      <Border Width="660" MaxWidth="660" MaxHeight="560"
-              Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center"
-              BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1"
-              CornerRadius="14" ClipToBounds="True">
-        <ExperimentalAcrylicBorder Material="{DynamicResource ReleaseNotesAcrylicMaterial}">
-          <Grid RowDefinitions="Auto,1,*,1,Auto">
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="20,14,16,12">
-              <StackPanel Spacing="2" VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Text="{Binding Update.LatestVersion}" FontSize="16" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding Update.ReleaseNotesContent.PublishedAtText}"
-                             FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
-                             VerticalAlignment="Center" />
-                </StackPanel>
-                <TextBlock Text="{Binding Update.StatusText}" FontSize="12"
-                           Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" />
-              </StackPanel>
-              <Button x:Name="updateDialogReleasePageButton" Grid.Column="1" Classes="update-dialog-link"
-                      Content="{l:Locale update.dialog.open_release}"
-                      Click="UpdateDialogReleasePageButton_OnClick"
-                      ToolTip.Tip="{l:Locale update.dialog.open_release}"
-                      AutomationProperties.Name="{l:Locale update.dialog.open_release}" />
-            </Grid>
-            <Border Grid.Row="1" Background="{DynamicResource BorderSoftBrush}" />
-            <views:ReleaseNotesView DataContext="{Binding Update.ReleaseNotesContent}" Grid.Row="2"
-                                    Margin="20,6,20,10" MaxHeight="350" MinHeight="150" />
-            <Border Grid.Row="3" Background="{DynamicResource BorderSoftBrush}" />
-            <Grid Grid.Row="4" Margin="20,10,16,12">
-              <Grid IsVisible="{Binding Update.IsDownloading}" RowDefinitions="Auto,Auto" RowSpacing="8">
-                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                  <TextBlock Text="{Binding Update.ProgressText}" FontSize="12"
-                             Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="1" Text="{Binding Update.SpeedText}" FontSize="12"
-                             Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
-                  <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Update.DownloadPercent}" FontWeight="SemiBold" />
-                    <TextBlock Text="%" FontWeight="SemiBold" />
-                  </StackPanel>
-                </Grid>
-                <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                  <ProgressBar Value="{Binding Update.DownloadPercent}" Minimum="0" Maximum="100" Height="4" VerticalAlignment="Center" />
-                  <Button Grid.Column="1" MinHeight="32" Padding="12,6"
-                          Content="{l:Locale update.dialog.later}" Command="{Binding Update.DismissDialogCommand}" />
-                </Grid>
-              </Grid>
-              <Grid IsVisible="{Binding Update.IsVerifying}" ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <StackPanel Spacing="6" VerticalAlignment="Center">
-                  <TextBlock Text="{Binding Update.StatusText}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
-                  <ProgressBar IsIndeterminate="True" Height="4" />
-                </StackPanel>
-                <Button Grid.Column="1" MinHeight="32" Padding="12,6"
-                        Content="{l:Locale update.dialog.later}" Command="{Binding Update.DismissDialogCommand}" />
-              </Grid>
-              <Grid IsVisible="{Binding Update.CanInstall}" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                <Button Grid.Column="1" MinHeight="32" Padding="12,6"
-                        Content="{l:Locale update.dialog.later}" Command="{Binding Update.DismissDialogCommand}" />
-                <Button x:Name="updateInstallButton" Grid.Column="2" Classes="primary" MinHeight="30" Padding="12,5"
-                        Content="{l:Locale update.dialog.install}" Command="{Binding Update.InstallAndRestartCommand}" />
-              </Grid>
-              <Grid IsVisible="{Binding Update.CanRetry}" RowDefinitions="Auto,Auto" RowSpacing="8">
-                <TextBlock Text="{Binding Update.ErrorMessage}" FontSize="12"
-                           Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" />
-                <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                  <Button Grid.Column="1" MinHeight="32" Padding="12,6"
-                          Content="{l:Locale update.dialog.later}" Command="{Binding Update.DismissDialogCommand}" />
-                  <Button x:Name="updateRetryButton" Grid.Column="2" Classes="primary" MinHeight="32" Padding="14,6"
-                          Content="{l:Locale update.dialog.retry}" Command="{Binding Update.RetryCommand}" />
-                </Grid>
-              </Grid>
-            </Grid>
-          </Grid>
-        </ExperimentalAcrylicBorder>
-      </Border>
     </Border>
     <controls:AppModalHost x:Name="appModalHost" ZIndex="300" />
   </Grid>

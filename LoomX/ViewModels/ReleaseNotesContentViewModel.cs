@@ -52,6 +52,7 @@ public sealed class ReleaseNotesContentViewModel : NotifyViewModel, IDisposable
 
     public string Title { get => title; private set => SetProperty(ref title, value); }
     public string PublishedAtText => release?.PublishedAt?.ToLocalTime().ToString("d", LocaleService.CurrentCulture) ?? string.Empty;
+    public string ReleaseUrl => release?.HtmlUrl ?? string.Empty;
     public ObservableStringBuilder Markdown { get => markdown; private set => SetProperty(ref markdown, value); }
     public ObservableCollection<ReleaseNoteSectionViewModel> Sections { get; } = [];
     public bool IsSectioned
@@ -100,6 +101,7 @@ public sealed class ReleaseNotesContentViewModel : NotifyViewModel, IDisposable
             IsSectioned = Sections.Count > 0;
             IsEmpty = string.IsNullOrWhiteSpace(sanitized);
             OnPropertyChanged(nameof(PublishedAtText));
+            OnPropertyChanged(nameof(ReleaseUrl));
             OnPropertyChanged(nameof(EmptyText));
         });
     }

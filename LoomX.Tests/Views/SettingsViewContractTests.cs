@@ -279,6 +279,9 @@ public sealed class SettingsViewContractTests
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.CanShowLoadMore}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\" IsVisible=\"{Binding ReleaseHistory.HasMore}\"", source, StringComparison.Ordinal);
         Assert.Contains("<views:ReleaseNotesView DataContext=\"{Binding ReleaseHistory.Content}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{l:Locale update.dialog.open_release}\"", source, StringComparison.Ordinal);
+        Assert.Contains("CommandParameter=\"{Binding ReleaseHistory.Content.ReleaseUrl}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"SelectedReleasePageButton_OnClick\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsInitialLoading}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsEmpty}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.HasError}\"", source, StringComparison.Ordinal);

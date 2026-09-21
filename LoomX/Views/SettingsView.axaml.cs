@@ -14,6 +14,14 @@ public partial class SettingsView : UserControl
         catch { }
     }
 
+    private void SelectedReleasePageButton_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Button { CommandParameter: string url }
+            && Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            && uri.Scheme == Uri.UriSchemeHttps)
+            OpenLink(uri.AbsoluteUri);
+    }
+
     private void ProjectHomeButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/Bian-Sh/Loom-X");
     private void IssuesButton_OnClick(object? sender, RoutedEventArgs e) => OpenLink("https://github.com/Bian-Sh/Loom-X/issues");
 }

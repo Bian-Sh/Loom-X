@@ -514,3 +514,34 @@ if (Test-Path -LiteralPath $outputDir) { throw "发布目录已存在：$outputD
 
 - 发布目录：`outputs/20260921-192320-release-notes-visual-polish/publish/`。
 - 安装器：`outputs/20260921-192320-release-notes-visual-polish/installer/LoomX-0.12.7-setup.exe`。
+
+## 20. Release Notes 改为悬停预览卡片（2026-09-21 20:53 +08:00）
+
+### 20.1 行为调整
+
+- 发现更新后不再自动弹出主模态；标题栏更新入口 Hover 时展示固定宽高上限的紧凑 Markdown 卡片。
+- 卡片正文不再使用 Foldout，统一由一个 `MarkdownRenderer` 渲染，并在内容过长时由内部 `ScrollViewer` 滚动。
+- 下载与校验阶段点击入口无响应；准备完成后点击入口直接进入现有应用内安装风险确认；可重试错误状态点击入口直接重试。
+- 设置页版本详情保留“前往发布页”按钮；Hover 卡片本身无按钮、无可交互链接。
+- Debug 预览正文已移除“安全链接”，并同步移除已废弃的“独立折叠”描述。
+- Popup 外层增加透明绘制边距，为 `BoxShadow` 预留空间，避免底部圆角阴影被子窗口矩形边界裁剪成方块。
+
+### 20.2 验证证据
+
+- `dotnet build LoomX.slnx -c Release --no-restore`：0 error，2 个既有 `NU1903`。
+- 服务/ViewModel 定向测试：61/61 PASS。
+- UI/契约/本地化定向测试：48/48 PASS。
+- 安全链接专项契约测试：`UpdateExperienceContractTests` 8/8 PASS。
+- 完整测试：`dotnet test LoomX.slnx -c Release --no-restore --blame-hang-timeout 60s` → 1180/1180 PASS，0 skipped。
+- `git diff --check`：PASS，仅输出工作区既有的 LF/CRLF 提示。
+- 首次完整测试曾出现 4 个 `RuntimeGraphControlTests` Avalonia 线程顺序型瞬时失败；该类单独重跑 4/4 PASS，随后完整测试重新运行 1180/1180 PASS。
+
+### 20.3 发布产物与冒烟
+
+- Release publish：407 个文件，`LoomX.exe` 存在。
+- Inno Setup 6.7.3 编译成功，安装器大小 49,208,926 字节。
+- 发布包启动 PID 28144 后，`ExecutablePath` 与本轮 publish 目录精确一致；验证后仅关闭该 PID。
+
+### 20.4 结论
+
+**PASS。** Release Notes Hover 卡片不再展示测试用“安全链接”，正文链接禁用命中，且更新入口状态机、设置页发布页跳转和阴影圆角修复均由定向测试覆盖。

@@ -51,7 +51,6 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     private UpdateStage stage;
     private UpdateErrorKind errorKind;
     private bool started;
-    private bool isDialogVisible;
     private bool disposed;
     private int installStarted;
     private int installConfirmationStarted;
@@ -78,9 +77,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         this.dispatch = dispatch ?? DispatchToUiThread;
 
         CheckCommand = new AsyncCommand(() => CheckNowAsync(true), () => !IsBusy, this.logger);
-        ToggleDialogCommand = new AsyncCommand(ToggleDialogAsync, logger: this.logger);
-        DismissDialogCommand = new DelegateCommand(() => SetDialogVisible(false));
-        LaterCommand = DismissDialogCommand;
+        ActivateUpdateEntryCommand = new AsyncCommand(ActivateUpdateEntryAsync, logger: this.logger);
         RetryCommand = new AsyncCommand(RetryAsync, () => CanRetry, this.logger);
         InstallAndRestartCommand = new AsyncCommand(ConfirmAndInstallAsync, () => CanInstall, this.logger);
         RefreshLocalizedText();
@@ -109,7 +106,6 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     public bool IsBusy => Stage is UpdateStage.Checking or UpdateStage.Downloading or UpdateStage.Verifying or UpdateStage.Installing;
     public bool IsUpdateEntryVisible => Stage is UpdateStage.Downloading or UpdateStage.Verifying or UpdateStage.Ready
         || Stage == UpdateStage.Error && Release is not null;
-    public bool IsDialogVisible => isDialogVisible;
     public bool IsProgressVisible => Stage is UpdateStage.Downloading or UpdateStage.Verifying;
     public bool IsProgressIndeterminate => Stage == UpdateStage.Verifying;
     public bool CanInstall => Stage == UpdateStage.Ready
@@ -119,9 +115,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     public bool CanRetry => Stage == UpdateStage.Error && ErrorKind is UpdateErrorKind.Check or UpdateErrorKind.Prepare;
 
     public ICommand CheckCommand { get; }
-    public ICommand ToggleDialogCommand { get; }
-    public ICommand DismissDialogCommand { get; }
-    public ICommand LaterCommand { get; }
+    public ICommand ActivateUpdateEntryCommand { get; }
     public ICommand RetryCommand { get; }
     public ICommand InstallAndRestartCommand { get; }
 
@@ -173,12 +167,10 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
 
             if (result.Latest is null)
             {
-                SetDialogVisible(false);
                 TransitionTo(manual ? UpdateStage.Latest : UpdateStage.Idle);
             }
             else
             {
-                SetDialogVisible(true);
                 _ = StartPreparation();
             }
 
@@ -288,7 +280,6 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     private async Task ConfirmAndInstallAsync()
     {
         if (!CanInstall || Interlocked.Exchange(ref installConfirmationStarted, 1) != 0) return;
-        SetDialogVisible(false);
         RaiseCommandStates();
         OnPropertyChanged(nameof(CanInstall));
 
@@ -406,23 +397,18 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         return Task.CompletedTask;
     }
 
-    private async Task ToggleDialogAsync()
+    private async Task ActivateUpdateEntryAsync()
     {
         if (!IsUpdateEntryVisible) return;
+
         if (Stage == UpdateStage.Ready)
         {
             await ConfirmAndInstallAsync();
             return;
         }
 
-        SetDialogVisible(!IsDialogVisible);
+        if (Stage == UpdateStage.Error && CanRetry) await RetryAsync();
     }
-
-    private void SetDialogVisible(bool visible) => dispatch(() =>
-    {
-        if (SetProperty(ref isDialogVisible, visible, nameof(IsDialogVisible)))
-            logger.LogDebug("更新浮窗可见性变化 {Visible} {Stage}", visible, Stage);
-    });
 
     private void TransitionTo(UpdateStage nextStage, UpdateErrorKind nextErrorKind = UpdateErrorKind.None) => dispatch(() =>
     {

@@ -31,6 +31,7 @@ public partial class MainWindow : Window
     private UpdateCoordinator? observedUpdateCoordinator;
     private readonly UpdateWindowPresentation updatePresentation = new();
     private readonly DispatcherTimer navigationSelectionAnimationTimer;
+    private readonly DispatcherTimer updateReleasePreviewHideTimer;
     private readonly TranslateTransform navigationSelectionIndicatorTransform = new();
     private readonly TranslateTransform navigationSelectionOutlineTransform = new();
     private Stopwatch? navigationSelectionAnimationStopwatch;
@@ -62,6 +63,8 @@ public partial class MainWindow : Window
             TimeSpan.FromMilliseconds(8),
             DispatcherPriority.Render,
             NavigationSelectionAnimationTimer_OnTick);
+        updateReleasePreviewHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(160) };
+        updateReleasePreviewHideTimer.Tick += (_, _) => CloseUpdateReleasePreview();
         appearanceCoordinator = new WindowAppearanceCoordinator(this);
         TransparencyLevelHint = BuildTransparencyLevels("acrylic");
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
@@ -77,6 +80,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             toastService.Requested -= ToastServiceOnRequested;
+            updateReleasePreviewHideTimer.Stop();
             DetachUpdateCoordinator();
             DetachNavigationViewModel();
             updatePresentation.Dispose();
@@ -126,8 +130,6 @@ public partial class MainWindow : Window
         if (observedUpdateCoordinator is null) return;
 
         observedUpdateCoordinator.PropertyChanged += UpdateCoordinator_OnPropertyChanged;
-        if (observedUpdateCoordinator.IsDialogVisible)
-            Dispatcher.UIThread.Post(FocusUpdateDialogAction, DispatcherPriority.Background);
     }
 
     private void DetachUpdateCoordinator()
@@ -135,34 +137,15 @@ public partial class MainWindow : Window
         if (observedUpdateCoordinator is not null)
             observedUpdateCoordinator.PropertyChanged -= UpdateCoordinator_OnPropertyChanged;
         observedUpdateCoordinator = null;
+        CloseUpdateReleasePreview();
         updatePresentation.Attach(null);
     }
 
     private void UpdateCoordinator_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(UpdateCoordinator.IsDialogVisible)
-            || sender is not UpdateCoordinator { IsDialogVisible: true }) return;
-
-        Dispatcher.UIThread.Post(FocusUpdateDialogAction, DispatcherPriority.Background);
-    }
-
-    private void FocusUpdateDialogAction()
-    {
-        if (observedUpdateCoordinator?.IsDialogVisible != true) return;
-
-        if (updateInstallButton.IsVisible && updateInstallButton.IsEnabled)
-        {
-            updateInstallButton.Focus();
-            return;
-        }
-
-        if (updateRetryButton.IsVisible && updateRetryButton.IsEnabled)
-        {
-            updateRetryButton.Focus();
-            return;
-        }
-
-        updateDialogReleasePageButton.Focus();
+        if (e.PropertyName == nameof(UpdateCoordinator.IsUpdateEntryVisible)
+            && sender is UpdateCoordinator { IsUpdateEntryVisible: false })
+            CloseUpdateReleasePreview();
     }
 
     private void NavigationViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -252,18 +235,6 @@ public partial class MainWindow : Window
         else Dispatcher.UIThread.Post(ShowToast);
     }
 
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape && observedUpdateCoordinator?.IsDialogVisible == true)
-        {
-            observedUpdateCoordinator.DismissDialogCommand.Execute(null);
-            e.Handled = true;
-            return;
-        }
-
-        base.OnKeyDown(e);
-    }
-
     private void WindowChrome_OnPointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (IsInsideButton(e.Source)) return;
@@ -350,28 +321,32 @@ public partial class MainWindow : Window
             ResourceLookup.Resolve("update.install.confirm.accept", LocaleService.CurrentCulture),
             ResourceLookup.Resolve("update.install.confirm.cancel", LocaleService.CurrentCulture)));
 
-    private void UpdateDialogReleasePageButton_OnClick(object? sender, RoutedEventArgs e) =>
-        OpenReleasePage(observedUpdateCoordinator?.ReleaseUrl);
-
-    private void OpenReleasePage(string? releaseUrl)
+    private void UpdateEntryButton_OnPointerEntered(object? sender, PointerEventArgs e)
     {
-        if (!Uri.TryCreate(releaseUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
-        {
-            logger.LogWarning("更新发布页地址无效 {HasUrl}", !string.IsNullOrWhiteSpace(releaseUrl));
-            toastService.Show(ResourceLookup.Resolve("update.release.open.failed", LocaleService.CurrentCulture), ToastLevel.Error);
-            return;
-        }
+        updateReleasePreviewHideTimer.Stop();
+        if (observedUpdateCoordinator?.Release is not null)
+            updateReleasePreviewPopup.IsOpen = true;
+    }
 
-        try
-        {
-            Process.Start(new ProcessStartInfo { FileName = uri.AbsoluteUri, UseShellExecute = true });
-            logger.LogInformation("更新发布页已打开 {Host}", uri.Host);
-        }
-        catch (Exception exception)
-        {
-            logger.LogError(exception, "打开更新发布页失败 {Host}", uri.Host);
-            toastService.Show(ResourceLookup.Resolve("update.release.open.failed", LocaleService.CurrentCulture), ToastLevel.Error);
-        }
+    private void UpdateEntryButton_OnPointerExited(object? sender, PointerEventArgs e) =>
+        ScheduleUpdateReleasePreviewClose();
+
+    private void UpdateReleasePreview_OnPointerEntered(object? sender, PointerEventArgs e) =>
+        updateReleasePreviewHideTimer.Stop();
+
+    private void UpdateReleasePreview_OnPointerExited(object? sender, PointerEventArgs e) =>
+        ScheduleUpdateReleasePreviewClose();
+
+    private void ScheduleUpdateReleasePreviewClose()
+    {
+        updateReleasePreviewHideTimer.Stop();
+        updateReleasePreviewHideTimer.Start();
+    }
+
+    private void CloseUpdateReleasePreview()
+    {
+        updateReleasePreviewHideTimer.Stop();
+        updateReleasePreviewPopup.IsOpen = false;
     }
 
     private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
@@ -489,7 +464,6 @@ public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, ID
         nameof(SpeedText),
         nameof(DownloadPercent),
         nameof(IsUpdateEntryVisible),
-        nameof(IsDialogVisible),
         nameof(IsDownloading),
         nameof(IsVerifying),
         nameof(IsPreparing),
@@ -497,8 +471,7 @@ public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, ID
         nameof(IsError),
         nameof(CanInstall),
         nameof(CanRetry),
-        nameof(ToggleDialogCommand),
-        nameof(DismissDialogCommand),
+        nameof(ActivateUpdateEntryCommand),
         nameof(RetryCommand),
         nameof(InstallAndRestartCommand)
     ];
@@ -526,7 +499,6 @@ public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, ID
     public string SpeedText => coordinator?.SpeedText ?? string.Empty;
     public int DownloadPercent => coordinator?.DownloadPercent ?? 0;
     public bool IsUpdateEntryVisible => coordinator?.IsUpdateEntryVisible == true;
-    public bool IsDialogVisible => coordinator?.IsDialogVisible == true;
     public bool IsDownloading => coordinator?.Stage == UpdateStage.Downloading;
     public bool IsVerifying => coordinator?.Stage == UpdateStage.Verifying;
     public bool IsPreparing => coordinator?.Stage is UpdateStage.Downloading or UpdateStage.Verifying;
@@ -534,8 +506,7 @@ public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, ID
     public bool IsError => coordinator?.Stage == UpdateStage.Error;
     public bool CanInstall => coordinator?.CanInstall == true;
     public bool CanRetry => coordinator?.CanRetry == true;
-    public ICommand? ToggleDialogCommand => coordinator?.ToggleDialogCommand;
-    public ICommand? DismissDialogCommand => coordinator?.DismissDialogCommand;
+    public ICommand? ActivateUpdateEntryCommand => coordinator?.ActivateUpdateEntryCommand;
     public ICommand? RetryCommand => coordinator?.RetryCommand;
     public ICommand? InstallAndRestartCommand => coordinator?.InstallAndRestartCommand;
 
@@ -597,9 +568,7 @@ public sealed class UpdateWindowPresentationAdapter : INotifyPropertyChanged, ID
             case nameof(UpdateCoordinator.IsUpdateEntryVisible):
                 RaisePropertyChanged(nameof(IsUpdateEntryVisible));
                 break;
-            case nameof(UpdateCoordinator.IsDialogVisible):
-                RaisePropertyChanged(nameof(IsDialogVisible));
-                break;
+
             case nameof(UpdateCoordinator.CanInstall):
                 RaisePropertyChanged(nameof(CanInstall));
                 break;

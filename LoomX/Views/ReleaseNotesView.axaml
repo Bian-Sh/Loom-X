@@ -12,57 +12,6 @@
     <x:Double x:Key="FontSize3Xl">18</x:Double>
   </UserControl.Resources>
   <UserControl.Styles>
-    <Style Selector="Expander.release-note-section">
-      <Setter Property="Margin" Value="0" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-    </Style>
-    <Style Selector="Expander.release-note-section /template/ ToggleButton#ExpanderHeader">
-      <Setter Property="MinHeight" Value="38" />
-      <Setter Property="Padding" Value="10,5,8,5" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}" />
-      <Setter Property="BorderThickness" Value="0,0,0,1" />
-      <Setter Property="CornerRadius" Value="0" />
-      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-    </Style>
-    <Style Selector="Expander.release-note-section /template/ Border#ToggleButtonBackground">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="{DynamicResource BorderSoftBrush}" />
-      <Setter Property="BorderThickness" Value="0,0,0,1" />
-      <Setter Property="CornerRadius" Value="0" />
-    </Style>
-    <Style Selector="Expander.release-note-section /template/ ToggleButton#ExpanderHeader:pointerover">
-      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-    </Style>
-    <Style Selector="Expander.release-note-section /template/ ToggleButton#ExpanderHeader:pointerover /template/ Border#ToggleButtonBackground">
-      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
-    </Style>
-    <Style Selector="Expander.release-note-section /template/ Border#ExpanderContent">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="0" />
-    </Style>
-    <Style Selector="Expander.release-note-section /template/ Border#ExpandCollapseChevronBorder">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Margin" Value="4,0,2,0" />
-    </Style>
-    <Style Selector="Expander.release-note-section /template/ Path#ExpandCollapseChevron">
-      <Setter Property="Stroke" Value="{DynamicResource TextSecondaryBrush}" />
-    </Style>
-    <Style Selector="md|MarkdownRenderer.release-note-heading">
-      <Setter Property="Margin" Value="0" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-    <Style Selector="md|MarkdownRenderer.release-note-heading md|MarkdownTextBlock">
-      <Setter Property="Margin" Value="0" />
-      <Setter Property="FontSize" Value="16" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="LineHeight" Value="20" />
-    </Style>
     <Style Selector="md|MarkdownRenderer.release-note-body md|MarkdownTextBlock">
       <Setter Property="Margin" Value="0,1" />
       <Setter Property="FontSize" Value="13" />
@@ -73,31 +22,11 @@
     <ScrollViewer IsVisible="{Binding HasContent}"
                   VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
-      <StackPanel Spacing="0" md:MarkdownTextBlock.IsSelectionScope="True">
-        <ItemsControl ItemsSource="{Binding Sections}" IsVisible="{Binding IsSectioned}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:ReleaseNoteSectionViewModel">
-              <Expander Classes="release-note-section"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Stretch"
-                        AutomationProperties.Name="{Binding Title}"
-                        IsExpanded="{Binding IsExpanded}">
-                <Expander.Header>
-                  <md:MarkdownRenderer Classes="release-note-heading"
-                                       MarkdownBuilder="{Binding HeadingMarkdown}" />
-                </Expander.Header>
-                <Border Padding="12,6,30,10">
-                  <md:MarkdownRenderer Classes="release-note-body"
-                                       MarkdownBuilder="{Binding Markdown}" />
-                </Border>
-              </Expander>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <md:MarkdownRenderer Classes="release-note-body"
-                             MarkdownBuilder="{Binding Markdown}"
-                             IsVisible="{Binding HasUnsectionedContent}" />
-      </StackPanel>
+      <md:MarkdownRenderer Classes="release-note-body"
+                           Margin="0,0,8,0"
+                           IsHitTestVisible="False"
+                           md:MarkdownTextBlock.IsSelectionScope="True"
+                           MarkdownBuilder="{Binding Markdown}" />
     </ScrollViewer>
     <TextBlock IsVisible="{Binding IsEmpty}"
                Text="{Binding EmptyText}"

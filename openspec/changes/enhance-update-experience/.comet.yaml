@@ -27,5 +27,5 @@ classic_migration: 1
 run_id: 51e487bc-6d5a-46f1-82cd-2365360e975d
 bound_branch: codex/merge-structured-config-assistant-decisions
 verify_failures: 0
-check_epoch: 10
+check_epoch: 12
 archive_confirmation: pending

@@ -123,7 +123,7 @@ internal sealed class DebugUpdatePreviewService : IUpdateService
             $"v{version}",
             version,
             index == 0 ? "Loom-X 更新体验预览" : $"Loom-X v{version}",
-            $"## 🐞 修复问题\n\n- 修复透明模式下更新说明可读性\n\n## ✨ 新增功能\n\n- 支持三个模块默认展开并独立折叠\n\n## 🚀 优化改进\n\n- 优化安装确认流程\n- 安全链接：[项目主页](https://github.com/Bian-Sh/Loom-X)",
+            $"## 🐞 修复问题\n\n- 修复透明模式下更新说明可读性\n\n## ✨ 新增功能\n\n- 支持在更新入口悬停预览版本说明\n\n## 🚀 优化改进\n\n- 优化安装确认流程",
             "https://github.com/Bian-Sh/Loom-X/releases",
             DateTimeOffset.Now.AddDays(-index),
             [installer, checksum],

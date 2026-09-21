@@ -48,7 +48,9 @@ public sealed class MainWindowChromeContractTests
         Assert.True(entryStart >= 0 && minimizeStart > entryStart, "更新入口必须位于最小化按钮左侧。");
         Assert.Contains("Grid.Column=\"1\"", source[entryStart..minimizeStart], StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding Update.IsUpdateEntryVisible}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Command=\"{Binding Update.ToggleDialogCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding Update.ActivateUpdateEntryCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("PointerEntered=\"UpdateEntryButton_OnPointerEntered\"", source, StringComparison.Ordinal);
+        Assert.Contains("PointerExited=\"UpdateEntryButton_OnPointerExited\"", source, StringComparison.Ordinal);
         Assert.Contains("ToolTip.Tip=\"{Binding Update.UpdateEntryHint}\"", source, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.Name=\"{Binding Update.UpdateEntryHint}\"", source, StringComparison.Ordinal);
         Assert.Contains("Height=\"32\" MinWidth=\"32\"", source, StringComparison.Ordinal);

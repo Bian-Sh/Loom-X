@@ -101,10 +101,19 @@
                       </StackPanel>
                     </Grid>
                     <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="16,12,16,16">
-                      <StackPanel Spacing="3" Margin="0,0,0,10">
-                        <TextBlock Text="{Binding ReleaseHistory.Content.Title}" FontSize="16" FontWeight="SemiBold"/>
-                        <TextBlock Text="{Binding ReleaseHistory.Content.PublishedAtText}" Classes="hint"/>
-                      </StackPanel>
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,10">
+                        <StackPanel Spacing="3">
+                          <TextBlock Text="{Binding ReleaseHistory.Content.Title}" FontSize="16" FontWeight="SemiBold"/>
+                          <TextBlock Text="{Binding ReleaseHistory.Content.PublishedAtText}" Classes="hint"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Content="{l:Locale update.dialog.open_release}"
+                                CommandParameter="{Binding ReleaseHistory.Content.ReleaseUrl}"
+                                Click="SelectedReleasePageButton_OnClick"
+                                IsVisible="{Binding ReleaseHistory.Content.HasContent}"
+                                Classes="outline"
+                                VerticalAlignment="Top"/>
+                      </Grid>
                       <views:ReleaseNotesView DataContext="{Binding ReleaseHistory.Content}" Grid.Row="1"/>
                     </Grid>
                   </Grid>

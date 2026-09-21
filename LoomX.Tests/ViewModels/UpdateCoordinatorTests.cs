@@ -108,7 +108,6 @@ public sealed class UpdateCoordinatorTests
         await service.PrepareStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
 
         Assert.NotNull(result?.Latest);
-        Assert.True(coordinator.IsDialogVisible);
         Assert.Equal(UpdateStage.Downloading, coordinator.Stage);
         service.ReportVerifying();
         Assert.Equal(UpdateStage.Verifying, coordinator.Stage);
@@ -118,7 +117,6 @@ public sealed class UpdateCoordinatorTests
         Assert.Contains(UpdateStage.Downloading, stages);
         Assert.Contains(UpdateStage.Verifying, stages);
         Assert.Equal(UpdateStage.Ready, coordinator.Stage);
-        Assert.True(coordinator.IsDialogVisible);
         Assert.True(coordinator.CanInstall);
         Assert.False(coordinator.IsProgressVisible);
     }
@@ -170,18 +168,26 @@ public sealed class UpdateCoordinatorTests
     }
 
     [Fact]
-    public async Task 稍后只隐藏浮窗且不会取消准备任务()
+    public async Task 下载中激活入口不会弹出安装确认或取消准备任务()
     {
         await using var fixture = await CoordinatorFixture.CreateAsync();
         var service = new FakeUpdateService();
         service.EnqueuePreparation();
-        using var coordinator = fixture.CreateCoordinator(service);
+        var confirmations = 0;
+        using var coordinator = fixture.CreateCoordinator(
+            service,
+            confirmInstall: () =>
+            {
+                confirmations++;
+                return Task.FromResult(false);
+            });
 
         await coordinator.CheckNowAsync(false);
         await service.PrepareStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
-        coordinator.DismissDialogCommand.Execute(null);
+        coordinator.ActivateUpdateEntryCommand.Execute(null);
+        await Task.Delay(50);
 
-        Assert.False(coordinator.IsDialogVisible);
+        Assert.Equal(0, confirmations);
         Assert.False(service.PrepareCancellationToken.IsCancellationRequested);
         Assert.Equal(UpdateStage.Downloading, coordinator.Stage);
     }
@@ -202,7 +208,7 @@ public sealed class UpdateCoordinatorTests
         Assert.NotNull(coordinator.Release);
         Assert.Equal(UpdateErrorKind.Prepare, coordinator.ErrorKind);
         Assert.True(coordinator.CanRetry);
-        coordinator.RetryCommand.Execute(null);
+        coordinator.ActivateUpdateEntryCommand.Execute(null);
         await WaitForAsync(() => service.PrepareCalls == 2);
         retried.SetResult(CreatePreparedUpdate());
         await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
@@ -354,12 +360,9 @@ public sealed class UpdateCoordinatorTests
         await coordinator.CheckNowAsync(false);
         prepared.SetResult(CreatePreparedUpdate());
         await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
-        coordinator.DismissDialogCommand.Execute(null);
 
-        coordinator.ToggleDialogCommand.Execute(null);
+        coordinator.ActivateUpdateEntryCommand.Execute(null);
         await WaitForAsync(() => confirmations == 1);
-
-        Assert.False(coordinator.IsDialogVisible);
         Assert.Equal(0, service.LaunchCalls);
         Assert.Equal(UpdateStage.Ready, coordinator.Stage);
     }
@@ -382,7 +385,6 @@ public sealed class UpdateCoordinatorTests
         Assert.Equal(0, service.LaunchCalls);
         Assert.Equal(0, exits);
         Assert.Equal(UpdateStage.Ready, coordinator.Stage);
-        Assert.False(coordinator.IsDialogVisible);
         Assert.True(coordinator.CanInstall);
     }
 
@@ -406,7 +408,7 @@ public sealed class UpdateCoordinatorTests
         await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
 
         coordinator.InstallAndRestartCommand.Execute(null);
-        coordinator.ToggleDialogCommand.Execute(null);
+        coordinator.ActivateUpdateEntryCommand.Execute(null);
         await WaitForAsync(() => confirmations == 1);
         Assert.False(coordinator.CanInstall);
 
@@ -437,7 +439,6 @@ public sealed class UpdateCoordinatorTests
 
         Assert.Equal(UpdateStage.Idle, automatic.Stage);
         Assert.False(automatic.IsUpdateEntryVisible);
-        Assert.False(automatic.IsDialogVisible);
     }
 
     private static void RecordStage(PropertyChangedEventArgs args, UpdateCoordinator coordinator, ICollection<UpdateStage> stages)
