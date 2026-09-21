@@ -2,6 +2,7 @@
 change: enhance-update-experience
 design-doc: docs/superpowers/specs/2026-09-20-enhance-update-experience-design.md
 base-ref: e0e1dde3ebd11c130a77935313372a332016a1fb
+archived-with: 2026-09-21-enhance-update-experience
 ---
 
 <!-- comet-task-authority: openspec/changes/enhance-update-experience/tasks.md -->

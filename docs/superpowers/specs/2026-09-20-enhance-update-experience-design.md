@@ -2,6 +2,8 @@
 comet_change: enhance-update-experience
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-21-enhance-update-experience
+status: final
 ---
 
 # Loom-X 桌面端更新体验深度设计
