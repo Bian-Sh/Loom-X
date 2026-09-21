@@ -5,6 +5,7 @@ using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using LoomX;
 using LoomX.ViewModels;
@@ -32,6 +33,18 @@ public sealed class ProviderBooleanNotConverter : IValueConverter
 
 public partial class ProvidersView : UserControl
 {
+    private const double TestResponseAutoScrollDeadZone = 10;
+    private const double TestResponseAutoScrollSpeedFactor = 12;
+    private const double TestResponseAutoScrollMaximumSpeed = 1800;
+    private readonly DispatcherTimer testResponseAutoScrollTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
+    private readonly Stopwatch testResponseAutoScrollStopwatch = new();
+    private ScrollViewer? testResponseScrollViewer;
+    private bool testResponseAutoScrollActive;
+    private Point testResponseAutoScrollAnchorPoint;
+    private Vector testResponseAutoScrollDisplacement;
+    private IPointer? testResponseAutoScrollPointer;
+    private Cursor? previousTestResponseCursor;
+    private Cursor? testResponseAutoScrollCursor;
     private ItemsControl? modelDragItemsControl;
     private Grid? modelDragHost;
     private Border? modelDragPreviewBorder;
@@ -43,9 +56,177 @@ public partial class ProvidersView : UserControl
     {
         InitializeComponent();
         AddHandler(InputElement.KeyDownEvent, TestResponseTextBox_OnKeyDown, RoutingStrategies.Tunnel, true);
+        TestResponseTextBox.AddHandler(InputElement.PointerPressedEvent, TestResponseTextBox_OnPointerPressed, RoutingStrategies.Tunnel, true);
+        TestResponseTextBox.AddHandler(InputElement.PointerMovedEvent, TestResponseTextBox_OnPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
+        TestResponseTextBox.AddHandler(InputElement.PointerCaptureLostEvent, TestResponseTextBox_OnPointerCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
+        testResponseAutoScrollTimer.Tick += TestResponseAutoScrollTimer_OnTick;
+        DetachedFromVisualTree += (_, _) => StopTestResponseAutoScroll();
         AddHandler(InputElement.PointerMovedEvent, ModelDrag_OnPointerMoved, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
         AddHandler(InputElement.PointerReleasedEvent, ModelDrag_OnPointerReleased, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
         AddHandler(InputElement.PointerCaptureLostEvent, ModelDrag_OnPointerCaptureLost, RoutingStrategies.Tunnel | RoutingStrategies.Bubble, true);
+    }
+
+    private void TestResponseTextBox_OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        var updateKind = e.GetCurrentPoint(TestResponseTextBox).Properties.PointerUpdateKind;
+        if (updateKind == PointerUpdateKind.MiddleButtonPressed)
+        {
+            if (testResponseAutoScrollActive)
+                StopTestResponseAutoScroll();
+            else
+                StartTestResponseAutoScroll(e.GetPosition(TestResponseAutoScrollOverlay), e.Pointer);
+
+            e.Handled = true;
+            return;
+        }
+
+        if (!testResponseAutoScrollActive || updateKind is not (
+                PointerUpdateKind.LeftButtonPressed or
+                PointerUpdateKind.RightButtonPressed or
+                PointerUpdateKind.XButton1Pressed or
+                PointerUpdateKind.XButton2Pressed)) return;
+
+        StopTestResponseAutoScroll();
+        e.Handled = true;
+    }
+
+    private void TestResponseTextBox_OnPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (!testResponseAutoScrollActive) return;
+
+        var pointerPosition = e.GetPosition(TestResponseAutoScrollOverlay);
+        testResponseAutoScrollDisplacement = new Vector(
+            pointerPosition.X - testResponseAutoScrollAnchorPoint.X,
+            pointerPosition.Y - testResponseAutoScrollAnchorPoint.Y);
+        UpdateTestResponseAutoScrollFeedback(testResponseAutoScrollDisplacement);
+        e.Handled = true;
+    }
+
+    private void TestResponseTextBox_OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs e)
+    {
+        if (testResponseAutoScrollActive) StopTestResponseAutoScroll();
+    }
+
+    private void StartTestResponseAutoScroll(Point anchorPoint, IPointer? pointer)
+    {
+        var scrollViewer = FindTestResponseScrollViewer();
+        if (scrollViewer is null) return;
+
+        var horizontalMaximum = Math.Max(0, scrollViewer.Extent.Width - scrollViewer.Viewport.Width);
+        var verticalMaximum = Math.Max(0, TestTabScrollViewer.Extent.Height - TestTabScrollViewer.Viewport.Height);
+        if (testResponseAutoScrollActive || (horizontalMaximum <= 0.5 && verticalMaximum <= 0.5)) return;
+
+        testResponseScrollViewer = scrollViewer;
+        testResponseAutoScrollActive = true;
+        testResponseAutoScrollAnchorPoint = anchorPoint;
+        testResponseAutoScrollDisplacement = default;
+        testResponseAutoScrollPointer = pointer;
+        previousTestResponseCursor = TestResponseTextBox.Cursor;
+        var cursorType = horizontalMaximum > 0.5 && verticalMaximum > 0.5
+            ? StandardCursorType.SizeAll
+            : horizontalMaximum > 0.5
+                ? StandardCursorType.SizeWestEast
+                : StandardCursorType.SizeNorthSouth;
+        testResponseAutoScrollCursor = new Cursor(cursorType);
+        TestResponseTextBox.Cursor = testResponseAutoScrollCursor;
+        Canvas.SetLeft(TestResponseAutoScrollAnchor, anchorPoint.X - TestResponseAutoScrollAnchor.Width / 2);
+        Canvas.SetTop(TestResponseAutoScrollAnchor, anchorPoint.Y - TestResponseAutoScrollAnchor.Height / 2);
+        TestResponseAutoScrollAnchor.IsVisible = true;
+        UpdateTestResponseAutoScrollFeedback(default);
+        pointer?.Capture(TestResponseTextBox);
+        testResponseAutoScrollStopwatch.Restart();
+        testResponseAutoScrollTimer.Start();
+    }
+
+    private void StopTestResponseAutoScroll()
+    {
+        if (!testResponseAutoScrollActive) return;
+
+        testResponseAutoScrollActive = false;
+        testResponseAutoScrollTimer.Stop();
+        testResponseAutoScrollStopwatch.Reset();
+        TestResponseAutoScrollAnchor.IsVisible = false;
+        TestResponseTextBox.Cursor = previousTestResponseCursor;
+        previousTestResponseCursor = null;
+        testResponseAutoScrollCursor?.Dispose();
+        testResponseAutoScrollCursor = null;
+        testResponseAutoScrollDisplacement = default;
+        testResponseScrollViewer = null;
+
+        var pointer = testResponseAutoScrollPointer;
+        testResponseAutoScrollPointer = null;
+        if (pointer?.Captured == TestResponseTextBox) pointer.Capture(null);
+    }
+
+    private void UpdateTestResponseAutoScrollFeedback(Vector displacement)
+    {
+        var horizontalVelocity = CalculateTestResponseAutoScrollVelocity(displacement.X);
+        var verticalVelocity = CalculateTestResponseAutoScrollVelocity(displacement.Y);
+        TestResponseAutoScrollLeftGlyph.Opacity = horizontalVelocity < 0 ? 1 : horizontalVelocity > 0 ? 0.25 : 0.65;
+        TestResponseAutoScrollRightGlyph.Opacity = horizontalVelocity > 0 ? 1 : horizontalVelocity < 0 ? 0.25 : 0.65;
+        TestResponseAutoScrollUpGlyph.Opacity = verticalVelocity < 0 ? 1 : verticalVelocity > 0 ? 0.25 : 0.65;
+        TestResponseAutoScrollDownGlyph.Opacity = verticalVelocity > 0 ? 1 : verticalVelocity < 0 ? 0.25 : 0.65;
+    }
+
+    private void TestResponseAutoScrollTimer_OnTick(object? sender, EventArgs e)
+    {
+        if (!testResponseAutoScrollActive || testResponseScrollViewer is null) return;
+
+        var elapsedSeconds = testResponseAutoScrollStopwatch.Elapsed.TotalSeconds;
+        testResponseAutoScrollStopwatch.Restart();
+        var horizontalVelocity = CalculateTestResponseAutoScrollVelocity(testResponseAutoScrollDisplacement.X);
+        var verticalVelocity = CalculateTestResponseAutoScrollVelocity(testResponseAutoScrollDisplacement.Y);
+        if (horizontalVelocity == 0 && verticalVelocity == 0) return;
+
+        var horizontalMaximum = Math.Max(0, testResponseScrollViewer.Extent.Width - testResponseScrollViewer.Viewport.Width);
+        var verticalMaximum = Math.Max(0, TestTabScrollViewer.Extent.Height - TestTabScrollViewer.Viewport.Height);
+        var nextHorizontalOffset = CalculateTestResponseAutoScrollOffset(
+            testResponseScrollViewer.Offset.X,
+            horizontalVelocity,
+            elapsedSeconds,
+            horizontalMaximum);
+        var nextVerticalOffset = CalculateTestResponseAutoScrollOffset(
+            TestTabScrollViewer.Offset.Y,
+            verticalVelocity,
+            elapsedSeconds,
+            verticalMaximum);
+        var horizontalChanged = Math.Abs(nextHorizontalOffset - testResponseScrollViewer.Offset.X) > 0.01;
+        var verticalChanged = Math.Abs(nextVerticalOffset - TestTabScrollViewer.Offset.Y) > 0.01;
+        if (!horizontalChanged && !verticalChanged) return;
+
+        if (horizontalChanged)
+            testResponseScrollViewer.Offset = new Vector(nextHorizontalOffset, testResponseScrollViewer.Offset.Y);
+        if (verticalChanged)
+            TestTabScrollViewer.Offset = new Vector(TestTabScrollViewer.Offset.X, nextVerticalOffset);
+    }
+
+    private ScrollViewer? FindTestResponseScrollViewer()
+    {
+        TestResponseTextBox.ApplyTemplate();
+        return TestResponseTextBox.GetVisualDescendants()
+            .OfType<ScrollViewer>()
+            .FirstOrDefault(item => item.Name == "PART_ScrollViewer")
+            ?? TestResponseTextBox.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+    }
+
+    internal static double CalculateTestResponseAutoScrollVelocity(double displacement)
+    {
+        var distance = Math.Abs(displacement) - TestResponseAutoScrollDeadZone;
+        if (distance <= 0) return 0;
+
+        var speed = Math.Min(TestResponseAutoScrollMaximumSpeed, distance * TestResponseAutoScrollSpeedFactor);
+        return Math.CopySign(speed, displacement);
+    }
+
+    internal static double CalculateTestResponseAutoScrollOffset(
+        double current,
+        double velocity,
+        double elapsedSeconds,
+        double maximum)
+    {
+        var safeMaximum = Math.Max(0, maximum);
+        var safeElapsed = Math.Max(0, elapsedSeconds);
+        return Math.Clamp(current + velocity * safeElapsed, 0, safeMaximum);
     }
 
     private void TestResponseTextBox_OnKeyDown(object? sender, KeyEventArgs e)
