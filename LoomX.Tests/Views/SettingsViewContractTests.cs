@@ -283,6 +283,10 @@ public sealed class SettingsViewContractTests
         Assert.Contains("<views:ReleaseNotesView DataContext=\"{Binding ReleaseHistory.Content}\"", source, StringComparison.Ordinal);
         Assert.Contains("Classes=\"release-history-list selection-rail-list\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"ListBox.release-history-list ListBoxItem\"><Setter Property=\"Cursor\" Value=\"Hand\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"selection-rail-card\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.selection-rail-list ListBoxItem\"", appSource, StringComparison.Ordinal);
+        Assert.Contains("Property=\"Margin\" Value=\"0,0,0,6\"", appSource, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Border.selection-rail-card\"", appSource, StringComparison.Ordinal);
         Assert.Contains("Selector=\"ListBox.selection-rail-list ListBoxItem:selected\"", appSource, StringComparison.Ordinal);
         Assert.Contains("Property=\"BorderThickness\" Value=\"3,0,0,0\"", appSource, StringComparison.Ordinal);
         Assert.Contains("<TextBlock Text=\"{Binding VersionText}\" FontWeight=\"SemiBold\"/>", source, StringComparison.Ordinal);

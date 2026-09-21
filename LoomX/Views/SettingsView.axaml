@@ -78,18 +78,20 @@
                 <Border Grid.Row="1" Background="{DynamicResource BorderBrush}"/>
                 <Grid Grid.Row="2">
                   <Grid ColumnDefinitions="200,*">
-                    <Grid Grid.Column="0" RowDefinitions="*,Auto" Background="{DynamicResource SurfaceSubtleBrush}">
+                    <Grid Grid.Column="0" RowDefinitions="*,Auto" Background="{DynamicResource SurfaceBrush}">
                       <ListBox Classes="release-history-list selection-rail-list" ItemsSource="{Binding ReleaseHistory.Releases}" SelectedItem="{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}" Background="Transparent" BorderThickness="0" Margin="8">
                         <ListBox.ItemTemplate>
                           <DataTemplate>
-                            <Grid RowDefinitions="Auto,Auto" Margin="4,6" ColumnDefinitions="*,Auto">
-                              <TextBlock Text="{Binding VersionText}" FontWeight="SemiBold"/>
-                              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-                                <Border IsVisible="{Binding IsLatest}" Background="{DynamicResource AccentSoftBrush}" CornerRadius="5" Padding="5,1"><TextBlock Text="{Binding LatestBadgeText}" Foreground="{DynamicResource AccentBrush}" FontSize="10"/></Border>
-                                <Border IsVisible="{Binding IsCurrent}" Background="{DynamicResource SuccessSoftBrush}" CornerRadius="5" Padding="5,1"><TextBlock Text="{Binding CurrentBadgeText}" Foreground="{DynamicResource SuccessBrush}" FontSize="10"/></Border>
-                              </StackPanel>
-                              <TextBlock Grid.Row="1" Text="{Binding PublishedAtText}" Classes="hint"/>
-                            </Grid>
+                            <Border Classes="selection-rail-card" Padding="10,8">
+                              <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto">
+                                <TextBlock Text="{Binding VersionText}" FontWeight="SemiBold"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                  <Border IsVisible="{Binding IsLatest}" Background="{DynamicResource AccentSoftBrush}" CornerRadius="5" Padding="5,1"><TextBlock Text="{Binding LatestBadgeText}" Foreground="{DynamicResource AccentBrush}" FontSize="10"/></Border>
+                                  <Border IsVisible="{Binding IsCurrent}" Background="{DynamicResource SuccessSoftBrush}" CornerRadius="5" Padding="5,1"><TextBlock Text="{Binding CurrentBadgeText}" Foreground="{DynamicResource SuccessBrush}" FontSize="10"/></Border>
+                                </StackPanel>
+                                <TextBlock Grid.Row="1" Text="{Binding PublishedAtText}" Classes="hint"/>
+                              </Grid>
+                            </Border>
                           </DataTemplate>
                         </ListBox.ItemTemplate>
                       </ListBox>
