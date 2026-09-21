@@ -140,9 +140,6 @@
   <data name="settings.update.version.label">
     <value>現在のバージョン：</value>
   </data>
-  <data name="settings.update.version.hint">
-    <value>ローカルデスクトップアプリのバージョン情報。</value>
-  </data>
   <data name="settings.update.auto.check">
     <value>自動更新チェック</value>
   </data>

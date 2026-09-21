@@ -61,7 +61,6 @@
             <Border Classes="panel" Padding="16,12">
               <StackPanel Spacing="9">
                 <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4"><TextBlock Text="{l:Locale settings.update.version.label}" FontWeight="SemiBold" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding VersionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
-                <TextBlock Text="{l:Locale settings.update.version.hint}" Classes="hint"/>
                 <CheckBox Content="{l:Locale settings.update.auto.check}" IsChecked="{Binding AutoCheckUpdates}"/>
                 <TextBlock Text="{l:Locale settings.update.auto.check.hint}" Classes="hint" Margin="24,-7,0,0"/>
                 <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="9"><CheckBox Content="{l:Locale settings.update.use.proxy}" IsChecked="{Binding UseProxyForUpdates}"/><TextBlock Grid.Row="1" Text="{l:Locale settings.update.use.proxy.hint}" Classes="hint" Margin="24,-7,0,0"/><Button Grid.RowSpan="2" Grid.Column="1" Content="{l:Locale settings.update.check.button}" Command="{Binding CheckUpdateCommand}" Classes="outline" HorizontalAlignment="Right" VerticalAlignment="Bottom" IsEnabled="{Binding IsNotBusy}"/></Grid>

@@ -351,7 +351,7 @@ public sealed class SettingsViewContractTests
         var jaJp = ReadDesktopFile("Resources", "Strings.ja-JP.resx");
 
         Assert.Contains("<Grid ColumnDefinitions=\"Auto,*\" ColumnSpacing=\"4\">", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{l:Locale settings.update.version.hint}\" Classes=\"hint\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text=\"{l:Locale settings.update.version.hint}\"", source, StringComparison.Ordinal);
         Assert.Contains("<Grid RowDefinitions=\"Auto,Auto\" ColumnDefinitions=\"*,Auto\" ColumnSpacing=\"12\" RowSpacing=\"9\">", source, StringComparison.Ordinal);
         Assert.Contains("Grid.Row=\"1\" Text=\"{l:Locale settings.update.use.proxy.hint}\" Classes=\"hint\" Margin=\"24,-7,0,0\"", source, StringComparison.Ordinal);
         Assert.Contains("Grid.RowSpan=\"2\" Grid.Column=\"1\" Content=\"{l:Locale settings.update.check.button}\"", source, StringComparison.Ordinal);
