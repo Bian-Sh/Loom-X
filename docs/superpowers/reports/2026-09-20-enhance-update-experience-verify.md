@@ -450,3 +450,34 @@ if (Test-Path -LiteralPath $outputDir) { throw "发布目录已存在：$outputD
 ### 17.5 结论
 
 **PASS。** 补充需求实现、自动化测试、透明/非透明 CUA 验收、发布目录、安装器生成和发布包进程路径均已验证。
+
+
+## 18. 合并远端后的最终验证（2026-09-21 18:45 +08:00）
+
+### 18.1 OpenSpec 完整性与一致性
+
+| 维度 | 结果 |
+|---|---|
+| 完整性 | 31/31 tasks 完成；9/9 requirements 有实现与测试证据 |
+| 正确性 | 24/24 scenarios 已由自动化测试、契约测试或 CUA 验收覆盖 |
+| 一致性 | 实现符合 OpenSpec design 与 Superpowers Design Doc；未发现新的 Critical、Warning 或规格漂移 |
+
+- `comet state check enhance-update-experience verify --json`：4/4 入口检查通过，`verify_mode=full`。
+- `comet classic openspec -- validate enhance-update-experience --strict`：PASS。
+- 远端 `origin/master` 的提交 `5dce5ff` 已通过普通 merge 纳入当前分支；该提交只调整助手会话 JSONL 中文保存及其测试，与更新体验实现无冲突。
+
+### 18.2 合并后 Runtime 证据
+
+- Comet Verify：`comet check run enhance-update-experience verify --local --json -- dotnet test LoomX.slnx -c Release --no-restore` → **1182/1182 PASS**，0 skipped；证据日志：`openspec/changes/enhance-update-experience/.comet/checks/9c8f869b-c1ca-4404-8333-23424c85af92.log`。
+- Release build：`dotnet build LoomX.slnx -c Release --no-restore` → **0 error**，2 个既有 `NU1903`。
+- 测试重新编译仍可见既有 `CS8618`、`CA2024`、`CS8602`；未发现本次改动新增的编译错误。
+
+### 18.3 用户设置与进程边界
+
+- 使用本次发布包以 `--allow-multiple-instances` 启动 PID 29044，进程实际路径与 `outputs/20260921-174531-enhance-update-experience-followup/publish/LoomX.exe` 精确一致。
+- 通过 CUA 将用户原有“透明窗口”设置恢复为 Off，并在重快照中确认 toggle 的 `selected=false`。
+- 仅关闭本次启动的 PID 29044；其他 LoomX 进程 PID 35328 保持运行，未操作其他会话进程。
+
+### 18.4 最终结论
+
+**PASS。** 合并远端后完整测试、Release build、OpenSpec strict、规格映射与用户设置恢复均已重新验证；当前 change 可推进到 Archive 确认阶段。
