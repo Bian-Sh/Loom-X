@@ -282,11 +282,14 @@ public sealed class SettingsViewContractTests
         Assert.Contains("<views:ReleaseNotesView DataContext=\"{Binding ReleaseHistory.Content}\"", source, StringComparison.Ordinal);
         Assert.Contains("Classes=\"release-history-list\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"ListBox.release-history-list ListBoxItem\"><Setter Property=\"Cursor\" Value=\"Hand\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("<TextBlock Text=\"{Binding VersionText}\" FontWeight=\"SemiBold\"/>", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Tag=\"{Binding Release.HtmlUrl}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ReleaseHistory.SelectedRelease.VersionText}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Tag=\"{Binding ReleaseHistory.SelectedRelease.Release.HtmlUrl}\"", source, StringComparison.Ordinal);
         Assert.Contains("Cursor=\"Hand\"", source, StringComparison.Ordinal);
         Assert.Contains("Foreground=\"{DynamicResource AccentBrush}\"", source, StringComparison.Ordinal);
         Assert.Contains("TextDecorations=\"Underline\"", source, StringComparison.Ordinal);
         Assert.Contains("ToolTip.Tip=\"{l:Locale settings.update.history.open.release.tip}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Tag=\"{Binding Release.HtmlUrl}\"", source, StringComparison.Ordinal);
         Assert.Contains("PointerPressed=\"ReleaseVersion_OnPointerPressed\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Content=\"{l:Locale update.dialog.open_release}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SelectedReleasePageButton_OnClick", source, StringComparison.Ordinal);
