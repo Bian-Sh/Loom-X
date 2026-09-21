@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,12 @@ public delegate Task<bool> ToolApprovalGate(ToolCall toolCall, ToolDefinition to
 public sealed class AgentLoop
 {
     private const string CancelledToolResult = "{\"cancelled\":true,\"reason\":\"assistant_run_cancelled\"}";
+    private const string AskUserToolName = "assistant.ask_user";
+    private const int AskUserRepeatLimit = 2;
+    private static readonly JsonSerializerOptions ResultJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
     private readonly IModelClient modelClient;
     private readonly ToolRegistry toolRegistry;
     private readonly ILogger<AgentLoop> logger;
@@ -68,8 +75,10 @@ public sealed class AgentLoop
         var completed = false;
         var cancelled = false;
         string? failedDetail = null;
-        // 用户取消 AskUser 后，本轮不再展示面板；若模型仍重复调用则复用原取消结果。
-        var disabledToolResults = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // AskUser 是本轮一次性的人机交互：成功提交、跳过或取消后都不允许再次展示。
+        // 部分模型即使看不到工具定义仍会凭历史重复调用，因此执行层也必须硬拦截。
+        var completedInteractiveToolResults = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var suppressedAskUserCalls = 0;
 
         for (var step = 0; step < session.Options.MaxSteps && !completed && !cancelled && failedDetail is null; step++)
         {
@@ -82,9 +91,9 @@ public sealed class AgentLoop
             var completionReceived = false;
 
             // 逐条拉取模型流。yield 不允许出现在带 catch 的 try 内，因此仅在 try 中移动枚举器，事件在 try 外处理。
-            var availableTools = disabledToolResults.Count == 0
+            var availableTools = completedInteractiveToolResults.Count == 0
                 ? toolRegistry.All
-                : toolRegistry.All.Where(tool => !disabledToolResults.ContainsKey(tool.Name)).ToArray();
+                : toolRegistry.All.Where(tool => !completedInteractiveToolResults.ContainsKey(tool.Name)).ToArray();
             await using var enumerator = StreamWithRetryAsync(
                 new ModelRequest(session.Messages, availableTools), session.Options.ModelTimeout,
                 session.Id, step + 1, cancellationToken).GetAsyncEnumerator(cancellationToken);
@@ -185,6 +194,7 @@ public sealed class AgentLoop
                 break;
             }
 
+            var completeLocallyAfterTools = false;
             for (var toolIndex = 0; toolIndex < dedupedToolCalls.Count; toolIndex++)
             {
                 var toolCall = dedupedToolCalls[toolIndex];
@@ -237,11 +247,16 @@ public sealed class AgentLoop
 
                 ToolResult? result;
                 bool toolCancelled;
-                if (disabledToolResults.TryGetValue(toolCall.Name, out var disabledResult))
+                if (completedInteractiveToolResults.TryGetValue(toolCall.Name, out var completedResult))
                 {
-                    result = ToolResult.Ok(disabledResult);
+                    suppressedAskUserCalls++;
+                    result = ToolResult.Ok(CreateSuppressedAskUserResult(completedResult));
                     toolCancelled = false;
-                    logger.LogInformation("Agent 忽略了已取消的重复工具调用 {ToolName}", safeToolCall.Name);
+                    completeLocallyAfterTools = suppressedAskUserCalls >= AskUserRepeatLimit;
+                    logger.LogWarning(
+                        "Agent 拦截已完成的人机交互重复调用 {ToolName} {RepeatCount}",
+                        safeToolCall.Name,
+                        suppressedAskUserCalls);
                 }
                 else
                 {
@@ -265,10 +280,26 @@ public sealed class AgentLoop
                     Success = result.Success,
                     Detail = result.Success ? null : ModelErrorClassifier.SanitizeUpstreamMessage(result.Content),
                 };
-                if (IsCancelledAskUserResult(safeToolCall.Name, result.Content))
+                if (result.Success && IsAskUserTool(safeToolCall.Name))
                 {
-                    disabledToolResults.TryAdd(safeToolCall.Name, result.Content);
+                    completedInteractiveToolResults.TryAdd(safeToolCall.Name, result.Content);
                 }
+            }
+
+            if (completeLocallyAfterTools)
+            {
+                var firstResult = completedInteractiveToolResults[AskUserToolName];
+                session.AddMessage(ChatMessage.Assistant(CreateAskUserRepeatGuardMessage(firstResult)));
+                yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with
+                {
+                    Message = session.Messages[^1],
+                    Step = step + 1,
+                };
+                completed = true;
+                logger.LogWarning(
+                    "Agent 因模型连续重复人机交互而本地结束 {SessionId} {RepeatCount}",
+                    session.Id,
+                    suppressedAskUserCalls);
             }
         }
 
@@ -418,24 +449,72 @@ public sealed class AgentLoop
         return compact.Length <= 300 ? compact : compact[..300] + "…";
     }
 
-    private static bool IsCancelledAskUserResult(string toolName, string content)
-    {
-        if (!string.Equals(toolName, "assistant.ask_user", StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
+    private static bool IsAskUserTool(string toolName) =>
+        string.Equals(toolName, AskUserToolName, StringComparison.OrdinalIgnoreCase);
 
+    private static string CreateSuppressedAskUserResult(string firstResult)
+    {
+        var outcome = GetAskUserOutcome(firstResult);
+        return new JsonObject
+        {
+            ["interaction_completed"] = true,
+            ["repeat_suppressed"] = true,
+            ["reason"] = "ask_user_already_completed",
+            ["cancelled"] = outcome == AskUserOutcome.Cancelled,
+            ["skipped"] = outcome == AskUserOutcome.Skipped,
+            ["message"] = "本轮用户交互已经完成，不得再次调用 assistant.ask_user；请根据上一次结果直接完成回答。",
+        }.ToJsonString(ResultJsonOptions);
+    }
+
+    private static string CreateAskUserRepeatGuardMessage(string firstResult) => GetAskUserOutcome(firstResult) switch
+    {
+        AskUserOutcome.Cancelled => "已取消本次交互，本轮不会重复询问。",
+        AskUserOutcome.Skipped => "已跳过本次交互，本轮不会重复询问。",
+        _ => "已收到你的选择，本轮不会重复询问。",
+    };
+
+    private static AskUserOutcome GetAskUserOutcome(string content)
+    {
         try
         {
-            return JsonNode.Parse(content) is JsonObject result
-                && result["cancelled"] is JsonValue cancelledValue
+            if (JsonNode.Parse(content) is not JsonObject result)
+            {
+                return AskUserOutcome.Submitted;
+            }
+
+            if (result["cancelled"] is JsonValue cancelledValue
                 && cancelledValue.TryGetValue<bool>(out var cancelled)
-                && cancelled;
+                && cancelled)
+            {
+                return AskUserOutcome.Cancelled;
+            }
+
+            var hasValue = result["values"] is JsonObject values
+                && values.Any(pair => HasMeaningfulDecisionValue(pair.Value));
+            var hasCustomInput = result["custom_inputs"] is JsonObject customInputs
+                && customInputs.Any(pair => HasMeaningfulDecisionValue(pair.Value));
+            return hasValue || hasCustomInput ? AskUserOutcome.Submitted : AskUserOutcome.Skipped;
         }
         catch (JsonException)
         {
-            return false;
+            return AskUserOutcome.Submitted;
         }
+    }
+
+    private static bool HasMeaningfulDecisionValue(JsonNode? value) => value switch
+    {
+        null => false,
+        JsonArray array => array.Count > 0,
+        JsonObject objectValue => objectValue.Count > 0,
+        JsonValue scalar when scalar.TryGetValue<string>(out var text) => !string.IsNullOrWhiteSpace(text),
+        _ => true,
+    };
+
+    private enum AskUserOutcome
+    {
+        Submitted,
+        Skipped,
+        Cancelled,
     }
 
     /// <summary>

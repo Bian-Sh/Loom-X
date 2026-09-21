@@ -37,7 +37,7 @@ public static class AssistantTools
         registry.Register(new ToolDefinition
         {
             Name = "assistant.ask_user",
-            Description = "通用 Human-in-the-loop 结构化交互，可直接用于测试、偏好收集、必要输入、歧义澄清和行动确认；fields 中每个字段独立分页。若用户要求在 single_select 或 multi_select 的选项下方同一页输入其他内容，只创建一个选择字段并设置 allow_custom_input=true，可同时设置 custom_input_placeholder 和 max_length；不要创建独立 text 字段。无需加载 Skill，无需 Browser Bridge 或 Chrome；不得用于索取密钥或认证信息。",
+            Description = "通用 Human-in-the-loop 结构化交互，可直接用于测试、偏好收集、必要输入、歧义澄清和行动确认；fields 中每个字段独立分页。若用户要求在 single_select 或 multi_select 的选项下方同一页输入其他内容，只创建一个选择字段并设置 allow_custom_input=true，可同时设置 custom_input_placeholder 和 max_length；不要创建独立 text 字段。无需加载 Skill，无需 Browser Bridge 或 Chrome；不得用于索取密钥或认证信息。返回结果中的 completed=true 表示交互已经结束，skipped=true 表示用户主动跳过，cancelled=true 表示用户取消；无论用户提交、跳过还是取消，同一轮不得再次调用，必须根据返回结果直接完成回答。",
             ParametersSchema = CreateAskUserSchema(),
             RiskLevel = ToolRiskLevel.Read,
             SafeArgumentsProjector = CreateSafeArgumentsProjection,
@@ -513,11 +513,26 @@ public static class AssistantTools
 
         return new JsonObject
         {
+            ["completed"] = true,
             ["cancelled"] = result.Cancelled,
+            ["skipped"] = IsSkipped(result),
             ["values"] = values,
             ["custom_inputs"] = customInputs,
         }.ToJsonString(OutputJsonOptions);
     }
+
+    private static bool IsSkipped(UserDecisionResult result) =>
+        !result.Cancelled
+        && !result.Values.Values.Any(HasMeaningfulDecisionValue)
+        && !result.CustomInputs.Values.Any(value => !string.IsNullOrWhiteSpace(value));
+
+    private static bool HasMeaningfulDecisionValue(object? value) => value switch
+    {
+        null => false,
+        string valueText => !string.IsNullOrWhiteSpace(valueText),
+        IEnumerable<string> items => items.Any(item => !string.IsNullOrWhiteSpace(item)),
+        _ => true,
+    };
 
     private static JsonNode CreateAskUserSchema() => JsonNode.Parse("""
         {

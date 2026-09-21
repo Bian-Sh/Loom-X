@@ -224,26 +224,28 @@ public sealed class AgentLoopTests
         Assert.DoesNotContain(events, item => item.Kind == AgentEventKind.TaskCompleted);
     }
 
-    [Fact]
-    public async Task AskUser返回取消结果_应继续总结且不再展示AskUser()
+    [Theory]
+    [InlineData("{\"cancelled\":false,\"values\":{\"choice\":\"default\"},\"custom_inputs\":{}}") ]
+    [InlineData("{\"cancelled\":false,\"values\":{\"choice\":null},\"custom_inputs\":{}}") ]
+    [InlineData("{\"cancelled\":true,\"values\":{},\"custom_inputs\":{}}") ]
+    public async Task AskUser成功完成后_不同Id重复调用不再执行Handler(string firstResult)
     {
         var handlerCalls = 0;
         var registry = new ToolRegistry();
         registry.Register(new ToolDefinition
         {
             Name = "assistant.ask_user",
-            Description = "测试 AskUser 取消链路。",
+            Description = "测试 AskUser 一次性交互。",
             ParametersSchema = new JsonObject(),
             Handler = (_, _) =>
             {
                 Interlocked.Increment(ref handlerCalls);
-                return Task.FromResult(ToolResult.Ok(
-                    "{\"cancelled\":true,\"values\":{},\"custom_inputs\":{}}"));
+                return Task.FromResult(ToolResult.Ok(firstResult));
             },
         });
         var modelClient = new ScriptedModelClient(
             [
-                new ModelToolCallEvent(new ToolCall("ask_cancelled", "assistant.ask_user", "{}")),
+                new ModelToolCallEvent(new ToolCall("ask_first", "assistant.ask_user", "{}")),
                 new ModelCompletedEvent("tool_calls"),
             ],
             [
@@ -251,7 +253,7 @@ public sealed class AgentLoopTests
                 new ModelCompletedEvent("tool_calls"),
             ],
             [
-                new TextDeltaEvent("面板已取消（cancelled: true）。"),
+                new TextDeltaEvent("已根据用户结果继续处理。"),
                 new ModelCompletedEvent("stop"),
             ]);
         var session = new AgentSession();
@@ -269,10 +271,82 @@ public sealed class AgentLoopTests
                 tool => string.Equals(tool.Name, "assistant.ask_user", StringComparison.OrdinalIgnoreCase)));
         var toolResults = session.Messages.Where(item => item.Role == ChatRole.Tool).ToArray();
         Assert.Equal(2, toolResults.Length);
-        Assert.All(toolResults, result =>
-            Assert.Contains("\"cancelled\":true", result.Content, StringComparison.Ordinal));
-        Assert.Equal("面板已取消（cancelled: true）。", session.Messages[^1].Content);
+        Assert.Equal(firstResult, toolResults[0].Content);
+        var suppressed = JsonNode.Parse(toolResults[1].Content!)!.AsObject();
+        Assert.True(suppressed["interaction_completed"]!.GetValue<bool>());
+        Assert.True(suppressed["repeat_suppressed"]!.GetValue<bool>());
+        Assert.Equal("ask_user_already_completed", suppressed["reason"]!.GetValue<string>());
+        Assert.Contains("本轮用户交互已经完成", toolResults[1].Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("\\u", toolResults[1].Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("已根据用户结果继续处理。", session.Messages[^1].Content);
     }
+
+    [Fact]
+    public async Task AskUser完成后模型连续无视终态_第二次重复时本地熔断完成()
+    {
+        var handlerCalls = 0;
+        var registry = new ToolRegistry();
+        registry.Register(new ToolDefinition
+        {
+            Name = "assistant.ask_user",
+            Description = "测试 AskUser 重复调用熔断。",
+            ParametersSchema = new JsonObject(),
+            Handler = (_, _) =>
+            {
+                Interlocked.Increment(ref handlerCalls);
+                return Task.FromResult(ToolResult.Ok(
+                    "{\"cancelled\":false,\"values\":{\"choice\":\"default\"},\"custom_inputs\":{}}"));
+            },
+        });
+        var modelClient = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("ask_first", "assistant.ask_user", "{}")), new ModelCompletedEvent("tool_calls")],
+            [new ModelToolCallEvent(new ToolCall("ask_repeat_1", "assistant.ask_user", "{}")), new ModelCompletedEvent("tool_calls")],
+            [new ModelToolCallEvent(new ToolCall("ask_repeat_2", "assistant.ask_user", "{}")), new ModelCompletedEvent("tool_calls")]);
+        var session = new AgentSession(new AgentSessionOptions { MaxSteps = 8 });
+
+        var events = await CollectAsync(
+            CreateLoop(modelClient, registry).RunAsync(session, "请显示 AskUser 测试面板"));
+
+        Assert.Equal(AgentSessionState.Completed, session.State);
+        Assert.Equal(AgentEventKind.TaskCompleted, events[^1].Kind);
+        Assert.Equal(1, Volatile.Read(ref handlerCalls));
+        Assert.Equal(3, modelClient.Requests.Count);
+        Assert.Equal(3, session.Messages.Count(item => item.Role == ChatRole.Tool));
+        Assert.Equal(ChatRole.Assistant, session.Messages[^1].Role);
+        Assert.Contains("本轮不会重复询问", session.Messages[^1].Content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AskUser执行失败后_允许模型修正参数重试()
+    {
+        var handlerCalls = 0;
+        var registry = new ToolRegistry();
+        registry.Register(new ToolDefinition
+        {
+            Name = "assistant.ask_user",
+            Description = "测试 AskUser 失败重试。",
+            ParametersSchema = new JsonObject(),
+            Handler = (_, _) =>
+            {
+                var call = Interlocked.Increment(ref handlerCalls);
+                return Task.FromResult(call == 1
+                    ? ToolResult.SafeFail("请求参数无效。")
+                    : ToolResult.Ok("{\"cancelled\":false,\"values\":{\"choice\":\"default\"},\"custom_inputs\":{}}"));
+            },
+        });
+        var modelClient = new ScriptedModelClient(
+            [new ModelToolCallEvent(new ToolCall("ask_invalid", "assistant.ask_user", "{}")), new ModelCompletedEvent("tool_calls")],
+            [new ModelToolCallEvent(new ToolCall("ask_fixed", "assistant.ask_user", "{}")), new ModelCompletedEvent("tool_calls")],
+            [new TextDeltaEvent("已完成。"), new ModelCompletedEvent("stop")]);
+        var session = new AgentSession();
+
+        await CollectAsync(CreateLoop(modelClient, registry).RunAsync(session, "请提问"));
+
+        Assert.Equal(AgentSessionState.Completed, session.State);
+        Assert.Equal(2, Volatile.Read(ref handlerCalls));
+        Assert.Equal("已完成。", session.Messages[^1].Content);
+    }
+
     [Fact]
     public async Task ModelTimeout_FailsTask()
     {

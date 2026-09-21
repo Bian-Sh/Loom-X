@@ -97,6 +97,7 @@ public sealed class AssistantToolsTests
         Assert.Contains("偏好", tool.Description, StringComparison.Ordinal);
         Assert.Contains("澄清", tool.Description, StringComparison.Ordinal);
         Assert.Contains("确认", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("同一轮不得再次调用", tool.Description, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -135,7 +136,9 @@ public sealed class AssistantToolsTests
         var result = await execution.WaitAsync(TimeSpan.FromSeconds(2));
         var json = JsonNode.Parse(result.Content)!.AsObject();
         Assert.True(result.Success);
+        Assert.True(json["completed"]!.GetValue<bool>());
         Assert.False(json["cancelled"]!.GetValue<bool>());
+        Assert.False(json["skipped"]!.GetValue<bool>());
         Assert.Equal("safe", json["values"]!["mode"]!.GetValue<string>());
         Assert.Equal("请优先保证安全性", json["custom_inputs"]!["mode"]!.GetValue<string>());
     }
@@ -269,6 +272,30 @@ public sealed class AssistantToolsTests
         var result = JsonNode.Parse((await execution).Content)!;
         Assert.Null(result["values"]!["mode"]);
         Assert.Equal("我想逐步确认", result["custom_inputs"]!["mode"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task AskUser_可选字段空提交明确标记为已跳过()
+    {
+        using var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var tool = GetTool(broker);
+        var arguments = CreateValidArguments();
+        arguments["fields"]![0]!["is_required"] = false;
+
+        var execution = tool.Handler(arguments, CancellationToken.None);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(broker.Submit(
+            request.RequestId,
+            UserDecisionBrokerTestExtensions.ClaimantId,
+            new Dictionary<string, object?> { ["mode"] = null }));
+
+        var result = JsonNode.Parse((await execution).Content)!.AsObject();
+        Assert.True(result["completed"]!.GetValue<bool>());
+        Assert.False(result["cancelled"]!.GetValue<bool>());
+        Assert.True(result["skipped"]!.GetValue<bool>());
+        Assert.Null(result["values"]!["mode"]);
+        Assert.Empty(result["custom_inputs"]!.AsObject());
     }
 
     [Fact]
@@ -441,7 +468,12 @@ public sealed class AssistantToolsTests
 
         var result = await execution.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.True(result.Success);
-        Assert.Equal("{\"cancelled\":true,\"values\":{},\"custom_inputs\":{}}", result.Content);
+        var json = JsonNode.Parse(result.Content)!.AsObject();
+        Assert.True(json["completed"]!.GetValue<bool>());
+        Assert.True(json["cancelled"]!.GetValue<bool>());
+        Assert.False(json["skipped"]!.GetValue<bool>());
+        Assert.Empty(json["values"]!.AsObject());
+        Assert.Empty(json["custom_inputs"]!.AsObject());
         Assert.DoesNotContain(cancellationReason, result.Content, StringComparison.Ordinal);
     }
 
