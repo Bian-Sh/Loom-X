@@ -19,6 +19,13 @@ public sealed class ReleaseNotesViewContractTests
         Assert.Contains("IsVisible=\"{Binding IsSectioned}\"", source, StringComparison.Ordinal);
         Assert.Contains("x:DataType=\"vm:ReleaseNoteSectionViewModel\"", source, StringComparison.Ordinal);
         Assert.Contains("MarkdownBuilder=\"{Binding HeadingMarkdown}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"release-note-heading\"", source, StringComparison.Ordinal);
+        Assert.Contains("x:Double x:Key=\"FontSize2Xl\">16</x:Double>", source, StringComparison.Ordinal);
+        Assert.Contains("ToggleButton#ExpanderHeader", source, StringComparison.Ordinal);
+        Assert.Contains("Border#ToggleButtonBackground", source, StringComparison.Ordinal);
+        Assert.Contains("Border#ExpanderContent", source, StringComparison.Ordinal);
+        Assert.Contains("StackPanel Spacing=\"0\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Border Padding=\"8,0,2,6\">", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Header=\"{Binding Title}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsExpanded=\"{Binding IsExpanded}\"", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Stretch\"", source, StringComparison.Ordinal);

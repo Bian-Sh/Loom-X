@@ -19,6 +19,7 @@ public sealed class UpdateExperienceContractTests
         Assert.StartsWith("#if DEBUG\n", previewService, StringComparison.Ordinal);
         Assert.EndsWith("#endif\n", previewService, StringComparison.Ordinal);
         Assert.Contains("LOOMX_UPDATE_PREVIEW", previewService, StringComparison.Ordinal);
+        Assert.DoesNotContain("\\n\\nLOOMX_UPDATE_PREVIEW\"", previewService, StringComparison.Ordinal);
         Assert.Contains("\"downloading\" or \"verifying\" or \"ready\" or \"error\" or \"history-empty\"", previewService, StringComparison.Ordinal);
         Assert.DoesNotContain("default:", previewService, StringComparison.Ordinal);
     }
@@ -48,6 +49,7 @@ public sealed class UpdateExperienceContractTests
     public void 主窗口更新说明覆盖全窗口并使用固定遮罩与磨砂容器()
     {
         var source = ReadDesktopFile("MainWindow.axaml");
+        var tokens = ReadDesktopFile("Styles", "VisualTokens.axaml");
         var dialogStart = source.IndexOf("x:Name=\"updateDialogOverlay\"", StringComparison.Ordinal);
         var dialogEnd = dialogStart >= 0 ? source.IndexOf("</Border>", dialogStart, StringComparison.Ordinal) : -1;
 
@@ -58,7 +60,12 @@ public sealed class UpdateExperienceContractTests
         Assert.Contains("Material=\"{DynamicResource ReleaseNotesAcrylicMaterial}\"", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Center\"", source, StringComparison.Ordinal);
         Assert.Contains("VerticalAlignment=\"Center\"", source, StringComparison.Ordinal);
-        Assert.Contains("Width=\"680\" Height=\"540\" MaxWidth=\"680\" MaxHeight=\"600\"", source, StringComparison.Ordinal);
+        Assert.Contains("Width=\"660\" MaxWidth=\"660\" MaxHeight=\"560\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Height=\"540\"", source, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"350\" MinHeight=\"150\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"update-dialog-link\"", source, StringComparison.Ordinal);
+        Assert.Contains("TintOpacity=\"0.56\" MaterialOpacity=\"0.78\"", tokens, StringComparison.Ordinal);
+        Assert.DoesNotContain("TintOpacity=\"0.90\" MaterialOpacity=\"0.96\"", tokens, StringComparison.Ordinal);
         Assert.Contains("Grid Grid.Row=\"0\" ColumnDefinitions=\"*,Auto\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Width=\"36\" Height=\"36\"", source[dialogStart..], StringComparison.Ordinal);
         Assert.DoesNotContain("Grid ColumnDefinitions=\"228,*\"", source[dialogStart..], StringComparison.Ordinal);

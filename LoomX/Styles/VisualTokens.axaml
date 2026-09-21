@@ -35,7 +35,7 @@
       <SolidColorBrush x:Key="DangerMessageTextBrush" Color="#303639" />
       <SolidColorBrush x:Key="WindowCloseHoverBrush" Color="#E81123" />
       <SolidColorBrush x:Key="WindowClosePressedBrush" Color="#C50F1F" />
-      <ExperimentalAcrylicMaterial x:Key="ReleaseNotesAcrylicMaterial" BackgroundSource="Digger" TintColor="#FFF8FAFB" TintOpacity="0.90" MaterialOpacity="0.96" FallbackColor="#FFF8FAFB" />
+      <ExperimentalAcrylicMaterial x:Key="ReleaseNotesAcrylicMaterial" BackgroundSource="Digger" TintColor="#FFF8FAFB" TintOpacity="0.56" MaterialOpacity="0.78" FallbackColor="#F2F8FAFB" />
     </ResourceDictionary>
     <ResourceDictionary x:Key="Dark">
       <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#E6172226" />
@@ -71,7 +71,7 @@
       <SolidColorBrush x:Key="DangerMessageTextBrush" Color="#F1DADD" />
       <SolidColorBrush x:Key="WindowCloseHoverBrush" Color="#E81123" />
       <SolidColorBrush x:Key="WindowClosePressedBrush" Color="#C50F1F" />
-      <ExperimentalAcrylicMaterial x:Key="ReleaseNotesAcrylicMaterial" BackgroundSource="Digger" TintColor="#FF25363D" TintOpacity="0.90" MaterialOpacity="0.96" FallbackColor="#FF25363D" />
+      <ExperimentalAcrylicMaterial x:Key="ReleaseNotesAcrylicMaterial" BackgroundSource="Digger" TintColor="#FF25363D" TintOpacity="0.56" MaterialOpacity="0.78" FallbackColor="#F225363D" />
     </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

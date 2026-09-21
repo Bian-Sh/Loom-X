@@ -481,3 +481,36 @@ if (Test-Path -LiteralPath $outputDir) { throw "发布目录已存在：$outputD
 ### 18.4 最终结论
 
 **PASS。** 合并远端后完整测试、Release build、OpenSpec strict、规格映射与用户设置恢复均已重新验证；当前 change 可推进到 Archive 确认阶段。
+
+
+## 19. Release Notes 视觉返工（2026-09-21 19:26 +08:00）
+
+### 19.1 根因与调整
+
+- 原实现把 Markdown 二级标题直接放入 Fluent 默认 Expander Header，但只清理了 Expander 根属性，没有覆盖模板内部 `ExpanderHeader`、`ToggleButtonBackground` 和 `ExpanderContent`，导致标题白条、卡片边框和正文底色叠加。
+- 原 `FontSize2Xl` 与 Markdown Heading2 默认间距造成标题过大；固定 `680 × 540` 又把少量正文强行拉成安装向导式大空白。
+- 本轮为共享 Markdown 视图增加局部紧凑排版资源和模板内样式：标题 16px、正文 13px、连续分隔线、透明内容面、轻量 Hover；Header 和正文仍由 `MarkdownRenderer` 渲染，未增加第二套 Foldout 组件。
+- 更新浮窗改为 `660` 宽、仅设置 `MaxHeight=560`，正文区域 `150–350` 高度内自适应；“前往发布页”和“稍后”改为低视觉权重按钮，进度条降为 4px。
+- Acrylic 从 `TintOpacity=0.90 / MaterialOpacity=0.96` 调整为 `0.56 / 0.78`，并保留高不透明度实色回退。Debug Release 正文不再显示 `LOOMX_UPDATE_PREVIEW` 测试标记。
+
+### 19.2 TDD 与自动化证据
+
+- RED：Release Notes/更新体验契约测试新增紧凑 Header、模板内部样式、自适应高度、轻量材质和测试标记不可见断言；首次运行 11 个聚焦测试时 3 个按预期失败。
+- GREEN：实现后同一组聚焦测试 **11/11 PASS**。
+- 完整测试：`dotnet test LoomX.slnx -c Release --no-restore` → **1182/1182 PASS**，0 skipped。
+- Release publish：407 个文件，`LoomX.exe` 存在；发布包启动 PID 29164 后 `ExecutablePath` 与输出目录精确一致，随后仅关闭该 PID。
+- Inno Setup 6.7.3 编译成功，安装器大小 49,227,875 字节。
+
+### 19.3 CUA 视觉验收
+
+- 透明模式截图：`outputs/20260921-192320-release-notes-visual-polish/verification/release-notes-transparent.png`。
+- 非透明模式截图：`outputs/20260921-192320-release-notes-visual-polish/verification/release-notes-nontransparent.png`。
+- 三个模块不再显示为独立白色卡片；标题、正文和 Chevron 形成连续文档结构。
+- 折叠首个模块后正文从 UIA 树消失，另外两个模块保持展开；重新展开后继续显示。
+- `LOOMX_UPDATE_PREVIEW` 不再出现在可见 UIA 文本中。
+- 验收结束后配置库 `TransparencyEnabled=0`，保持用户透明窗口设置为 Off；只关闭本轮 PID 27044 和发布冒烟 PID 29164，未操作其他 LoomX 进程。
+
+### 19.4 产物
+
+- 发布目录：`outputs/20260921-192320-release-notes-visual-polish/publish/`。
+- 安装器：`outputs/20260921-192320-release-notes-visual-polish/installer/LoomX-0.12.7-setup.exe`。
