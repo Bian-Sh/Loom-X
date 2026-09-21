@@ -387,3 +387,28 @@ if (Test-Path -LiteralPath $outputDir) { throw "发布目录已存在：$outputD
 - 最终 Release build 仍保留既有 `NU1903`：`SQLitePCLRaw.lib.e_sqlite3` 2.1.11 存在已知高严重性漏洞；本次修复不扩大依赖范围，也不宣称零警告。
 - 聚焦测试触发重新编译时仍可见既有 `CS8618`、`CA2024`、`CS8602`；本次未修改对应代码。
 - 本次只修复 final scoped re-review 指出的日志异常安全边界，未修改 UI、OpenSpec tasks/spec/design、Comet 状态、发布输出或证据 ledger。
+
+## 16. Comet Full Verify 最终复核（2026-09-21 10:19-10:21 +08:00）
+
+### 16.1 先前 IMPORTANT 的关闭证据
+
+- 修复提交：`fd8f8e6`（修复安装器启动后的日志异常边界）。
+- Fresh scoped re-review：原开放 Important 在 UpdateService 与 UpdateCoordinator 两层均为 ADDRESSED；独立聚焦 6/6 PASS，`git diff --check 681ac9f..fd8f8e6` PASS；无新增 Critical/Important。
+- 可接受 Minor：成功后的 best-effort 日志若失败，不会留下第二条诊断日志；作用域仅限 launcher 已成功后的非关键成功日志，不会吞掉校验、launcher 或退出回调异常。
+
+### 16.2 最终 Runtime 验证
+
+- Build：`comet check run enhance-update-experience build --local -- dotnet build LoomX.slnx -c Release --no-restore` → 0 error；Runtime 日志 `openspec/changes/enhance-update-experience/.comet/checks/6032b4e9-5837-431c-ab8d-e4530367cd49.log`。
+- Verify：`comet check run enhance-update-experience verify --local -- dotnet test LoomX.slnx -c Release --no-restore --blame-hang-timeout 60s` → 1162/1162 PASS，0 skipped；Runtime 日志 `openspec/changes/enhance-update-experience/.comet/checks/fa80d487-2372-4656-82d7-a53e46690687.log`。
+- OpenSpec strict：最终重新执行 `comet classic openspec -- validate enhance-update-experience --strict`。
+- 已知警告继续如实保留：`NU1903`；重新编译/发布时可见既有 `CS8618`、`CA2024`，测试编译还可能出现既有 `CS8602`。
+
+### 16.3 最终发布与进程路径
+
+- 新发布目录：`outputs/20260921-101946-enhance-update-experience/`；未覆盖或删除旧输出。
+- 递归检查唯一 exe 为 `LoomX.exe`，`publish.log` 存在，发布产物扫描 `LOOMX_UPDATE_PREVIEW` 为 0 命中。
+- 使用 `Start-Process -FilePath <最新发布 LoomX.exe> -WindowStyle Hidden -PassThru` 启动 PID 49588；`Win32_Process.ExecutablePath` 与最新发布 exe 精确一致。验证后只终止 PID 49588。
+
+### 16.4 最终结论
+
+**PASS。** 22/22 任务完成；proposal、delta spec、OpenSpec design 与 Superpowers Design Doc 均可定位且实现一致；原不可豁免 Important 已由 TDD 修复并经 fresh scoped re-review 关闭；完整测试、Release build、OpenSpec strict、发布完整性及进程路径均通过。可以进入 Archive 确认阶段。
