@@ -280,7 +280,11 @@ public sealed class SettingsViewContractTests
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.CanShowLoadMore}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\" IsVisible=\"{Binding ReleaseHistory.HasMore}\"", source, StringComparison.Ordinal);
         Assert.Contains("<views:ReleaseNotesView DataContext=\"{Binding ReleaseHistory.Content}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"release-history-list\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.release-history-list ListBoxItem\"><Setter Property=\"Cursor\" Value=\"Hand\"/>", source, StringComparison.Ordinal);
         Assert.Contains("Cursor=\"Hand\"", source, StringComparison.Ordinal);
+        Assert.Contains("Foreground=\"{DynamicResource AccentBrush}\"", source, StringComparison.Ordinal);
+        Assert.Contains("TextDecorations=\"Underline\"", source, StringComparison.Ordinal);
         Assert.Contains("ToolTip.Tip=\"{l:Locale settings.update.history.open.release.tip}\"", source, StringComparison.Ordinal);
         Assert.Contains("Tag=\"{Binding Release.HtmlUrl}\"", source, StringComparison.Ordinal);
         Assert.Contains("PointerPressed=\"ReleaseVersion_OnPointerPressed\"", source, StringComparison.Ordinal);

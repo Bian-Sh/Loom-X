@@ -8,6 +8,7 @@
     <Style Selector="TextBlock.hint"><Setter Property="FontSize" Value="11"/><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
     <Style Selector="Button.outline"><Setter Property="MinHeight" Value="34"/><Setter Property="Padding" Value="11,7"/><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/></Style>
     <Style Selector="Button.primary"><Setter Property="MinHeight" Value="36"/><Setter Property="Padding" Value="16,8"/><Setter Property="Background" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="ListBox.release-history-list ListBoxItem"><Setter Property="Cursor" Value="Hand"/></Style>
   </UserControl.Styles>
   <Grid MinHeight="450">
     <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
@@ -78,12 +79,14 @@
                 <Grid Grid.Row="2">
                   <Grid ColumnDefinitions="200,*">
                     <Grid Grid.Column="0" RowDefinitions="*,Auto" Background="{DynamicResource SurfaceSubtleBrush}">
-                      <ListBox ItemsSource="{Binding ReleaseHistory.Releases}" SelectedItem="{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}" Background="Transparent" BorderThickness="0" Margin="8">
+                      <ListBox Classes="release-history-list" ItemsSource="{Binding ReleaseHistory.Releases}" SelectedItem="{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}" Background="Transparent" BorderThickness="0" Margin="8">
                         <ListBox.ItemTemplate>
                           <DataTemplate>
                             <Grid RowDefinitions="Auto,Auto" Margin="4,6" ColumnDefinitions="*,Auto">
                               <TextBlock Text="{Binding VersionText}"
                                          FontWeight="SemiBold"
+                                         Foreground="{DynamicResource AccentBrush}"
+                                         TextDecorations="Underline"
                                          Cursor="Hand"
                                          Tag="{Binding Release.HtmlUrl}"
                                          ToolTip.Tip="{l:Locale settings.update.history.open.release.tip}"
