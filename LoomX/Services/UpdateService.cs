@@ -97,7 +97,11 @@ public sealed record UpdateDownloadProgress(
 public sealed record PreparedUpdate(
     string Version,
     string InstallerPath,
-    DateTimeOffset VerifiedAt);
+    DateTimeOffset VerifiedAt,
+    string Sha256,
+    long InstallerSize);
+
+public sealed class InvalidPreparedUpdateException(string message) : InvalidOperationException(message);
 
 public sealed record UpdateReleasePage(
     IReadOnlyList<UpdateRelease> Items,
@@ -317,9 +321,10 @@ public sealed class UpdateService : IUpdateService
                     100,
                     0,
                     UpdatePreparationPhase.Verifying));
-                await VerifyChecksumAsync(installerPath, checksumPath, cancellationToken);
-                logger.LogInformation("更新包缓存校验完成 {Version} {Bytes}", release.Version, new FileInfo(installerPath).Length);
-                return new PreparedUpdate(release.Version, installerPath, DateTimeOffset.UtcNow);
+                var sha256 = await VerifyChecksumAsync(installerPath, checksumPath, cancellationToken);
+                var installerSize = new FileInfo(installerPath).Length;
+                logger.LogInformation("更新包缓存校验完成 {Version} {Bytes}", release.Version, installerSize);
+                return new PreparedUpdate(release.Version, installerPath, DateTimeOffset.UtcNow, sha256, installerSize);
             }
             catch (InvalidOperationException)
             {
@@ -341,11 +346,12 @@ public sealed class UpdateService : IUpdateService
                 100,
                 0,
                 UpdatePreparationPhase.Verifying));
-            await VerifyChecksumAsync(installerPartial, checksumPartial, cancellationToken);
+            var sha256 = await VerifyChecksumAsync(installerPartial, checksumPartial, cancellationToken);
             File.Move(installerPartial, installerPath, true);
             File.Move(checksumPartial, checksumPath, true);
-            logger.LogInformation("更新包校验完成 {Version} {Bytes}", release.Version, new FileInfo(installerPath).Length);
-            return new PreparedUpdate(release.Version, installerPath, DateTimeOffset.UtcNow);
+            var installerSize = new FileInfo(installerPath).Length;
+            logger.LogInformation("更新包校验完成 {Version} {Bytes}", release.Version, installerSize);
+            return new PreparedUpdate(release.Version, installerPath, DateTimeOffset.UtcNow, sha256, installerSize);
         }
         catch
         {
@@ -360,10 +366,41 @@ public sealed class UpdateService : IUpdateService
     public void LaunchInstaller(PreparedUpdate preparedUpdate)
     {
         ArgumentNullException.ThrowIfNull(preparedUpdate);
-        if (string.IsNullOrWhiteSpace(preparedUpdate.Version)
-            || string.IsNullOrWhiteSpace(preparedUpdate.InstallerPath)
-            || !File.Exists(preparedUpdate.InstallerPath))
-            throw new InvalidOperationException("已验证更新包不可用，请重新下载。");
+        try
+        {
+            if (string.IsNullOrWhiteSpace(preparedUpdate.Version)
+                || string.IsNullOrWhiteSpace(preparedUpdate.InstallerPath)
+                || preparedUpdate.InstallerSize < 0
+                || !TryParseSha256(preparedUpdate.Sha256, out var expectedSha256)
+                || !File.Exists(preparedUpdate.InstallerPath))
+                throw new InvalidPreparedUpdateException("已验证更新包不可用，请重新下载。");
+
+            using var stream = new FileStream(
+                preparedUpdate.InstallerPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                81920,
+                FileOptions.SequentialScan);
+            if (stream.Length != preparedUpdate.InstallerSize)
+                throw new InvalidPreparedUpdateException("已验证更新包已发生变化，请重新下载。");
+
+            var actualSha256 = SHA256.HashData(stream);
+            if (!CryptographicOperations.FixedTimeEquals(actualSha256, expectedSha256))
+                throw new InvalidPreparedUpdateException("已验证更新包已发生变化，请重新下载。");
+        }
+        catch (InvalidPreparedUpdateException)
+        {
+            InvalidatePreparedUpdate(preparedUpdate);
+            logger.LogWarning("更新安装器启动前身份复验失败 {Version}", preparedUpdate.Version);
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            InvalidatePreparedUpdate(preparedUpdate);
+            logger.LogWarning("更新安装器启动前无法读取 {Version} {ExceptionType}", preparedUpdate.Version, exception.GetType().Name);
+            throw new InvalidPreparedUpdateException("已验证更新包不可用，请重新下载。");
+        }
 
         installerLauncher.Launch(preparedUpdate.InstallerPath);
         logger.LogInformation("更新安装器已启动 {Version}", preparedUpdate.Version);
@@ -392,7 +429,7 @@ public sealed class UpdateService : IUpdateService
         progress?.Report(new UpdateDownloadProgress(transferred, total, 100, (long)(transferred / Math.Max(Stopwatch.GetElapsedTime(startedAt).TotalSeconds, 0.001))));
     }
 
-    private static async Task VerifyChecksumAsync(string installerPath, string checksumPath, CancellationToken cancellationToken)
+    private static async Task<string> VerifyChecksumAsync(string installerPath, string checksumPath, CancellationToken cancellationToken)
     {
         var text = await File.ReadAllTextAsync(checksumPath, cancellationToken);
         var match = ChecksumRegex.Match(text);
@@ -401,6 +438,28 @@ public sealed class UpdateService : IUpdateService
         var actual = Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
         if (!string.Equals(actual, match.Value, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("更新包 SHA-256 校验失败。");
+        return actual;
+    }
+
+    private static bool TryParseSha256(string value, out byte[] sha256)
+    {
+        sha256 = [];
+        if (string.IsNullOrWhiteSpace(value) || value.Length != 64) return false;
+        try
+        {
+            sha256 = Convert.FromHexString(value);
+            return sha256.Length == 32;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static void InvalidatePreparedUpdate(PreparedUpdate preparedUpdate)
+    {
+        TryDelete(preparedUpdate.InstallerPath);
+        TryDelete(preparedUpdate.InstallerPath + ".sha256");
     }
 
     private static async Task<HttpResponseMessage> SendGetAsync(HttpClient client, string rawUrl, CancellationToken cancellationToken)

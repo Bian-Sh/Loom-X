@@ -79,3 +79,14 @@
 - Context7 resources/templates 均为空，无法调用 `resolve-library-id` / `query-docs`；降级参考 Avalonia 官方主题文档，确认使用 `RequestedThemeVariant` 与 Light/Dark ThemeDictionaries。
 
 OpenSpec 6.3/6.5 仅在上述新证据齐全后重新确认完成；未 push，未运行 Comet build guard、verify 或 archive。
+
+
+## Final Review Fix Wave（2026-09-21 09:18-09:31 +08:00）
+
+- `PreparedUpdate` 新增准备阶段 SHA-256 与长度；`LaunchInstaller` 紧邻启动前复验长度和固定时间摘要，失配时 launcher 0 次并删除当前安装器/校验缓存。协调器安装前额外核对 Prepared/Release 版本，失效产物清空并要求重新 Prepare。
+- 安装闩锁拆分启动失败与退出失败：launcher 失败可安全重试；launcher 成功后闩锁永久保持，退出回调失败进入 `Exit` 错误态，安装命令不再开放，并通过 `update.error.exit` 四语言资源提示手动关闭应用。
+- RED：Service 0/1（旧实现未拒绝篡改文件）；Coordinator 0/2（旧实现退出失败回滚 Ready、版本不一致仍安装）。GREEN：对应 1/1 与 2/2。
+- 聚焦：UpdateServiceTests 12/12、UpdateCoordinatorTests 13/13；更新域联合 53/53。完整测试首次 1159/1160 因新增日志续行包含 CJK 回退值触发本地化契约，修正后契约 1/1、最终完整 1160/1160。
+- Release build 0 error、2 个 `NU1903`；OpenSpec strict valid；`git diff --check fd182a9467dbdcefcbc216e8cccc0e85455d453c --` 退出码 0。既有 `NU1903`、`CS8618`、`CA2024`、`CS8602` 如实保留。
+- 最终发布：`outputs/20260921-092945-enhance-update-experience/`；唯一 `LoomX.exe`、`publish.log` 存在、`LOOMX_UPDATE_PREVIEW` 命中 0。隐藏启动 PID 42840，Win32 路径与发布 exe 完全一致，验证后只关闭该 PID，未操作 PID 30928。
+- 未重复 CUA UI 截图；未触碰 Comet 激活未跟踪目录，未提交 outputs/证据，未 push，未运行 Comet guard/verify/archive。

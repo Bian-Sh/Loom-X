@@ -232,6 +232,57 @@ public sealed class UpdateCoordinatorTests
     }
 
     [Fact]
+    public async Task 退出回调失败后不会再次启动安装器且安装命令保持关闭()
+    {
+        await using var fixture = await CoordinatorFixture.CreateAsync();
+        var service = new FakeUpdateService();
+        var prepared = service.EnqueuePreparation();
+        var exits = 0;
+        using var coordinator = fixture.CreateCoordinator(service, () =>
+        {
+            exits++;
+            throw new InvalidOperationException("退出失败");
+        });
+        await coordinator.CheckNowAsync(false);
+        prepared.SetResult(CreatePreparedUpdate());
+        await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
+
+        coordinator.InstallAndRestartCommand.Execute(null);
+        await WaitForAsync(() => service.LaunchCalls == 1 && coordinator.Stage == UpdateStage.Error);
+        coordinator.InstallAndRestartCommand.Execute(null);
+        await Task.Delay(50);
+
+        Assert.Equal(1, service.LaunchCalls);
+        Assert.Equal(1, exits);
+        Assert.False(coordinator.CanInstall);
+        Assert.False(coordinator.InstallAndRestartCommand.CanExecute(null));
+        Assert.False(coordinator.CanRetry);
+        Assert.Equal(UpdateErrorKind.Exit, coordinator.ErrorKind);
+        Assert.Equal(ResourceLookup.Resolve("update.error.exit", LocaleService.CurrentCulture), coordinator.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task 准备版本与当前发布版本不一致时拒绝启动并要求重新准备()
+    {
+        await using var fixture = await CoordinatorFixture.CreateAsync();
+        var service = new FakeUpdateService();
+        var prepared = service.EnqueuePreparation();
+        using var coordinator = fixture.CreateCoordinator(service);
+        await coordinator.CheckNowAsync(false);
+        prepared.SetResult(CreatePreparedUpdate("9.9.8"));
+        await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
+
+        coordinator.InstallAndRestartCommand.Execute(null);
+        await WaitForAsync(() => coordinator.Stage == UpdateStage.Error);
+
+        Assert.Equal(0, service.LaunchCalls);
+        Assert.Null(coordinator.PreparedUpdate);
+        Assert.False(coordinator.CanInstall);
+        Assert.True(coordinator.CanRetry);
+        Assert.Equal(UpdateErrorKind.Prepare, coordinator.ErrorKind);
+    }
+
+    [Fact]
     public async Task 安装器启动失败不会退出并恢复就绪()
     {
         await using var fixture = await CoordinatorFixture.CreateAsync();
@@ -249,6 +300,13 @@ public sealed class UpdateCoordinatorTests
         Assert.Equal(0, exits);
         Assert.Equal(UpdateErrorKind.Install, coordinator.ErrorKind);
         Assert.True(coordinator.CanInstall);
+
+        service.LaunchException = null;
+        coordinator.InstallAndRestartCommand.Execute(null);
+        await WaitForAsync(() => service.LaunchCalls == 2);
+
+        Assert.Equal(1, exits);
+        Assert.Equal(UpdateStage.Installing, coordinator.Stage);
     }
 
     [Fact]
@@ -279,8 +337,8 @@ public sealed class UpdateCoordinatorTests
         if (args.PropertyName == nameof(UpdateCoordinator.Stage)) stages.Add(coordinator.Stage);
     }
 
-    private static PreparedUpdate CreatePreparedUpdate() =>
-        new("9.9.9", Path.Combine(Path.GetTempPath(), "LoomXSetup.exe"), DateTimeOffset.UtcNow);
+    private static PreparedUpdate CreatePreparedUpdate(string version = "9.9.9") =>
+        new(version, Path.Combine(Path.GetTempPath(), "LoomXSetup.exe"), DateTimeOffset.UtcNow, new string('0', 64), 0);
 
     private static async Task WaitForAsync(Func<bool> condition)
     {

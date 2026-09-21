@@ -1695,6 +1695,7 @@
   <data name="update.error.check"><value>检查更新失败，请稍后重试。</value></data>
   <data name="update.error.prepare"><value>更新包准备失败，请重试。</value></data>
   <data name="update.error.install"><value>无法启动更新安装器，请重试。</value></data>
+  <data name="update.error.exit"><value>更新安装器已启动，但应用无法自动退出。请手动关闭应用。</value></data>
   <data name="release.notes.empty"><value>此版本暂无发布说明。</value></data>
   <data name="settings.update.history.title"><value>版本历史</value></data>
   <data name="settings.update.history.refresh"><value>刷新</value></data>

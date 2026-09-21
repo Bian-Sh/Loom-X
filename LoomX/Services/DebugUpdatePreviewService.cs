@@ -101,7 +101,9 @@ internal sealed class DebugUpdatePreviewService : IUpdateService
         return new PreparedUpdate(
             release.Version,
             Path.Combine(Path.GetTempPath(), "LoomXPreview", "LoomXSetup.exe"),
-            DateTimeOffset.Now);
+            DateTimeOffset.Now,
+            new string('0', 64),
+            total);
     }
 
     public void LaunchInstaller(PreparedUpdate preparedUpdate) =>

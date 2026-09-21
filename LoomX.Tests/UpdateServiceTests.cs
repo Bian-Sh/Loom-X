@@ -166,6 +166,27 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task LaunchInstaller_准备后安装器被替换时拒绝启动并清理当前缓存()
+    {
+        var fixture = UpdateFixture.CreateValid();
+        try
+        {
+            var prepared = await fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings);
+            await File.WriteAllTextAsync(prepared.InstallerPath, "准备完成后被替换");
+
+            var exception = await Record.ExceptionAsync(() =>
+                Task.Run(() => fixture.Service.LaunchInstaller(prepared)));
+
+            Assert.IsAssignableFrom<InvalidOperationException>(exception);
+
+            Assert.Equal(0, fixture.Launcher.LaunchCalls);
+            Assert.False(File.Exists(fixture.InstallerPath));
+            Assert.False(File.Exists(fixture.ChecksumPath));
+        }
+        finally { fixture.Dispose(); }
+    }
+
+    [Fact]
     public async Task PrepareUpdateAsync_有效缓存重新校验后不重复下载()
     {
         var fixture = UpdateFixture.CreateValid();
@@ -356,7 +377,13 @@ public sealed class UpdateServiceTests
     private sealed class RecordingLauncher : IUpdateInstallerLauncher
     {
         public string? Path { get; private set; }
-        public void Launch(string installerPath) => Path = installerPath;
+        public int LaunchCalls { get; private set; }
+
+        public void Launch(string installerPath)
+        {
+            LaunchCalls++;
+            Path = installerPath;
+        }
     }
 
     private sealed class UpdateFixture : IDisposable

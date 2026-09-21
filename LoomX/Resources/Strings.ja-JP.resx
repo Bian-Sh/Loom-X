@@ -1524,6 +1524,7 @@
   <data name="update.error.check"><value>更新を確認できませんでした。後でもう一度お試しください。</value></data>
   <data name="update.error.prepare"><value>更新を準備できませんでした。もう一度お試しください。</value></data>
   <data name="update.error.install"><value>更新インストーラーを起動できませんでした。もう一度お試しください。</value></data>
+  <data name="update.error.exit"><value>更新インストーラーは起動しましたが、アプリを自動終了できませんでした。アプリを手動で閉じてください。</value></data>
   <data name="release.notes.empty"><value>このバージョンにはリリースノートがありません。</value></data>
   <data name="settings.update.history.title"><value>リリース履歴</value></data>
   <data name="settings.update.history.refresh"><value>更新</value></data>

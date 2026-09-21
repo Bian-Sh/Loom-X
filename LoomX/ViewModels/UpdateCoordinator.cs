@@ -25,7 +25,8 @@ public enum UpdateErrorKind
     None,
     Check,
     Prepare,
-    Install
+    Install,
+    Exit
 }
 
 /// <summary>统一管理启动、定时、准备与安装确认，并向所有更新入口提供同一份状态。</summary>
@@ -106,7 +107,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     public bool IsDialogVisible => isDialogVisible;
     public bool IsProgressVisible => Stage is UpdateStage.Downloading or UpdateStage.Verifying;
     public bool IsProgressIndeterminate => Stage == UpdateStage.Verifying;
-    public bool CanInstall => Stage == UpdateStage.Ready && PreparedUpdate is not null;
+    public bool CanInstall => Stage == UpdateStage.Ready && PreparedUpdate is not null && Volatile.Read(ref installStarted) == 0;
     public bool CanRetry => Stage == UpdateStage.Error && ErrorKind is UpdateErrorKind.Check or UpdateErrorKind.Prepare;
 
     public ICommand CheckCommand { get; }
@@ -277,15 +278,46 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     private Task InstallAndRestartAsync()
     {
         var target = preparedUpdate;
-        if (Stage != UpdateStage.Ready || target is null || Interlocked.Exchange(ref installStarted, 1) != 0)
+        var targetRelease = release;
+        if (Stage != UpdateStage.Ready || target is null) return Task.CompletedTask;
+        if (targetRelease is null || !string.Equals(target.Version, targetRelease.Version, StringComparison.OrdinalIgnoreCase))
+        {
+            dispatch(() =>
+            {
+                preparedUpdate = null;
+                OnPropertyChanged(nameof(PreparedUpdate));
+            });
+            TransitionTo(UpdateStage.Error, UpdateErrorKind.Prepare);
+            logger.LogWarning("准备完成的更新版本与当前发布版本不一致 {PreparedVersion} {ReleaseVersion}",
+                target.Version, targetRelease?.Version ?? "none");
             return Task.CompletedTask;
+        }
+
+        if (Interlocked.Exchange(ref installStarted, 1) != 0) return Task.CompletedTask;
+        TransitionTo(UpdateStage.Installing);
 
         try
         {
-            TransitionTo(UpdateStage.Installing);
             updateService.LaunchInstaller(target);
-            requestApplicationExit();
             logger.LogInformation("更新安装器已启动 {Version}", target.Version);
+        }
+        catch (InvalidPreparedUpdateException exception)
+        {
+            Interlocked.Exchange(ref installStarted, 0);
+            dispatch(() =>
+            {
+                preparedUpdate = null;
+                OnPropertyChanged(nameof(PreparedUpdate));
+            });
+            TransitionTo(UpdateStage.Error, UpdateErrorKind.Prepare);
+            var diagnostic = SafeUpdateDiagnosticException.Create(exception, "install-validate");
+            logger.LogWarning(diagnostic, "更新安装器启动前验证失败 {Version} {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                target.Version,
+                diagnostic.OriginalExceptionType,
+                diagnostic.OriginalHResult,
+                diagnostic.HttpStatusCode,
+                diagnostic.Stage);
+            return Task.CompletedTask;
         }
         catch (Exception exception)
         {
@@ -293,6 +325,23 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
             TransitionTo(UpdateStage.Ready, UpdateErrorKind.Install);
             var diagnostic = SafeUpdateDiagnosticException.Create(exception, "install");
             logger.LogWarning(diagnostic, "更新安装器启动失败 {Version} {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                target.Version,
+                diagnostic.OriginalExceptionType,
+                diagnostic.OriginalHResult,
+                diagnostic.HttpStatusCode,
+                diagnostic.Stage);
+            return Task.CompletedTask;
+        }
+
+        try
+        {
+            requestApplicationExit();
+        }
+        catch (Exception exception)
+        {
+            TransitionTo(UpdateStage.Error, UpdateErrorKind.Exit);
+            var diagnostic = SafeUpdateDiagnosticException.Create(exception, "exit-after-install");
+            logger.LogWarning(diagnostic, "更新安装器已启动但应用退出失败 {Version} {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
                 target.Version,
                 diagnostic.OriginalExceptionType,
                 diagnostic.OriginalHResult,
@@ -367,6 +416,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         UpdateErrorKind.Check => Loc("update.error.check"),
         UpdateErrorKind.Prepare => Loc("update.error.prepare"),
         UpdateErrorKind.Install => Loc("update.error.install"),
+        UpdateErrorKind.Exit => Loc("update.error.exit"),
         _ => string.Empty
     };
 

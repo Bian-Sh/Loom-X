@@ -1545,6 +1545,7 @@
   <data name="update.error.check"><value>無法檢查更新，請稍後重試。</value></data>
   <data name="update.error.prepare"><value>無法準備更新套件，請重試。</value></data>
   <data name="update.error.install"><value>無法啟動更新安裝程式，請重試。</value></data>
+  <data name="update.error.exit"><value>更新安裝程式已啟動，但應用程式無法自動結束。請手動關閉應用程式。</value></data>
   <data name="release.notes.empty"><value>此版本暫無發行說明。</value></data>
   <data name="settings.update.history.title"><value>版本歷史</value></data>
   <data name="settings.update.history.refresh"><value>重新整理</value></data>

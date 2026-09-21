@@ -286,3 +286,44 @@ if (Test-Path -LiteralPath $outputDir) { throw "发布目录已存在：$outputD
 
 - 旧深色/Toast 证据被判无效时，6.3/6.5 不作为完成证据；新 `15`/`16`/`19`、最新发布和路径核验齐全后重新确认 6.3/6.5 为完成。
 - 未修改、添加、提交、删除、移动或清理用户列出的 Comet 激活未跟踪目录；未 push；未运行 Comet build guard、verify 或 archive。
+
+
+## 13. Final Review Fix Wave（2026-09-21 09:18-09:31 +08:00）
+
+### 13.1 两个 Important 的最小修复
+
+1. **Ready 后安装器身份复验**：`PreparedUpdate` 现在携带准备阶段确认的 SHA-256 与安装器长度。`UpdateService.LaunchInstaller` 在调用 launcher 前重新打开文件，先核对长度，再将十六进制摘要解析为字节并使用 `CryptographicOperations.FixedTimeEquals` 比较；摘要大小写不会影响比较。复验失败会删除当前安装器与配套 `.sha256` 缓存，抛出不含路径、摘要或文件内容的 `InvalidPreparedUpdateException`。`UpdateCoordinator` 同时在安装前核对 `PreparedUpdate.Version` 与当前 `Release.Version`；版本不一致或准备产物失效时清空 `PreparedUpdate`，进入 `Prepare` 错误态，必须重新 Prepare，不能在同一个失效对象上反复点击。
+2. **安装一次性闩锁**：安装流程拆分为“启动安装器”和“请求应用退出”两个异常边界。只有 `LaunchInstaller` 自身失败时清除 `installStarted`；普通 launcher 启动失败仍可安全重试，失效准备产物则要求重新 Prepare。一旦 launcher 成功，闩锁在协调器生命周期内永久保持；即使 `requestApplicationExit` 抛异常，也只进入不可再次安装的 `Exit` 错误态，`CanInstall` 与安装命令保持关闭。新增 `update.error.exit` 四语言资源，提示用户安装器已启动并需手动关闭应用。日志只记录版本、异常类型、HResult、HTTP 状态和阶段等安全摘要。
+
+### 13.2 RED → GREEN 证据
+
+- Service RED：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateServiceTests.LaunchInstaller_准备后安装器被替换时拒绝启动并清理当前缓存" --blame-hang-timeout 60s`。第一次与协调器 RED 并行启动时发生既有输出文件竞争，`LoomX.Harness.dll` 被另一 `VBCSCompiler` 占用（CS2012），该次不作为行为 RED；串行重跑得到 0/1，通过数 0，失败原因为旧实现未抛异常并实际调用 launcher（`No exception was thrown`）。
+- Coordinator RED：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateCoordinatorTests.退出回调失败后不会再次启动安装器且安装命令保持关闭|FullyQualifiedName~UpdateCoordinatorTests.准备版本与当前发布版本不一致时拒绝启动并要求重新准备" --blame-hang-timeout 60s`。结果 0/2；退出失败被旧 catch 回滚到 Ready，版本不一致仍进入 Installing，两个用例均等待目标 Error 状态超时。
+- Service GREEN：同一聚焦回归用例 1/1 PASS；launcher 调用为 0，安装器与校验缓存均被清理。
+- Coordinator GREEN：同一双用例 2/2 PASS；退出回调失败后 `LaunchCalls == 1`、`CanInstall == false`、`CanRetry == false`，版本不一致时 `LaunchCalls == 0` 且清空准备产物。
+- 正常路径保持：既有“安装器启动失败不会退出并恢复就绪”用例扩展为清除 launcher 异常后再次执行，确认第二次 launcher 成功且只请求一次退出。
+
+### 13.3 最终自动化验证
+
+- 聚焦组 1：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateServiceTests" --blame-hang-timeout 60s` → 12/12 PASS。
+- 聚焦组 2：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateCoordinatorTests" --blame-hang-timeout 60s` → 13/13 PASS。
+- 更新域联合：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --blame-hang-timeout 60s --filter "FullyQualifiedName~UpdateServiceTests|FullyQualifiedName~UpdateCoordinatorTests|FullyQualifiedName~ReleaseHistoryViewModelTests|FullyQualifiedName~ReleaseNotesContentViewModelTests"` → 53/53 PASS。
+- 完整测试首次尝试：1159/1160 PASS；唯一失败为 `LocalizationNoCjkTest.Phase2LocalizedViewsAndViewModelsContainNoHardcodedCjk`，根因是新增日志参数续行上的中文回退值 `"无"` 未位于 logger 调用行。改为安全英文摘要 `"none"` 后，聚焦本地化契约 1/1 PASS。
+- 完整测试最终：`dotnet test LoomX.slnx -c Release --no-restore --blame-hang-timeout 60s` → 1160/1160 PASS，持续 1 分 52 秒。
+- Release build：`dotnet build LoomX.slnx -c Release --no-restore` → 0 error、2 个 `NU1903`。
+- OpenSpec：`openspec validate enhance-update-experience --strict` → `Change 'enhance-update-experience' is valid`。
+- change scoped diff check：`git diff --check fd182a9467dbdcefcbc216e8cccc0e85455d453c --` → 无输出、退出码 0。
+
+### 13.4 发布与进程路径核验
+
+- 新发布目录：`outputs/20260921-092945-enhance-update-experience/`，未覆盖或删除任何旧输出。
+- 发布目录递归检查只有一个 exe：`LoomX.exe`；`publish.log` 存在；对发布产物扫描 `LOOMX_UPDATE_PREVIEW` 命中 0。
+- 使用 PowerShell `Start-Process -FilePath <绝对 LoomX.exe> -WindowStyle Hidden -PassThru` 启动，设置项目既有 `LOOMX_ALLOW_MULTIPLE_INSTANCES=1`，显式清除本轮进程环境中的 `LOOMX_UPDATE_PREVIEW`。
+- 本轮 PID 42840；`Win32_Process.ExecutablePath` 精确等于 `D:\AppData\Github\Loom-X - Copy\outputs\20260921-092945-enhance-update-experience\LoomX.exe`。验证后仅终止 PID 42840，未操作受保护的其他 Session PID 30928。
+
+### 13.5 边界、警告与剩余风险
+
+- 未修改 UI 布局或主题；用户可见变化仅为 `update.error.exit` 资源键及四语言文案契约，因此未重复整套 CUA 截图。
+- 未添加、修改、删除、移动或清理用户要求保留的 Comet 激活未跟踪目录；未提交 `outputs/` 或证据目录；未 push；未运行 Comet guard/verify/archive。
+- 既有警告如实保留：`NU1903`（SQLitePCLRaw 已知高严重性漏洞）、`CS8618`（SettingsViewModel.status）、`CA2024`（AnthropicResponseMapper）、`CS8602`（AnthropicRequestFactoryTests）。最终增量 Release build 只打印 2 个 `NU1903`；聚焦测试重新编译与发布阶段仍可见其余既有警告。
+- 剩余固有风险：路径式 `Process.Start` 无法提供从哈希完成到操作系统打开可执行文件之间的完全原子绑定；当前实现通过独占写/删除共享限制下读取文件、紧邻启动前固定时间摘要复验及失败后清缓存，将可控窗口压缩到最小。

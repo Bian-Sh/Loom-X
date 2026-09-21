@@ -599,6 +599,7 @@
   <data name="update.error.check"><value>Unable to check for updates. Try again later.</value></data>
   <data name="update.error.prepare"><value>Unable to prepare the update. Try again.</value></data>
   <data name="update.error.install"><value>Unable to start the update installer. Try again.</value></data>
+  <data name="update.error.exit"><value>The update installer started, but the app could not exit automatically. Close the app manually.</value></data>
   <data name="release.notes.empty"><value>No release notes are available for this version.</value></data>
   <data name="settings.update.history.title"><value>Release history</value></data>
   <data name="settings.update.history.refresh"><value>Refresh</value></data>
