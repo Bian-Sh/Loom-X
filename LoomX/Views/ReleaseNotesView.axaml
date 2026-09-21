@@ -24,7 +24,7 @@
                   HorizontalScrollBarVisibility="Disabled">
       <md:MarkdownRenderer Classes="release-note-body"
                            Margin="0,0,8,0"
-                           IsHitTestVisible="False"
+                           LinkClick="MarkdownRenderer_OnLinkClick"
                            md:MarkdownTextBlock.IsSelectionScope="True"
                            MarkdownBuilder="{Binding Markdown}" />
     </ScrollViewer>
