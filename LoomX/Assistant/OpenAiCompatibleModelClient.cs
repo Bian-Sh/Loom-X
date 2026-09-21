@@ -558,13 +558,25 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                     var deltaId = deltaNode["id"]?.GetValue<string>();
                     var function = deltaNode["function"];
                     var deltaName = function?["name"]?.GetValue<string>();
+                    var hasIndex = deltaNode["index"] is not null;
                     var index = deltaNode["index"]?.GetValue<int>() ?? 0;
+
+                    // SenseNova 偶尔只在首个 chunk 提供 1-based index，后续 arguments 分片省略 index/id/name。
+                    // 此时若当前只有一个尚未完成的调用，分片归属是唯一的，应继续该 builder；否则保持丢弃，
+                    // 避免把无归属的占位片段污染到已有完整调用。
+                    if (!hasIndex
+                        && string.IsNullOrEmpty(deltaId)
+                        && string.IsNullOrWhiteSpace(deltaName)
+                        && toolCallBuilders.Values.Where(item => !item.HasCompleteArguments).Distinct().ToArray() is { Length: 1 } pending)
+                    {
+                        var orphanArguments = function?["arguments"]?.GetValue<string>();
+                        if (orphanArguments is { Length: > 0 }) pending[0].AppendArguments(orphanArguments);
+                        continue;
+                    }
 
                     // 根因防御：合法的 tool_call 首个 chunk 一定携带 id 或 name；
                     // 而后续的 arguments 分片虽然不带 id/name，但对应 index 已有 builder。
-                    // 部分上游（如 sensenova）会在流里附带「既无 id/name、index 也无对应 builder」的
-                    // 畸形占位片段，若为其新建 builder 会累积出 name 为空的调用，进而被误判为
-                    // 「未注册工具」并以空 tool_call_id 回传历史导致 400。这里直接丢弃。
+                    // 部分上游会附带既无 id/name、也无法唯一归属的畸形占位片段，直接丢弃。
                     var hasBuilder = toolCallBuilders.ContainsKey(index);
 
                     if (!hasBuilder && string.IsNullOrEmpty(deltaId) && string.IsNullOrWhiteSpace(deltaName))
@@ -915,6 +927,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         public string Id = string.Empty;
         public string Name = string.Empty;
         public readonly StringBuilder Arguments = new();
+
+        public bool HasCompleteArguments => Arguments.Length > 0 && IsCompleteJsonObject(Arguments.ToString());
 
         public void AppendArguments(string fragment)
         {
