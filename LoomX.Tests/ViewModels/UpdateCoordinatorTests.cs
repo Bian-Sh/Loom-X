@@ -262,6 +262,33 @@ public sealed class UpdateCoordinatorTests
     }
 
     [Fact]
+    public async Task 安装器启动后的成功日志失败仍请求退出且不会重新开放安装命令()
+    {
+        await using var fixture = await CoordinatorFixture.CreateAsync();
+        var service = new FakeUpdateService();
+        var prepared = service.EnqueuePreparation();
+        var exits = 0;
+        var logger = new ThrowingLogger<UpdateCoordinator>("更新安装器已启动");
+        using var coordinator = fixture.CreateCoordinator(service, () => exits++, logger);
+        await coordinator.CheckNowAsync(false);
+        prepared.SetResult(CreatePreparedUpdate());
+        await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
+
+        coordinator.InstallAndRestartCommand.Execute(null);
+        await service.InstallerLaunched.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await Task.Delay(50);
+        coordinator.InstallAndRestartCommand.Execute(null);
+        await Task.Delay(50);
+
+        Assert.Equal(1, service.LaunchCalls);
+        Assert.Equal(1, exits);
+        Assert.Equal(UpdateStage.Installing, coordinator.Stage);
+        Assert.False(coordinator.CanInstall);
+        Assert.False(coordinator.InstallAndRestartCommand.CanExecute(null));
+        Assert.False(coordinator.CanRetry);
+    }
+
+    [Fact]
     public async Task 准备版本与当前发布版本不一致时拒绝启动并要求重新准备()
     {
         await using var fixture = await CoordinatorFixture.CreateAsync();
@@ -424,6 +451,24 @@ public sealed class UpdateCoordinatorTests
             [],
             new UpdateAsset("LoomXSetup.exe", "https://example.com/LoomXSetup.exe", 100, "application/octet-stream"),
             new UpdateAsset("LoomXSetup.exe.sha256", "https://example.com/LoomXSetup.exe.sha256", 64, "text/plain"));
+    }
+
+    private sealed class ThrowingLogger<T>(string messagePrefix) : Microsoft.Extensions.Logging.ILogger<T>
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            Microsoft.Extensions.Logging.LogLevel logLevel,
+            Microsoft.Extensions.Logging.EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (formatter(state, exception).StartsWith(messagePrefix, StringComparison.Ordinal))
+                throw new InvalidOperationException("日志写入失败");
+        }
     }
 
     private sealed class CoordinatorFixture : IAsyncDisposable

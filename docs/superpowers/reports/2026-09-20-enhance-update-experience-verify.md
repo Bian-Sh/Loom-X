@@ -327,3 +327,63 @@ if (Test-Path -LiteralPath $outputDir) { throw "发布目录已存在：$outputD
 - 未添加、修改、删除、移动或清理用户要求保留的 Comet 激活未跟踪目录；未提交 `outputs/` 或证据目录；未 push；未运行 Comet guard/verify/archive。
 - 既有警告如实保留：`NU1903`（SQLitePCLRaw 已知高严重性漏洞）、`CS8618`（SettingsViewModel.status）、`CA2024`（AnthropicResponseMapper）、`CS8602`（AnthropicRequestFactoryTests）。最终增量 Release build 只打印 2 个 `NU1903`；聚焦测试重新编译与发布阶段仍可见其余既有警告。
 - 剩余固有风险：路径式 `Process.Start` 无法提供从哈希完成到操作系统打开可执行文件之间的完全原子绑定；当前实现通过独占写/删除共享限制下读取文件、紧邻启动前固定时间摘要复验及失败后清缓存，将可控窗口压缩到最小。
+
+## 14. Comet Full Verify（2026-09-21 09:59 +08:00）
+
+### 14.1 验证记分卡
+
+| 检查项 | 结果 | 证据 |
+|---|---|---|
+| 1. `tasks.md` 全部完成 | PASS | 22/22，OpenSpec apply instructions 返回 `all_done` |
+| 2. OpenSpec `design.md` 高层决策 | PASS | 自动准备与用户确认启动边界、共享协调器和 Release History 分离均已实现 |
+| 3. Superpowers Design Doc 一致性 | **FAIL（IMPORTANT）** | 设计要求“安装器已经启动但退出失败时不重复启动安装器”；成功日志仍位于可释放 `installStarted` 的通用异常边界内 |
+| 4. 能力规格与场景覆盖 | PASS（含下述实现边界缺陷） | Release 分页、Markdown、进度、Ready 确认、设置页历史与代理/校验场景均有实现和测试；安装一次性安全不变量仍有 1 项 Important |
+| 5. `proposal.md` 目标 | PASS | 低打扰入口、浮窗直显 Release Note、自动准备但确认后安装、设置页多版本浏览均已交付 |
+| 6. Delta spec 与 Design Doc 无矛盾 | PASS | 未发现文档间漂移；失败来自实现异常边界未完全满足设计 |
+| 7. 关联设计文档可定位 | PASS | `docs/superpowers/specs/2026-09-20-enhance-update-experience-design.md` 存在且已核对 |
+
+### 14.2 独立运行证据
+
+- `comet check run enhance-update-experience verify --local -- dotnet test LoomX.slnx -c Release --no-restore --blame-hang-timeout 60s`：1160/1160 PASS，0 skipped，持续 1 分 51 秒；日志 `openspec/changes/enhance-update-experience/.comet/checks/88842210-fcbc-4ca6-bcc1-ab489de3b794.log`。
+- `comet classic openspec -- validate enhance-update-experience --strict`：`Change 'enhance-update-experience' is valid`。
+- Build 阶段独立 Runtime build：0 error；保留既有 `NU1903`、`CS8618`、`CA2024`、`CS8602` 警告，不宣称零警告。
+
+### 14.3 IMPORTANT：launcher 成功后的日志异常仍可能释放闩锁
+
+- `UpdateService.LaunchInstaller` 在 `installerLauncher.Launch(...)` 成功返回后继续记录成功日志；该日志异常会向调用方传播。
+- `UpdateCoordinator.InstallAndRestartAsync` 将 `updateService.LaunchInstaller(target)` 与协调器成功日志放在同一个通用 `try/catch` 中；任一成功后日志异常都会进入“启动失败”分支，执行 `installStarted = 0` 并恢复 `Ready`。
+- 结果是安装器可能已经启动，但安装按钮重新开放，违反 Design Doc 的一次性安装命令与“不重复启动安装器”要求。
+- 现有 1160 个测试仅覆盖 launcher 直接失败和退出回调失败，未覆盖“launcher 已成功、后续日志抛异常”。
+
+**推荐处理：** 回到 Build，以 TDD 增加抛异常 Logger 场景，并将 launcher 成功边界与非关键成功日志彻底分离；只有 launcher 本身失败时才允许释放闩锁。完成后重跑协调器/服务聚焦测试、更新域联合测试、完整测试、Release build 和 fresh scoped review。
+
+### 14.4 本轮结论
+
+**FAIL：1 个不可豁免的 IMPORTANT。** 自动化测试与 OpenSpec strict 均通过，但实现尚未完全满足安装一次性安全边界；本轮不得执行 verify guard、不得进入 archive。
+
+## 15. Verify Failure Fix：安装器启动后日志异常边界（2026-09-21 10:10 +08:00）
+
+### 15.1 RED 证据
+
+- Service 聚焦用例：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateServiceTests.LaunchInstaller_安装器启动后的成功日志失败不影响启动结果" --logger "console;verbosity=minimal"` → 0/1，`UpdateService.LaunchInstaller` 在 launcher 已成功后把 `ILogger.LogInformation` 的 `InvalidOperationException` 向上抛出。
+- Coordinator 聚焦用例：`dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateCoordinatorTests.安装器启动后的成功日志失败仍请求退出且不会重新开放安装命令" --logger "console;verbosity=minimal"` → 0/1，第二次执行安装命令后 `LaunchCalls` 实际为 2，证明旧异常边界会释放一次性闩锁。
+
+### 15.2 最小实现
+
+- `UpdateService.LaunchInstaller` 保留启动前长度与 SHA-256 身份复验；只有 `installerLauncher.Launch(...)` 成功返回后，成功日志才进入独立 best-effort 边界，日志异常不再向上改变启动结果。
+- `UpdateCoordinator.InstallAndRestartAsync` 的 launcher 异常边界只包围 `updateService.LaunchInstaller(target)`；成功日志移到边界外并按 best-effort 处理，随后仍请求应用退出。普通 launcher 失败仍释放闩锁并回到 `Ready`，`InvalidPreparedUpdateException`、退出回调失败后的永久闩锁保持原行为。
+
+### 15.3 GREEN 与回归
+
+- 两个新增聚焦用例串行重跑：各 1/1 PASS。第一次并行 GREEN 尝试发生 `LoomX.dll` 输出文件被另一 `VBCSCompiler` 占用的 `CS2012` 竞争；协调器用例通过，Service 用例随后串行独立重跑通过，该竞争不属于产品行为失败。
+- `UpdateServiceTests`：13/13 PASS。
+- `UpdateCoordinatorTests`：14/14 PASS。
+- 更新域联合：`UpdateServiceTests|UpdateCoordinatorTests|ReleaseHistoryViewModelTests|ReleaseNotesContentViewModelTests` → 55/55 PASS。
+- 完整测试：`dotnet test LoomX.slnx -c Release --no-restore --blame-hang-timeout 60s` → 1162/1162 PASS，0 skipped，持续 1 分 54 秒。
+- Release build：`dotnet build LoomX.slnx -c Release --no-restore --nologo` → 0 error、2 个 `NU1903`。
+
+### 15.4 已知警告与结论
+
+- 最终 Release build 仍保留既有 `NU1903`：`SQLitePCLRaw.lib.e_sqlite3` 2.1.11 存在已知高严重性漏洞；本次修复不扩大依赖范围，也不宣称零警告。
+- 聚焦测试触发重新编译时仍可见既有 `CS8618`、`CA2024`、`CS8602`；本次未修改对应代码。
+- 本次只修复 final scoped re-review 指出的日志异常安全边界，未修改 UI、OpenSpec tasks/spec/design、Comet 状态、发布输出或证据 ledger。

@@ -299,7 +299,6 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         try
         {
             updateService.LaunchInstaller(target);
-            logger.LogInformation("更新安装器已启动 {Version}", target.Version);
         }
         catch (InvalidPreparedUpdateException exception)
         {
@@ -331,6 +330,15 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
                 diagnostic.HttpStatusCode,
                 diagnostic.Stage);
             return Task.CompletedTask;
+        }
+
+        try
+        {
+            logger.LogInformation("更新安装器已启动 {Version}", target.Version);
+        }
+        catch
+        {
+            // 安装器已成功启动，非关键日志失败不能释放一次性闩锁。
         }
 
         try

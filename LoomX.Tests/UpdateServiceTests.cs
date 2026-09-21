@@ -187,6 +187,29 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task LaunchInstaller_安装器启动后的成功日志失败不影响启动结果()
+    {
+        var fixture = UpdateFixture.CreateValid();
+        try
+        {
+            var prepared = await fixture.Service.PrepareUpdateAsync(fixture.Release, DirectSettings);
+            var service = new UpdateService(
+                _ => new HttpClient(fixture.Handler),
+                fixture.Launcher,
+                new ThrowingLogger<UpdateService>("更新安装器已启动"),
+                fixture.RootDirectory,
+                "0.12.6");
+
+            var exception = Record.Exception(() => service.LaunchInstaller(prepared));
+
+            Assert.Null(exception);
+            Assert.Equal(1, fixture.Launcher.LaunchCalls);
+            Assert.Equal(prepared.InstallerPath, fixture.Launcher.Path);
+        }
+        finally { fixture.Dispose(); }
+    }
+
+    [Fact]
     public async Task PrepareUpdateAsync_有效缓存重新校验后不重复下载()
     {
         var fixture = UpdateFixture.CreateValid();
@@ -383,6 +406,24 @@ public sealed class UpdateServiceTests
         {
             LaunchCalls++;
             Path = installerPath;
+        }
+    }
+
+    private sealed class ThrowingLogger<T>(string messagePrefix) : Microsoft.Extensions.Logging.ILogger<T>
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            Microsoft.Extensions.Logging.LogLevel logLevel,
+            Microsoft.Extensions.Logging.EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (formatter(state, exception).StartsWith(messagePrefix, StringComparison.Ordinal))
+                throw new InvalidOperationException("日志写入失败");
         }
     }
 

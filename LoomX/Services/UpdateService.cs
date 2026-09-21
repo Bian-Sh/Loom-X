@@ -403,7 +403,14 @@ public sealed class UpdateService : IUpdateService
         }
 
         installerLauncher.Launch(preparedUpdate.InstallerPath);
-        logger.LogInformation("更新安装器已启动 {Version}", preparedUpdate.Version);
+        try
+        {
+            logger.LogInformation("更新安装器已启动 {Version}", preparedUpdate.Version);
+        }
+        catch
+        {
+            // 安装器已启动后，日志失败不得改变调用结果或诱发重复启动。
+        }
     }
 
     private async Task DownloadFileAsync(HttpClient client, string url, string path, IProgress<UpdateDownloadProgress>? progress, CancellationToken cancellationToken)
