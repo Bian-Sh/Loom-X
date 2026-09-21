@@ -149,7 +149,8 @@ public partial class App : Application
                 mainWindow.ApplyAppearance,
                 dataStore,
                 LocalizerFactory.Create<MainWindowViewModel>(),
-                requestApplicationExit: () => desktop.Shutdown());
+                requestApplicationExit: () => desktop.Shutdown(),
+                applyTheme: mainWindow.ApplyTheme);
             desktop.MainWindow = mainWindow;
             if (activationPending)
                 mainWindow.ActivateFromSecondaryLaunch();

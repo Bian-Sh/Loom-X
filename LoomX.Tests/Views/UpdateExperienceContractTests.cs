@@ -31,7 +31,7 @@ public sealed class UpdateExperienceContractTests
         var settingsViewModel = NormalizeLineEndings(ReadDesktopFile("ViewModels", "SettingsViewModel.cs"));
 
         Assert.Contains("requestApplicationExit: () => desktop.Shutdown()", app, StringComparison.Ordinal);
-        Assert.Contains("AssistantViewModel? assistantViewModel = null,\n        Action? requestApplicationExit = null)", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("AssistantViewModel? assistantViewModel = null,\n        Action? requestApplicationExit = null,\n        Action<string>? applyTheme = null)", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("private readonly ReleaseHistoryViewModel releaseHistoryViewModel;", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("IUpdateService updateService = new UpdateService(", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("new UpdateCoordinator(\n            this.dataStore,\n            updateService,", mainViewModel, StringComparison.Ordinal);
@@ -49,6 +49,8 @@ public sealed class UpdateExperienceContractTests
         var source = ReadDesktopFile("MainWindow.axaml");
         var toastStart = source.IndexOf("x:Name=\"toastBorder\"", StringComparison.Ordinal);
         var dialogStart = source.IndexOf("x:Name=\"updateDialogOverlay\"", StringComparison.Ordinal);
+        var toastTagEnd = toastStart >= 0 ? source.IndexOf('>', toastStart) : -1;
+        var dialogTagEnd = dialogStart >= 0 ? source.IndexOf('>', dialogStart) : -1;
         var systemCloseStart = source.IndexOf("Classes=\"window-control window-close\"", StringComparison.Ordinal);
         var systemCloseEnd = systemCloseStart >= 0 ? source.IndexOf("</Button>", systemCloseStart, StringComparison.Ordinal) : -1;
         var dialogCloseStart = source.IndexOf("x:Name=\"updateDialogCloseButton\"", StringComparison.Ordinal);
@@ -89,7 +91,21 @@ public sealed class UpdateExperienceContractTests
         Assert.DoesNotContain("Update.ReleaseNotesVisible", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Update.OpenReleaseNotesCommand", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Text=\"{Binding Update.ReleaseNotes}\"", source, StringComparison.Ordinal);
-        Assert.True(toastStart >= 0 && dialogStart > toastStart, "Toast 必须保持独立层并位于更新浮窗后方。");
+        Assert.True(toastStart >= 0 && toastTagEnd > toastStart, "找不到 Toast 容器。");
+        Assert.True(dialogStart >= 0 && dialogTagEnd > dialogStart, "找不到更新浮窗遮罩。");
+        var toastTag = source[toastStart..toastTagEnd];
+        var dialogTag = source[dialogStart..dialogTagEnd];
+        Assert.Contains("Classes=\"toast-layer\"", toastTag, StringComparison.Ordinal);
+        Assert.Contains("<Style Selector=\"Border.toast-layer\">", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Panel.ZIndex\" Value=\"2\" />", source, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Left\"", toastTag, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"16,0,0,24\"", toastTag, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"196\"", toastTag, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"update-dialog-layer\"", dialogTag, StringComparison.Ordinal);
+        Assert.Contains("<Style Selector=\"Border.update-dialog-layer\">", source, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Panel.ZIndex\" Value=\"1\" />", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid ColumnDefinitions=\"228,*\">", source, StringComparison.Ordinal);
+        Assert.Contains("<Border Grid.Column=\"1\" Margin=\"48,56\" MaxWidth=\"760\"", source, StringComparison.Ordinal);
     }
 
     [Fact]

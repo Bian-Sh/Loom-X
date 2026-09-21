@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Avalonia.Styling;
 using LoomX;
 using System.IO;
 using Xunit;
@@ -22,6 +23,28 @@ public sealed class SettingsViewContractTests
         Assert.DoesNotContain("DebouncedAutoSaver", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("private readonly SemaphoreSlim saveLock", viewModelSource, StringComparison.Ordinal);
         Assert.Contains("private void SaveAfterEdit()", viewModelSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ThemeSelectionAppliesAvaloniaVariantAndProvidesDistinctDarkTokens()
+    {
+        var appSource = ReadDesktopFile("App.axaml.cs");
+        var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
+        var mainViewModelSource = ReadDesktopFile("ViewModels", "MainWindowViewModel.cs");
+        var settingsViewModelSource = ReadDesktopFile("ViewModels", "SettingsViewModel.cs");
+        var tokenSource = ReadDesktopFile("Styles", "VisualTokens.axaml");
+
+        Assert.Contains("applyTheme: mainWindow.ApplyTheme", appSource, StringComparison.Ordinal);
+        Assert.Contains("public void ApplyTheme(string theme)", windowSource, StringComparison.Ordinal);
+        Assert.Contains("ThemeVariant.Dark", windowSource, StringComparison.Ordinal);
+        Assert.Contains("ThemeVariant.Light", windowSource, StringComparison.Ordinal);
+        Assert.Contains("ThemeVariant.Default", windowSource, StringComparison.Ordinal);
+        Assert.Contains("applyTheme?.Invoke(settings.Theme);", mainViewModelSource, StringComparison.Ordinal);
+        Assert.Contains("if (!suppressAutoSave) ApplyThemePreview();", settingsViewModelSource, StringComparison.Ordinal);
+        Assert.Contains("<ResourceDictionary x:Key=\"Light\">", tokenSource, StringComparison.Ordinal);
+        Assert.Contains("<ResourceDictionary x:Key=\"Dark\">", tokenSource, StringComparison.Ordinal);
+        Assert.Contains("Color=\"#E6172226\"", tokenSource, StringComparison.Ordinal);
+        Assert.Contains("Color=\"#F1F6F7\"", tokenSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -178,11 +201,15 @@ public sealed class SettingsViewContractTests
         var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
             new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
 
-        var brush = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]);
-        var originalColor = brush.Color;
-        brush.Color = Color.FromArgb(12, originalColor.R, originalColor.G, originalColor.B);
+        Assert.True(dictionary.TryGetResource("WindowBackgroundBrush", ThemeVariant.Light, out var lightResource));
+        Assert.True(dictionary.TryGetResource("WindowBackgroundBrush", ThemeVariant.Dark, out var darkResource));
+        var lightBrush = Assert.IsType<SolidColorBrush>(lightResource);
+        var darkBrush = Assert.IsType<SolidColorBrush>(darkResource);
+        var originalColor = lightBrush.Color;
+        lightBrush.Color = Color.FromArgb(12, originalColor.R, originalColor.G, originalColor.B);
 
-        Assert.Equal(12, brush.Color.A);
+        Assert.Equal(12, lightBrush.Color.A);
+        Assert.NotEqual(lightBrush.Color.R, darkBrush.Color.R);
     }
 
     [Fact]
@@ -190,15 +217,18 @@ public sealed class SettingsViewContractTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        window.ApplyTheme("light");
         var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
             new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
         window.Resources.MergedDictionaries.Add(dictionary);
 
         window.ApplyAppearance(true, 0, 64, "acrylic");
-        var highBlurSurfaceAlpha = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]).Color.A;
+        Assert.True(dictionary.TryGetResource("WindowBackgroundBrush", ThemeVariant.Light, out var highBlurResource));
+        var highBlurSurfaceAlpha = Assert.IsType<SolidColorBrush>(highBlurResource).Color.A;
 
         window.ApplyAppearance(true, 100, 0, "mica");
-        var lowBlurSurfaceAlpha = Assert.IsType<SolidColorBrush>(dictionary["WindowBackgroundBrush"]).Color.A;
+        Assert.True(dictionary.TryGetResource("WindowBackgroundBrush", ThemeVariant.Light, out var lowBlurResource));
+        var lowBlurSurfaceAlpha = Assert.IsType<SolidColorBrush>(lowBlurResource).Color.A;
 
         Assert.Equal(MainWindow.CalculateBrushAlpha(230, 0, MainWindow.CalculateBlurTintFactor(64)), highBlurSurfaceAlpha);
         Assert.Equal(MainWindow.CalculateBrushAlpha(230, 100, MainWindow.CalculateBlurTintFactor(0)), lowBlurSurfaceAlpha);
@@ -219,7 +249,8 @@ public sealed class SettingsViewContractTests
     {
         EnsureAvaloniaSetup();
         var app = Assert.IsType<App>(Application.Current);
-        Assert.True(app.TryGetResource("WindowBackgroundBrush", null, out var resource));
+        app.RequestedThemeVariant = ThemeVariant.Light;
+        Assert.True(app.TryGetResource("WindowBackgroundBrush", ThemeVariant.Light, out var resource));
         var brush = Assert.IsType<SolidColorBrush>(resource);
         var originalAlpha = brush.Color.A;
 

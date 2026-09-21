@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.Styling;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.Logging;
 using LoomX.Services;
@@ -357,6 +358,18 @@ public partial class MainWindow : Window
         logger.LogInformation("重复启动请求已激活主窗口 {NativeActivated} {ProcessId}", nativeActivated, Environment.ProcessId);
     }
 
+    public void ApplyTheme(string theme)
+    {
+        if (Application.Current is not { } application) return;
+        application.RequestedThemeVariant = theme.Trim().ToLowerInvariant() switch
+        {
+            "dark" => ThemeVariant.Dark,
+            "light" => ThemeVariant.Light,
+            _ => ThemeVariant.Default
+        };
+        appearanceCoordinator.RefreshThemeResources();
+    }
+
     public void ApplyAppearance(bool enabled, int opacity, int blurAmount, string algorithm)
     {
         // 算法选择已固定为 Acrylic；保留参数仅兼容旧版调用方和配置数据。
@@ -385,8 +398,9 @@ public partial class MainWindow : Window
 
     internal bool TryResolveAppearanceResource(string key, out object? value)
     {
-        if (TryGetResource(key, null, out value)) return true;
-        if (Application.Current is { } application && application.TryGetResource(key, null, out value)) return true;
+        var theme = ActualThemeVariant;
+        if (TryGetResource(key, theme, out value)) return true;
+        if (Application.Current is { } application && application.TryGetResource(key, theme, out value)) return true;
         value = null;
         return false;
     }

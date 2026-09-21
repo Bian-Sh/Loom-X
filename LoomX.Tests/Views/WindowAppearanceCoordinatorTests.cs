@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
+using Avalonia.Styling;
 using LoomX;
 using LoomX.Services;
 using LoomX.Views;
@@ -17,29 +18,30 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
 
         window.ApplyAppearance(false, 20, 0, "blur");
 
-        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A);
-        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["PopupBackgroundBrush"]).Color.A);
+        Assert.Equal(255, GetBrush(dictionary, "DialogBackgroundBrush").Color.A);
+        Assert.Equal(255, GetBrush(dictionary, "PopupBackgroundBrush").Color.A);
         Assert.Equal(255, Assert.IsType<SolidColorBrush>(window.Background).Color.A);
 
         window.ApplyAppearance(true, 20, 0, "blur");
 
         var lowBlurFactor = MainWindow.CalculateBlurTintFactor(0);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(232, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(224, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["PopupBackgroundBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(232, 20, lowBlurFactor), GetBrush(dictionary, "DialogBackgroundBrush").Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(224, 20, lowBlurFactor), GetBrush(dictionary, "PopupBackgroundBrush").Color.A);
         Assert.Same(Brushes.Transparent, window.Background);
 
         window.ApplyAppearance(true, 20, 64, "blur");
 
         var highBlurFactor = MainWindow.CalculateBlurTintFactor(64);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(232, 20, highBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(224, 20, highBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["PopupBackgroundBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(232, 20, highBlurFactor), GetBrush(dictionary, "DialogBackgroundBrush").Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(224, 20, highBlurFactor), GetBrush(dictionary, "PopupBackgroundBrush").Color.A);
         Assert.True(
-            Assert.IsType<SolidColorBrush>(dictionary["DialogBackgroundBrush"]).Color.A
+            GetBrush(dictionary, "DialogBackgroundBrush").Color.A
             > MainWindow.CalculateBrushAlpha(232, 20, lowBlurFactor));
     }
 
@@ -48,20 +50,21 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
 
         window.ApplyAppearance(true, 20, 0, "acrylic");
-        var lowBlurAlpha = Assert.IsType<SolidColorBrush>(dictionary["AccentSoftBrush"]).Color.A;
+        var lowBlurAlpha = GetBrush(dictionary, "AccentSoftBrush").Color.A;
         Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, MainWindow.CalculateBlurTintFactor(0)), lowBlurAlpha);
 
         window.ApplyAppearance(true, 20, 64, "acrylic");
-        var highBlurAlpha = Assert.IsType<SolidColorBrush>(dictionary["AccentSoftBrush"]).Color.A;
+        var highBlurAlpha = GetBrush(dictionary, "AccentSoftBrush").Color.A;
         Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, MainWindow.CalculateBlurTintFactor(64)), highBlurAlpha);
         Assert.True(highBlurAlpha > lowBlurAlpha);
 
         window.ApplyAppearance(false, 20, 64, "acrylic");
-        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["AccentSoftBrush"]).Color.A);
+        Assert.Equal(255, GetBrush(dictionary, "AccentSoftBrush").Color.A);
     }
 
     [Fact]
@@ -69,32 +72,33 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
 
         window.ApplyAppearance(true, 20, 0, "acrylic");
         var lowBlurFactor = MainWindow.CalculateBlurTintFactor(0);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["SuccessSoftBrush"]).Color.A);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["WarningSoftBrush"]).Color.A);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["DangerSoftBrush"]).Color.A);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["SuccessBorderBrush"]).Color.A);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["WarningBorderBrush"]).Color.A);
-        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, lowBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["DangerBorderBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor), GetBrush(dictionary, "SuccessSoftBrush").Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor), GetBrush(dictionary, "WarningSoftBrush").Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor), GetBrush(dictionary, "DangerSoftBrush").Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, lowBlurFactor), GetBrush(dictionary, "SuccessBorderBrush").Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, lowBlurFactor), GetBrush(dictionary, "WarningBorderBrush").Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, lowBlurFactor), GetBrush(dictionary, "DangerBorderBrush").Color.A);
 
         window.ApplyAppearance(true, 20, 64, "acrylic");
         var highBlurFactor = MainWindow.CalculateBlurTintFactor(64);
         Assert.True(
-            Assert.IsType<SolidColorBrush>(dictionary["SuccessSoftBrush"]).Color.A
+            GetBrush(dictionary, "SuccessSoftBrush").Color.A
             > MainWindow.CalculateBrushAlpha(214, 20, lowBlurFactor));
-        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, highBlurFactor), Assert.IsType<SolidColorBrush>(dictionary["DangerBorderBrush"]).Color.A);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(160, 20, highBlurFactor), GetBrush(dictionary, "DangerBorderBrush").Color.A);
 
         window.ApplyAppearance(false, 20, 64, "acrylic");
-        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["SuccessSoftBrush"]).Color.A);
-        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["WarningSoftBrush"]).Color.A);
-        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["DangerSoftBrush"]).Color.A);
-        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["SuccessBorderBrush"]).Color.A);
-        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["WarningBorderBrush"]).Color.A);
-        Assert.Equal(255, Assert.IsType<SolidColorBrush>(dictionary["DangerBorderBrush"]).Color.A);
+        Assert.Equal(255, GetBrush(dictionary, "SuccessSoftBrush").Color.A);
+        Assert.Equal(255, GetBrush(dictionary, "WarningSoftBrush").Color.A);
+        Assert.Equal(255, GetBrush(dictionary, "DangerSoftBrush").Color.A);
+        Assert.Equal(255, GetBrush(dictionary, "SuccessBorderBrush").Color.A);
+        Assert.Equal(255, GetBrush(dictionary, "WarningBorderBrush").Color.A);
+        Assert.Equal(255, GetBrush(dictionary, "DangerBorderBrush").Color.A);
     }
 
     [Fact]
@@ -102,6 +106,7 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
         var dialog = new GlassDialogWindow();
@@ -122,6 +127,7 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
         WindowAppearanceSnapshot? changed = null;
@@ -139,11 +145,11 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
         window.ApplyAppearance(true, 0, 0, "acrylic");
-        Assert.True(dictionary.ContainsKey("DangerMessageSurfaceBrush"));
-        var brush = Assert.IsType<SolidColorBrush>(dictionary["DangerMessageSurfaceBrush"]);
+        var brush = GetBrush(dictionary, "DangerMessageSurfaceBrush");
         Assert.InRange(brush.Color.A, (byte)217, (byte)254);
         window.ApplyAppearance(false, 0, 0, "acrylic");
         Assert.Equal(255, brush.Color.A);
@@ -151,6 +157,12 @@ public sealed class WindowAppearanceCoordinatorTests
 
     private static ResourceDictionary LoadVisualTokens() => Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
         new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
+
+    private static SolidColorBrush GetBrush(ResourceDictionary dictionary, string key)
+    {
+        Assert.True(dictionary.TryGetResource(key, ThemeVariant.Light, out var resource));
+        return Assert.IsType<SolidColorBrush>(resource);
+    }
 
     private static void EnsureAvaloniaSetup()
     {

@@ -125,6 +125,12 @@
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
     </Style>
+    <Style Selector="Border.update-dialog-layer">
+      <Setter Property="Panel.ZIndex" Value="1" />
+    </Style>
+    <Style Selector="Border.toast-layer">
+      <Setter Property="Panel.ZIndex" Value="2" />
+    </Style>
     <Style Selector="Button.update-entry">
       <Setter Property="Height" Value="32" />
       <Setter Property="Width" Value="32" />
@@ -267,13 +273,14 @@
         </Grid>
       </Border>
     </Grid>
-    <Border x:Name="toastBorder" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Background="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="14,11" MaxWidth="420">
+    <Border x:Name="toastBorder" Classes="toast-layer" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,24" Background="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="14,11" MaxWidth="196">
       <TextBlock x:Name="toastText" Foreground="White" TextWrapping="Wrap" />
     </Border>
-    <Border x:Name="updateDialogOverlay" DataContext="{Binding $parent[Window].UpdatePresentation}"
+    <Border x:Name="updateDialogOverlay" Classes="update-dialog-layer" DataContext="{Binding $parent[Window].UpdatePresentation}"
             IsVisible="{Binding Update.IsDialogVisible}" Background="{DynamicResource SurfaceMutedBrush}"
-            HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="48,56">
-      <Border MaxWidth="760" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+            HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+      <Grid ColumnDefinitions="228,*">
+        <Border Grid.Column="1" Margin="48,56" MaxWidth="760" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
               Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderStrongBrush}"
               BorderThickness="1" CornerRadius="12" ClipToBounds="True">
         <Grid RowDefinitions="Auto,1,*,1,Auto">
@@ -338,7 +345,8 @@
             </Grid>
           </Grid>
         </Grid>
-      </Border>
+        </Border>
+      </Grid>
     </Border>
   </Grid>
 </Window>

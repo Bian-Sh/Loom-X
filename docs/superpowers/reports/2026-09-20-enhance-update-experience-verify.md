@@ -1,11 +1,11 @@
 # enhance-update-experience 集成验证报告
 
 - 计划日期：2026-09-20
-- 本机时钟记录：2026-09-21 07:09-07:41 +08:00（按任务要求用于实际证据目录与 `outputs/` 时间命名）
+- 本机时钟记录：初始验证 2026-09-21 07:09-07:51 +08:00；Fix Round 1 2026-09-21 08:08-08:42 +08:00
 - 基线：`a081a665e8bc73252f52c55fe68af49506e2db96`
 - 分支：`codex/merge-structured-config-assistant-decisions`
-- 最终发布目录：`outputs/20260921-073944-enhance-update-experience/`
-- 最终证据目录：`.superpowers/sdd/2026-09-20-enhance-update-experience/task-10-evidence/20260921-070917/`
+- 最终发布目录：`outputs/20260921-083304-enhance-update-experience/`
+- 最终有效补证目录：`.superpowers/sdd/2026-09-20-enhance-update-experience/task-10-evidence/fix-round-1-20260921-080800/`
 
 ## 1. 实施摘要
 
@@ -79,13 +79,13 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --blame-hang-
 
 ### 4.2 完整测试
 
-最终命令：
+首次发布前命令：
 
 ```powershell
 dotnet test LoomX.slnx -c Release --no-restore --blame-hang-timeout 60s
 ```
 
-真实结果：1156 个测试中 1155 PASS、1 FAIL，约 1 分 52 秒。唯一失败：
+首次发布前完整测试真实结果：1156 个测试中 1155 PASS、1 FAIL，约 1 分 52 秒。唯一失败：
 
 - `GatewayViewModelDeletionTests.ComboDeletePreservesBoundComboAsSelectedMissingOption`
 - 异常：`InvalidOperationException: Collection was modified; enumeration operation may not execute.`
@@ -98,7 +98,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --blame-hang-
 
 结果：8/8 PASS，约 13 秒。未修改无关测试基础设施，也未用反复重跑掩盖完整测试真实结果。
 
-补充历史证据：在标题栏最终修复前的一次完整测试曾 1156/1156 PASS（约 1 分 57 秒）；最终报告仍以上述最终代码的 1155/1156 为准。
+补充历史证据：在标题栏最终修复前的一次完整测试曾 1156/1156 PASS（约 1 分 57 秒）；首次发布前记录保留上述 1155/1156；后续结果按各阶段分别记录。
 
 ### 4.3 Release Build
 
@@ -143,10 +143,10 @@ git diff --check
 |---|---|
 | `01-downloading-dialog.png` | 透明主题辅助截图；Markdown、54.0/128.0 MB、4.0 MB/秒、42%、稍后按钮可见。透明截图不用于单独判定配色。 |
 | `05-light-transparency-off.png` | 浅色 + 关闭透明效果；下载浮窗文字、链接、进度与操作清晰。 |
-| `06-dark-transparency-off.png` | 深色 + 关闭透明效果；内容与操作对比可读。 |
+| `06-dark-transparency-off.png` | **无效历史证据**：与旧 `05-light-transparency-off.png` 字节数及 SHA-256 完全相同，不再支持深色结论；文件保留未删除。 |
 | `07-history-page1-badges.png` | 首次页、最新/当前徽标、默认选中最新、共享 Markdown。 |
 | `08-history-load-more-selection.png` | 加载更多后仍选中 v0.12.6，正文未丢失；未因切换版本重复请求。 |
-| `09-toast-no-overlap.png` | 普通 Toast“发现新版本 v9.9.0”位于底部，标题栏入口保留且未与更新浮窗重叠。 |
+| `09-toast-no-overlap.png` | 历史截图未同时显示 Toast 与更新浮窗，不能证明二者不重叠；文件保留但不作为 Finding 2 证据。 |
 | `10-verifying-indeterminate.png` | 校验态保留 Markdown，显示非确定进度与“稍后”。 |
 | `11-ready-actions.png` | Ready 仅显示“稍后 / 重启并安装”。未点击安装。 |
 | `12-error-retry.png` | 更新准备错误摘要安全可读，提供“重试”。 |
@@ -160,15 +160,15 @@ git diff --check
 
 ### 5.2 主题结论
 
-- 浅色、深色均在关闭透明效果后截图确认，更新浮窗、标题栏入口、设置页和错误/空态可读。
+- 原始旧 `06` 证据无效；Fix Round 1 已用新 `15`/`16` 在关闭透明效果后分别确认浅色与真实深色，且 SHA-256 不同。
 - 透明主题只作为辅助观察，未据此单独判断真实配色。
 - 标题栏默认宽度 32px；Hover 宽度 252px；系统窗口按钮固定在独立 42px 列，位置未被挤压。
 
-## 6. 发布与进程路径
+## 6. Task 10 首轮发布与进程路径（Fix Round 1 后已被替代）
 
 第一次发布目录 `outputs/20260921-072800-enhance-update-experience/` 在后续修复前生成，已按要求保留且未覆盖/删除，不作为最终产物引用。
 
-最终发布命令：
+首轮第二次发布命令：
 
 ```powershell
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -177,18 +177,18 @@ if (Test-Path -LiteralPath $outputDir) { throw "发布目录已存在：$outputD
 ./scripts/publish-desktop.ps1 -Configuration Release -OutputDirectory $outputDir
 ```
 
-最终结果：
+首轮第二次发布结果：
 
-- 目录：`D:\AppData\Github\Loom-X - Copy\outputs\20260921-073944-enhance-update-experience`
+- 当时目录：`D:\AppData\Github\Loom-X - Copy\outputs\20260921-073944-enhance-update-experience`（Fix Round 1 后已陈旧，保留但不作为最终包）
 - 唯一 exe：`LoomX.exe`（exe 数量 1）。
 - `publish.log`：保留。
 - 发布输出警告：`NU1903`、`CS8618`、`CA2024`；0 error。
 - Release 预览分支扫描：`False`。
 
-最终启动命令使用 PowerShell `Start-Process -FilePath <绝对 LoomX.exe>`；为与无关 Session 的单实例共存，仅设置项目既有 `LOOMX_ALLOW_MULTIPLE_INSTANCES=1`，未设置 `LOOMX_UPDATE_PREVIEW`。
+当时启动命令使用 PowerShell `Start-Process -FilePath <绝对 LoomX.exe>`；为与无关 Session 的单实例共存，仅设置项目既有 `LOOMX_ALLOW_MULTIPLE_INSTANCES=1`，未设置 `LOOMX_UPDATE_PREVIEW`。
 
-- 最终进程 PID：32612（验证后已关闭）。
-- 期望路径：`D:\AppData\Github\Loom-X - Copy\outputs\20260921-073944-enhance-update-experience\LoomX.exe`
+- 当时进程 PID：32612（验证后已关闭）。
+- 当时期望路径：`D:\AppData\Github\Loom-X - Copy\outputs\20260921-073944-enhance-update-experience\LoomX.exe`
 - `Win32_Process.ExecutablePath`：与期望路径完全相同。
 
 ## 7. 日志敏感信息检查
@@ -217,19 +217,72 @@ if (Test-Path -LiteralPath $outputDir) { throw "发布目录已存在：$outputD
 
 - 本 change 引入的预览接线、设置页 Tab 生命周期和标题栏 Hover 缺陷均已按 TDD 修复并有 CUA 证据。
 - 定向测试、代表类、Release build、OpenSpec strict validate、diff check 与最终发布通过。
-- 剩余风险：最终完整测试出现 1 个无关的并发枚举偶发失败；独立代表类 8/8 PASS，但完整测试的真实结果仍记录为 1155/1156，未掩盖。
+- 历史风险：首次发布前完整测试出现 1 个无关并发枚举偶发失败；独立代表类 8/8 PASS。提交后最终复核为 1156/1156，Fix Round 1 最终源码复核为 1157/1157；三次真实结果均保留。
 - 既有 `NU1903`、`CS8618`、`CA2024`、`CS8602` 未在本 Task 扩大范围处理。
 
 
-## 11. 提交后复核（2026-09-21 07:48-07:51 +08:00）
+## 11. 提交后最终复核（2026-09-21 07:48-07:51 +08:00）
 
-为最终回报重新执行同一份已提交源码，未修改生产代码、测试或发布包：
+提交后最终复核重新执行同一份已提交源码，未修改生产代码、测试或发布包：
 
 - 服务/ViewModel 定向组：50/50 PASS；`--blame-hang-timeout 60s`；出现既有 `NU1903`、`CS8618`、`CA2024`、`CS8602`。
 - UI/契约/本地化定向组：47/47 PASS；`--blame-hang-timeout 60s`；出现既有 `NU1903`。
 - 设置页生命周期与标题栏 Hover 代表测试组合：2/2 PASS；`--blame-hang-timeout 60s`；出现既有 `NU1903`。
-- 完整测试：1156/1156 PASS，持续 1 分 51 秒；`--blame-hang-timeout 60s`。这次复核通过不删除上文最终验证曾出现的 1155/1156 偶发失败记录，二者共同证明该既有并发枚举失败具有非稳定性。
+- 完整测试：1156/1156 PASS，持续 1 分 51 秒；`--blame-hang-timeout 60s`。这次复核通过不删除上文首次发布前曾出现的 1155/1156 偶发失败记录，二者共同证明该既有并发枚举失败具有非稳定性。
 - Release build：0 error、2 个 `NU1903`。
 - OpenSpec strict：`Change 'enhance-update-experience' is valid`。
 - `git diff --check a081a665e8bc73252f52c55fe68af49506e2db96..HEAD`：无错误。
-- 最终发布目录与实际进程路径保持 `outputs/20260921-073944-enhance-update-experience/`，因为本次仅复核且未修改源码；陈旧的 `outputs/20260921-072800-enhance-update-experience/` 仍保留。
+- 当次提交后复核未修改源码，当时发布目录为 `outputs/20260921-073944-enhance-update-experience/`；Fix Round 1 后该包与 `072800` 均为保留的陈旧包，最终引用 `083304`。
+
+
+## 12. Fix Round 1/5（2026-09-21 08:08-08:42 +08:00）
+
+### 12.1 Finding 1：真实深色 + 关闭透明
+
+- 旧证据核验：
+  - `05-light-transparency-off.png`：56,351 字节，SHA-256 `48B9197354584C0AAB0074CAEA7C28175C15CC3FA83FA56C4DDDE8CD640A500C`。
+  - `06-dark-transparency-off.png`：56,351 字节，SHA-256 同为 `48B9197354584C0AAB0074CAEA7C28175C15CC3FA83FA56C4DDDE8CD640A500C`。
+  - 结论：旧 `06` 为无效历史证据，保留但不再支持 OpenSpec 6.3/6.5。
+- 根因：`SettingsViewModel.SelectedTheme` 只保存配置，没有应用 Avalonia `RequestedThemeVariant`；`VisualTokens.axaml` 也只有固定浅色资源。
+- TDD：主题契约先因缺少 `applyTheme: mainWindow.ApplyTheme` 1 FAIL；最小接线后，主题 + Toast 聚焦组合 2/2 PASS。
+- 修复：主题选择即时应用 `ThemeVariant.Light/Dark/Default`，配置外部刷新同步应用；视觉令牌拆分 Light/Dark ThemeDictionary；切换主题时刷新透明外观资源缓存。
+- 新 CUA 证据（action 前后均 `get_window_state`，单窗口截图）：
+  - `15-valid-light-after-theme-fix.png/json`：浅色、透明关闭；82,845 字节；SHA-256 `DE8262498254D53CD04FEB75FCF5D9EF0CFFDF9423E57AB30152635BBF58265D`。
+  - `16-valid-dark-transparency-off.png/json`：深色、透明关闭；83,100 字节；SHA-256 `B052CDEAEA6FB37F2689A497C3FF0483C0E1514E3BCAAB2B2C51A3615EDDEF5A`。
+  - 新浅色/深色 SHA-256 不同，UIA ComboBox 值与视觉结果均确认主题已经改变。透明主题截图仍只作辅助，不单独判定真实配色。
+
+### 12.2 Finding 2：Toast 显式高于 Overlay 且不覆盖主体
+
+- RED：先修改 `UpdateExperienceContractTests`，删除“Toast 位于浮窗后方”的错误断言，显式要求 Toast ZIndex=2、Overlay ZIndex=1、Toast 位于 228px 侧栏且最大宽度 196px；旧实现 1 FAIL，缺少 Toast `Panel.ZIndex`。
+- GREEN：`MainWindow.axaml` 使用 Style Setter 明确 `Panel.ZIndex`；Toast 左下侧栏显示并允许换行，更新浮窗主体放在第二列。直接在元素上设置附加属性曾触发 Avalonia `AVLN3000`，因此采用仓库可编译的 Style Setter 模式。
+- CUA：`19-valid-dark-toast-dialog-no-overlap.png/json` 同时显示 Toast“发现新版本 v9.9.0”与更新浮窗，Toast 在左下侧栏、浮窗主体在右侧内容列，空间不重叠；133,856 字节；SHA-256 `1283A930A53E9B371A43387EAC904F8443773C2C8669560FA6CADFB8669E66CC`。
+
+### 12.3 Finding 3：完整测试阶段名称
+
+- **首次发布前完整测试**：1155/1156；唯一失败为无关 `GatewayViewModelDeletionTests` 并发枚举偶发异常，独立代表类 8/8 PASS。
+- **提交后最终复核**：1156/1156 PASS。
+- **Fix Round 1 最终源码复核**：1157/1157 PASS，1 分 54 秒。三次结果均保留，不再把前两次同时称为“最终”。
+
+### 12.4 Fix Round 1 命令与结果
+
+- 聚焦主题 + Toast：2/2 PASS；`--blame-hang-timeout 60s`；2 个既有 `NU1903`。
+- UI/契约/本地化：48/48 PASS；`--blame-hang-timeout 60s`；2 个既有 `NU1903`。
+- 服务/更新 ViewModel：50/50 PASS；`--blame-hang-timeout 60s`；2 个既有 `NU1903`。
+- `WindowAppearanceCoordinatorTests`：6/6 PASS；`AssistantDecisionLifecycleTests` 独立：2/2 PASS。
+- 挂起证据：命令 `dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --blame-hang-timeout 60s --filter "FullyQualifiedName~SettingsViewModel|FullyQualifiedName~MainWindowViewModel|FullyQualifiedName~WindowAppearanceCoordinatorTests"` 在运行 1 个测试后触发 60 秒 blame hang；当时运行 `AssistantDecisionLifecycleTests.MainWindowViewModel_Dispose幂等释放Assistant并收敛已Claim请求`。未反复重跑大组合，拆分后代表类 2/2 PASS。
+- 完整测试：`dotnet test LoomX.slnx -c Release --no-restore --blame-hang-timeout 60s`，1157/1157 PASS，1 分 54 秒。
+- Release build：`dotnet build LoomX.slnx -c Release --no-restore`，0 error、2 warning，均为 `NU1903`。发布阶段另有既有 `CS8618`、`CA2024`；定向编译曾出现既有 `CS8602`，未宣称无警告。
+
+### 12.5 最新发布、进程与日志
+
+- 发布命令：`scripts/publish-desktop.ps1`，全新目录 `D:\AppData\Github\Loom-X - Copy\outputs\20260921-083304-enhance-update-experience`。旧 `072800`、`073944` 目录均保留且未覆盖/删除。
+- 完整性：exe 数量 1，唯一入口 `LoomX.exe`；`publish.log` 存在；发布文件扫描 `LOOMX_UPDATE_PREVIEW` 命中 0。
+- 按约定通过 PowerShell `Start-Process -FilePath <绝对路径>` 启动 PID 46716；`Win32_Process.ExecutablePath` 与 `D:\AppData\Github\Loom-X - Copy\outputs\20260921-083304-enhance-update-experience\LoomX.exe` 精确相等（`match=True`）；验证后只关闭本轮 PID 46716。
+- `20-final-release-smoke.png/json`：最新 Release 包实际启动单窗口证据；`release-process.txt` 保存路径核验。
+- 日志：扫描 `C:\Users\BianShanghai\AppData\Local\LoomX\logs\loomx-20260921_005.log`，预览正文、`LOOMX_UPDATE_PREVIEW`、Debug 原始异常、`Authorization:`、`Bearer `、`sk-` 均 0 命中；结果见 `sensitive-log-scan.txt`。
+- Context7：MCP resources 与 resource templates 均为空，无法调用 `resolve-library-id` / `query-docs`；降级查阅 Avalonia 官方主题文档，确认 `RequestedThemeVariant` 和 Light/Dark ThemeDictionaries 用法。
+
+### 12.6 OpenSpec 与边界
+
+- 旧深色/Toast 证据被判无效时，6.3/6.5 不作为完成证据；新 `15`/`16`/`19`、最新发布和路径核验齐全后重新确认 6.3/6.5 为完成。
+- 未修改、添加、提交、删除、移动或清理用户列出的 Comet 激活未跟踪目录；未 push；未运行 Comet build guard、verify 或 archive。

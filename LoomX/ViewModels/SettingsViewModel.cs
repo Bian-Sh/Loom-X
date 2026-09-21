@@ -51,6 +51,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private readonly bool ownsReleaseHistory;
     private readonly ILogger<SettingsViewModel> logger;
     private readonly Action<bool, int, int, string>? applyAppearance;
+    private readonly Action<string>? applyTheme;
     private readonly IStringLocalizer<SettingsViewModel> _loc;
     private SettingOption selectedLanguage = LanguageOptions[0];
     private SettingOption selectedTheme = ThemeOptions[0];
@@ -99,7 +100,16 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             SaveAfterEdit();
         }
     }
-    public SettingOption SelectedTheme { get => selectedTheme; set { if (SetProperty(ref selectedTheme, value)) SaveAfterEdit(); } }
+    public SettingOption SelectedTheme
+    {
+        get => selectedTheme;
+        set
+        {
+            if (!SetProperty(ref selectedTheme, value)) return;
+            if (!suppressAutoSave) ApplyThemePreview();
+            SaveAfterEdit();
+        }
+    }
     public SettingOption SelectedProxyMode
     {
         get => selectedProxyMode;
@@ -157,7 +167,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public ICommand ClearLogsCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
 
-    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null, ReleaseHistoryViewModel? releaseHistory = null, IStringLocalizer<SettingsViewModel>? localizer = null)
+    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null, ReleaseHistoryViewModel? releaseHistory = null, IStringLocalizer<SettingsViewModel>? localizer = null, Action<string>? applyTheme = null)
     {
         this.dataStore = dataStore;
         this.logger = logger ?? NullLogger<SettingsViewModel>.Instance;
@@ -169,6 +179,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             dataStore.GetUpdateProxySettingsAsync);
         ownsReleaseHistory = releaseHistory is null;
         this.applyAppearance = applyAppearance;
+        this.applyTheme = applyTheme;
         _loc = localizer ?? LocalizerFactory.Create<SettingsViewModel>();
         Status = Loc("settings.status.loading");
         LoadCommand = new AsyncCommand(LoadAsync);
@@ -182,8 +193,8 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         _ = LoadAsync();
     }
 
-    public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null)
-        : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance, null, null) { }
+    public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, Action<string>? applyTheme = null)
+        : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance, null, null, null, applyTheme) { }
 
     private string Loc(string key) => _loc[key]?.Value ?? key;
 
@@ -407,6 +418,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private static SettingOption FindOption(IReadOnlyList<SettingOption> options, string? value, SettingOption fallback) => options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)) ?? fallback;
 
     private void ApplyAppearancePreview() => applyAppearance?.Invoke(TransparencyEnabled, TransparencyOpacity, BlurAmount, AcrylicTransparencyAlgorithm);
+    private void ApplyThemePreview() => applyTheme?.Invoke(SelectedTheme.Value);
 
     private void OnConfigurationChanged(object? sender, ConfigurationChangedEventArgs args)
     {

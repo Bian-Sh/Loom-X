@@ -35,6 +35,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     private readonly UpdateCoordinator updateCoordinator;
     private readonly ReleaseHistoryViewModel releaseHistoryViewModel;
     private readonly Action<bool, int, int, string>? applyAppearance;
+    private readonly Action<string>? applyTheme;
     private readonly IStringLocalizer<MainWindowViewModel> _loc;
     private object currentView;
     private string currentViewKey = "nav.overview";
@@ -76,7 +77,8 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         AppDataStore? dataStore = null,
         IStringLocalizer<MainWindowViewModel>? localizer = null,
         AssistantViewModel? assistantViewModel = null,
-        Action? requestApplicationExit = null)
+        Action? requestApplicationExit = null,
+        Action<string>? applyTheme = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
@@ -84,6 +86,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         var ownedConfigService = configService ?? new ConfigSnapshotService(this.loggerFactory.CreateLogger<ConfigSnapshotService>());
         this.dataStore = dataStore ?? new AppDataStore(ownedConfigService, gatewayService, this.loggerFactory.CreateLogger<AppDataStore>());
         this.applyAppearance = applyAppearance;
+        this.applyTheme = applyTheme;
         _loc = localizer ?? LocalizerFactory.Create<MainWindowViewModel>();
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService, logger: this.loggerFactory.CreateLogger<ConsoleViewModel>());
         overviewViewModel = new OverviewViewModel(gatewayService, this.dataStore, this.loggerFactory.CreateLogger<MainWindowViewModel>());
@@ -111,7 +114,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             updateService,
             this.dataStore.GetUpdateProxySettingsAsync,
             this.loggerFactory.CreateLogger<ReleaseHistoryViewModel>());
-        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, releaseHistory: releaseHistoryViewModel, localizer: LocalizerFactory.Create<SettingsViewModel>());
+        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, releaseHistory: releaseHistoryViewModel, localizer: LocalizerFactory.Create<SettingsViewModel>(), applyTheme: this.applyTheme);
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
         NavigationItems = new([
             new("nav.overview", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
@@ -195,6 +198,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             if (dataStore.Settings is { } settings)
             {
                 LocaleService.SetCulture(settings.Language);
+                applyTheme?.Invoke(settings.Theme);
                 applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
             }
             ShowOverview();
@@ -226,7 +230,10 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         void Apply()
         {
             if (dataStore.Settings is { } settings)
+            {
+                applyTheme?.Invoke(settings.Theme);
                 applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
+            }
         }
         if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
     }
