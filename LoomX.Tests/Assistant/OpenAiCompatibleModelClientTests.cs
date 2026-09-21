@@ -856,9 +856,37 @@ public sealed class OpenAiCompatibleModelClientTests
         Assert.Equal("tool", messages[2]!["role"]?.GetValue<string>());
         Assert.Equal("call_9", messages[2]!["tool_call_id"]?.GetValue<string>());
         var tools = body["tools"]!.AsArray();
-        Assert.Equal("mock.list_providers", tools[0]!["function"]!["name"]?.GetValue<string>());
+        Assert.Equal("mock_list_providers", tools[0]!["function"]!["name"]?.GetValue<string>());
     }
 
+
+    [Fact]
+    public async Task StreamAsync_ChatCompletions将点号工具名转换为兼容名称()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, "data: [DONE]\n");
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+        var askUser = new ToolDefinition
+        {
+            Name = "assistant.ask_user",
+            Description = "显示用户决策面板。",
+            ParametersSchema = JsonNode.Parse("""{"type":"object","properties":{}}""")!,
+            Handler = (_, _) => Task.FromResult(ToolResult.Ok("{}")),
+        };
+
+        await CollectAsync(client.StreamAsync(
+            new ModelRequest(
+                [
+                    ChatMessage.User("请测试"),
+                    ChatMessage.AssistantToolCalls([new ToolCall("call_1", "assistant.ask_user", "{}")]),
+                    ChatMessage.ToolResult(new ToolCall("call_1", "assistant.ask_user", "{}"), "结果"),
+                ],
+                [askUser]),
+            CancellationToken.None));
+
+        var body = JsonNode.Parse(handler.LastRequestBody!)!.AsObject();
+        Assert.Equal("assistant_ask_user", body["tools"]![0]!["function"]!["name"]!.GetValue<string>());
+        Assert.Equal("assistant_ask_user", body["messages"]![1]!["tool_calls"]![0]!["function"]!["name"]!.GetValue<string>());
+    }
     [Fact]
     public async Task StreamAsync_AssistantToolCallsSerializedInHistory()
     {
@@ -877,7 +905,7 @@ public sealed class OpenAiCompatibleModelClientTests
         var toolCalls = messages[1]!["tool_calls"]!.AsArray();
         Assert.Equal("call_1", toolCalls[0]!["id"]?.GetValue<string>());
         Assert.Equal("function", toolCalls[0]!["type"]?.GetValue<string>());
-        Assert.Equal("mock.list_providers", toolCalls[0]!["function"]!["name"]?.GetValue<string>());
+        Assert.Equal("mock_list_providers", toolCalls[0]!["function"]!["name"]?.GetValue<string>());
     }
 
     [Fact]
