@@ -120,16 +120,24 @@ public sealed class AssistantToolsTests
         var field = Assert.Single(request.Request.Fields);
         Assert.Equal("mode", field.Id);
         Assert.Equal(UserDecisionFieldType.SingleSelect, field.Type);
-        Assert.True(broker.Submit(request.RequestId, new Dictionary<string, object?>
-        {
-            ["mode"] = "safe",
-        }));
+        Assert.True(broker.Submit(
+            request.RequestId,
+            UserDecisionBrokerTestExtensions.ClaimantId,
+            new Dictionary<string, object?>
+            {
+                ["mode"] = "safe",
+            },
+            new Dictionary<string, string>
+            {
+                ["mode"] = "请优先保证安全性",
+            }));
 
         var result = await execution.WaitAsync(TimeSpan.FromSeconds(2));
         var json = JsonNode.Parse(result.Content)!.AsObject();
         Assert.True(result.Success);
         Assert.False(json["cancelled"]!.GetValue<bool>());
         Assert.Equal("safe", json["values"]!["mode"]!.GetValue<string>());
+        Assert.Equal("请优先保证安全性", json["custom_inputs"]!["mode"]!.GetValue<string>());
     }
 
     [Fact]
@@ -606,6 +614,7 @@ public sealed class AssistantToolsTests
                     },
                 },
                 ["default_option_id"] = "safe",
+                ["allow_custom_input"] = true,
             },
         },
     };

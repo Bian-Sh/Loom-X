@@ -381,11 +381,6 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
                 return;
             }
 
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                ClearSelectionsWithoutNotification();
-            }
-
             NotifyValueChanged();
         }
     }
@@ -406,11 +401,6 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
             finally
             {
                 updatingSelection = false;
-            }
-
-            if (value is not null)
-            {
-                SetCustomInputWithoutSelectionReset(string.Empty);
             }
 
             OnPropertyChanged();
@@ -453,8 +443,6 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
             {
                 updatingSelection = false;
             }
-
-            SetCustomInputWithoutSelectionReset(string.Empty);
         }
 
         OnPropertyChanged(nameof(SelectedOptionId));
@@ -518,11 +506,6 @@ public sealed class AskUserMultiSelectFieldViewModel : AskUserFieldViewModel
                 return;
             }
 
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                ClearSelectionsWithoutNotification();
-            }
-
             NotifyValueChanged();
         }
     }
@@ -544,11 +527,6 @@ public sealed class AskUserMultiSelectFieldViewModel : AskUserFieldViewModel
         if (updatingSelection)
         {
             return;
-        }
-
-        if (option.IsSelected)
-        {
-            SetCustomInputWithoutSelectionReset(string.Empty);
         }
 
         NotifyValueChanged();

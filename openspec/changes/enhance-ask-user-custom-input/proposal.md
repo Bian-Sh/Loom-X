@@ -5,7 +5,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 ## What Changes
 
 - 为 `single_select` 与 `multi_select` 字段增加可选的自由输入能力，并允许调用方提供输入框占位提示。
-- 在选择题选项下方以“我有其他想法...”作为默认占位提示展示输入框；自由输入与预设选项互斥。
+- 在选择题选项下方以“我有其他想法...”作为默认占位提示展示输入框；自由输入与预设选项可以同时保留和提交。
 - 必填选择题可以由有效预设选项或非空自由输入任一满足。
 - AskUser 结果新增 `custom_inputs` 映射，按字段 id 向 AI 返回选择题的自由输入原文，同时保留 `values` 中既有选择结果结构。
 - 自由文本字段直接返回用户实际输入字符串，不再仅返回 `{ "provided": true }`。
@@ -27,7 +27,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 
 - 公开接口：`assistant.ask_user` 参数 Schema 和工具结果 JSON 契约。
 - 数据模型与校验：`UserDecisionField`、`UserDecisionResult`、`UserDecisionValidator`。
-- 桌面交互：AskUser 字段 ViewModel、悬浮卡片选择题模板及键盘/选择互斥行为。
+- 桌面交互：AskUser 字段 ViewModel、悬浮卡片选择题模板及键盘/选择与自由输入共存行为。
 - 测试：AssistantTools、UserDecision、AskUser ViewModel 与视图契约测试。
 - Agent 循环：AskUser 取消后本轮移除工具可见性，并对模型的重复调用复用取消结果。
 - 不引入新依赖，不修改数据库 Schema，不记录用户输入到日志。

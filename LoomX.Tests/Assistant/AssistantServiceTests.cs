@@ -70,6 +70,7 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.Contains("不要额外创建 text 字段", prompt, StringComparison.Ordinal);
         Assert.Contains("max_length", prompt, StringComparison.Ordinal);
         Assert.Contains("输入框80字", prompt, StringComparison.Ordinal);
+        Assert.Contains("预设选项与自由输入可以同时提交", prompt, StringComparison.Ordinal);
     }
 
     [Fact]

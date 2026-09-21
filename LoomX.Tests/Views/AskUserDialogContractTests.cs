@@ -55,7 +55,7 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
-    public void 单选自由输入_展示默认提示并与预设选项互斥()
+    public void 单选自由输入_展示默认提示并与预设选项共存()
     {
         var viewModel = new AskUserDialogViewModel(CreatePending(new UserDecisionField(
             "mode",
@@ -73,10 +73,10 @@ public sealed class AskUserDialogContractTests
         Assert.Equal(120, field.CustomInputMaxLength);
 
         field.CustomInput = "我想逐步确认";
-        Assert.Null(field.SelectedOptionId);
+        Assert.Equal("safe", field.SelectedOptionId);
 
         field.Options.Single(option => option.Id == "safe").IsSelected = true;
-        Assert.Equal(string.Empty, field.CustomInput);
+        Assert.Equal("我想逐步确认", field.CustomInput);
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class AskUserDialogContractTests
     }
 
     [Fact]
-    public void 多选自由输入_与预设项互斥并投影到独立映射()
+    public void 多选自由输入_与预设项共存并投影到独立映射()
     {
         var viewModel = new AskUserDialogViewModel(CreatePending(new UserDecisionField(
             "features",
@@ -112,16 +112,15 @@ public sealed class AskUserDialogContractTests
             maxLength: 100)));
         var field = Assert.IsType<AskUserMultiSelectFieldViewModel>(viewModel.CurrentField);
 
-        field.CustomInput = "只启用本地索引";
-        Assert.All(field.Options, option => Assert.False(option.IsSelected));
+        field.CustomInput = "补充说明：优先本地索引";
+        Assert.All(field.Options, option => Assert.True(option.IsSelected));
 
-        field.Options[0].IsSelected = true;
-        Assert.Equal(string.Empty, field.CustomInput);
+        field.Options[0].IsSelected = false;
+        Assert.Equal("补充说明：优先本地索引", field.CustomInput);
 
-        field.CustomInput = "只启用本地索引";
         Assert.True(viewModel.TryBuildResult(out var values, out var customInputs));
-        Assert.Empty(Assert.IsAssignableFrom<IEnumerable<string>>(values["features"]));
-        Assert.Equal("只启用本地索引", customInputs["features"]);
+        Assert.Equal(["local"], Assert.IsAssignableFrom<IEnumerable<string>>(values["features"]));
+        Assert.Equal("补充说明：优先本地索引", customInputs["features"]);
     }
 
     [Fact]

@@ -589,7 +589,8 @@ public static class UserDecisionValidator
     {
         if (hasCustomInputEntry)
         {
-            ValidateSubmittedCustomInput(errors, field, value, customInput);
+            ValidateSubmittedCustomInput(errors, field, customInput);
+            ValidateSubmittedSelectionWithCustomInput(errors, field, value);
             return;
         }
 
@@ -626,7 +627,6 @@ public static class UserDecisionValidator
     private static void ValidateSubmittedCustomInput(
         ICollection<UserDecisionValidationError> errors,
         UserDecisionField field,
-        object? value,
         string? customInput)
     {
         if (!field.AllowCustomInput
@@ -654,18 +654,21 @@ public static class UserDecisionValidator
             errors.Add(new UserDecisionValidationError(field.Id, "自由输入包含敏感信息。"));
             return;
         }
+    }
 
-        var hasSelection = field.Type switch
+    private static void ValidateSubmittedSelectionWithCustomInput(
+        ICollection<UserDecisionValidationError> errors,
+        UserDecisionField field,
+        object? value)
+    {
+        switch (field.Type)
         {
-            UserDecisionFieldType.SingleSelect => value is not null,
-            UserDecisionFieldType.MultiSelect => value is not IEnumerable<string> selected
-                || value is string
-                || selected.Any(),
-            _ => false,
-        };
-        if (hasSelection)
-        {
-            errors.Add(new UserDecisionValidationError(field.Id, "自由输入不能与预设选项同时提交。"));
+            case UserDecisionFieldType.SingleSelect when value is not null:
+                ValidateSubmittedSingle(errors, field, value);
+                break;
+            case UserDecisionFieldType.MultiSelect when value is not null:
+                ValidateSubmittedMulti(errors, field, value, enforceMinimum: false);
+                break;
         }
     }
 
@@ -689,7 +692,8 @@ public static class UserDecisionValidator
     private static void ValidateSubmittedMulti(
         ICollection<UserDecisionValidationError> errors,
         UserDecisionField field,
-        object value)
+        object value,
+        bool enforceMinimum = true)
     {
         if (value is not IEnumerable<string> selectedValues || value is string)
         {
@@ -719,7 +723,7 @@ public static class UserDecisionValidator
 
         var minimum = field.MinSelections ?? (field.IsRequired ? 1 : 0);
         var maximum = field.MaxSelections ?? field.Options.Count;
-        if (selected.Length < minimum || selected.Length > maximum)
+        if ((enforceMinimum && selected.Length < minimum) || selected.Length > maximum)
         {
             errors.Add(new UserDecisionValidationError(field.Id, "多选字段的选择数量无效。"));
         }

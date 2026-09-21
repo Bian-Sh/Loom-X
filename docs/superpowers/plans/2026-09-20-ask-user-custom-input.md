@@ -24,7 +24,7 @@ base-ref: e364174ae800c15d97106d3b5f8b90ddbf34d823
 
 **目标：** 为 AskUser 单选和多选字段增加可选的“我有其他想法...”自由输入，并把选择题自由输入与普通文本字段原文完整返回给 AI。
 
-**架构：** 在现有 `UserDecisionField → UserDecisionBroker → AskUserDialogViewModel → AssistantTools.SerializeResult` 链路上增加独立的 `CustomInputs` 映射，不把自由输入伪装成 option id，也不改变既有 `values` 类型。UI 只在字段显式允许时显示 Watermark 输入框，ViewModel 负责选择与文字互斥，Validator 与 Broker 负责最终一致性和不可变快照。
+**架构：** 在现有 `UserDecisionField → UserDecisionBroker → AskUserDialogViewModel → AssistantTools.SerializeResult` 链路上增加独立的 `CustomInputs` 映射，不把自由输入伪装成 option id，也不改变既有 `values` 类型。UI 只在字段显式允许时显示 Watermark 输入框，ViewModel 负责同时保留选择与文字，Validator 与 Broker 负责最终一致性和不可变快照。
 
 **技术栈：** C# / .NET 10、Avalonia 11.3、xUnit、System.Text.Json、Microsoft.Extensions.Logging、OpenSpec / Comet。
 
@@ -35,7 +35,7 @@ base-ref: e364174ae800c15d97106d3b5f8b90ddbf34d823
 - 所有文档、代码注释和 git 提交消息使用中文；技术标识符保持英文。
 - `allow_custom_input` 默认 false；未启用字段的 UI、校验和工具结果保持兼容。
 - 中文默认 Watermark 必须是 `我有其他想法...`，不得显示“其他（可选）”标签。
-- 自由输入与预设选择互斥；单选自由输入不触发自动前进。
+- 自由输入与预设选择可同时保留和提交；单选自由输入不触发自动前进。
 - `values` 保持现有类型，选择题自由输入写入独立 `custom_inputs`。
 - 文本字段实际字符串直接写入 `values`，不得再转换为 `{ "provided": true }`。
 - 用户原文不得进入日志、Toast、SafeArguments 或错误摘要。
@@ -235,7 +235,7 @@ var hasCustomInput = customInputs.TryGetValue(field.Id, out var customInput)
     && !string.IsNullOrWhiteSpace(customInput);
 ```
 
-有自由输入时验证授权、长度和互斥；合法后跳过选择数量校验。无自由输入时调用现有 `ValidateSubmittedValue`。
+有自由输入时验证授权、长度和敏感信息，并继续校验同时存在的预设选择；只有未选择任何预设项时，自由输入才作为必填与最少选择数约束的替代答案。
 
 - **Step 5：实现结果快照与 Broker Submit**
 
@@ -338,7 +338,7 @@ git add LoomX/Assistant/AssistantTools.cs LoomX.Tests/Assistant/AssistantToolsTe
 git commit -m "修复 AskUser 实际文本回传"
 ```
 
-### Task 4：实现选择字段 ViewModel 互斥状态与提交投影
+### Task 4：实现选择字段 ViewModel 共存状态与提交投影
 
 **文件：**
 - 修改：`LoomX/ViewModels/AskUserDialogViewModel.cs`
@@ -351,7 +351,7 @@ git commit -m "修复 AskUser 实际文本回传"
 - 产生：`TryBuildResult(out values, out customInputs)`
 - 保持：旧 `TryBuildResult(out values)` 转发新重载，减少测试迁移
 
-- **Step 1：为单选互斥与默认提示增加失败测试**
+- **Step 1：为单选共存与默认提示增加失败测试**
 
 创建启用自由输入且默认选中 `safe` 的单选字段，断言：
 
@@ -369,7 +369,7 @@ Assert.Equal(string.Empty, field.CustomInput);
 
 再验证自定义 placeholder 和 max length。
 
-- **Step 2：为多选互斥、跳过和结果投影增加失败测试**
+- **Step 2：为多选共存、跳过和结果投影增加失败测试**
 
 覆盖：输入文字清除所有 CheckBox；重新选中任一项清空文字；`ClearValue` 同时清空两者；多页 Previous/Next 后文字保留；最终：
 
@@ -406,7 +406,7 @@ public bool TryBuildResult(
 
 所有当前字段和最终校验都同时传入两个映射。
 
-- **Step 5：实现单选和多选互斥状态**
+- **Step 5：实现单选和多选与自由输入共存状态**
 
 两个选择字段共享相同的公开属性命名，但保留各自选择逻辑。使用 `updatingSelection` 防止递归：
 
@@ -620,7 +620,7 @@ dotnet publish LoomX/LoomX.csproj -c Release -r win-x64 --self-contained false -
 
 1. 单选字段出现 Watermark“我有其他想法...”，无“其他（可选）”标签。
 2. 输入文字后预设 RadioButton 清空；重新选择 option 后文字清空。
-3. 多选字段同样互斥，Previous/Next 后状态保留。
+3. 多选字段的选项与自由输入同时保留，Previous/Next 后状态不丢失。
 4. 必填字段可用自由输入提交；空白文本不能提交。
 5. 普通 text 字段和 `custom_inputs` 原文在后续 AI 工具结果中可见。
 
@@ -638,9 +638,9 @@ git commit -m "完成 AskUser 自由输入验证与交付"
 ## 实施与审查记录
 
 - TDD：各任务均先运行失败测试确认能力缺失，再完成最小实现并转绿。
-- 本地标准审查：检查 `base-ref..HEAD` 全量差异、选择与自由输入互斥状态机、双映射兼容性及日志安全边界，未发现 CRITICAL 或 IMPORTANT 问题。因本 change 明确禁用后台子代理，审查在主会话完成。
+- 本地标准审查：检查 `base-ref..HEAD` 全量差异、选择与自由输入共存状态机、双映射兼容性及日志安全边界，未发现 CRITICAL 或 IMPORTANT 问题。因本 change 明确禁用后台子代理，审查在主会话完成。
 - 自动验证：AskUser 定向测试 187 项通过；Release 全量测试 1110 项通过；OpenSpec strict 校验通过；Release 构建 0 error。
-- 桌面验收：已验证默认 Watermark“我有其他想法...”、无“其他（可选）”标签、单选/多选互斥、重新选择清空自由文本、分页状态保留和必填自由输入提交。提交后外部模型返回非标准空响应，最终 AI 回复未生成；实际文本与 `custom_inputs` 进入后续模型请求由 `AssistantServiceTests` 自动化验证覆盖。
+- 桌面验收：已验证默认 Watermark“我有其他想法...”、无“其他（可选）”标签、单选/多选与自由文本共存、重新选择不清空自由文本、分页状态保留和必填自由输入提交。提交后外部模型返回非标准空响应，最终 AI 回复未生成；实际文本与 `custom_inputs` 进入后续模型请求由 `AssistantServiceTests` 自动化验证覆盖。
 - 发布目录：`outputs/2026-09-20-043915-ask-user-custom-input`。
 ## 补充修复：模型调用契约明确同页输入
 

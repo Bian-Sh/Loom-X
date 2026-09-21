@@ -165,7 +165,7 @@ public sealed class UserDecisionModelsTests
     }
 
     [Fact]
-    public void 提交校验_选择题自由输入满足必填并拒绝冲突或未授权输入()
+    public void 提交校验_选择题自由输入满足必填并允许与预设选项共存()
     {
         var single = new UserDecisionField(
             "mode",
@@ -198,9 +198,14 @@ public sealed class UserDecisionModelsTests
         Assert.Empty(UserDecisionValidator.ValidateSubmission(request, values, customInputs));
 
         values["mode"] = "safe";
+        values["features"] = new[] { "search" };
+        Assert.Empty(UserDecisionValidator.ValidateSubmission(request, values, customInputs));
+
+        values["mode"] = "unknown";
         Assert.Contains(
             UserDecisionValidator.ValidateSubmission(request, values, customInputs),
-            error => error.FieldId == "mode" && error.Message.Contains("同时"));
+            error => error.FieldId == "mode" && error.Message.Contains("未知选项"));
+        values["mode"] = "safe";
 
         var unauthorized = CreateRequest(new UserDecisionField(
             "plain",

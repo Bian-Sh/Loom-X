@@ -3,7 +3,7 @@
 - Change: enhance-ask-user-custom-input
 - Phase: design
 - Mode: compact
-- Context hash: 588e003ceb713032f2e6d374a9f9c01cc3e229bb65b8e66553fadeac2ac20b92
+- Context hash: a85b264386c9ca66b7f4f80e05eaa65713e837c171ce5e56f15799e2632b431e
 
 Generated-by: comet-handoff.sh
 Task hash policy: task-content-v1. Read tasks.md for live completion; excerpts are design-time context.
@@ -14,7 +14,7 @@ OpenSpec remains the canonical capability spec. This handoff is a deterministic,
 
 - Source: openspec/changes/enhance-ask-user-custom-input/proposal.md
 - Lines: 1-33
-- SHA256: ec87a6a3e711ad518e1ed2af59aebc724d7855e899b0053289d4f6e56224d46c
+- SHA256: 270d6c0605f47d4fb3fc27a952815676430b6c9fbc27ac44192f91d8d55c435c
 
 ```md
 ## Why
@@ -24,7 +24,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 ## What Changes
 
 - 为 `single_select` 与 `multi_select` 字段增加可选的自由输入能力，并允许调用方提供输入框占位提示。
-- 在选择题选项下方以“我有其他想法...”作为默认占位提示展示输入框；自由输入与预设选项互斥。
+- 在选择题选项下方以“我有其他想法...”作为默认占位提示展示输入框；自由输入与预设选项可以同时保留和提交。
 - 必填选择题可以由有效预设选项或非空自由输入任一满足。
 - AskUser 结果新增 `custom_inputs` 映射，按字段 id 向 AI 返回选择题的自由输入原文，同时保留 `values` 中既有选择结果结构。
 - 自由文本字段直接返回用户实际输入字符串，不再仅返回 `{ "provided": true }`。
@@ -46,7 +46,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 
 - 公开接口：`assistant.ask_user` 参数 Schema 和工具结果 JSON 契约。
 - 数据模型与校验：`UserDecisionField`、`UserDecisionResult`、`UserDecisionValidator`。
-- 桌面交互：AskUser 字段 ViewModel、悬浮卡片选择题模板及键盘/选择互斥行为。
+- 桌面交互：AskUser 字段 ViewModel、悬浮卡片选择题模板及键盘/选择与自由输入共存行为。
 - 测试：AssistantTools、UserDecision、AskUser ViewModel 与视图契约测试。
 - Agent 循环：AskUser 取消后本轮移除工具可见性，并对模型的重复调用复用取消结果。
 - 不引入新依赖，不修改数据库 Schema，不记录用户输入到日志。
@@ -57,10 +57,10 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 
 - Source: openspec/changes/enhance-ask-user-custom-input/design.md
 - Lines: 1-80
-- SHA256: 86477960a55dbde50dc03a3ea9d2c78706d8f73565bf14ab0af8549a35e2f32a
+- SHA256: b1939b29ff29a5e14634ef6d56b1f3cf093aa3b234b8d2e1cd9b214ad162771f
 
 ```md
-## Context
+﻿## Context
 
 当前 AskUser 请求模型把单选、多选、数字和文本统一表示为 `UserDecisionField`，提交时仅传递字段值字典。选择字段没有承载自由输入的状态，文本结果又在工具序列化阶段被转换为存在性标记。此次变更需要贯穿请求 Schema、领域校验、Broker 提交结果、卡片 ViewModel 和 Avalonia 模板，同时保持未启用自由输入的选择字段兼容。需求契约见 `specs/assistant-user-decisions/spec.md`。
 
@@ -68,14 +68,14 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 
 **Goals:**
 
-- 让单选和多选字段按需启用与选项互斥的自由输入。
+- 让单选和多选字段按需启用可与选项共存的自由输入。
 - 保留 `values` 中既有 option id / option id 数组结构，通过独立 `custom_inputs` 返回自由输入。
 - 让文本字段向 AI 返回实际内容，并确保内容不进入日志。
 - 使用现有 ViewModel、Validator、Broker 和资源本地化模式完成最小扩展。
 
 **Non-Goals:**
 
-- 不允许自由输入与预设选项同时提交。
+- 允许自由输入与预设选项同时提交，并分别保存在 `custom_inputs` 与 `values` 中。
 - 不新增富文本、附件、多个自由输入项或持久化草稿。
 - 不改变数字字段，也不改变未启用自由输入的选择题行为。
 - 不把用户输入写入日志、Toast、会话标题或诊断摘要。
@@ -90,9 +90,9 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 
 ### 2. ViewModel 分别保存结构化选择和自由输入
 
-单选、多选字段 ViewModel 增加 `CustomInput`、`AllowsCustomInput`、`CustomInputPlaceholder` 和可见性状态。自由输入变为非空时清除现有选择；用户选择任一预设项时清空自由输入。清空/跳过操作同时清除两种状态。单选自动前进只由预设 RadioButton 点击触发，自由输入不会自动前进，避免用户尚未完成表达就切换题目。
+单选、多选字段 ViewModel 增加 `CustomInput`、`AllowsCustomInput`、`CustomInputPlaceholder` 和可见性状态。自由输入与现有选择共存；用户输入或选择/切换选项时均不得清空另一方。仅用户明确执行清空/跳过操作时同时清除两种状态。单选自动前进只由预设 RadioButton 点击触发，自由输入不会自动前进，避免用户尚未完成表达就切换题目。
 
-备选方案是允许选择与文字共存。该方案会让必填、最少选择数和 AI 解释优先级变得含糊，也不符合“所有选项均不符合时输入其他想法”的目标，因此采用互斥模型。
+选择与文字采用共存模型。应用不擅自推断二者冲突，也不因用户输入或选择操作清空另一方；助手同时接收 `values` 与 `custom_inputs`，结合上下文判断补充、修正或权重关系。
 
 ### 3. 校验同时接收 values 与 customInputs
 
@@ -121,7 +121,7 @@ AskUser 的选择题只能返回预设 option id，用户遇到所有选项均�
 
 - [工具结果开始包含用户实际文本，模型上下文敏感度提高] → 仅把内容返回发起 AskUser 的当前工具调用；日志、SafeArguments、Toast 和诊断信息继续只使用安全摘要。
 - [Broker 接口扩展影响测试替身和调用点] → 保持单一提交入口并更新全部实现/替身，使用编译错误和定向测试覆盖遗漏。
-- [输入文字与选项互斥可能因双向绑定产生递归通知] → 在选择字段 ViewModel 内使用现有更新保护标记，集中执行状态切换并用单元测试覆盖。
+- [单选切换仍可能因双向绑定产生递归通知] → 在选择字段 ViewModel 内保留现有更新保护标记，仅维护单选选项之间的互斥，不修改自由输入或多选状态。
 - [默认占位提示在不同语言中长度不同] → 使用资源本地化和 TextBox watermark，不为提示预留固定宽度。
 
 ## Migration Plan
@@ -147,7 +147,7 @@ AgentLoop 在检测到成功的 AskUser 取消结果后，按工具名保存该�
 
 - Source: openspec/changes/enhance-ask-user-custom-input/tasks.md
 - Lines: 1-26
-- SHA256: 600ea38ab595b8aff8fc70f4fa1b10193e1918bb1388d90eb396c2f3344eb612
+- SHA256: a0845d54f31c78d26ae1b7d7798fd5825e333870c835f71d574216c4fed440e1
 
 ```md
 ## 1. 请求契约与领域模型
@@ -163,7 +163,7 @@ AgentLoop 在检测到成功的 AskUser 取消结果后，按工具名保存该�
 
 ## 3. 卡片交互与本地化
 
-- [x] 3.1 先为单选/多选自由输入的状态保留、选项互斥、跳过清空、必填替代校验及单选不自动前进补充失败测试，并运行 AskUser ViewModel/视图契约测试确认失败 <!-- comet-task:askuser-3-1 -->
+- [x] 3.1 先为单选/多选自由输入的状态保留、选项共存、跳过清空、必填替代校验及单选不自动前进补充失败测试，并运行 AskUser ViewModel/视图契约测试确认失败 <!-- comet-task:askuser-3-1 -->
 - [x] 3.2 扩展选择字段 ViewModel 和 `AskUserCard` 模板，在选项下方展示无额外标签的输入框，使用本地化默认提示“我有其他想法...”，并运行定向测试确认通过 <!-- comet-task:askuser-3-2 -->
 - [x] 3.3 补齐所有 Locale 资源和源码契约检查，运行 `AskUserDialogContractTests`、`AssistantViewStyleTests` 确认输入框显示条件、watermark 与现有卡片布局兼容 <!-- comet-task:askuser-3-3 -->
 
@@ -171,7 +171,7 @@ AgentLoop 在检测到成功的 AskUser 取消结果后，按工具名保存该�
 
 - [x] 4.1 运行 AskUser、UserDecision、AssistantTools、AssistantService 和 AssistantViewModel 相关测试，确认选择结果兼容、实际文本回传和日志安全边界 <!-- comet-task:askuser-4-1 -->
 - [x] 4.2 运行 `openspec validate enhance-ask-user-custom-input --strict`、完整测试和 Release 构建，确认无失败、无编译错误 <!-- comet-task:askuser-4-2 -->
-- [x] 4.3 发布桌面端到 `outputs/2026-09-20-<time>-ask-user-custom-input`，使用 `cua-driver` 验证单选、多选自由输入、互斥行为、默认提示和提交后的 AI 可见结果 <!-- comet-task:askuser-4-3 -->
+- [x] 4.3 发布桌面端到 `outputs/2026-09-20-<time>-ask-user-custom-input`，使用 `cua-driver` 验证单选、多选自由输入、选择与文字共存、默认提示和提交后的 AI 可见结果 <!-- comet-task:askuser-4-3 -->
 ## 5. 模型调用契约与同页建模回归
 
 - [x] 5.1 为工具描述、Schema description 和系统提示补充“字段独立分页、选择题同页输入使用 allow_custom_input、字数写入同一字段 max_length、不得新增 text 字段”的失败测试与实现，并运行定向测试确认通过 <!-- comet-task:askuser-5-1 -->
@@ -195,13 +195,13 @@ created: 2026-09-21
 
 - Source: openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md
 - Lines: 1-70
-- SHA256: c516680d8115a77757a13b051cd09ce300bb90d27a93ca9bcf4bcef4d8474e19
+- SHA256: 665b27f2306ef37a8dc89bd2c60630433b1009c1851af81afb6518e468eb0cb7
 
 ```md
-## ADDED Requirements
+﻿## ADDED Requirements
 
 ### Requirement: AskUser 选择字段必须支持可选自由输入
-系统 SHALL 允许 `single_select` 和 `multi_select` 字段通过 `allow_custom_input` 启用自由输入，并 SHALL 允许调用方通过 `custom_input_placeholder` 自定义占位提示。未提供占位提示时，桌面端 SHALL 使用“我有其他想法...”作为默认提示。自由输入与预设选项 SHALL 互斥，且未启用该能力的选择字段 SHALL 保持现有交互和结果结构。
+系统 SHALL 允许 `single_select` 和 `multi_select` 字段通过 `allow_custom_input` 启用自由输入，并 SHALL 允许调用方通过 `custom_input_placeholder` 自定义占位提示。未提供占位提示时，桌面端 SHALL 使用“我有其他想法...”作为默认提示。自由输入与预设选项 SHALL 可以共存并同时提交，且未启用该能力的选择字段 SHALL 保持现有交互和结果结构。
 
 #### Scenario: 选择字段展示自由输入框
 - **WHEN** 单选或多选字段设置 `allow_custom_input=true`
@@ -215,13 +215,13 @@ created: 2026-09-21
 - **WHEN** 选择字段未设置 `allow_custom_input` 或其值为 false
 - **THEN** 桌面端不展示自由输入框，字段继续只接受预设选项
 
-#### Scenario: 输入自由内容清除已有选择
-- **WHEN** 用户在选择字段的自由输入框中输入非空内容
-- **THEN** 系统清除该字段已选中的单选或多选 option id，并保留用户输入原文
+#### Scenario: 输入自由内容保留已有选择
+- **WHEN** 用户在选择字段的自由输入框中输入或编辑内容
+- **THEN** 系统保留该字段已有的单选或多选 option id，并同时保留用户输入原文
 
-#### Scenario: 重新选择选项清空自由输入
-- **WHEN** 用户已输入自由内容后重新选择任一预设选项
-- **THEN** 系统清空该字段的自由输入，并按既有单选或多选规则保存 option id
+#### Scenario: 调整选项保留自由输入
+- **WHEN** 用户已输入自由内容后选择、切换或取消任一预设选项
+- **THEN** 系统保留该字段的自由输入，并按既有单选或多选规则更新 option id
 
 #### Scenario: 自由输入满足必填选择题
 - **WHEN** 必填选择字段没有有效预设选项但包含非空自由输入
@@ -232,7 +232,7 @@ created: 2026-09-21
 - **THEN** 系统按缺少有效值处理并显示安全校验摘要
 
 ### Requirement: AskUser 必须把用户输入原文返回给助手
-系统 SHALL 在 AskUser 成功提交时把文本字段的实际字符串写入 `values`，不得仅返回输入存在性标记。选择字段使用自由输入时，系统 SHALL 在结果根对象的 `custom_inputs` 映射中按字段 id 返回用户原文，同时在 `values` 中保留该选择字段现有类型对应的空值。系统 MUST NOT 因返回原文而把用户输入记录到运行日志。
+系统 SHALL 在 AskUser 成功提交时把文本字段的实际字符串写入 `values`，不得仅返回输入存在性标记。选择字段使用自由输入时，系统 SHALL 在结果根对象的 `custom_inputs` 映射中按字段 id 返回用户原文；若用户同时选择预设选项，`values` SHALL 保留该选择字段的 option id 或 option id 数组，若没有预设选择则保留现有类型对应的空值。系统 MUST NOT 因返回原文而把用户输入记录到运行日志。
 
 #### Scenario: 文本字段返回实际内容
 - **WHEN** 用户在文本字段输入内容并提交 AskUser

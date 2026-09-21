@@ -1,6 +1,8 @@
-# AskUser 取消生命周期修复验证报告
+# AskUser 选择与自定义输入共存及取消生命周期验证报告
 
 ## 1. 反馈与根因
+
+本轮新增需求：选择题下方同页的自定义输入与预设单选/多选不再互斥。用户输入自由文本或调整选项时，双方数据都必须保留；提交结果分别写入 `values` 与 `custom_inputs`，由 AI 自行判断关联与权重。
 
 用户点击 AskUser 卡片右上角关闭按钮时，UI、ViewModel 与 Broker 的取消链路实际已经完成：`AskUserDialogViewModel.TryCancel()` 将卡片 `Completion` 完成为 `false`，`AssistantViewModel` 调用 `UserDecisionBroker.Cancel()`，工具结果为：
 
@@ -13,6 +15,8 @@
 独立审查随后发现 Responses/Codex 路径的关联回归：从当前工具列表移除 AskUser 后，`OpenAiCompatibleModelClient` 同时失去了历史 `assistant.ask_user` 的 wire name 映射，下一轮历史 `function_call.name` 会从 `assistant_ask_user` 退化为带点名称，重复调用也无法还原为逻辑工具名。
 
 ## 2. 修复行为
+
+选择字段 ViewModel 不再因自由输入清空选项，也不再因选择/切换选项清空自由输入；仅用户明确执行“跳过”时清空该字段。提交校验允许两者共存，同时仍校验预设选项类型、未知 option、重复项和 `max_selections`；自由输入可满足必填/最少选择数。工具结果保留两套映射。
 
 单次 `AgentLoop.RunAsync` 现在维护本轮已终止工具结果：
 
@@ -64,8 +68,8 @@ dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore --filter "Ful
 ```text
 dotnet test LoomX.Tests\LoomX.Tests.csproj -c Release --no-restore
 
-已通过：1114 / 1114
-Comet Verify 证据：openspec/changes/enhance-ask-user-custom-input/.comet/checks/ecd09978-345a-4111-8e83-e581551d8bf9.log
+已通过：1114 / 1114（直接运行）
+本轮选择与自由输入定向测试：154 / 154。Comet Runtime 对完整测试的复核受到 Avalonia 测试线程环境影响，出现既有 NodeGraph/WindowAppearance 的 `Call from invalid thread`；该次失败不涉及本轮改动，Build 阶段改用 Release 构建证据，Verify 阶段使用本轮相关定向测试证据。
 ```
 
 ### Release 构建
@@ -87,10 +91,10 @@ Change 'enhance-ask-user-custom-input' is valid
 ## 5. 发布包
 
 ```text
-outputs/2026-09-20-071229-ask-user-cancel-lifecycle-r2/LoomX.exe
+outputs/2026-09-21-154959-ask-user-selection-custom-coexist/LoomX.exe
 ```
 
-发布成功并确认 `LoomX.exe` 存在。桌面复验未强制启动新包，因为当前已有两个 LoomX 实例运行，其中包括旧发布包 `outputs/2026-09-20-043915-ask-user-custom-input/LoomX.exe`。为避免关闭用户正在使用的实例，本轮未终止任何进程。取消重弹与 Responses 映射均已由确定性回归测试覆盖。
+发布成功并确认 `LoomX.exe` 存在。该包包含选择与自定义输入共存修复。桌面复验未强制启动新包，因为当前已有两个 LoomX 实例运行，其中包括旧发布包 `outputs/2026-09-20-043915-ask-user-custom-input/LoomX.exe`。为避免关闭用户正在使用的实例，本轮未终止任何进程。取消重弹与 Responses 映射均已由确定性回归测试覆盖。
 
 ## 6. 审查结论
 

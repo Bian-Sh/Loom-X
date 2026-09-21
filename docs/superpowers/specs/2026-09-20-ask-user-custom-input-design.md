@@ -1,4 +1,4 @@
----
+﻿---
 comet_change: enhance-ask-user-custom-input
 role: technical-design
 canonical_spec: openspec
@@ -44,7 +44,7 @@ AssistantTools.SerializeResult
 - `AssistantTools`：公开 Schema、参数解析、安全参数投影和工具结果序列化。
 - `UserDecisionModels`：字段元数据、请求/提交校验和不可变结果快照。
 - `UserDecisionBroker`：提交两个映射并维持并发完成语义。
-- `AskUserDialogViewModel`：字段状态、互斥切换、分页校验和结果投影。
+- `AskUserDialogViewModel`：字段状态、选择与自由输入共存、分页校验和结果投影。
 - `AskUserCard`：单选/多选模板中的自由输入 TextBox，不处理业务校验。
 - `AssistantViewModel`：只负责把 ViewModel 构建的两个映射提交给 Broker。
 
@@ -150,7 +150,7 @@ Broker 将 null 视为空映射，并在 Claim 校验之后分别创建两个只
 2. 对每个字段读取结构化值和自由输入。
 3. 自由输入存在时，要求字段为已启用自由输入的选择字段。
 4. 自由输入必须非空白且不超过字段 `MaxLength ?? 1000`。
-5. 自由输入与预设值不能同时有效；单选必须为 null，多选必须为空集合。
+5. 自由输入与预设值可以同时有效；有选择时 `values` 保留 option id，没有选择时保持 null 或空集合。
 6. 合法自由输入直接满足 `is_required` 和 multi-select 的 `min_selections`。
 7. 没有自由输入时完全复用现有值类型、option id、数量、数字和文本校验。
 
@@ -190,7 +190,7 @@ public string CustomInput { get; set; }
 
 ### 6.3 多选字段
 
-多选使用同一组公开属性。`CustomInput` 变为非空时取消所有 CheckBox；任一 CheckBox 变为选中时清空自由输入。取消最后一个 CheckBox 不恢复旧文本。所有批量变更使用单一更新保护标记，最终只触发一次值变化通知。
+多选使用同一组公开属性。`CustomInput` 变为非空时保留已有 CheckBox；任一 CheckBox 变为选中或取消时均保留自由输入。所有批量变更使用单一更新保护标记，最终只触发一次值变化通知。
 
 ## 7. Avalonia UI 与本地化
 
@@ -221,7 +221,7 @@ public string CustomInput { get; set; }
 - `LoomX/Assistant/UserDecisions/UserDecisionModels.cs`：字段元数据、双映射校验、结果快照。
 - `LoomX/Assistant/UserDecisions/UserDecisionBroker.cs`：Submit 签名与双快照提交。
 - `LoomX/Assistant/AssistantTools.cs`：Schema、解析、安全投影和结果 JSON。
-- `LoomX/ViewModels/AskUserDialogViewModel.cs`：自由输入状态、互斥和双映射投影。
+- `LoomX/ViewModels/AskUserDialogViewModel.cs`：自由输入状态、选择共存和双映射投影。
 - `LoomX/ViewModels/AssistantViewModel.cs`：向 Broker 提交 customInputs。
 - `LoomX/Views/AskUserCard.axaml(.cs)`：选择题输入框和 Enter 行为。
 - `LoomX/Resources/Strings*.resx`：默认 watermark。
@@ -237,7 +237,7 @@ public string CustomInput { get; set; }
 
 1. 请求 Schema 与字段模型：先证明新属性不存在或被拒绝，再实现解析和请求校验。
 2. 提交与结果：先证明自由输入不能满足校验、Broker 无法保存、文本仍被替换，再实现双映射。
-3. ViewModel 与 XAML：先证明没有自由输入状态和模板，再实现互斥、清空、分页保留和本地化。
+3. ViewModel 与 XAML：先证明没有自由输入状态和模板，再实现选择与文字共存、分页保留和本地化。
 4. 集成安全：验证 AssistantService 收到实际 JSON，日志捕获器不含用户原文。
 
 最终验证包括：
@@ -247,13 +247,13 @@ public string CustomInput { get; set; }
 - `dotnet build -c Release`。
 - `openspec validate enhance-ask-user-custom-input --strict`。
 - 发布到 `outputs/2026-09-20-<time>-ask-user-custom-input`。
-- 通过 `cua-driver` 验证单选、多选、互斥切换、Enter 提交和默认 watermark。
+- 通过 `cua-driver` 验证单选、多选、选择与文字共存、Enter 提交和默认 watermark。
 
 ## 11. 完成判定
 
 - 未启用自由输入的选择题行为和工具结果不变。
 - 启用后输入框只显示 watermark“我有其他想法...”，无生硬额外标签。
-- 选择与文字始终互斥，必填规则正确。
+- 选择与文字可同时保留并提交，必填规则正确。
 - AI 同时收到实际 text 字符串和选择题 `custom_inputs` 原文。
 - 所有日志和用户可见诊断都不包含输入原文。
 - 完整测试、Release 构建、OpenSpec strict validate、发布和桌面验收均通过。
