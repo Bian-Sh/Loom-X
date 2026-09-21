@@ -352,9 +352,9 @@ public sealed class SettingsViewContractTests
 
         Assert.Contains("<Grid ColumnDefinitions=\"Auto,*\" ColumnSpacing=\"4\">", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{l:Locale settings.update.version.hint}\" Classes=\"hint\"", source, StringComparison.Ordinal);
-        Assert.Contains("<Grid ColumnDefinitions=\"*,Auto\" ColumnSpacing=\"12\">", source, StringComparison.Ordinal);
-        Assert.Contains("Text=\"{l:Locale settings.update.use.proxy.hint}\" Classes=\"hint\" Margin=\"24,-7,0,0\" VerticalAlignment=\"Bottom\"", source, StringComparison.Ordinal);
-        Assert.Contains("Grid.Column=\"1\" Content=\"{l:Locale settings.update.check.button}\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Grid RowDefinitions=\"Auto,Auto\" ColumnDefinitions=\"*,Auto\" ColumnSpacing=\"12\" RowSpacing=\"9\">", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.Row=\"1\" Text=\"{l:Locale settings.update.use.proxy.hint}\" Classes=\"hint\" Margin=\"24,-7,0,0\"", source, StringComparison.Ordinal);
+        Assert.Contains("Grid.RowSpan=\"2\" Grid.Column=\"1\" Content=\"{l:Locale settings.update.check.button}\"", source, StringComparison.Ordinal);
         Assert.Contains("HorizontalAlignment=\"Right\"", source, StringComparison.Ordinal);
         Assert.Contains("IsEnabled=\"{Binding IsNotBusy}\"", source, StringComparison.Ordinal);
         Assert.Contains("VerticalAlignment=\"Bottom\"", source, StringComparison.Ordinal);
