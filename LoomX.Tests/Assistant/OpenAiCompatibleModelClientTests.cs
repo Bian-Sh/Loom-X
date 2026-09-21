@@ -773,6 +773,28 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public async Task StreamAsync_SenseNova后续分片漂移Index时继续唯一未完成工具调用()
+    {
+        var sse = string.Join('\n',
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"assistant_ask_user","arguments":"{\"title\":"}}]},"finish_reason":null}]}""",
+            "",
+            """data: {"choices":[{"delta":{"tool_calls":[{"index":1,"function":{"arguments":"\"测试面板\"}"}}]},"finish_reason":null}]}""",
+            "",
+            """data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}""",
+            "",
+            "data: [DONE]",
+            "");
+        var handler = new FakeHttpHandler(HttpStatusCode.OK, sse);
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "http://localhost/v1", "test-model");
+        var request = new ModelRequest([ChatMessage.User("测试 AskUser")], [CreateTool()]);
+
+        var events = await CollectAsync(client.StreamAsync(request, CancellationToken.None));
+
+        var toolCall = Assert.Single(events.OfType<ModelToolCallEvent>()).ToolCall;
+        Assert.Equal("assistant_ask_user", toolCall.Name);
+        Assert.Equal("""{"title":"测试面板"}""", toolCall.ArgumentsJson);
+    }
+    [Fact]
     public async Task StreamAsync_SenseNova省略后续Index时继续唯一未完成工具调用()
     {
         var sse = string.Join('\n',

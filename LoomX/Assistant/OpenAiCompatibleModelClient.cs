@@ -558,29 +558,23 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                     var deltaId = deltaNode["id"]?.GetValue<string>();
                     var function = deltaNode["function"];
                     var deltaName = function?["name"]?.GetValue<string>();
-                    var hasIndex = deltaNode["index"] is not null;
                     var index = deltaNode["index"]?.GetValue<int>() ?? 0;
-
-                    // SenseNova 偶尔只在首个 chunk 提供 1-based index，后续 arguments 分片省略 index/id/name。
-                    // 此时若当前只有一个尚未完成的调用，分片归属是唯一的，应继续该 builder；否则保持丢弃，
-                    // 避免把无归属的占位片段污染到已有完整调用。
-                    if (!hasIndex
-                        && string.IsNullOrEmpty(deltaId)
-                        && string.IsNullOrWhiteSpace(deltaName)
-                        && toolCallBuilders.Values.Where(item => !item.HasCompleteArguments).Distinct().ToArray() is { Length: 1 } pending)
-                    {
-                        var orphanArguments = function?["arguments"]?.GetValue<string>();
-                        if (orphanArguments is { Length: > 0 }) pending[0].AppendArguments(orphanArguments);
-                        continue;
-                    }
-
-                    // 根因防御：合法的 tool_call 首个 chunk 一定携带 id 或 name；
-                    // 而后续的 arguments 分片虽然不带 id/name，但对应 index 已有 builder。
-                    // 部分上游会附带既无 id/name、也无法唯一归属的畸形占位片段，直接丢弃。
                     var hasBuilder = toolCallBuilders.ContainsKey(index);
 
+                    // SenseNova 偶尔只在首个 chunk 提供稳定 index，后续 arguments 分片可能省略 index，
+                    // 也可能把 index 漂移到一个尚无 builder 的值。若当前只有一个尚未完成的调用，
+                    // 分片归属是唯一的，应继续该 builder；已有完整调用或多个候选时仍丢弃，避免污染。
                     if (!hasBuilder && string.IsNullOrEmpty(deltaId) && string.IsNullOrWhiteSpace(deltaName))
                     {
+                        var pending = toolCallBuilders.Values
+                            .Where(item => !item.HasCompleteArguments)
+                            .Distinct()
+                            .ToArray();
+                        var orphanArguments = function?["arguments"]?.GetValue<string>();
+                        if (pending.Length == 1 && orphanArguments is { Length: > 0 })
+                        {
+                            pending[0].AppendArguments(orphanArguments);
+                        }
                         continue;
                     }
 
