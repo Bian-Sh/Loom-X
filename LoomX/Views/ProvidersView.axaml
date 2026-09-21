@@ -6,12 +6,8 @@
     <Style Selector="ScrollViewer.provider-tab-scroll"><Setter Property="Margin" Value="0"/><Setter Property="Padding" Value="0,0,8,0"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style>
     <Style Selector="ListBox.provider-list"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
     <Style Selector="Border.provider-card"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem"><Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,1"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem:selected"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="3,0,0,0"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
     <Style Selector="ListBox.provider-list ListBoxItem:pointerover Border.provider-card"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/></Style>
     <Style Selector="ListBox.provider-list ListBoxItem:selected:pointerover Border.provider-card"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/></Style>
-    <Style Selector="ListBox.provider-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
     <Style Selector="Border.provider-card Button.provider-delete"><Setter Property="Opacity" Value="0"/><Setter Property="IsHitTestVisible" Value="False"/></Style>
     <Style Selector="Border.provider-card:pointerover Button.provider-delete"><Setter Property="Opacity" Value="1"/><Setter Property="IsHitTestVisible" Value="True"/></Style>
     <Style Selector="Border.header-item Button.header-delete"><Setter Property="Opacity" Value="0"/><Setter Property="IsHitTestVisible" Value="False"/></Style>
@@ -60,7 +56,7 @@
             <Border Grid.Row="1" Padding="10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
               <TextBox Classes="search" Text="{Binding ProviderSearchQuery, UpdateSourceTrigger=PropertyChanged}" Watermark="{l:Locale providers.search.watermark}"/>
             </Border>
-            <ListBox Grid.Row="2" Classes="provider-list" ItemsSource="{Binding FilteredProviders}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox Grid.Row="2" Classes="provider-list selection-rail-list" ItemsSource="{Binding FilteredProviders}" SelectedItem="{Binding SelectedProvider}" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
               <ListBox.ItemTemplate>
                 <DataTemplate>
                   <Border Classes="provider-card" Padding="10,8" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">

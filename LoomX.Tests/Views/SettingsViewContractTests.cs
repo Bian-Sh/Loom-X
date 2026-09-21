@@ -264,6 +264,7 @@ public sealed class SettingsViewContractTests
     public void 更新页保留原设置并提供完整版本历史分栏状态()
     {
         var source = ReadDesktopFile("Views", "SettingsView.axaml");
+        var appSource = ReadDesktopFile("App.axaml");
 
         Assert.Contains("<TabControl SelectedIndex=\"{Binding SelectedTabIndex, Mode=TwoWay}\">", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding VersionLabel}\"", source, StringComparison.Ordinal);
@@ -280,8 +281,10 @@ public sealed class SettingsViewContractTests
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.CanShowLoadMore}\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\" IsVisible=\"{Binding ReleaseHistory.HasMore}\"", source, StringComparison.Ordinal);
         Assert.Contains("<views:ReleaseNotesView DataContext=\"{Binding ReleaseHistory.Content}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Classes=\"release-history-list\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"release-history-list selection-rail-list\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"ListBox.release-history-list ListBoxItem\"><Setter Property=\"Cursor\" Value=\"Hand\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.selection-rail-list ListBoxItem:selected\"", appSource, StringComparison.Ordinal);
+        Assert.Contains("Property=\"BorderThickness\" Value=\"3,0,0,0\"", appSource, StringComparison.Ordinal);
         Assert.Contains("<TextBlock Text=\"{Binding VersionText}\" FontWeight=\"SemiBold\"/>", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Tag=\"{Binding Release.HtmlUrl}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding ReleaseHistory.SelectedRelease.VersionText}\"", source, StringComparison.Ordinal);
@@ -298,6 +301,20 @@ public sealed class SettingsViewContractTests
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.HasError}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.HasCachedContent}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsLoadingMore}\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 发布页提示保持简洁()
+    {
+        var zhCn = ReadDesktopFile("Resources", "Strings.resx");
+        var zhTw = ReadDesktopFile("Resources", "Strings.zh-TW.resx");
+        var enUs = ReadDesktopFile("Resources", "Strings.en-US.resx");
+        var jaJp = ReadDesktopFile("Resources", "Strings.ja-JP.resx");
+
+        Assert.Contains("<data name=\"settings.update.history.open.release.tip\"><value>点击前往此版本的发布页</value></data>", zhCn, StringComparison.Ordinal);
+        Assert.Contains("<data name=\"settings.update.history.open.release.tip\"><value>點擊前往此版本的發布頁</value></data>", zhTw, StringComparison.Ordinal);
+        Assert.Contains("<data name=\"settings.update.history.open.release.tip\"><value>Open this release page</value></data>", enUs, StringComparison.Ordinal);
+        Assert.Contains("<data name=\"settings.update.history.open.release.tip\"><value>このバージョンのリリースページを開きます</value></data>", jaJp, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -213,16 +213,20 @@ public sealed class ProvidersViewContractTests
     {
         var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Views", "ProvidersView.axaml");
         var source = File.ReadAllText(path);
+        var appSource = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "App.axaml"));
 
-        Assert.Contains("Classes=\"provider-list\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"provider-list selection-rail-list\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"ListBox.provider-list\"><Setter Property=\"Background\" Value=\"Transparent\"/>", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.provider-card\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.provider-list ListBoxItem\"><Setter Property=\"Background\" Value=\"Transparent\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.provider-list ListBoxItem:selected\"><Setter Property=\"Background\" Value=\"Transparent\"/><Setter Property=\"BorderBrush\" Value=\"{DynamicResource AccentBrush}\"/><Setter Property=\"BorderThickness\" Value=\"3,0,0,0\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.provider-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter\"><Setter Property=\"Background\" Value=\"Transparent\"/><Setter Property=\"Foreground\" Value=\"{DynamicResource TextPrimaryBrush}\"/>", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.selection-rail-list ListBoxItem\"", appSource, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.selection-rail-list ListBoxItem:selected\"", appSource, StringComparison.Ordinal);
+        Assert.Contains("Property=\"BorderBrush\" Value=\"{DynamicResource AccentBrush}\"", appSource, StringComparison.Ordinal);
+        Assert.Contains("Property=\"BorderThickness\" Value=\"3,0,0,0\"", appSource, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"ListBox.selection-rail-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter\"", appSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("Selector=\"ListBox.provider-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Selector=\"ListBox.provider-list ListBoxItem:selected\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"ListBox.provider-list ListBoxItem:pointerover Border.provider-card\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceMutedBrush}\"/>", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"ListBox.provider-list ListBoxItem:selected:pointerover Border.provider-card\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceMutedBrush}\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("Selector=\"ListBox.provider-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter\"><Setter Property=\"Background\" Value=\"Transparent\"/><Setter Property=\"Foreground\" Value=\"{DynamicResource TextPrimaryBrush}\"/>", source, StringComparison.Ordinal);
         Assert.Contains("Property=\"Margin\" Value=\"0,0,0,1\"", source, StringComparison.Ordinal);
         Assert.Contains("<Border Classes=\"provider-card\" Padding=\"10,8\" Background=\"{DynamicResource SurfaceSubtleBrush}\" BorderBrush=\"{DynamicResource BorderStrongBrush}\" BorderThickness=\"0,0,0,1\">", source, StringComparison.Ordinal);
     }

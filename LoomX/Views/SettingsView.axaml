@@ -79,7 +79,7 @@
                 <Grid Grid.Row="2">
                   <Grid ColumnDefinitions="200,*">
                     <Grid Grid.Column="0" RowDefinitions="*,Auto" Background="{DynamicResource SurfaceSubtleBrush}">
-                      <ListBox Classes="release-history-list" ItemsSource="{Binding ReleaseHistory.Releases}" SelectedItem="{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}" Background="Transparent" BorderThickness="0" Margin="8">
+                      <ListBox Classes="release-history-list selection-rail-list" ItemsSource="{Binding ReleaseHistory.Releases}" SelectedItem="{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}" Background="Transparent" BorderThickness="0" Margin="8">
                         <ListBox.ItemTemplate>
                           <DataTemplate>
                             <Grid RowDefinitions="Auto,Auto" Margin="4,6" ColumnDefinitions="*,Auto">
