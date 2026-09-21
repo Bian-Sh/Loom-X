@@ -37,14 +37,13 @@ RestartApplications=yes
 
 [Tasks]
 Name: "startmenuicon"; Description: "创建开始菜单快捷方式"
-Name: "desktopicon"; Description: "创建桌面快捷方式"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\LoomX"; Filename: "{app}\LoomX.exe"; WorkingDir: "{app}"; Tasks: startmenuicon
-Name: "{autodesktop}\LoomX"; Filename: "{app}\LoomX.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\LoomX"; Filename: "{app}\LoomX.exe"; WorkingDir: "{app}"
 
 [Run]
 Filename: "{app}\LoomX.exe"; Description: "启动 LoomX"; WorkingDir: "{app}"; Flags: nowait postinstall

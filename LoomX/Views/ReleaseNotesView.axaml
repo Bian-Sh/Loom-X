@@ -4,11 +4,40 @@
              xmlns:vm="using:LoomX.ViewModels"
              x:Class="LoomX.Views.ReleaseNotesView"
              x:DataType="vm:ReleaseNotesContentViewModel">
+  <UserControl.Styles>
+    <Style Selector="Expander.release-note-section">
+      <Setter Property="Margin" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+  </UserControl.Styles>
   <Grid>
     <ScrollViewer IsVisible="{Binding HasContent}"
                   VerticalScrollBarVisibility="Auto"
                   HorizontalScrollBarVisibility="Disabled">
-      <md:MarkdownRenderer MarkdownBuilder="{Binding Markdown}" />
+      <StackPanel Spacing="2" md:MarkdownTextBlock.IsSelectionScope="True">
+        <ItemsControl ItemsSource="{Binding Sections}" IsVisible="{Binding IsSectioned}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ReleaseNoteSectionViewModel">
+              <Expander Classes="release-note-section"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Stretch"
+                        AutomationProperties.Name="{Binding Title}"
+                        IsExpanded="{Binding IsExpanded}">
+                <Expander.Header>
+                  <md:MarkdownRenderer MarkdownBuilder="{Binding HeadingMarkdown}" />
+                </Expander.Header>
+                <Border Padding="8,0,2,6">
+                  <md:MarkdownRenderer MarkdownBuilder="{Binding Markdown}" />
+                </Border>
+              </Expander>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <md:MarkdownRenderer MarkdownBuilder="{Binding Markdown}"
+                             IsVisible="{Binding HasUnsectionedContent}" />
+      </StackPanel>
     </ScrollViewer>
     <TextBlock IsVisible="{Binding IsEmpty}"
                Text="{Binding EmptyText}"

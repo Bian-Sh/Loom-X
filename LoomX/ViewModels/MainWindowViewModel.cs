@@ -78,6 +78,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         IStringLocalizer<MainWindowViewModel>? localizer = null,
         AssistantViewModel? assistantViewModel = null,
         Action? requestApplicationExit = null,
+        Func<Task<bool>>? confirmUpdateInstall = null,
         Action<string>? applyTheme = null)
     {
         this.gatewayService = gatewayService;
@@ -109,7 +110,8 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             this.dataStore,
             updateService,
             this.loggerFactory.CreateLogger<UpdateCoordinator>(),
-            requestApplicationExit);
+            requestApplicationExit,
+            confirmUpdateInstall);
         releaseHistoryViewModel = new ReleaseHistoryViewModel(
             updateService,
             this.dataStore.GetUpdateProxySettingsAsync,

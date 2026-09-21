@@ -8,6 +8,8 @@ using Avalonia.Threading;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.Logging;
+using LoomX.Localization;
+using LoomX.Models;
 using LoomX.Services;
 using LoomX.ViewModels;
 using System.ComponentModel;
@@ -24,6 +26,7 @@ public partial class MainWindow : Window
     private readonly ILogger<MainWindow> logger;
     private readonly DispatcherTimer toastTimer;
     private readonly WindowAppearanceCoordinator appearanceCoordinator;
+    private readonly AppModalService appModalService;
     private MainWindowViewModel? navigationViewModel;
     private UpdateCoordinator? observedUpdateCoordinator;
     private readonly UpdateWindowPresentation updatePresentation = new();
@@ -41,13 +44,18 @@ public partial class MainWindow : Window
     public UpdateWindowPresentation UpdatePresentation => updatePresentation;
     internal WindowAppearanceCoordinator AppearanceCoordinator => appearanceCoordinator;
 
-    public MainWindow() : this(new ToastService(), null) { }
+    public MainWindow() : this(new ToastService(), null, null) { }
 
-    public MainWindow(ToastService toastService, ILogger<MainWindow>? logger = null)
+    public MainWindow(
+        ToastService toastService,
+        ILogger<MainWindow>? logger = null,
+        ILogger<AppModalService>? appModalLogger = null)
     {
         this.toastService = toastService;
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<MainWindow>.Instance;
+        appModalService = new AppModalService(appModalLogger);
         InitializeComponent();
+        appModalHost.Attach(appModalService);
         navigationSelectionIndicator.RenderTransform = navigationSelectionIndicatorTransform;
         navigationSelectionOutline.RenderTransform = navigationSelectionOutlineTransform;
         navigationSelectionAnimationTimer = new DispatcherTimer(
@@ -154,7 +162,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        updateDialogCloseButton.Focus();
+        updateDialogReleasePageButton.Focus();
     }
 
     private void NavigationViewModel_OnPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -332,6 +340,38 @@ public partial class MainWindow : Window
             if (current is Button) return true;
         }
         return false;
+    }
+
+    public Task<bool> ConfirmUpdateInstallAsync() =>
+        appModalService.ShowConfirmationAsync(new AppModalOptions(
+            ResourceLookup.Resolve("update.install.confirm.title", LocaleService.CurrentCulture),
+            ResourceLookup.Resolve("update.install.confirm.message", LocaleService.CurrentCulture),
+            AppModalKind.Warning,
+            ResourceLookup.Resolve("update.install.confirm.accept", LocaleService.CurrentCulture),
+            ResourceLookup.Resolve("update.install.confirm.cancel", LocaleService.CurrentCulture)));
+
+    private void UpdateDialogReleasePageButton_OnClick(object? sender, RoutedEventArgs e) =>
+        OpenReleasePage(observedUpdateCoordinator?.ReleaseUrl);
+
+    private void OpenReleasePage(string? releaseUrl)
+    {
+        if (!Uri.TryCreate(releaseUrl, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps)
+        {
+            logger.LogWarning("更新发布页地址无效 {HasUrl}", !string.IsNullOrWhiteSpace(releaseUrl));
+            toastService.Show(ResourceLookup.Resolve("update.release.open.failed", LocaleService.CurrentCulture), ToastLevel.Error);
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo { FileName = uri.AbsoluteUri, UseShellExecute = true });
+            logger.LogInformation("更新发布页已打开 {Host}", uri.Host);
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "打开更新发布页失败 {Host}", uri.Host);
+            toastService.Show(ResourceLookup.Resolve("update.release.open.failed", LocaleService.CurrentCulture), ToastLevel.Error);
+        }
     }
 
     private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;

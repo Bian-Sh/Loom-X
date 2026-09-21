@@ -613,4 +613,10 @@
   <data name="settings.update.history.loading.more"><value>Loading more…</value></data>
   <data name="settings.update.history.badge.latest"><value>Latest</value></data>
   <data name="settings.update.history.badge.current"><value>Current</value></data>
+  <data name="update.dialog.open_release"><value>Open release page</value></data>
+  <data name="update.release.open.failed"><value>Unable to open the release page. Try again later.</value></data>
+  <data name="update.install.confirm.title"><value>Install update?</value></data>
+  <data name="update.install.confirm.message"><value>Installing will close and restart Loom-X. Routing will be interrupted briefly and in-flight requests may fail. Save important work first.</value></data>
+  <data name="update.install.confirm.accept"><value>Install and restart</value></data>
+  <data name="update.install.confirm.cancel"><value>Not now</value></data>
 </root>

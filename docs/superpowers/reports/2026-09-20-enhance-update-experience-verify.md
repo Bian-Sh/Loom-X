@@ -412,3 +412,41 @@ if (Test-Path -LiteralPath $outputDir) { throw "发布目录已存在：$outputD
 ### 16.4 最终结论
 
 **PASS。** 22/22 任务完成；proposal、delta spec、OpenSpec design 与 Superpowers Design Doc 均可定位且实现一致；原不可豁免 Important 已由 TDD 修复并经 fresh scoped re-review 关闭；完整测试、Release build、OpenSpec strict、发布完整性及进程路径均通过。可以进入 Archive 确认阶段。
+
+## 17. 更新说明与安装确认补充验收（2026-09-21 17:45-18:28 +08:00）
+
+### 17.1 实现结论
+
+- Release Notes 遮罩固定为纯黑 `#A6000000`，不受透明主题协调器修改；弹窗相对完整主窗口居中，并使用独立 `ReleaseNotesAcrylicMaterial`。
+- 弹窗调整为 `680 × 540` 的紧凑单栏布局，移除大图标与多余留白；顶部保留版本、发布日期、状态和“前往发布页”，底部按下载、校验、Ready、失败状态显示紧凑操作区。
+- `LiveMarkdown.Avalonia 1.12.2` 不支持 HTML，因此不能直接渲染 GitHub `<details open>`；安全策略也会移除 HTML。三个模块以原生 `Expander` 承载折叠行为，但 Header 和正文均由 `MarkdownRenderer` 渲染，默认全部展开、折叠状态相互独立，旧格式正文继续使用单 Markdown 回退。
+- Ready 逻辑保持原行为：若 Release Notes 正在展示，准备完成后弹窗继续显示并出现“重启并安装”；点击“稍后”后标题栏入口显示“安装”；点击该入口直接进入通用应用内安装风险确认，不重新打开 Release Notes。未增加超时、自动收起或“跳过版本”状态。
+- 通用 `AppModalHost` 使用固定 65% 黑色遮罩、完整窗口居中和 FIFO 请求队列；安装确认明确告知应用关闭重启、路由服务短暂中断及进行中请求可能失败。取消后保持 Ready 且不启动安装器。
+- Inno Setup 桌面快捷方式改为无条件创建 `{autodesktop}\LoomX`。
+
+### 17.2 TDD 与自动化验证
+
+- Release Notes 分段、默认展开、独立折叠、Markdown 标题及旧正文回退均有 ViewModel/视图契约测试。
+- Ready 标题栏入口直接确认、取消保持 Ready、重复确认闩锁、应用内模态队列和安装器脚本均有自动化测试。
+- 完整测试：`dotnet test LoomX.slnx -c Release --no-restore` → **1181/1181 PASS**，0 skipped。
+- Release 构建：`dotnet build LoomX.slnx -c Release --no-restore` → **0 error**；保留既有 `NU1903`。Debug/发布过程中仍可能显示既有 `CS8618`、`CA2024` 和测试项目 `CS8602`。
+
+### 17.3 CUA 实机验收
+
+- 非透明模式：后方 UI 在 `#A6000000` 遮罩下仍可辨认；弹窗位于整个 APP 中央。
+- 透明模式：独立磨砂内容区可读；透明主题截图仅作辅助，没有据此判断真实主题色。
+- 三个 Markdown 标题 Foldout 初始均展开；折叠第一个模块后，其余两个保持展开，折叠标题仍横向铺满。
+- Ready 预览中 Release Notes 未自动关闭，底部同时显示“稍后”和“重启并安装”。
+- 点击“稍后”后标题栏显示“安装”；再次点击只显示安装风险确认，正文包含应用关闭重启、路由服务短暂中断和进行中请求可能失败；点击“暂不安装”后确认框关闭、Ready 入口仍在。
+- 截图：`release-notes-compact-downloading.png`、`release-notes-compact-transparent.png`、`release-notes-compact-ready.png`。
+
+### 17.4 发布与安装器
+
+- 发布目录：`outputs/20260921-174531-enhance-update-experience-followup/publish/`，407 个文件，`LoomX.exe` 存在。
+- 安装器：`outputs/20260921-174531-enhance-update-experience-followup/installer/LoomX-0.12.7-setup.exe`，大小 49,212,277 字节。
+- 发布包使用 `Start-Process` 启动后，进程实际路径与上述 `publish/LoomX.exe` 精确一致；验证完成后仅终止本次启动的 PID。
+- `installer/LoomX.iss` 已通过契约测试和脚本检查，桌面快捷方式不再依赖默认未勾选任务。
+
+### 17.5 结论
+
+**PASS。** 补充需求实现、自动化测试、透明/非透明 CUA 验收、发布目录、安装器生成和发布包进程路径均已验证。

@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="LoomX.Controls.AppModalHost"
+             HorizontalContentAlignment="Stretch"
+             VerticalContentAlignment="Stretch"
+             IsVisible="False">
+  <UserControl.Resources>
+    <Animation x:Key="MaskFeedbackAnimation"
+               x:SetterTargetType="Border"
+               Duration="0:0:0.18">
+      <KeyFrame Cue="0%">
+        <Setter Property="Opacity" Value="1" />
+      </KeyFrame>
+      <KeyFrame Cue="45%">
+        <Setter Property="Opacity" Value="0.82" />
+      </KeyFrame>
+      <KeyFrame Cue="100%">
+        <Setter Property="Opacity" Value="1" />
+      </KeyFrame>
+    </Animation>
+  </UserControl.Resources>
+
+  <!-- 固定黑色 65% 遮罩覆盖整个宿主区域；不创建新的 Window。 -->
+  <Border x:Name="overlay"
+          Background="#A6000000"
+          PointerPressed="Overlay_OnPointerPressed">
+    <Border x:Name="modalCard"
+            Width="520"
+            MaxWidth="520"
+            Margin="24"
+            Padding="24"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Background="{DynamicResource DialogBackgroundBrush}"
+            BorderBrush="{DynamicResource BorderStrongBrush}"
+            BorderThickness="1"
+            CornerRadius="12"
+            BoxShadow="0 14 36 0 #66000000">
+      <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="18">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
+          <Border x:Name="warningBadge"
+                  Width="30"
+                  Height="30"
+                  Background="{DynamicResource WarningSoftBrush}"
+                  BorderBrush="{DynamicResource WarningBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="15"
+                  IsVisible="False">
+            <TextBlock Text="!"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource WarningBrush}"
+                       FontSize="18"
+                       FontWeight="Bold" />
+          </Border>
+          <TextBlock x:Name="titleText"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource TextPrimaryBrush}"
+                     FontSize="18"
+                     FontWeight="SemiBold"
+                     TextWrapping="Wrap" />
+        </StackPanel>
+
+        <TextBlock x:Name="messageText"
+                   Grid.Row="1"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   FontSize="14"
+                   LineHeight="22"
+                   TextWrapping="Wrap" />
+
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="10">
+          <Button x:Name="cancelButton"
+                  MinWidth="88"
+                  Click="CancelButton_OnClick" />
+          <Button x:Name="confirmButton"
+                  MinWidth="88"
+                  Classes="primary"
+                  Click="ConfirmButton_OnClick" />
+        </StackPanel>
+      </Grid>
+    </Border>
+  </Border>
+</UserControl>

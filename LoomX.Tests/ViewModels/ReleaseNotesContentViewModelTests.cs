@@ -209,6 +209,67 @@ public sealed class ReleaseNotesContentViewModelTests
         }
     }
 
+
+    [Fact]
+    public void SetRelease_三个约定标题投影为默认展开模块()
+    {
+        using var vm = new ReleaseNotesContentViewModel();
+        vm.SetRelease(CreateRelease("0.12.7", """
+            ## 🐞 修复问题
+
+            - 修复透明弹窗
+
+            ## ✨ 新增功能
+
+            - 新增折叠模块
+
+            ## 🚀 优化改进
+
+            - 优化安装体验
+            """));
+
+        Assert.True(vm.IsSectioned);
+        Assert.Equal(["🐞 修复问题", "✨ 新增功能", "🚀 优化改进"], vm.Sections.Select(section => section.Title));
+        Assert.Equal(["## 🐞 修复问题", "## ✨ 新增功能", "## 🚀 优化改进"], vm.Sections.Select(section => section.HeadingMarkdown.ToString()));
+        Assert.All(vm.Sections, section => Assert.True(section.IsExpanded));
+        Assert.Contains("修复透明弹窗", vm.Sections[0].Markdown.ToString(), StringComparison.Ordinal);
+        Assert.Contains("新增折叠模块", vm.Sections[1].Markdown.ToString(), StringComparison.Ordinal);
+        Assert.Contains("优化安装体验", vm.Sections[2].Markdown.ToString(), StringComparison.Ordinal);
+        Assert.All(vm.Sections, section => Assert.DoesNotContain("##", section.Markdown.ToString(), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Section_折叠状态彼此独立()
+    {
+        using var vm = new ReleaseNotesContentViewModel();
+        vm.SetRelease(CreateRelease("0.12.7", """
+            ## 🐞 修复问题
+            - A
+            ## ✨ 新增功能
+            - B
+            ## 🚀 优化改进
+            - C
+            """));
+
+        vm.Sections[0].IsExpanded = false;
+
+        Assert.False(vm.Sections[0].IsExpanded);
+        Assert.True(vm.Sections[1].IsExpanded);
+        Assert.True(vm.Sections[2].IsExpanded);
+    }
+
+    [Fact]
+    public void SetRelease_旧正文继续使用单一Markdown回退()
+    {
+        using var vm = new ReleaseNotesContentViewModel();
+        vm.SetRelease(CreateRelease("0.12.7", "# 普通更新说明\n\n- 保留旧格式"));
+
+        Assert.False(vm.IsSectioned);
+        Assert.Empty(vm.Sections);
+        Assert.Contains("保留旧格式", vm.Markdown.ToString(), StringComparison.Ordinal);
+        Assert.True(vm.HasContent);
+    }
+
     private static void AssertNoUnsafeInteractiveTargets(string markdown)
     {
         var pipeline = new MarkdownPipelineBuilder().UsePreciseSourceLocation().Build();

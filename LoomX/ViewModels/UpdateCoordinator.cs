@@ -37,6 +37,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     private readonly IUpdateService updateService;
     private readonly ILogger<UpdateCoordinator> logger;
     private readonly Action requestApplicationExit;
+    private readonly Func<Task<bool>> confirmInstall;
     private readonly IStringLocalizer<UpdateCoordinator> localizer;
     private readonly Action<Action> dispatch;
     private readonly CancellationTokenSource lifetime = new();
@@ -53,6 +54,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     private bool isDialogVisible;
     private bool disposed;
     private int installStarted;
+    private int installConfirmationStarted;
     private int downloadPercent;
     private long downloadedBytes;
     private long totalBytes;
@@ -63,6 +65,7 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         IUpdateService? updateService = null,
         ILogger<UpdateCoordinator>? logger = null,
         Action? requestApplicationExit = null,
+        Func<Task<bool>>? confirmInstall = null,
         IStringLocalizer<UpdateCoordinator>? localizer = null,
         Action<Action>? dispatch = null)
     {
@@ -70,15 +73,16 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         this.updateService = updateService ?? new UpdateService(logger: null, currentVersion: CurrentVersion);
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<UpdateCoordinator>.Instance;
         this.requestApplicationExit = requestApplicationExit ?? (() => { });
+        this.confirmInstall = confirmInstall ?? (() => Task.FromResult(true));
         this.localizer = localizer ?? LocalizerFactory.Create<UpdateCoordinator>();
         this.dispatch = dispatch ?? DispatchToUiThread;
 
         CheckCommand = new AsyncCommand(() => CheckNowAsync(true), () => !IsBusy, this.logger);
-        ToggleDialogCommand = new DelegateCommand(ToggleDialog);
+        ToggleDialogCommand = new AsyncCommand(ToggleDialogAsync, logger: this.logger);
         DismissDialogCommand = new DelegateCommand(() => SetDialogVisible(false));
         LaterCommand = DismissDialogCommand;
         RetryCommand = new AsyncCommand(RetryAsync, () => CanRetry, this.logger);
-        InstallAndRestartCommand = new AsyncCommand(InstallAndRestartAsync, () => CanInstall, this.logger);
+        InstallAndRestartCommand = new AsyncCommand(ConfirmAndInstallAsync, () => CanInstall, this.logger);
         RefreshLocalizedText();
         LocaleService.CultureChanged += OnCultureChanged;
     }
@@ -108,7 +112,10 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
     public bool IsDialogVisible => isDialogVisible;
     public bool IsProgressVisible => Stage is UpdateStage.Downloading or UpdateStage.Verifying;
     public bool IsProgressIndeterminate => Stage == UpdateStage.Verifying;
-    public bool CanInstall => Stage == UpdateStage.Ready && PreparedUpdate is not null && Volatile.Read(ref installStarted) == 0;
+    public bool CanInstall => Stage == UpdateStage.Ready
+        && PreparedUpdate is not null
+        && Volatile.Read(ref installStarted) == 0
+        && Volatile.Read(ref installConfirmationStarted) == 0;
     public bool CanRetry => Stage == UpdateStage.Error && ErrorKind is UpdateErrorKind.Check or UpdateErrorKind.Prepare;
 
     public ICommand CheckCommand { get; }
@@ -278,6 +285,42 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         if (ErrorKind == UpdateErrorKind.Prepare) await StartPreparation();
     }
 
+    private async Task ConfirmAndInstallAsync()
+    {
+        if (!CanInstall || Interlocked.Exchange(ref installConfirmationStarted, 1) != 0) return;
+        SetDialogVisible(false);
+        RaiseCommandStates();
+        OnPropertyChanged(nameof(CanInstall));
+
+        try
+        {
+            bool confirmed;
+            try
+            {
+                confirmed = await confirmInstall();
+            }
+            catch (Exception exception)
+            {
+                var diagnostic = SafeUpdateDiagnosticException.Create(exception, "install-confirm");
+                logger.LogWarning(diagnostic, "更新安装确认失败 {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                    diagnostic.OriginalExceptionType,
+                    diagnostic.OriginalHResult,
+                    diagnostic.HttpStatusCode,
+                    diagnostic.Stage);
+                return;
+            }
+
+            if (!confirmed) return;
+            await InstallAndRestartAsync();
+        }
+        finally
+        {
+            Interlocked.Exchange(ref installConfirmationStarted, 0);
+            RaiseCommandStates();
+            OnPropertyChanged(nameof(CanInstall));
+        }
+    }
+
     private Task InstallAndRestartAsync()
     {
         var target = preparedUpdate;
@@ -363,9 +406,15 @@ public sealed class UpdateCoordinator : NotifyViewModel, IDisposable
         return Task.CompletedTask;
     }
 
-    private void ToggleDialog()
+    private async Task ToggleDialogAsync()
     {
         if (!IsUpdateEntryVisible) return;
+        if (Stage == UpdateStage.Ready)
+        {
+            await ConfirmAndInstallAsync();
+            return;
+        }
+
         SetDialogVisible(!IsDialogVisible);
     }
 

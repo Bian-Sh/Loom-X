@@ -118,6 +118,7 @@ public sealed class UpdateCoordinatorTests
         Assert.Contains(UpdateStage.Downloading, stages);
         Assert.Contains(UpdateStage.Verifying, stages);
         Assert.Equal(UpdateStage.Ready, coordinator.Stage);
+        Assert.True(coordinator.IsDialogVisible);
         Assert.True(coordinator.CanInstall);
         Assert.False(coordinator.IsProgressVisible);
     }
@@ -337,6 +338,86 @@ public sealed class UpdateCoordinatorTests
     }
 
     [Fact]
+    public async Task 就绪入口直接请求安装确认而不重新打开更新说明()
+    {
+        await using var fixture = await CoordinatorFixture.CreateAsync();
+        var service = new FakeUpdateService();
+        var prepared = service.EnqueuePreparation();
+        var confirmations = 0;
+        using var coordinator = fixture.CreateCoordinator(
+            service,
+            confirmInstall: () =>
+            {
+                confirmations++;
+                return Task.FromResult(false);
+            });
+        await coordinator.CheckNowAsync(false);
+        prepared.SetResult(CreatePreparedUpdate());
+        await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
+        coordinator.DismissDialogCommand.Execute(null);
+
+        coordinator.ToggleDialogCommand.Execute(null);
+        await WaitForAsync(() => confirmations == 1);
+
+        Assert.False(coordinator.IsDialogVisible);
+        Assert.Equal(0, service.LaunchCalls);
+        Assert.Equal(UpdateStage.Ready, coordinator.Stage);
+    }
+
+    [Fact]
+    public async Task 取消安装确认保持就绪且不启动安装器()
+    {
+        await using var fixture = await CoordinatorFixture.CreateAsync();
+        var service = new FakeUpdateService();
+        var prepared = service.EnqueuePreparation();
+        var exits = 0;
+        using var coordinator = fixture.CreateCoordinator(service, () => exits++, confirmInstall: () => Task.FromResult(false));
+        await coordinator.CheckNowAsync(false);
+        prepared.SetResult(CreatePreparedUpdate());
+        await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
+
+        coordinator.InstallAndRestartCommand.Execute(null);
+        await Task.Delay(50);
+
+        Assert.Equal(0, service.LaunchCalls);
+        Assert.Equal(0, exits);
+        Assert.Equal(UpdateStage.Ready, coordinator.Stage);
+        Assert.False(coordinator.IsDialogVisible);
+        Assert.True(coordinator.CanInstall);
+    }
+
+    [Fact]
+    public async Task 安装确认进行中重复点击只显示一个确认请求()
+    {
+        await using var fixture = await CoordinatorFixture.CreateAsync();
+        var service = new FakeUpdateService();
+        var prepared = service.EnqueuePreparation();
+        var confirmation = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var confirmations = 0;
+        using var coordinator = fixture.CreateCoordinator(
+            service,
+            confirmInstall: () =>
+            {
+                confirmations++;
+                return confirmation.Task;
+            });
+        await coordinator.CheckNowAsync(false);
+        prepared.SetResult(CreatePreparedUpdate());
+        await WaitForAsync(() => coordinator.Stage == UpdateStage.Ready);
+
+        coordinator.InstallAndRestartCommand.Execute(null);
+        coordinator.ToggleDialogCommand.Execute(null);
+        await WaitForAsync(() => confirmations == 1);
+        Assert.False(coordinator.CanInstall);
+
+        confirmation.SetResult(false);
+        await WaitForAsync(() => coordinator.CanInstall);
+
+        Assert.Equal(1, confirmations);
+        Assert.Equal(0, service.LaunchCalls);
+    }
+
+    [Fact]
     public async Task 手动无更新显示最新而自动无更新回到空闲并隐藏入口()
     {
         await using var manualFixture = await CoordinatorFixture.CreateAsync();
@@ -500,8 +581,12 @@ public sealed class UpdateCoordinatorTests
             return new CoordinatorFixture(directory, configService, gatewayService, dataStore);
         }
 
-        public UpdateCoordinator CreateCoordinator(FakeUpdateService service, Action? requestExit = null, Microsoft.Extensions.Logging.ILogger<UpdateCoordinator>? logger = null) =>
-            new(dataStore, service, logger, requestExit, dispatch: action => action());
+        public UpdateCoordinator CreateCoordinator(
+            FakeUpdateService service,
+            Action? requestExit = null,
+            Microsoft.Extensions.Logging.ILogger<UpdateCoordinator>? logger = null,
+            Func<Task<bool>>? confirmInstall = null) =>
+            new(dataStore, service, logger, requestExit, confirmInstall: confirmInstall ?? (() => Task.FromResult(true)), dispatch: action => action());
 
         public ValueTask DisposeAsync()
         {

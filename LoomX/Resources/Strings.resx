@@ -1709,4 +1709,10 @@
   <data name="settings.update.history.loading.more"><value>正在加载更多…</value></data>
   <data name="settings.update.history.badge.latest"><value>最新</value></data>
   <data name="settings.update.history.badge.current"><value>当前</value></data>
+  <data name="update.dialog.open_release"><value>前往发布页</value></data>
+  <data name="update.release.open.failed"><value>无法打开发布页，请稍后重试。</value></data>
+  <data name="update.install.confirm.title"><value>安装更新？</value></data>
+  <data name="update.install.confirm.message"><value>安装将关闭并重启 Loom-X。期间路由服务会短暂中断，正在进行的请求可能失败。请先保存重要工作。</value></data>
+  <data name="update.install.confirm.accept"><value>安装并重启</value></data>
+  <data name="update.install.confirm.cancel"><value>暂不安装</value></data>
 </root>

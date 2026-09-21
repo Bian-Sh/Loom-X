@@ -31,7 +31,8 @@ public sealed class UpdateExperienceContractTests
         var settingsViewModel = NormalizeLineEndings(ReadDesktopFile("ViewModels", "SettingsViewModel.cs"));
 
         Assert.Contains("requestApplicationExit: () => desktop.Shutdown()", app, StringComparison.Ordinal);
-        Assert.Contains("AssistantViewModel? assistantViewModel = null,\n        Action? requestApplicationExit = null,\n        Action<string>? applyTheme = null)", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("confirmUpdateInstall: mainWindow.ConfirmUpdateInstallAsync", app, StringComparison.Ordinal);
+        Assert.Contains("AssistantViewModel? assistantViewModel = null,\n        Action? requestApplicationExit = null,\n        Func<Task<bool>>? confirmUpdateInstall = null,\n        Action<string>? applyTheme = null)", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("private readonly ReleaseHistoryViewModel releaseHistoryViewModel;", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("IUpdateService updateService = new UpdateService(", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("new UpdateCoordinator(\n            this.dataStore,\n            updateService,", mainViewModel, StringComparison.Ordinal);
@@ -44,21 +45,47 @@ public sealed class UpdateExperienceContractTests
     }
 
     [Fact]
-    public void 主窗口使用单层更新浮窗并直接展示共享更新说明()
+    public void 主窗口更新说明覆盖全窗口并使用固定遮罩与磨砂容器()
     {
         var source = ReadDesktopFile("MainWindow.axaml");
-        var toastStart = source.IndexOf("x:Name=\"toastBorder\"", StringComparison.Ordinal);
         var dialogStart = source.IndexOf("x:Name=\"updateDialogOverlay\"", StringComparison.Ordinal);
-        var toastTagEnd = toastStart >= 0 ? source.IndexOf('>', toastStart) : -1;
-        var dialogTagEnd = dialogStart >= 0 ? source.IndexOf('>', dialogStart) : -1;
-        var systemCloseStart = source.IndexOf("Classes=\"window-control window-close\"", StringComparison.Ordinal);
-        var systemCloseEnd = systemCloseStart >= 0 ? source.IndexOf("</Button>", systemCloseStart, StringComparison.Ordinal) : -1;
-        var dialogCloseStart = source.IndexOf("x:Name=\"updateDialogCloseButton\"", StringComparison.Ordinal);
-        var dialogCloseEnd = dialogCloseStart >= 0 ? source.IndexOf("</Button>", dialogCloseStart, StringComparison.Ordinal) : -1;
+        var dialogEnd = dialogStart >= 0 ? source.IndexOf("</Border>", dialogStart, StringComparison.Ordinal) : -1;
 
-        Assert.Contains("xmlns:views=\"using:LoomX.Views\"", source, StringComparison.Ordinal);
+        Assert.Contains("xmlns:controls=\"using:LoomX.Controls\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding Update.IsDialogVisible}\"", source, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth=\"760\"", source, StringComparison.Ordinal);
+        Assert.Contains("Background=\"#A6000000\"", source, StringComparison.Ordinal);
+        Assert.Contains("<ExperimentalAcrylicBorder", source, StringComparison.Ordinal);
+        Assert.Contains("Material=\"{DynamicResource ReleaseNotesAcrylicMaterial}\"", source, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Center\"", source, StringComparison.Ordinal);
+        Assert.Contains("VerticalAlignment=\"Center\"", source, StringComparison.Ordinal);
+        Assert.Contains("Width=\"680\" Height=\"540\" MaxWidth=\"680\" MaxHeight=\"600\"", source, StringComparison.Ordinal);
+        Assert.Contains("Grid Grid.Row=\"0\" ColumnDefinitions=\"*,Auto\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Width=\"36\" Height=\"36\"", source[dialogStart..], StringComparison.Ordinal);
+        Assert.DoesNotContain("Grid ColumnDefinitions=\"228,*\"", source[dialogStart..], StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"{DynamicResource SurfaceMutedBrush}\"", source[dialogStart..], StringComparison.Ordinal);
+        Assert.True(dialogStart >= 0 && dialogEnd > dialogStart, "找不到更新浮窗遮罩。");
+    }
+
+    [Fact]
+    public void 更新说明右上角前往发布页且应用内模态宿主位于主窗口()
+    {
+        var source = ReadDesktopFile("MainWindow.axaml");
+        var codeBehind = ReadDesktopFile("MainWindow.axaml.cs");
+
+        Assert.Contains("x:Name=\"updateDialogReleasePageButton\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{l:Locale update.dialog.open_release}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"UpdateDialogReleasePageButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"updateDialogCloseButton\"", source, StringComparison.Ordinal);
+        Assert.Contains("OpenReleasePage", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("<controls:AppModalHost x:Name=\"appModalHost\"", source, StringComparison.Ordinal);
+        Assert.Contains("ZIndex=\"300\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 更新说明继续展示状态与共享Markdown正文()
+    {
+        var source = ReadDesktopFile("MainWindow.axaml");
+
         Assert.Contains("Text=\"{Binding Update.LatestVersion}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Update.ReleaseNotesContent.PublishedAtText}\"", source, StringComparison.Ordinal);
         Assert.Contains("Text=\"{Binding Update.StatusText}\"", source, StringComparison.Ordinal);
@@ -67,45 +94,10 @@ public sealed class UpdateExperienceContractTests
         Assert.Contains("IsVisible=\"{Binding Update.IsVerifying}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding Update.CanInstall}\"", source, StringComparison.Ordinal);
         Assert.Contains("IsVisible=\"{Binding Update.CanRetry}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Value=\"{Binding Update.DownloadPercent}\"", source, StringComparison.Ordinal);
-        Assert.Contains("IsIndeterminate=\"True\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding Update.InstallAndRestartCommand}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Command=\"{Binding Update.RetryCommand}\"", source, StringComparison.Ordinal);
         Assert.Contains("Command=\"{Binding Update.DismissDialogCommand}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"{l:Locale update.dialog.later}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"{l:Locale update.dialog.install}\"", source, StringComparison.Ordinal);
-        Assert.Contains("Content=\"{l:Locale update.dialog.retry}\"", source, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"{l:Locale update.dialog.close}\"", source, StringComparison.Ordinal);
-        Assert.True(systemCloseStart >= 0 && systemCloseEnd > systemCloseStart, "找不到标题栏系统关闭按钮。");
-        Assert.True(dialogCloseStart >= 0 && dialogCloseEnd > dialogCloseStart, "找不到更新浮窗关闭按钮。");
-        var systemClose = source[systemCloseStart..systemCloseEnd];
-        var dialogClose = source[dialogCloseStart..dialogCloseEnd];
-        Assert.Contains("ToolTip.Tip=\"{l:Locale window.close}\"", systemClose, StringComparison.Ordinal);
-        Assert.Contains("AutomationProperties.Name=\"{l:Locale window.close}\"", systemClose, StringComparison.Ordinal);
-        Assert.DoesNotContain("update.dialog.close", systemClose, StringComparison.Ordinal);
-        Assert.Contains("ToolTip.Tip=\"{l:Locale update.dialog.close}\"", dialogClose, StringComparison.Ordinal);
-        Assert.Contains("AutomationProperties.Name=\"{l:Locale update.dialog.close}\"", dialogClose, StringComparison.Ordinal);
-        Assert.DoesNotContain("window.close", dialogClose, StringComparison.Ordinal);
-        Assert.DoesNotContain("Content=\"重启并安装\"", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Update.CardVisible", source, StringComparison.Ordinal);
         Assert.DoesNotContain("Update.ReleaseNotesVisible", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Update.OpenReleaseNotesCommand", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Text=\"{Binding Update.ReleaseNotes}\"", source, StringComparison.Ordinal);
-        Assert.True(toastStart >= 0 && toastTagEnd > toastStart, "找不到 Toast 容器。");
-        Assert.True(dialogStart >= 0 && dialogTagEnd > dialogStart, "找不到更新浮窗遮罩。");
-        var toastTag = source[toastStart..toastTagEnd];
-        var dialogTag = source[dialogStart..dialogTagEnd];
-        Assert.Contains("Classes=\"toast-layer\"", toastTag, StringComparison.Ordinal);
-        Assert.Contains("<Style Selector=\"Border.toast-layer\">", source, StringComparison.Ordinal);
-        Assert.Contains("<Setter Property=\"Panel.ZIndex\" Value=\"2\" />", source, StringComparison.Ordinal);
-        Assert.Contains("HorizontalAlignment=\"Left\"", toastTag, StringComparison.Ordinal);
-        Assert.Contains("Margin=\"16,0,0,24\"", toastTag, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth=\"196\"", toastTag, StringComparison.Ordinal);
-        Assert.Contains("Classes=\"update-dialog-layer\"", dialogTag, StringComparison.Ordinal);
-        Assert.Contains("<Style Selector=\"Border.update-dialog-layer\">", source, StringComparison.Ordinal);
-        Assert.Contains("<Setter Property=\"Panel.ZIndex\" Value=\"1\" />", source, StringComparison.Ordinal);
-        Assert.Contains("<Grid ColumnDefinitions=\"228,*\">", source, StringComparison.Ordinal);
-        Assert.Contains("<Border Grid.Column=\"1\" Margin=\"48,56\" MaxWidth=\"760\"", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -119,7 +111,7 @@ public sealed class UpdateExperienceContractTests
         Assert.Contains("Dispatcher.UIThread.Post(FocusUpdateDialogAction", source, StringComparison.Ordinal);
         Assert.Contains("updateInstallButton", source, StringComparison.Ordinal);
         Assert.Contains("updateRetryButton", source, StringComparison.Ordinal);
-        Assert.Contains("updateDialogCloseButton", source, StringComparison.Ordinal);
+        Assert.Contains("updateDialogReleasePageButton", source, StringComparison.Ordinal);
         Assert.Contains("if (IsInsideButton(e.Source)) return;", source, StringComparison.Ordinal);
     }
 

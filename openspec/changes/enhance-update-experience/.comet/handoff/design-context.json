@@ -3,12 +3,14 @@
   "phase": "design",
   "mode": "compact",
   "canonical_spec": "openspec",
+  "task_hash_policy": "task-content-v1",
   "generated_by": "comet-handoff.sh",
-  "context_hash": "afe58a3c8791e42191bb2d64e42afec5120e59edb4c22e09582ab2a6f6e42158",
+  "context_hash": "26c2f0184dcdb702b22a5e5eccc150774e2125298a92fa5de785d37358f59356",
   "files": [
     { "path": "openspec/changes/enhance-update-experience/proposal.md", "sha256": "5169ed070c60b1752c5e6670907e35baa3f571142d46bae48226f601b249c7b4" },
     { "path": "openspec/changes/enhance-update-experience/design.md", "sha256": "0b51062bd6640614e13cc974c58db4cb916bb575ae25e99ce701763c709eb3f5" },
-    { "path": "openspec/changes/enhance-update-experience/tasks.md", "sha256": "4116e0c0facbf2ce07db2edd875b28f04be24b5416f03115e93714ac1a89c8c0" },
-    { "path": "openspec/changes/enhance-update-experience/specs/desktop-update-experience/spec.md", "sha256": "529d968a2801e0bbfb76f945b5dde9ff60c445498681bf6e9422de969c8c73dc" }
+    { "path": "openspec/changes/enhance-update-experience/tasks.md", "sha256": "f077c643b4649eabac18555456aacab47ed5ada0e7481935f71bb073ec56e684" },
+    { "path": "openspec/changes/enhance-update-experience/.openspec.yaml", "sha256": "81135ec87a9e4d837ff0b50c44b20b6ea158b98cb51c326b80509d708a47f2d3" },
+    { "path": "openspec/changes/enhance-update-experience/specs/desktop-update-experience/spec.md", "sha256": "62bd21388fad0ea96a2e5e5b9689c14a76ce35ef0e7104d2c8128cce49bba578" }
   ]
 }
