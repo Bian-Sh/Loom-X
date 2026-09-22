@@ -41,9 +41,56 @@ Credential Protection SHALL 在 Router 请求正文进入外部 Provider 前检�
 - **WHEN** Provider 响应包含并非本地 SQLite 映射签发的占位符形态文本
 - **THEN** 该文本原样保留，不被解析为本地凭据
 
+### Requirement: Placeholder 完整性指令
+
+Credential Protection SHALL 将 placeholder 完整性指令作为协议必选组成部分。Request Pipeline 完成 token 化后，若最终 Provider 请求正文含 LoomX placeholder，系统 MUST 在发送 Provider 前临时注入不可单独关闭的 system/developer 级完整性指令，要求模型在 JSON、Header、URL、Shell 或 Tool Call 外围语法中逐字符保留完整引用。该指令 MUST NOT 包含凭据明文、token 映射或 Vault 内部信息，且 MUST NOT 改写客户端原始 system message 或会话持久化内容。
+
+#### Scenario: 含 placeholder 的请求强制注入完整性指令
+
+- **WHEN** Request Pipeline 处理后的 Provider 请求正文含本地签发的 LoomX placeholder
+- **THEN** Provider 请求附带 placeholder 不可修改、翻译、拆分、转义或重新格式化的完整性指令
+
+#### Scenario: 不含 placeholder 的请求不额外注入
+
+- **WHEN** Request Pipeline 处理后的 Provider 请求正文不含 LoomX placeholder
+- **THEN** Credential Protection 不为该请求额外注入 placeholder 完整性指令
+
+#### Scenario: 用户知悉系统指令修改
+
+- **WHEN** 用户查看或启用 Credential Protection
+- **THEN** 产品界面明确披露该插件会在含 placeholder 的请求中修改发送给 Provider 的 system/developer 指令，且说明 Prompt 只降低模型改写概率、不构成安全保证
+
+### Requirement: Placeholder 受限归一化
+
+Credential Protection SHALL 只对已定位的 placeholder 候选执行 ASCII 大小写折叠与 token 语法内部允许的 ASCII 空白归一化。系统 MUST NOT 对整段正文全局删空白，不得使用 Unicode 相似字符替换、易混字符替换、缺字补全、编辑距离或其他模糊匹配。归一化结果 MUST 完整满足固定 token 语法并精确命中本地 SQLite 中唯一映射，否则不得恢复。
+
+#### Scenario: 大小写和内部空白变化仍可恢复
+
+- **WHEN** Provider 返回的本地签发 placeholder 仅发生 ASCII 大小写变化或 token 语法内部允许的 ASCII 空白变化
+- **THEN** 系统将候选归一化为规范 token，精确查表后恢复原值
+
+#### Scenario: 字符损坏不进行模糊猜测
+
+- **WHEN** placeholder 出现缺字、易混字符替换、Unicode 相似字符或可对应多个 token 的歧义
+- **THEN** 系统不得根据相似度猜测凭据，并按所在安全边界保持未知引用或 fail closed
+
+### Requirement: Placeholder 外围语法保持不变
+
+Credential Protection SHALL 只规范和替换 placeholder 自身跨度，不得删除或重写外围引号、反引号、Header 前缀、URL、Shell 语法或其他字符。JSON 结构引号 MUST 由 JSON 解析与重新序列化管理；JSON 解析后仍属于字段值的引号 SHALL 被视为实际数据，并由 Tool Schema、Tool Executor 或目标协议判断是否合法。
+
+#### Scenario: Shell 命令中的合法引号被保留
+
+- **WHEN** Tool Call 的 command 字段在 Shell 引号内包含 LoomX placeholder
+- **THEN** 系统只恢复 placeholder，外围 Shell 引号和命令结构保持不变
+
+#### Scenario: 强类型字段的额外包装不被擅自删除
+
+- **WHEN** JSON 解析后的纯凭据字段值包含 placeholder 之外的额外引号或反引号
+- **THEN** Credential Protection 保留这些实际数据，由字段校验拒绝或接受，不自行修复工具调用语义
+
 ### Requirement: Provider 响应本地恢复
 
-Credential Protection SHALL 在成功的 Provider 响应返回 Router 客户前恢复本地签发的有效占位符。普通 JSON 响应 MUST 保持有效 JSON；SSE 流式响应 MUST 能恢复被拆分到多个内容事件中的占位符，并按独立内容通道隔离缓冲。
+Credential Protection SHALL 在成功的 Provider 响应返回 Router 客户前恢复本地签发的有效占位符。普通 JSON 响应 MUST 保持有效 JSON；SSE 流式响应 MUST 能恢复被拆分到多个网络 chunk 或内容事件中的占位符，并按独立内容通道隔离缓冲。流式候选长度保护 MUST 只计算实际未闭合 placeholder，不得把候选之前的普通文本计入 token 长度。
 
 #### Scenario: 普通 JSON 响应恢复
 
@@ -83,6 +130,35 @@ Credential Protection SHALL 只挂载在 Router 统一 Provider request/response
 
 - **WHEN** Agent 客户端把含凭据的消息显示在自身 UI、日志或历史存储中
 - **THEN** 该客户端自行负责本地隐私策略，Credential Protection 不声明能够控制或改写客户端展示
+
+### Requirement: 历史 placeholder 生命周期兼容
+
+Credential Protection SHALL 将“为新明文创建 token 的主动保护”和“解析既有 placeholder 的兼容运行时”作为不同生命周期。暂停主动保护时 MUST 停止新明文检测与 token 化，但 MUST 继续识别、归一化、注入完整性指令并恢复历史 placeholder。插件代码卸载与 Credential Vault 销毁 MUST 是两个独立操作。
+
+#### Scenario: 暂停主动保护仍可继续历史会话
+
+- **WHEN** 用户暂停对新敏感内容的保护后继续一个包含本地签发 placeholder 的历史会话
+- **THEN** 既有 placeholder 仍经过完整性指令、受限归一化和 Response 恢复，不因普通禁用操作失效
+
+#### Scenario: 暂停保护警告明文风险
+
+- **WHEN** 用户准备暂停主动保护
+- **THEN** 产品明确警告新请求及历史会话中保存的明文凭据可能直接发送给 Provider，且要求用户确认
+
+#### Scenario: 卸载前警告历史引用失效
+
+- **WHEN** 用户请求卸载 Credential Protection Runtime，尤其是 Vault 中仍存在 token 映射时
+- **THEN** 产品通过受保护的危险操作流程强警告历史会话、外部 Agent 缓存、导出文件和备份中的 placeholder 将不可解析，并要求二次确认
+
+#### Scenario: 卸载默认保留 Vault
+
+- **WHEN** 用户确认卸载插件代码但未单独确认销毁 Credential Vault
+- **THEN** Vault 与 token 映射被保留，安装兼容版本后历史 placeholder 可再次恢复
+
+#### Scenario: 销毁 Vault 使用独立不可逆确认
+
+- **WHEN** 用户请求销毁 Credential Vault
+- **THEN** 系统将其作为独立于卸载的不可逆高风险操作，明确说明所有历史 placeholder 将永久失效，并要求更高级别确认
 
 ### Requirement: Provider 鉴权不被破坏
 
