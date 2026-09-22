@@ -71,4 +71,15 @@
           DestinationFiles="@(_PluginPayload->'$(OutputPath)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
+  <Target Name="CopyFirstPartyPluginsToPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <_PluginPublishOutputDir>@(FirstPartyPlugin->'%(RootDir)%(Directory)')</_PluginPublishOutputDir>
+    </PropertyGroup>
+    <ItemGroup>
+      <_PluginPublishPayload Include="$(_PluginPublishOutputDir)**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PluginPublishPayload)"
+          DestinationFiles="@(_PluginPublishPayload->'$(PublishDir)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>
