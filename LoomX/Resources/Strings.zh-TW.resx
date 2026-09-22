@@ -23,6 +23,12 @@
   <data name="nav.overview.description">
     <value>確認本地服務健康，快速查看網關與模型配置。</value>
   </data>
+  <data name="nav.plugins">
+    <value>插件</value>
+  </data>
+  <data name="nav.plugins.description">
+    <value>查看已載入擴展、運行狀態、能力與安全生命週期。</value>
+  </data>
   <data name="nav.gateway">
     <value>網關</value>
   </data>
@@ -62,6 +68,39 @@
   <data name="nav.settings.description">
     <value>調整 Loom-X 的顯示、連接、更新與隱私偏好。</value>
   </data>
+  <data name="plugins.summary.loaded.label"><value>已載入</value></data>
+  <data name="plugins.summary.enabled.label"><value>運行中</value></data>
+  <data name="plugins.summary.diagnostics.label"><value>診斷</value></data>
+  <data name="plugins.summary.loaded"><value>{0} 個插件</value></data>
+  <data name="plugins.summary.enabled"><value>{0} 個已啟用</value></data>
+  <data name="plugins.summary.diagnostics"><value>{0} 條診斷</value></data>
+  <data name="plugins.action.refresh"><value>刷新</value></data>
+  <data name="plugins.empty.title"><value>尚未發現插件</value></data>
+  <data name="plugins.empty.description"><value>插件運行時已就緒，但應用程式目錄下暫未載入可用插件。</value></data>
+  <data name="plugins.error.title"><value>插件資訊載入失敗</value></data>
+  <data name="plugins.error.description"><value>無法讀取插件運行時。請重試刷新，並在控制檯查看不含敏感資訊的錯誤摘要。</value></data>
+  <data name="plugins.diagnostics.title"><value>運行時診斷</value></data>
+  <data name="plugins.diagnostics.description"><value>这里只顯示不含密鑰、請求正文或工具參數的安全摘要。</value></data>
+  <data name="plugins.status.waiting"><value>進入頁面後將讀取插件運行時。</value></data>
+  <data name="plugins.status.loading"><value>正在初始化插件運行時…</value></data>
+  <data name="plugins.status.runtime_unavailable"><value>插件運行時不可用。</value></data>
+  <data name="plugins.status.ready"><value>已載入 {0} 個插件。</value></data>
+  <data name="plugins.status.failed"><value>插件資訊載入失敗，請查看控制檯。</value></data>
+  <data name="plugins.status.enabled"><value>已啟用</value></data>
+  <data name="plugins.status.disabled"><value>已停用</value></data>
+  <data name="plugins.toast.refresh_failed"><value>插件資訊載入失敗</value></data>
+  <data name="plugins.toast.toggle_failed"><value>插件狀態未改變，請刷新後重試</value></data>
+  <data name="plugins.toast.enabled"><value>已啟用「{0}」</value></data>
+  <data name="plugins.toast.disabled"><value>已停用「{0}」</value></data>
+  <data name="plugins.category.system"><value>系統插件</value></data>
+  <data name="plugins.category.extension"><value>擴展插件</value></data>
+  <data name="plugins.credential.name"><value>憑據保護</value></data>
+  <data name="plugins.credential.description"><value>在 Router 請求鏈路中識別並遮罩敏感憑據，向模型注入 placeholder 完整性約束，並在響應鏈路恢復原值。</value></data>
+  <data name="plugins.credential.lifecycle"><value>當前版本暫不允許從介面停用：歷史會話中的 token 仍依賴相容解析能力。後續將把「主動保護」和「相容恢復」拆分，並為解除安裝提供保留 Vault 的強警告流程。</value></data>
+  <data name="plugins.generic.description"><value>為 Loom-X Router Pipeline 提供可組合的請求或響應擴展。</value></data>
+  <data name="plugins.generic.lifecycle"><value>停用只影響當前運行時執行，不會刪除插件檔案或插件自有資料；重啟後的持久化開關將在後續版本接入。</value></data>
+  <data name="plugins.extension_count"><value>{0} 個擴展點</value></data>
+  <data name="plugins.capabilities.none"><value>未聲明能力</value></data>
   <data name="settings.tab.general">
     <value>通用</value>
   </data>

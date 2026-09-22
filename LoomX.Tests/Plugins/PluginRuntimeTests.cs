@@ -108,15 +108,23 @@ public sealed class PluginRuntimeTests : IDisposable
         var pipeline = runtime.GetPipeline("request")!;
         const string payload = """{"api_key":"sk-abcdefghij0123456789abcd"}""";
 
-        runtime.SetPluginEnabled("loomx.credential-protection", false);
+        Assert.True(runtime.SetPluginEnabled("loomx.credential-protection", false));
         var disabledResult = await pipeline.ExecuteAsync(payload);
         Assert.Equal(PipelineOutcome.Passed, disabledResult.Outcome);
         Assert.Equal(payload, disabledResult.Payload);
 
-        runtime.SetPluginEnabled("loomx.credential-protection", true);
+        Assert.True(runtime.SetPluginEnabled("loomx.credential-protection", true));
         var enabledResult = await pipeline.ExecuteAsync(payload);
         Assert.Equal(PipelineOutcome.Modified, enabledResult.Outcome);
         Assert.DoesNotContain("sk-abcdefghij0123456789abcd", enabledResult.Payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PluginToggle_ReturnsFalseForUnknownPlugin()
+    {
+        var runtime = StartRuntime();
+
+        Assert.False(runtime.SetPluginEnabled("missing.plugin", false));
     }
 
     [Fact]

@@ -89,14 +89,19 @@ public sealed class PluginRuntime
     }
 
     /// <summary>启用/禁用插件：其全部 Entry 同步启停，重新启用后按配置顺序恢复执行。</summary>
-    public void SetPluginEnabled(string pluginId, bool enabled)
+    public bool SetPluginEnabled(string pluginId, bool enabled)
     {
         var plugin = plugins.FirstOrDefault(item => item.Manifest.Id == pluginId);
-        if (plugin is null) return;
+        if (plugin is null)
+        {
+            logger.LogWarning("插件启停被忽略：未找到插件 {PluginId}", pluginId);
+            return false;
+        }
         plugin.Enabled = enabled;
         foreach (var entry in plugin.Entries)
             entry.Enabled = enabled;
         logger.LogInformation("插件{State} {PluginId}", enabled ? "已启用" : "已禁用", pluginId);
+        return true;
     }
 
     /// <summary>启用/禁用单个 Entry。</summary>

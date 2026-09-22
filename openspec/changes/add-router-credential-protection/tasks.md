@@ -47,7 +47,8 @@
 ## 后续 TODO（本次范围外）
 
 - [x] 实现 placeholder 受限归一化：仅 ASCII 大小写与 token 内部允许空白；跨网络 chunk/SSE event 延续候选状态，并修正普通长文本加半截 token 的长度误判。后续继续补 property-based test 与 fuzz test 扩展语料。
-- [x] 实现 placeholder 完整性 Prompt：最终 Provider 请求含 placeholder 时强制临时注入 OpenAI/Ollama system、Anthropic system 或 Gemini systemInstruction；不得写入 Session/JSONL，不得作为 user message。产品 UI/插件说明中的显式披露随生命周期设置界面实现。
+- [x] 实现 placeholder 完整性 Prompt：最终 Provider 请求含 placeholder 时强制临时注入 OpenAI/Ollama system、Anthropic system 或 Gemini systemInstruction；不得写入 Session/JSONL，不得作为 user message。
+- [x] 新增首页一级“插件”页面：展示 Plugin Runtime 已加载插件、版本、能力、扩展点与安全诊断；Credential Protection 明确披露会修改 Provider 系统/开发者指令，并在生命周期拆分完成前禁用普通启停操作。
 - [ ] 拆分 Credential Protection 生命周期：完整保护与兼容解析模式；暂停主动保护时继续解析历史 token，并强警告明文外发风险。
 - [ ] 将 Credential Protection 定义为受保护的第一方系统插件或常驻 Reference Runtime；实现危险卸载流程、Vault 默认保留、Vault 独立销毁与更高级别确认。
 - [ ] 增加生命周期迁移与兼容测试：禁用后历史会话继续有效、卸载后重装恢复、Vault 销毁后明确永久失效，并覆盖外部 Agent 保存引用无法穷尽扫描的产品提示。
