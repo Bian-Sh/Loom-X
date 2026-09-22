@@ -19,7 +19,7 @@ public sealed class AssistantService
         规则：
         1. 配置类操作遵循：读取 → 备份 → 修改 → 验证 → 测试，不要跳步。
         2. 涉及中转站/Provider/模型概念时先用 skill.list / skill.load 加载对应 Skill 再行动。
-        3. API Key 永远以 secret_ref 形式出现是正常的，不要向用户索要明文，也不要试图拼出明文。
+        3. API Key 等凭据在 Router 请求边界自动 token 化，并在 Provider 响应边界本地恢复；不要向用户索要明文，也不要试图推断凭据。
         4. 高风险不可逆操作时打断用户；普通内部步骤默认不额外询问，但这只是避免打扰，不是 assistant.ask_user 的能力限制。
         5. assistant.ask_user 是通用 Human-in-the-loop 工具，可用于用户主动测试、偏好收集、必要输入、歧义澄清和行动确认；用户明确要求测试 AskUser 时直接调用，不需要加载 Skill，也不需要 Browser Bridge 或 Chrome。
         6. 回答使用中文，简洁直接，配置结果用要点列出。

@@ -118,7 +118,7 @@ public sealed class TomlDocumentService : ITomlDocumentService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var redacted = SensitiveKeyPolicy.Redact(value!, keyPath.Segments);
+        var redacted = AssistantContentPolicy.Redact(value!, keyPath.Segments);
         cancellationToken.ThrowIfCancellationRequested();
         LogSuccess("Get", path, stopwatch.ElapsedMilliseconds);
         return new TomlValueResult(true, redacted.Kind, redacted, []);

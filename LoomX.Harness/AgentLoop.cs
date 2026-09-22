@@ -162,7 +162,7 @@ public sealed class AgentLoop
             // 保留首次出现的完整调用（arguments 已逐步追加完整）。
             var dedupedToolCalls = DedupeToolCallsById(toolCalls);
             var safeToolCalls = dedupedToolCalls
-                .Select(call => ToolArgumentSafety.Project(
+                .Select(call => ToolCallProjection.Project(
                     call,
                     toolRegistry.TryGet(call.Name, out var definition) ? definition : null))
                 .ToArray();

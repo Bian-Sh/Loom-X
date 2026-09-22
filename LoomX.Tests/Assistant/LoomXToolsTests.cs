@@ -2,7 +2,6 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using LoomX.Assistant;
-using LoomX.Assistant.Browser;
 using LoomX.Configuration;
 using LoomX.Services;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +19,6 @@ public sealed class LoomXToolsTests : IAsyncLifetime
     private ConfigurationManagementService configuration = null!;
     private ToolRegistry registry = null!;
     private GatewayStateHub gatewayStateHub = null!;
-    private BrowserSecretVault secretVault = null!;
 
     public async Task InitializeAsync()
     {
@@ -51,8 +49,7 @@ public sealed class LoomXToolsTests : IAsyncLifetime
 
         registry = new ToolRegistry();
         gatewayStateHub = new GatewayStateHub();
-        secretVault = new BrowserSecretVault();
-        LoomXTools.RegisterAll(registry, configuration, configurationProvider, tester, new SkillStore(skillsDirectory), secretVault, gatewayStateHub);
+        LoomXTools.RegisterAll(registry, configuration, configurationProvider, tester, new SkillStore(skillsDirectory), gatewayStateHub);
     }
 
     public async Task DisposeAsync()
@@ -85,21 +82,21 @@ public sealed class LoomXToolsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task CreateProvider_支持浏览器SecretRef并在Schema中公开参数()
+    public async Task CreateProvider_统一使用ApiKey参数并只返回配置状态()
     {
         var tool = Assert.Single(registry.All, item => item.Name == "loomx.create_provider");
-        Assert.NotNull(tool.ParametersSchema["properties"]?["api_key_secret_ref"]);
+        Assert.Null(tool.ParametersSchema["properties"]?["api_key_secret_ref"]);
+        Assert.NotNull(tool.ParametersSchema["properties"]?["api_key"]);
 
-        var secretRef = secretVault.Store(PlaintextApiKey, "api_key");
         var result = await InvokeAsync(
             "loomx.create_provider",
-            $$"""{"business_id":"browser-secret","display_name":"浏览器 Secret","base_url":"https://api.example.com/v1","api_mode":"openai","api_key_secret_ref":"{{secretRef}}"}""");
+            $$"""{"business_id":"pipeline-secret","display_name":"Pipeline Secret","base_url":"https://api.example.com/v1","api_mode":"openai","api_key":"{{PlaintextApiKey}}"}""");
 
         Assert.True(result.Success, result.Content);
         Assert.DoesNotContain(PlaintextApiKey, result.Content);
-        var provider = await InvokeAsync("loomx.get_provider", """{"id":"browser-secret"}""");
+        var provider = await InvokeAsync("loomx.get_provider", """{"id":"pipeline-secret"}""");
         Assert.True(provider.Success, provider.Content);
-        Assert.Contains("\"configured\":true", provider.Content, StringComparison.Ordinal);
+        Assert.Contains("\"api_key_configured\":true", provider.Content, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -237,7 +234,7 @@ public sealed class LoomXToolsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SecretBoundary_NoToolOutputContainsPlaintextApiKey()
+    public async Task ProviderToolOutputs_ExposeConfiguredStateWithoutCredentialValue()
     {
         await CreateProviderAsync();
 
@@ -254,8 +251,8 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         }
 
         var provider = await InvokeAsync("loomx.get_provider", """{"id":"demo"}""");
-        Assert.Contains("secret://provider/demo/apikey", provider.Content);
-        Assert.Contains("\"configured\":true", provider.Content);
+        Assert.DoesNotContain("secret://", provider.Content, StringComparison.Ordinal);
+        Assert.Contains("\"api_key_configured\":true", provider.Content, StringComparison.Ordinal);
     }
 
     [Fact]

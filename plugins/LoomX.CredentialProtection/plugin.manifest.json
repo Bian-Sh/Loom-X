@@ -1,0 +1,23 @@
+{
+  "id": "loomx.credential-protection",
+  "version": "0.6.0",
+  "assembly": "LoomX.CredentialProtection.dll",
+  "plugin_type": "LoomX.CredentialProtection.CredentialProtectionPlugin",
+  "capabilities": ["credential.detect", "credential.mask", "credential.integrity-instruction", "credential.restore"],
+  "extensions": [
+    {
+      "id": "credential.request",
+      "kind": "request",
+      "pipeline": "request",
+      "failure_policy": "fail-closed",
+      "capabilities": ["credential.detect", "credential.mask", "credential.integrity-instruction"]
+    },
+    {
+      "id": "credential.response",
+      "kind": "response",
+      "pipeline": "response",
+      "failure_policy": "fail-closed",
+      "capabilities": ["credential.restore"]
+    }
+  ]
+}

@@ -155,7 +155,7 @@ public sealed class AssistantTester
             ["enabled"] = endpoint.Enabled,
             ["combos_bound"] = endpoint.Combos.Count,
             ["combos_enabled"] = enabledCombos,
-            ["api_key"] = SecretBoundary.Describe(hasApiKey, SecretBoundary.EndpointApiKeyRef(endpoint.Key)),
+            ["api_key_configured"] = hasApiKey,
         };
         result["diagnosis"] = endpoint switch
         {

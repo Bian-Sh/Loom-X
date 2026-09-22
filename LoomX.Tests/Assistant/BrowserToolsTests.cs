@@ -9,14 +9,13 @@ namespace LoomX.Tests.Assistant;
 public sealed class BrowserToolsTests
 {
     private readonly FakeBrowserBridge bridge = new();
-    private readonly BrowserSecretVault vault = new();
     private readonly ToolRegistry registry = new();
     private readonly BrowserBridgeLeaseManager leaseManager;
 
     public BrowserToolsTests()
     {
         leaseManager = new BrowserBridgeLeaseManager(bridge, NullLogger<BrowserBridgeLeaseManager>.Instance);
-        BrowserTools.RegisterAll(registry, bridge, vault, leaseManager);
+        BrowserTools.RegisterAll(registry, bridge, leaseManager);
     }
 
     [Fact]
@@ -109,7 +108,7 @@ public sealed class BrowserToolsTests
     }
 
     [Fact]
-    public async Task Read_从正文收割Secret并返回安全引用()
+    public async Task Read_原样返回Bridge结构化结果_统一保护由AgentLoop负责()
     {
         const string secret = "sk-livekey0123456789abcdef";
         bridge.NextResult = new JsonObject
@@ -120,17 +119,11 @@ public sealed class BrowserToolsTests
         var result = await InvokeAsync("browser.read", """{"session_id":"session-1"}""");
 
         Assert.True(result.Success);
-        Assert.DoesNotContain(secret, result.Content, StringComparison.Ordinal);
-        Assert.Contains("[API Key 已安全收割]", result.Content, StringComparison.Ordinal);
-        var json = JsonNode.Parse(result.Content)!.AsObject();
-        var harvested = Assert.IsType<JsonArray>(json["harvested_secrets"]);
-        var reference = Assert.Single(harvested)!["secret_ref"]!.GetValue<string>();
-        Assert.True(vault.TryResolve(reference, out var resolved));
-        Assert.Equal(secret, resolved);
+        Assert.Contains(secret, result.Content, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Network_HarvestsAuthorizationHeaders()
+    public async Task Network_原样返回Bridge网络结果_统一保护由AgentLoop负责()
     {
         bridge.NextResult = new JsonObject
         {
@@ -146,8 +139,7 @@ public sealed class BrowserToolsTests
         var result = await InvokeAsync("browser.network", """{"session_id":"session-1","url_contains":"chat"}""");
 
         Assert.True(result.Success);
-        Assert.DoesNotContain("sk-livekey0123456789abcdef", result.Content);
-        Assert.Contains("secret://browser/", result.Content);
+        Assert.Contains("sk-livekey0123456789abcdef", result.Content, StringComparison.Ordinal);
         Assert.Contains("gpt-4o", result.Content);
     }
 

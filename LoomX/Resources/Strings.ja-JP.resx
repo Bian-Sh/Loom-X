@@ -23,6 +23,12 @@
   <data name="nav.overview.description">
     <value>ローカルサービスの健全性を確認し、ゲートウェイとモデル設定を簡単に確認します。</value>
   </data>
+  <data name="nav.plugins">
+    <value>プラグイン</value>
+  </data>
+  <data name="nav.plugins.description">
+    <value>読み込まれた拡張機能、実行状態、機能、安全ライフサイクルを確認します。</value>
+  </data>
   <data name="nav.gateway">
     <value>ゲートウェイ</value>
   </data>
@@ -62,6 +68,39 @@
   <data name="nav.settings.description">
     <value>Loom-X の表示、接続、更新、プライバシー設定を調整します。</value>
   </data>
+  <data name="plugins.summary.loaded.label"><value>読み込み済み</value></data>
+  <data name="plugins.summary.enabled.label"><value>実行中</value></data>
+  <data name="plugins.summary.diagnostics.label"><value>診断</value></data>
+  <data name="plugins.summary.loaded"><value>{0} 個のプラグイン</value></data>
+  <data name="plugins.summary.enabled"><value>{0} 個が有効</value></data>
+  <data name="plugins.summary.diagnostics"><value>{0} 件の診断</value></data>
+  <data name="plugins.action.refresh"><value>更新</value></data>
+  <data name="plugins.empty.title"><value>プラグインが見つかりません</value></data>
+  <data name="plugins.empty.description"><value>プラグインランタイムは準備できていますが、アプリケーションディレクトリから利用可能なプラグインを読み込めませんでした。</value></data>
+  <data name="plugins.error.title"><value>プラグイン情報を読み込めません</value></data>
+  <data name="plugins.error.description"><value>プラグインランタイムを読み取れませんでした。更新を再試行し、コンソールの安全なエラー要約を確認してください。</value></data>
+  <data name="plugins.diagnostics.title"><value>ランタイム診断</value></data>
+  <data name="plugins.diagnostics.description"><value>認証情報、リクエスト本文、ツール引数を含まない安全な要約のみ表示します。</value></data>
+  <data name="plugins.status.waiting"><value>ページを開くとプラグインランタイムを読み込みます。</value></data>
+  <data name="plugins.status.loading"><value>プラグインランタイムを初期化しています…</value></data>
+  <data name="plugins.status.runtime_unavailable"><value>プラグインランタイムを利用できません。</value></data>
+  <data name="plugins.status.ready"><value>{0} 個のプラグインを読み込みました。</value></data>
+  <data name="plugins.status.failed"><value>プラグイン情報の読み込みに失敗しました。コンソールを確認してください。</value></data>
+  <data name="plugins.status.enabled"><value>有効</value></data>
+  <data name="plugins.status.disabled"><value>無効</value></data>
+  <data name="plugins.toast.refresh_failed"><value>プラグイン情報を読み込めませんでした</value></data>
+  <data name="plugins.toast.toggle_failed"><value>プラグイン状態は変更されませんでした。更新して再試行してください。</value></data>
+  <data name="plugins.toast.enabled"><value>「{0}」を有効にしました</value></data>
+  <data name="plugins.toast.disabled"><value>「{0}」を無効にしました</value></data>
+  <data name="plugins.category.system"><value>システムプラグイン</value></data>
+  <data name="plugins.category.extension"><value>拡張プラグイン</value></data>
+  <data name="plugins.credential.name"><value>認証情報保護</value></data>
+  <data name="plugins.credential.description"><value>Router リクエスト内の機密認証情報を検出してマスクし、placeholder 整合性指示を注入し、レスポンスで元の値を復元します。</value></data>
+  <data name="plugins.credential.lifecycle"><value>過去の会話 token が互換復元に依存するため、現バージョンでは UI から無効化できません。今後、能動保護と互換復元を分離し、Vault を既定で保持する強い警告付きアンインストールを追加します。</value></data>
+  <data name="plugins.generic.description"><value>Loom-X Router Pipeline に合成可能なリクエストまたはレスポンス拡張を提供します。</value></data>
+  <data name="plugins.generic.lifecycle"><value>無効化は現在のランタイムだけに影響し、プラグインファイルと所有データは削除しません。永続的な起動設定は今後追加します。</value></data>
+  <data name="plugins.extension_count"><value>{0} 個の拡張ポイント</value></data>
+  <data name="plugins.capabilities.none"><value>宣言された機能なし</value></data>
   <data name="settings.tab.general">
     <value>一般</value>
   </data>

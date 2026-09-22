@@ -28,6 +28,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     private readonly ConsoleViewModel consoleViewModel;
     private readonly SettingsViewModel settingsViewModel;
     private readonly OverviewViewModel overviewViewModel;
+    private readonly PluginsViewModel pluginsViewModel;
     private readonly ProvidersViewModel providersViewModel;
     private readonly GatewayViewModel gatewayViewModel;
     private readonly ActivityViewModel activityViewModel;
@@ -91,6 +92,10 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         _loc = localizer ?? LocalizerFactory.Create<MainWindowViewModel>();
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService, logger: this.loggerFactory.CreateLogger<ConsoleViewModel>());
         overviewViewModel = new OverviewViewModel(gatewayService, this.dataStore, this.loggerFactory.CreateLogger<MainWindowViewModel>());
+        pluginsViewModel = new PluginsViewModel(
+            gatewayService,
+            this.toastService,
+            this.loggerFactory.CreateLogger<PluginsViewModel>());
         providersViewModel = new ProvidersViewModel(
             this.dataStore,
             this.toastService,
@@ -120,6 +125,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
         NavigationItems = new([
             new("nav.overview", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
+            new("nav.plugins", "M 8,13 L 13,13 L 13,8 L 19,8 L 19,13 L 24,13 L 24,19 L 19,19 L 19,24 L 13,24 L 13,19 L 8,19 Z", () => ShowPlugins()),
             new("nav.assistant", "M 6,4 L 26,4 L 26,20 L 18,20 L 12,27 L 12,20 L 6,20 Z M 11,10 L 13,10 M 16,10 L 18,10 M 21,10 L 23,10", () => ShowAssistant()),
             new("nav.gateway", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
             new("nav.providers", "M 7,8 L 25,8 M 7,16 L 25,16 M 7,24 L 25,24 M 4,8 L 4,8 M 4,16 L 4,16 M 4,24 L 4,24", () => ShowProviders()),
@@ -177,6 +183,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     }
 
     private void ShowOverview() => ShowView("nav.overview", overviewViewModel);
+    private void ShowPlugins() => ShowView("nav.plugins", pluginsViewModel);
     private void ShowAssistant() => ShowView("nav.assistant", assistantViewModel);
     private void ShowProviders() => ShowView("nav.providers", providersViewModel);
     private void ShowGateway() => ShowView("nav.gateway", gatewayViewModel);
@@ -275,6 +282,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         gatewayService.StateChanged -= OnGatewayStateChanged;
         LocaleService.CultureChanged -= OnCultureChanged;
         overviewViewModel.Dispose();
+        pluginsViewModel.Dispose();
         providersViewModel.Dispose();
         gatewayViewModel.Dispose();
         activityViewModel.Dispose();

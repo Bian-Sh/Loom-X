@@ -1,5 +1,9 @@
 <Solution>
   <Project Path="LoomX.Tests/LoomX.Tests.csproj" />
   <Project Path="LoomX.Harness/LoomX.Harness.csproj" />
+  <Project Path="LoomX.Plugin.Abstractions/LoomX.Plugin.Abstractions.csproj" />
+  <Project Path="LoomX.PluginHost/LoomX.PluginHost.csproj" />
+  <Project Path="plugins/LoomX.CredentialProtection/LoomX.CredentialProtection.csproj" />
+  <Project Path="LoomX.PluginPlayground/LoomX.PluginPlayground.csproj" />
   <Project Path="LoomX/LoomX.csproj" />
 </Solution>
