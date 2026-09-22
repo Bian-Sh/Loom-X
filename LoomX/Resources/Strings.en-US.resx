@@ -370,7 +370,8 @@
   <data name="providers.models.sync.button"><value>Sync models</value></data>
   <data name="providers.models.toggleAll.tooltip"><value>Enable or disable all models</value></data>
   <data name="providers.models.sort.drag.tooltip"><value>Drag to reorder models</value></data>
-  <data name="providers.models.sort.toggle.tooltip"><value>Control downstream exposure</value></data>
+  <data name="providers.models.sort.toggle.tooltip"><value>Only enable models supported by the API compatibility type</value></data>
+  <data name="providers.models.sort.toggle.currenttype"><value>Current type: {0}</value></data>
   <data name="providers.models.sort.toggle.automation"><value>Enable model</value></data>
   <data name="providers.models.vision.tooltip"><value>Supports image input</value></data>
   <data name="providers.models.ctx.suffix"><value>ctx ·</value></data>
@@ -436,6 +437,7 @@
   <data name="gateway.endpoint.comboCount"><value>Exposed {0} combos</value></data>
   <data name="gateway.endpoint.comboCount.prefix"><value>Exposed</value></data>
   <data name="gateway.endpoint.comboCount.suffix"><value>combos</value></data>
+  <data name="gateway.endpoint.comboCount.invalid"><value>{0} invalid</value></data>
   <data name="gateway.combo.header"><value>Model Combo</value></data>
   <data name="gateway.combo.header.hint"><value>Shared across endpoints, with failover by member order</value></data>
   <data name="gateway.combo.add.tooltip"><value>Add Combo model</value></data>

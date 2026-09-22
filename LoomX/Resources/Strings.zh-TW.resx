@@ -971,7 +971,10 @@
     <value>拖動調整模型順序</value>
   </data>
   <data name="providers.models.sort.toggle.tooltip">
-    <value>控制模型是否暴露給下游</value>
+    <value>請勾選介面相容類型支援的模型</value>
+  </data>
+  <data name="providers.models.sort.toggle.currenttype">
+    <value>目前類型：{0}</value>
   </data>
   <data name="providers.models.sort.toggle.automation">
     <value>啓用模型</value>
@@ -1167,6 +1170,9 @@
   </data>
   <data name="gateway.endpoint.comboCount.suffix">
     <value>個 Combo</value>
+  </data>
+  <data name="gateway.endpoint.comboCount.invalid">
+    <value>{0}個無效</value>
   </data>
   <data name="gateway.combo.header">
     <value>模型組合</value>

@@ -971,7 +971,10 @@
     <value>ドラッグしてモデルの順序を調整</value>
   </data>
   <data name="providers.models.sort.toggle.tooltip">
-    <value>モデルを下流に公開するか制御</value>
+    <value>互換タイプに対応するモデルのみを有効化してください</value>
+  </data>
+  <data name="providers.models.sort.toggle.currenttype">
+    <value>現在のタイプ：{0}</value>
   </data>
   <data name="providers.models.sort.toggle.automation">
     <value>モデルを有効化</value>
@@ -1167,6 +1170,9 @@
   </data>
   <data name="gateway.endpoint.comboCount.suffix">
     <value> 件の Combo</value>
+  </data>
+  <data name="gateway.endpoint.comboCount.invalid">
+    <value>{0}件無効</value>
   </data>
   <data name="gateway.combo.header">
     <value>モデル Combo</value>

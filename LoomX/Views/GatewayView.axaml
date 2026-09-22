@@ -25,16 +25,16 @@
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
             <ItemsControl Classes="endpoint-list" ItemsSource="{Binding Endpoints}">
               <ItemsControl.ItemTemplate><DataTemplate>
-              <Border Classes="endpoint-card" Padding="14,12" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="5">
-                  <TextBlock Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold"/>
+              <Border Classes="endpoint-card" Padding="14,8" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="2">
+                  <TextBlock Text="{Binding DisplayName}" FontSize="15" FontWeight="SemiBold"/>
                   <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleEndpointCommand}" CommandParameter="{Binding}" OnContent="" OffContent=""/>
-                  <TextBlock Grid.Row="1" Text="{Binding PublicUrl}" Classes="muted" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                  <TextBlock Grid.Row="1" Text="{Binding PublicUrl}" Classes="muted" FontFamily="Consolas" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center"/>
                   <Button Grid.Row="1" Grid.Column="1" Classes="icon endpoint-copy" Content="⧉" ToolTip.Tip="{l:Locale gateway.endpoint.copyUrl.tooltip}" AutomationProperties.Name="{l:Locale gateway.endpoint.copyUrl.tooltip}" Click="CopyEndpointUrl_OnClick" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                   <Border Grid.Row="2" Grid.ColumnSpan="2" Classes="endpoint-key-row" IsVisible="{Binding IsApiKeyVisible}">
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="7">
-                      <TextBlock Text="API Key" Classes="muted" FontSize="11" VerticalAlignment="Center"/>
-                      <TextBlock Grid.Column="1" Text="{Binding MaskedApiKey}" FontFamily="Consolas" FontSize="11" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                      <TextBlock Text="API Key" Classes="muted" FontSize="12" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="1" Text="{Binding MaskedApiKey}" FontFamily="Consolas" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="1">
                         <Button Classes="icon endpoint-refresh" Command="{Binding $parent[UserControl].DataContext.RotateGatewayApiKeyCommand}" CommandParameter="{Binding}" ToolTip.Tip="{l:Locale gateway.endpoint.rotateKey.tooltip}" AutomationProperties.Name="{l:Locale gateway.endpoint.rotateKey.tooltip}"><Path Classes="icon-glyph" Data="M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6" Stroke="{DynamicResource TextSecondaryBrush}" Width="14" Height="14"/></Button>
                         <Button Classes="icon endpoint-key-copy" Content="⧉" ToolTip.Tip="{l:Locale gateway.endpoint.copyKey.tooltip}" AutomationProperties.Name="{l:Locale gateway.endpoint.copyKey.tooltip}" Click="CopyEndpointApiKey_OnClick"/>
@@ -43,7 +43,7 @@
                   </Border>
                   <Grid Grid.Row="3" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <Button x:Name="comboPickerButton" HorizontalContentAlignment="Stretch" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="8,5" Click="EndpointComboPicker_OnClick">
-                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBlock Text="{Binding SelectedComboSummary}" TextTrimming="CharacterEllipsis"/><PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="12" Height="12"/></Grid>
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBlock Text="{Binding SelectedComboSummary}" TextTrimming="CharacterEllipsis" TextAlignment="Center" VerticalAlignment="Center"/><PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="12" Height="12"/></Grid>
                     </Button>
                     <Popup PlacementTarget="{Binding #comboPickerButton}" Placement="Bottom" IsLightDismissEnabled="True" IsOpen="{Binding IsComboPickerOpen, Mode=TwoWay}" HorizontalOffset="0" VerticalOffset="4">
                       <Border Width="250" MaxHeight="260" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
@@ -55,11 +55,11 @@
                       </Border>
                     </Popup>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsOllamaEndpoint}">
-                      <TextBlock Text="Reasoning effort" Classes="muted" FontSize="11" VerticalAlignment="Center"/>
+                      <TextBlock Text="Reasoning effort" Classes="muted" FontSize="12" VerticalAlignment="Center"/>
                       <ComboBox Classes="endpoint-reasoning" ItemsSource="{Binding ReasoningEffortOptions}" SelectedItem="{Binding ReasoningEffort, Mode=TwoWay}" SelectionChanged="ReasoningEffort_OnSelectionChanged"/>
                     </StackPanel>
                   </Grid>
-                  <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="4"><TextBlock Text="{l:Locale gateway.endpoint.comboCount.prefix}" Classes="muted" FontSize="11"/><TextBlock Text="{Binding SelectedComboCount}" Classes="muted" FontSize="11"/><TextBlock Text="{l:Locale gateway.endpoint.comboCount.suffix}" Classes="muted" FontSize="11"/></StackPanel>
+                  <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="4"><TextBlock Text="{l:Locale gateway.endpoint.comboCount.prefix}" Classes="muted" FontSize="12"/><TextBlock Text="{Binding SelectedComboCount}" Classes="muted" FontSize="12"/><TextBlock Text="{l:Locale gateway.endpoint.comboCount.suffix}" Classes="muted" FontSize="12"/><TextBlock Text="·" Classes="muted" FontSize="12" IsVisible="{Binding HasInvalidCombos}"/><TextBlock Text="{Binding InvalidComboSummary}" Classes="combo-missing" FontSize="12" IsVisible="{Binding HasInvalidCombos}"/></StackPanel>
                 </Grid>
               </Border>
               </DataTemplate></ItemsControl.ItemTemplate>

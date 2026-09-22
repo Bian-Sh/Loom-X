@@ -621,6 +621,9 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
     public ObservableCollection<GatewayComboBindingOption> ComboOptions { get; } = [];
     public int SelectedComboCount => ComboOptions.Count(item => item.IsSelected);
     public string SelectedComboSummary => SelectedComboCount == 0 ? ResourceLookup.Resolve("gateway.combo.summary.empty") : string.Join(ResourceLookup.Resolve("gateway.combo.summary.separator"), ComboOptions.Where(item => item.IsSelected).Select(item => item.Name));
+    public int InvalidComboCount => ComboOptions.Count(item => item.IsSelected && item.IsDeleted);
+    public bool HasInvalidCombos => InvalidComboCount > 0;
+    public string InvalidComboSummary => HasInvalidCombos ? string.Format(ResourceLookup.Resolve("gateway.endpoint.comboCount.invalid"), InvalidComboCount) : "";
     public bool IsComboPickerOpen { get => isComboPickerOpen; set => SetProperty(ref isComboPickerOpen, value); }
     public bool Enabled { get => enabled; set => SetProperty(ref enabled, value); }
     public string ApiKey { get => apiKey; private set { if (SetProperty(ref apiKey, value)) OnPropertyChanged(nameof(MaskedApiKey)); } }
@@ -671,6 +674,9 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
             ComboOptions.Add(new GatewayComboBindingOption(this, binding.ComboId, binding.Name, binding.ComboEnabled, binding.Enabled, binding.IsDeleted));
         OnPropertyChanged(nameof(SelectedComboCount));
         OnPropertyChanged(nameof(SelectedComboSummary));
+        OnPropertyChanged(nameof(InvalidComboCount));
+        OnPropertyChanged(nameof(HasInvalidCombos));
+        OnPropertyChanged(nameof(InvalidComboSummary));
     }
     internal void ApplyCombo(GatewayComboEditorViewModel combo)
     {
@@ -684,6 +690,9 @@ public sealed class GatewayEndpointEditorViewModel : NotifyViewModel
     {
         OnPropertyChanged(nameof(SelectedComboCount));
         OnPropertyChanged(nameof(SelectedComboSummary));
+        OnPropertyChanged(nameof(InvalidComboCount));
+        OnPropertyChanged(nameof(HasInvalidCombos));
+        OnPropertyChanged(nameof(InvalidComboSummary));
     }
     internal void RefreshLocalization() => OnPropertyChanged(nameof(SelectedComboSummary));
     public void MarkReasoningEffortSaved() => reasoningEffortDirty = false;

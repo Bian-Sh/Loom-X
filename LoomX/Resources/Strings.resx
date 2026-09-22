@@ -1115,7 +1115,10 @@
     <value>拖动调整模型顺序</value>
   </data>
   <data name="providers.models.sort.toggle.tooltip">
-    <value>控制模型是否暴露给下游</value>
+    <value>请勾选接口兼容类型支持的模型</value>
+  </data>
+  <data name="providers.models.sort.toggle.currenttype">
+    <value>当前类型：{0}</value>
   </data>
   <data name="providers.models.sort.toggle.automation">
     <value>启用模型</value>
@@ -1315,6 +1318,9 @@
   </data>
   <data name="gateway.endpoint.comboCount.suffix">
     <value>个 Combo</value>
+  </data>
+  <data name="gateway.endpoint.comboCount.invalid">
+    <value>{0}个无效</value>
   </data>
   <data name="gateway.combo.header">
     <value>模型组合</value>
