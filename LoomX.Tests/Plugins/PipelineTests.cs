@@ -6,23 +6,22 @@ using Xunit;
 namespace LoomX.Tests.Plugins;
 
 /// <summary>
-/// Pipeline 有序执行、启用禁用与异常隔离
+/// Router Pipeline 有序执行、启用禁用与异常隔离
 /// （spec: plugin-runtime-pipeline / 有序执行、启用禁用、异常隔离与失败策略）。
 /// </summary>
 public sealed class PipelineTests
 {
-    private static Pipeline CreatePipeline(string id = "tool-result", ExtensionKind kind = ExtensionKind.ToolResult) =>
-        new(id, kind, NullLogger.Instance);
+    private static Pipeline CreatePipeline(string id = "request") =>
+        new(id, ExtensionKind.Request, NullLogger.Instance);
 
     [Fact]
     public async Task MultiplePlugins_ExecuteInConfiguredOrder_WithoutInterPluginAwareness()
     {
         var log = new List<string>();
         var pipeline = CreatePipeline();
-        // 两个插件、三个 Entry：alpha 两个、beta 一个，配置顺序 b → a2 → a1
-        var entryA1 = new PipelineEntry(new TestToolResultExtension("ext.a1", executionLog: log, tag: "a1"), "plugin.alpha");
-        var entryA2 = new PipelineEntry(new TestToolResultExtension("ext.a2", executionLog: log, tag: "a2"), "plugin.alpha");
-        var entryB = new PipelineEntry(new TestToolResultExtension("ext.b", executionLog: log, tag: "b"), "plugin.beta");
+        var entryA1 = new PipelineEntry(new TestRequestExtension("ext.a1", executionLog: log, tag: "a1"), "plugin.alpha");
+        var entryA2 = new PipelineEntry(new TestRequestExtension("ext.a2", executionLog: log, tag: "a2"), "plugin.alpha");
+        var entryB = new PipelineEntry(new TestRequestExtension("ext.b", executionLog: log, tag: "b"), "plugin.beta");
         pipeline.AddEntry(entryA1);
         pipeline.AddEntry(entryA2);
         pipeline.AddEntry(entryB);
@@ -38,8 +37,8 @@ public sealed class PipelineTests
     public async Task ModifiedPayload_ChainsToNextEntry()
     {
         var pipeline = CreatePipeline();
-        pipeline.AddEntry(new PipelineEntry(new TestToolResultExtension("ext.upper", transform: text => text.ToUpperInvariant()), "plugin.a"));
-        pipeline.AddEntry(new PipelineEntry(new TestToolResultExtension("ext.wrap", transform: text => $"[{text}]"), "plugin.b"));
+        pipeline.AddEntry(new PipelineEntry(new TestRequestExtension("ext.upper", transform: text => text.ToUpperInvariant()), "plugin.a"));
+        pipeline.AddEntry(new PipelineEntry(new TestRequestExtension("ext.wrap", transform: text => $"[{text}]"), "plugin.b"));
 
         var result = await pipeline.ExecuteAsync("abc");
 
@@ -52,8 +51,8 @@ public sealed class PipelineTests
     {
         var log = new List<string>();
         var pipeline = CreatePipeline();
-        var first = new PipelineEntry(new TestToolResultExtension("ext.a", executionLog: log, tag: "a"), "plugin.a");
-        var second = new PipelineEntry(new TestToolResultExtension("ext.b", executionLog: log, tag: "b"), "plugin.b");
+        var first = new PipelineEntry(new TestRequestExtension("ext.a", executionLog: log, tag: "a"), "plugin.a");
+        var second = new PipelineEntry(new TestRequestExtension("ext.b", executionLog: log, tag: "b"), "plugin.b");
         pipeline.AddEntry(first);
         pipeline.AddEntry(second);
 
@@ -71,9 +70,9 @@ public sealed class PipelineTests
     public async Task OrdinaryEntryFailure_IsLoggedAndSkipped_MainFlowContinues()
     {
         var pipeline = CreatePipeline();
-        var tail = new TestToolResultExtension("ext.tail", transform: text => text + "!");
+        var tail = new TestRequestExtension("ext.tail", transform: text => text + "!");
         pipeline.AddEntry(new PipelineEntry(
-            new ThrowingExtension("ext.observability", ExtensionKind.ToolResult, ExtensionFailurePolicy.ContinueOnError),
+            new ThrowingRequestExtension("ext.observability", ExtensionFailurePolicy.ContinueOnError),
             "plugin.a"));
         pipeline.AddEntry(new PipelineEntry(tail, "plugin.b"));
 
@@ -88,10 +87,10 @@ public sealed class PipelineTests
     public async Task DataSafetyEntryFailure_FailClosed_OriginalDataNotReleased()
     {
         const string secretPayload = "raw sk-abcdefghij0123456789abcd";
-        var pipeline = CreatePipeline("persistence", ExtensionKind.Persistence);
-        var tail = new TestPersistenceExtension("ext.tail");
+        var pipeline = CreatePipeline();
+        var tail = new TestRequestExtension("ext.tail");
         pipeline.AddEntry(new PipelineEntry(
-            new ThrowingExtension("ext.safety", ExtensionKind.Persistence, ExtensionFailurePolicy.FailClosed),
+            new ThrowingRequestExtension("ext.safety", ExtensionFailurePolicy.FailClosed),
             "plugin.a"));
         pipeline.AddEntry(new PipelineEntry(tail, "plugin.b"));
 
@@ -100,15 +99,15 @@ public sealed class PipelineTests
         Assert.Equal(PipelineOutcome.Blocked, result.Outcome);
         Assert.Empty(result.Payload);
         Assert.DoesNotContain(secretPayload, result.Payload, StringComparison.Ordinal);
-        Assert.Equal(0, tail.CallCount); // 后续 Entry 不再接触原始数据
+        Assert.Equal(0, tail.CallCount);
     }
 
     [Fact]
     public async Task EntryReturningBlocked_StopsPipeline()
     {
         var pipeline = CreatePipeline();
-        var tail = new TestToolResultExtension("ext.tail");
-        pipeline.AddEntry(new PipelineEntry(new BlockingToolResultExtension("ext.block"), "plugin.a"));
+        var tail = new TestRequestExtension("ext.tail");
+        pipeline.AddEntry(new PipelineEntry(new BlockingRequestExtension("ext.block"), "plugin.a"));
         pipeline.AddEntry(new PipelineEntry(tail, "plugin.b"));
 
         var result = await pipeline.ExecuteAsync("payload");

@@ -1,23 +1,25 @@
 ## Why
 
-LoomX Plugin System 的定位是扩展 Router，而不是扩展内置 AI 助手。当前 Router 在把请求正文发送给外部 Provider 前缺少统一的插件处理边界，API Key、Bearer Token 等误入 prompt、Tool Result 或其他请求内容时，可能随模型请求泄露给外部 AI。`.design/LoomX_Plugin_System_Design_CN.md` 已明确：内置 AI 助手只是 Router 的消费者，应与外部 Agent Client 一样复用 Router Plugin Pipeline，从而自然获得脱敏以及后续 Tool Result Compression 等能力。
+LoomX Plugin System 的定位是扩展 Router，而不是扩展内置 AI 助手。当前 Router 在把请求正文发送给外部 Provider 前缺少统一的插件处理边界，API Key、Bearer Token 等误入用户消息、Tool Result 或其他请求内容时，可能随模型请求泄露给外部 AI。内置 AI 助手和外部 Agent Client 都应作为 Router 客户复用同一 Provider Pipeline。
 
 ## What Changes
 
-- 新增最小契约程序集 `LoomX.Plugin.Abstractions`（Plugin Manifest、Router Extension 接口、Pipeline 上下文），不依赖 LoomX UI、AI 助手或 Router 内部实现。
-- 新增 Plugin Runtime：从目录发现插件、验证 Manifest、经 AssemblyLoadContext 动态加载、注册 Router Extension、同一 Pipeline 内按配置顺序执行、插件异常隔离（数据安全类 Extension 失败 fail closed，不放行原始数据）。
-- 在 Router 的统一 Provider 执行链挂载 Request Pipeline：完整 `HttpRequestMessage` 构造完成后、`HttpClient.SendAsync` 之前处理请求正文。网关请求和内置 AI 助手请求均复用该边界。
-- 新增第一方 Credential Protection 插件：Credential Detection、Plugin-owned Sensitive Rule、SQLite 长期结构化 token、Provider Response/历史会话 Restore；请求、Tool Result 与会话持久化统一 token 化。
-- 新增 `LoomX.PluginPlayground` 验证项目，聚焦验证 Runtime/Pipeline 与 Sensitive Data 插件的组合（设计文档第 22 节 Phase 1 与 Phase 3 聚焦部分）。
-- 保持单 change 不拆分：范围确认时已选择“脱敏优先”，Playground 验证与 Credential Protection 落地是同一连贯能力的顺序里程碑，拆分反而割裂验证与落地的验收闭环。
-- 非目标：Settings UI / SettingsProvider 与 Avalonia 动态 XAML、Hot Reload、Tool Result Compression 插件、Plugin Marketplace / 在线仓库 / 签名体系 / 跨进程沙箱、插件间依赖图与全局 Priority DSL。
+- 新增最小契约程序集 `LoomX.Plugin.Abstractions`：Plugin Manifest、Router Request/Response Extension、Pipeline 上下文与结果，不依赖 LoomX UI、AI 助手或 Router 内部实现。
+- 新增 Plugin Runtime：从目录发现插件、验证 Manifest、经 AssemblyLoadContext 动态加载、注册 Router Extension、同一 Pipeline 内按配置顺序执行、插件异常隔离。
+- 在 Router 统一 Provider 执行链挂载 Request Pipeline：完整 `HttpRequestMessage` 构造完成后、`HttpClient.SendAsync` 之前处理请求正文。网关请求和内置 AI 助手请求均复用该边界。
+- 在成功 Provider 响应返回 Router 客户前挂载 Response Pipeline，支持普通 JSON 与流式 SSE 恢复。
+- 新增第一方 Credential Protection 插件：Credential Detection、Plugin-owned Sensitive Rule、SQLite 长期结构化 token、Provider Response Restore。用户消息与 Tool Result 等内容在组成 Provider Request 后统一 token 化。
+- 新增 `LoomX.PluginPlayground` 验证 Runtime/Pipeline 与 Credential Protection 插件组合。
+- 删除重复凭据实现：`SecretBoundary`、Browser Vault/Harvester 与 `SecretLeakScan`；`ToolCallProjection` 只负责工具协议投影，`AssistantContentPolicy` 只负责 TOML 暴露与 AskUser 产品校验。
+- 非目标：对 `AgentSession`、Assistant UI 或会话 JSONL 进行插件脱敏；这些属于内置助手自身的数据与隐私策略。
+- 非目标：本 change 新增 ToolResult Pipeline 或 RTX Compression。未来 RTX 压缩仍应实现于 Router，优先作为 Request Pipeline 的结构化处理阶段。
 
 ## Capabilities
 
 ### New Capabilities
 
-- `plugin-runtime-pipeline`: 定义插件目录发现、Manifest 契约与验证、AssemblyLoadContext 动态加载、Router Extension 注册、同一 Pipeline 内 Entry 有序执行、启用/禁用以及插件异常隔离的行为。
-- `credential-protection`: 定义 Router 出站请求正文的敏感数据检测（Credential Detection）、敏感规则管理（Plugin-owned Sensitive Rule）、脱敏替换（Mask/Placeholder）以及脱敏失败时 fail closed 的安全行为。
+- `plugin-runtime-pipeline`: 定义插件目录发现、Manifest 契约与验证、AssemblyLoadContext 动态加载、Router Request/Response Extension 注册、Pipeline 有序执行、启用/禁用以及异常隔离。
+- `credential-protection`: 定义 Router 出站请求正文的敏感数据检测、规则管理、长期结构化 token，以及 Provider 响应本地恢复和失败时 fail closed。
 
 ### Modified Capabilities
 
@@ -25,10 +27,10 @@ LoomX Plugin System 的定位是扩展 Router，而不是扩展内置 AI 助手�
 
 ## Impact
 
-- 新增 `LoomX.Plugin.Abstractions`、宿主侧 Plugin Runtime、`LoomX.PluginPlayground`、第一方 Credential Protection 插件及对应测试项目。
-- 修改 Router Provider 执行管道、`AgentLoop` 通用 Tool Result 处理边界、`AssistantSessionStore` 持久化/历史恢复边界与 DI 注册；Harness 只接收处理委托，不依赖 Plugin Runtime。
-- 内置 AI 助手作为 Router 客户复用 request/response Pipeline，并在工具结果进入 Session/UI 前复用 `tool-result` Pipeline。
-- Credential token 映射新增 `Microsoft.Data.Sqlite` 与 DPAPI 依赖；AssemblyLoadContext 仍使用 .NET 内置能力。
-- 安全约束：请求正文未经数据安全 Pipeline 成功处理不得发送给外部模型；数据安全类 Extension 失败时不得静默放行原始数据。
+- 新增 `LoomX.Plugin.Abstractions`、宿主侧 Plugin Runtime、`LoomX.PluginPlayground`、第一方 Credential Protection 插件及对应测试。
+- 修改 Router Provider 执行管道与 DI 注册；不在 `AgentLoop`、`AgentSession` 或 `AssistantSessionStore` 挂载 Plugin Pipeline。
+- 内置 AI 助手作为 Router 客户，仅通过 `IProviderExecutionPipeline` 获得 request/response Credential Protection；外部 Agent Client 获得相同保护。
+- Credential token 映射新增 `Microsoft.Data.Sqlite` 与 DPAPI 依赖。
+- 安全约束：请求正文未经数据安全 Pipeline 成功处理不得发送给外部模型；响应恢复失败不得静默放行未处理内容。
 - Provider 鉴权 Header 由 Router Core 管理，不纳入请求正文脱敏，避免破坏合法上游认证。
-- 删除重复凭据实现：`SecretBoundary`、Browser Vault/Harvester 与 `SecretLeakScan`；`ToolCallProjection` 只负责工具协议投影，`AssistantContentPolicy` 只负责 TOML 暴露与 AskUser 产品校验。
+- Router 不承诺控制客户端 UI、日志、截图或本地会话文件。内置助手若需要 `***` 打码，应在自身“数据与隐私”能力中独立实现，可复用纯检测规则但不能把 Plugin Runtime 注入会话层。

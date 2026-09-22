@@ -33,8 +33,8 @@ Runtime SHALL 通过 AssemblyLoadContext 动态加载插件 Runtime Assembly。�
 
 #### Scenario: 单插件注册多个 Extension
 
-- **WHEN** 一个插件声明 Request Extension 与 Tool Result Extension 两个 Extension
-- **THEN** 两个 Extension 分别进入各自指定的 Pipeline 并可独立启用或禁用
+- **WHEN** 一个插件声明 Request Extension 与 Response Extension 两个 Extension
+- **THEN** 两个 Extension 分别进入各自指定的 Router Pipeline 并可独立启用或禁用
 
 ### Requirement: 同一 Pipeline 内 Entry 有序执行
 

@@ -32,17 +32,3 @@ public interface IResponseExtension : IPipelineExtension
     ValueTask<PipelineResult> ProcessResponseAsync(
         PipelineContext context, string payload, CancellationToken cancellationToken);
 }
-
-/// <summary>Router 结构化 Tool Result 扩展点（候选契约，生产挂载留待后续 change）。</summary>
-public interface IToolResultExtension : IPipelineExtension
-{
-    ValueTask<PipelineResult> ProcessToolResultAsync(
-        PipelineContext context, string payload, CancellationToken cancellationToken);
-}
-
-/// <summary>Router 持久化扩展点（候选契约，待 Router audit/cache/trace 存储出现后挂载）。</summary>
-public interface IPersistenceExtension : IPipelineExtension
-{
-    ValueTask<PipelineResult> ProcessPersistenceAsync(
-        PipelineContext context, string payload, CancellationToken cancellationToken);
-}

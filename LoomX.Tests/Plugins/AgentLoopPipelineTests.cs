@@ -37,17 +37,6 @@ public sealed class RouterRequestPipelineTests : IDisposable
         return pipeline;
     }
 
-    private IPipeline CreateToolResultPipeline()
-    {
-        Directory.CreateDirectory(dataDirectory);
-        var engine = new CredentialEngine(new SensitiveRuleStore(dataDirectory));
-        var pipeline = new Pipeline("tool-result", ExtensionKind.ToolResult, NullLogger.Instance);
-        pipeline.AddEntry(new PipelineEntry(
-            new CredentialToolResultExtension(engine),
-            CredentialProtectionPlugin.PluginId));
-        return pipeline;
-    }
-
     [Fact]
     public async Task ExecuteAsync_SanitizesBodyBeforeSend_PreservesHeaders()
     {
@@ -130,45 +119,6 @@ public sealed class RouterRequestPipelineTests : IDisposable
         Assert.NotNull(handler.Body);
         Assert.DoesNotContain(ApiKey, handler.Body, StringComparison.Ordinal);
         Assert.Contains(CredentialEngine.PlaceholderPrefix, handler.Body, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task AgentLoop_ToolResultPipeline_TokenizesBeforeSessionAndNextRequest()
-    {
-        var registry = new ToolRegistry();
-        registry.Register(new ToolDefinition
-        {
-            Name = "mock.browser_read",
-            Description = "模拟浏览器读取结果",
-            ParametersSchema = System.Text.Json.Nodes.JsonNode.Parse("""{"type":"object"}""")!,
-            SafeArgumentsProjector = _ => new System.Text.Json.Nodes.JsonObject(),
-            Handler = (_, _) => Task.FromResult(ToolResult.Ok($$"""{"content":"{{ApiKey}}"}""")),
-        });
-        var model = new ScriptedModelClient(
-            [new ModelToolCallEvent(new ToolCall("call_1", "mock.browser_read", "{}")), new ModelCompletedEvent("tool_calls")],
-            [new TextDeltaEvent("完成"), new ModelCompletedEvent("stop")]);
-        var pipeline = CreateToolResultPipeline();
-        var loop = new AgentLoop(
-            model,
-            registry,
-            NullLogger<AgentLoop>.Instance,
-            toolResultProcessor: async (payload, cancellationToken) =>
-            {
-                var result = await pipeline.ExecuteAsync(payload, cancellationToken);
-                if (result.Outcome == PipelineOutcome.Blocked) throw new InvalidOperationException();
-                return result.Payload;
-            });
-        var session = new AgentSession();
-
-        await foreach (var _ in loop.RunAsync(session, "读取"))
-        {
-        }
-
-        var toolResult = Assert.Single(session.Messages, message => message.Role == ChatRole.Tool);
-        Assert.DoesNotContain(ApiKey, toolResult.Content, StringComparison.Ordinal);
-        Assert.Contains(CredentialEngine.PlaceholderPrefix, toolResult.Content, StringComparison.Ordinal);
-        var nextRequestToolResult = Assert.Single(model.Requests[1].Messages, message => message.Role == ChatRole.Tool);
-        Assert.DoesNotContain(ApiKey, nextRequestToolResult.Content, StringComparison.Ordinal);
     }
 
     [Fact]

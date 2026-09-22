@@ -69,24 +69,20 @@ public sealed class PluginRuntimeTests : IDisposable
 
         var info = Assert.Single(runtime.PluginInfos);
         Assert.Equal("loomx.credential-protection", info.Id);
-        Assert.Equal(4, info.ExtensionCount);
+        Assert.Equal(2, info.ExtensionCount);
         Assert.Empty(runtime.Diagnostics);
         Assert.NotNull(runtime.GetPipeline("request"));
         Assert.NotNull(runtime.GetPipeline("response"));
-        Assert.NotNull(runtime.GetPipeline("tool-result"));
-        Assert.NotNull(runtime.GetPipeline("persistence"));
+        Assert.Null(runtime.GetPipeline("tool-result"));
+        Assert.Null(runtime.GetPipeline("persistence"));
 
         // 契约隔离：插件程序集加载在独立 ALC（与静态引用副本不同），
         // 但契约类型身份共享——extension 可直接 cast 到宿主侧契约接口。
         var requestExtension = runtime.Pipelines["request"].Entries[0].Extension;
         var responseExtension = runtime.Pipelines["response"].Entries[0].Extension;
-        var toolResultExtension = runtime.Pipelines["tool-result"].Entries[0].Extension;
-        var persistenceExtension = runtime.Pipelines["persistence"].Entries[0].Extension;
         Assert.NotSame(typeof(CredentialProtectionPlugin).Assembly, requestExtension.GetType().Assembly);
         Assert.IsAssignableFrom<IRequestExtension>(requestExtension);
         Assert.IsAssignableFrom<IResponseExtension>(responseExtension);
-        Assert.IsAssignableFrom<IToolResultExtension>(toolResultExtension);
-        Assert.IsAssignableFrom<IPersistenceExtension>(persistenceExtension);
     }
 
     [Fact]

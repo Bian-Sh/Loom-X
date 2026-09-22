@@ -5,7 +5,7 @@ namespace LoomX.Assistant.Configuration;
 
 /// <summary>
 /// 助手产品层的内容暴露策略：限制 TOML 本地配置读取，并禁止 AskUser 索取认证信息。
-/// 这不是凭据脱敏器；运行时凭据检测、token 化与恢复统一由 Credential Protection Pipeline 负责。
+/// 这是内置助手自己的隐私策略，不属于 Router Credential Protection Plugin；二者可共享规则思想，但边界独立。
 /// </summary>
 public static class AssistantContentPolicy
 {

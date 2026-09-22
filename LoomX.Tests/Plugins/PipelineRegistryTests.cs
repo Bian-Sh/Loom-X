@@ -5,38 +5,36 @@ using Xunit;
 
 namespace LoomX.Tests.Plugins;
 
-/// <summary>Extension 注册与 Pipeline 归属（spec: plugin-runtime-pipeline / Extension 注册与 Pipeline 归属）。</summary>
+/// <summary>Extension 注册与 Router Pipeline 归属。</summary>
 public sealed class PipelineRegistryTests
 {
     private static Pipeline CreatePipeline(PipelineRegistry registry, string id, ExtensionKind kind) =>
         registry.GetOrCreatePipeline(id, kind, NullLogger.Instance);
 
     [Fact]
-    public void SinglePlugin_RegistersMultipleExtensions_ToTheirOwnPipelines()
+    public void SinglePlugin_RegistersRequestAndResponseExtensions_ToTheirOwnPipelines()
     {
         var registry = new PipelineRegistry();
-        var toolResult = CreatePipeline(registry, "tool-result", ExtensionKind.ToolResult);
-        var persistence = CreatePipeline(registry, "persistence", ExtensionKind.Persistence);
+        var request = CreatePipeline(registry, "request", ExtensionKind.Request);
+        var response = CreatePipeline(registry, "response", ExtensionKind.Response);
 
-        Assert.True(registry.Register(toolResult, new PipelineEntry(new TestToolResultExtension("ext.a"), "demo")));
-        Assert.True(registry.Register(persistence, new PipelineEntry(new TestPersistenceExtension("ext.b"), "demo")));
+        Assert.True(registry.Register(request, new PipelineEntry(new TestRequestExtension("ext.request"), "demo")));
+        Assert.True(registry.Register(response, new PipelineEntry(new TestResponseExtension("ext.response"), "demo")));
 
-        Assert.Single(toolResult.Entries);
-        Assert.Single(persistence.Entries);
-
-        // 两个 Extension 可独立启用禁用
-        toolResult.Entries[0].Enabled = false;
-        Assert.False(toolResult.Entries[0].Enabled);
-        Assert.True(persistence.Entries[0].Enabled);
+        Assert.Single(request.Entries);
+        Assert.Single(response.Entries);
+        request.Entries[0].Enabled = false;
+        Assert.False(request.Entries[0].Enabled);
+        Assert.True(response.Entries[0].Enabled);
     }
 
     [Fact]
     public void SameExtension_MountedToTwoPipelines_IsRejected()
     {
         var registry = new PipelineRegistry();
-        var first = CreatePipeline(registry, "first", ExtensionKind.ToolResult);
-        var second = CreatePipeline(registry, "second", ExtensionKind.ToolResult);
-        var extension = new TestToolResultExtension("ext.shared");
+        var first = CreatePipeline(registry, "first", ExtensionKind.Request);
+        var second = CreatePipeline(registry, "second", ExtensionKind.Request);
+        var extension = new TestRequestExtension("ext.shared");
 
         Assert.True(registry.Register(first, new PipelineEntry(extension, "demo")));
         Assert.False(registry.Register(second, new PipelineEntry(extension, "demo")));
@@ -50,11 +48,11 @@ public sealed class PipelineRegistryTests
     public void ExtensionKind_MismatchingPipeline_IsRejected()
     {
         var registry = new PipelineRegistry();
-        var persistence = CreatePipeline(registry, "persistence", ExtensionKind.Persistence);
+        var response = CreatePipeline(registry, "response", ExtensionKind.Response);
 
-        Assert.False(registry.Register(persistence, new PipelineEntry(new TestToolResultExtension("ext.a"), "demo")));
+        Assert.False(registry.Register(response, new PipelineEntry(new TestRequestExtension("ext.a"), "demo")));
 
-        Assert.Empty(persistence.Entries);
+        Assert.Empty(response.Entries);
         Assert.Contains(registry.Diagnostics, item => item.Contains("不匹配"));
     }
 
@@ -62,9 +60,9 @@ public sealed class PipelineRegistryTests
     public void PipelineId_KindConflict_Throws()
     {
         var registry = new PipelineRegistry();
-        CreatePipeline(registry, "shared-id", ExtensionKind.ToolResult);
+        CreatePipeline(registry, "shared-id", ExtensionKind.Request);
 
         Assert.Throws<InvalidOperationException>(() =>
-            CreatePipeline(registry, "shared-id", ExtensionKind.Persistence));
+            CreatePipeline(registry, "shared-id", ExtensionKind.Response));
     }
 }

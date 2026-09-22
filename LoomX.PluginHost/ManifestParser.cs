@@ -108,8 +108,6 @@ public static class ManifestParser
         {
             case "request": kind = ExtensionKind.Request; return true;
             case "response": kind = ExtensionKind.Response; return true;
-            case "tool-result": kind = ExtensionKind.ToolResult; return true;
-            case "persistence": kind = ExtensionKind.Persistence; return true;
             default: return false;
         }
     }

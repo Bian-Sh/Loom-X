@@ -62,7 +62,7 @@ Credential Protection SHALL 在成功的 Provider 响应返回 Router 客户前�
 
 ### Requirement: Router 客户共享保护
 
-Credential Protection SHALL 挂载在 Router 统一 Provider request/response 边界；内置 AI 助手 SHALL 通过通用 `tool-result` 与 `persistence` Pipeline 在工具结果进入 Session/UI 前及会话写盘前复用同一插件。Harness 只依赖处理委托或 Pipeline Contract，不得依赖具体插件实现。
+Credential Protection SHALL 只挂载在 Router 统一 Provider request/response 边界。内置 AI 助手与外部 Agent Client SHALL 作为 Router 客户复用该边界；`AgentLoop`、`AgentSession`、Assistant UI 与会话持久化不得依赖 Plugin Runtime。
 
 #### Scenario: 内置 AI 助手获得脱敏收益
 
@@ -74,15 +74,15 @@ Credential Protection SHALL 挂载在 Router 统一 Provider request/response �
 - **WHEN** 外部 Agent Client 通过 LoomX 网关发送包含明文凭据的请求正文
 - **THEN** 同一个 Router Request Pipeline 在转发 Provider 前完成脱敏
 
-#### Scenario: Tool Result 进入会话前脱敏
+#### Scenario: Tool Result 随下一轮请求统一脱敏
 
-- **WHEN** Browser 或其他工具返回包含明文凭据的结构化结果
-- **THEN** 结果经 `tool-result` Pipeline token 化后才进入 Session、事件与 UI
+- **WHEN** Browser 或其他工具返回包含明文凭据的结果，且 Agent 客户端把该结果放入下一次 Provider 请求正文
+- **THEN** Router Request Pipeline 在外发前统一 token 化该正文，不要求 Router 插件改写客户端 Session 或 UI
 
-#### Scenario: 历史会话跨重启恢复
+#### Scenario: 客户端本地展示不属于 Router 承诺
 
-- **WHEN** token 化后的会话 JSONL 在应用重启后被加载
-- **THEN** `response` Pipeline 使用 SQLite 长期映射恢复原内容，且 JSONL 与 token 数据库均不包含明文凭据
+- **WHEN** Agent 客户端把含凭据的消息显示在自身 UI、日志或历史存储中
+- **THEN** 该客户端自行负责本地隐私策略，Credential Protection 不声明能够控制或改写客户端展示
 
 ### Requirement: Provider 鉴权不被破坏
 

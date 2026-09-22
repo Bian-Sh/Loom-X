@@ -4,7 +4,6 @@ using System.Text.Unicode;
 using System.Text.Json.Nodes;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
-using LoomX.Plugins;
 
 namespace LoomX.Assistant;
 
@@ -25,7 +24,7 @@ public sealed record AssistantSessionSummary(
 
 /// <summary>
 /// 会话持久化（规格 #17）：保存 Session/Messages/任务状态。
-/// 凭据保护统一交给持久化与响应 Pipeline：写入时结构化脱敏，加载时本地恢复。
+/// 这是内置助手自身的数据存储，不挂载 Router Plugin Pipeline。
 /// </summary>
 public sealed class AssistantSessionStore
 {
@@ -38,21 +37,15 @@ public sealed class AssistantSessionStore
 
     private readonly string rootDirectory;
     private readonly ILogger<AssistantSessionStore>? logger;
-    private readonly IPipeline? persistencePipeline;
-    private readonly IPipeline? responsePipeline;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> writeLocks = new();
     private readonly SemaphoreSlim titleLock = new(1, 1);
 
     public AssistantSessionStore(
         string? rootDirectory = null,
-        ILogger<AssistantSessionStore>? logger = null,
-        IPipeline? persistencePipeline = null,
-        IPipeline? responsePipeline = null)
+        ILogger<AssistantSessionStore>? logger = null)
     {
         this.rootDirectory = rootDirectory ?? Path.Combine(AppDataPaths.RootDirectory, "AssistantSessions");
         this.logger = logger;
-        this.persistencePipeline = persistencePipeline;
-        this.responsePipeline = responsePipeline;
     }
 
     /// <summary>
@@ -216,15 +209,6 @@ public sealed class AssistantSessionStore
                 pending[index] = item.ToJsonString(StoreJsonOptions);
             }
 
-            for (var index = 0; index < pending.Count; index++)
-            {
-                pending[index] = await ApplyPipelineAsync(
-                    persistencePipeline,
-                    pending[index],
-                    "会话持久化凭据处理失败，已拒绝保存。",
-                    cancellationToken);
-            }
-
             var append = string.Join('\n', pending) + '\n';
 
             if (isV2 && valid.Count == existing.Length)
@@ -247,14 +231,9 @@ public sealed class AssistantSessionStore
 
         JsonObject? meta = null;
         var session = new AgentSession();
-        await foreach (var storedLine in File.ReadLinesAsync(path, cancellationToken))
+        await foreach (var line in File.ReadLinesAsync(path, cancellationToken))
         {
-            if (string.IsNullOrWhiteSpace(storedLine)) continue;
-            var line = await ApplyPipelineAsync(
-                responsePipeline,
-                storedLine,
-                "历史会话凭据恢复失败，已停止加载。",
-                cancellationToken);
+            if (string.IsNullOrWhiteSpace(line)) continue;
             JsonObject? item;
             try { item = JsonNode.Parse(line) as JsonObject; }
             catch (JsonException) { break; }
@@ -429,18 +408,6 @@ public sealed class AssistantSessionStore
             .Select(line => line.Trim())
             .Where(line => line.Length > 0));
         return collapsed.Length == 0 ? null : collapsed;
-    }
-
-    private static async Task<string> ApplyPipelineAsync(
-        IPipeline? pipeline,
-        string payload,
-        string failureMessage,
-        CancellationToken cancellationToken)
-    {
-        if (pipeline is null) return payload;
-        var result = await pipeline.ExecuteAsync(payload, cancellationToken);
-        if (result.Outcome == PipelineOutcome.Blocked) throw new InvalidOperationException(failureMessage);
-        return result.Payload;
     }
 
     private static string Truncate(string text, int maxLength) =>

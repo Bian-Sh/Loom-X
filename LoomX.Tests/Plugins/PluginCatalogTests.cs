@@ -31,7 +31,7 @@ public sealed class PluginCatalogTests : IDisposable
           "plugin_type": "Demo.Plugin.Plugin",
           "capabilities": ["demo.capability"],
           "extensions": [
-            { "id": "demo.tool-result", "kind": "tool-result", "pipeline": "tool-result",
+            { "id": "demo.request", "kind": "request", "pipeline": "request",
               "failure_policy": "fail-closed", "capabilities": ["demo.capability"] }
           ]
         }
@@ -49,8 +49,8 @@ public sealed class PluginCatalogTests : IDisposable
         Assert.Equal("demo.plugin", plugin.Manifest.Id);
         Assert.Equal("1.0.0", plugin.Manifest.Version);
         var extension = Assert.Single(plugin.Manifest.Extensions);
-        Assert.Equal(ExtensionKind.ToolResult, extension.Kind);
-        Assert.Equal("tool-result", extension.Pipeline);
+        Assert.Equal(ExtensionKind.Request, extension.Kind);
+        Assert.Equal("request", extension.Pipeline);
         Assert.Equal(ExtensionFailurePolicy.FailClosed, extension.FailurePolicy);
         Assert.Empty(diagnostics);
     }
@@ -61,7 +61,7 @@ public sealed class PluginCatalogTests : IDisposable
         WritePlugin("bad", """
             { "version": "1.0.0", "assembly": "A.dll", "plugin_type": "A.B",
               "capabilities": ["x"],
-              "extensions": [ { "id": "e", "kind": "persistence", "pipeline": "persistence" } ] }
+              "extensions": [ { "id": "e", "kind": "request", "pipeline": "request" } ] }
             """);
         WritePlugin("good", ValidManifest);
         var diagnostics = new List<string>();
@@ -93,7 +93,7 @@ public sealed class PluginCatalogTests : IDisposable
     {
         WritePlugin("bad", """
             { "id": "demo.bad", "version": "1.0.0", "assembly": "A.dll", "plugin_type": "A.B",
-              "extensions": [ { "id": "e", "kind": "persistence", "pipeline": "persistence" } ] }
+              "extensions": [ { "id": "e", "kind": "request", "pipeline": "request" } ] }
             """);
         var diagnostics = new List<string>();
 

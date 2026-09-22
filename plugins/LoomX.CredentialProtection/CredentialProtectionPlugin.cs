@@ -32,8 +32,6 @@ public sealed class CredentialProtectionPlugin : ILoomXPlugin
         var engine = new CredentialEngine(store);
         yield return new CredentialRequestExtension(engine);
         yield return new CredentialResponseExtension(engine);
-        yield return new CredentialToolResultExtension(engine);
-        yield return new CredentialPersistenceExtension(engine);
     }
 }
 
@@ -106,30 +104,4 @@ public sealed class CredentialResponseExtension(CredentialEngine engine) : IResp
             return ValueTask.FromResult(PipelineResult.Block("凭据恢复处理失败，已阻止未处理响应。"));
         }
     }
-}
-
-/// <summary>助手 Tool Result 边界：结果进入 Session、事件和 UI 前 token 化。</summary>
-public sealed class CredentialToolResultExtension(CredentialEngine engine)
-    : CredentialExtensionBase(engine), IToolResultExtension
-{
-    public override string ExtensionId => "credential.tool-result";
-
-    public override ExtensionKind Kind => ExtensionKind.ToolResult;
-
-    public ValueTask<PipelineResult> ProcessToolResultAsync(
-        PipelineContext context, string payload, CancellationToken cancellationToken) =>
-        Process(payload);
-}
-
-/// <summary>会话等本地持久化边界：写入前 token 化，历史文件不保存凭据明文。</summary>
-public sealed class CredentialPersistenceExtension(CredentialEngine engine)
-    : CredentialExtensionBase(engine), IPersistenceExtension
-{
-    public override string ExtensionId => "credential.persistence";
-
-    public override ExtensionKind Kind => ExtensionKind.Persistence;
-
-    public ValueTask<PipelineResult> ProcessPersistenceAsync(
-        PipelineContext context, string payload, CancellationToken cancellationToken) =>
-        Process(payload);
 }

@@ -142,30 +142,19 @@ public static class LoomXHost
 
         // 小助手（Phase 4）：会话门面与持久化。小助手作为 Router 客户，通过
         // IProviderExecutionPipeline 自动获得 Router 插件收益，不直接依赖 PluginRuntime。
-        builder.Services.AddSingleton(services =>
-        {
-            var runtime = services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>();
-            return new Assistant.AssistantSessionStore(
-                logger: services.GetRequiredService<ILogger<Assistant.AssistantSessionStore>>(),
-                persistencePipeline: runtime.GetPipeline("persistence"),
-                responsePipeline: runtime.GetPipeline("response"));
-        });
+        builder.Services.AddSingleton(services => new Assistant.AssistantSessionStore(
+            logger: services.GetRequiredService<ILogger<Assistant.AssistantSessionStore>>()));
         builder.Services.AddSingleton(services => new Assistant.AssistantPreferencesStore(
             services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
             services.GetRequiredService<ILogger<Assistant.AssistantPreferencesStore>>()));
-        builder.Services.AddSingleton(services =>
-        {
-            var runtime = services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>();
-            return new Assistant.AssistantService(
-                services.GetRequiredService<Assistant.AssistantModelClientFactory>(),
-                services.GetRequiredService<Assistant.ToolRegistry>(),
-                services.GetRequiredService<Assistant.AssistantSessionStore>(),
-                services.GetRequiredService<ILoggerFactory>(),
-                services.GetRequiredService<Assistant.AssistantPreferencesStore>(),
-                services.GetRequiredService<Assistant.UserDecisions.IUserDecisionBroker>(),
-                services.GetRequiredService<Assistant.Browser.BrowserBridgeLeaseManager>(),
-                runtime.GetPipeline("tool-result"));
-        });
+        builder.Services.AddSingleton(services => new Assistant.AssistantService(
+            services.GetRequiredService<Assistant.AssistantModelClientFactory>(),
+            services.GetRequiredService<Assistant.ToolRegistry>(),
+            services.GetRequiredService<Assistant.AssistantSessionStore>(),
+            services.GetRequiredService<ILoggerFactory>(),
+            services.GetRequiredService<Assistant.AssistantPreferencesStore>(),
+            services.GetRequiredService<Assistant.UserDecisions.IUserDecisionBroker>(),
+            services.GetRequiredService<Assistant.Browser.BrowserBridgeLeaseManager>()));
 
         var app = builder.Build();
         app.Lifetime.ApplicationStopped.Register(startupDb.Dispose);

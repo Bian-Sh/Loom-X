@@ -1,6 +1,5 @@
 ﻿using LoomX.Assistant.UserDecisions;
 using LoomX.Assistant.Browser;
-using LoomX.Plugins;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Assistant;
@@ -20,7 +19,7 @@ public sealed class AssistantService
         规则：
         1. 配置类操作遵循：读取 → 备份 → 修改 → 验证 → 测试，不要跳步。
         2. 涉及中转站/Provider/模型概念时先用 skill.list / skill.load 加载对应 Skill 再行动。
-        3. API Key 由 LoomX 凭据保护 Pipeline 自动 token 化与本地恢复；不要向用户索要明文，也不要试图推断或回显凭据。
+        3. API Key 等凭据在 Router 请求边界自动 token 化，并在 Provider 响应边界本地恢复；不要向用户索要明文，也不要试图推断凭据。
         4. 高风险不可逆操作时打断用户；普通内部步骤默认不额外询问，但这只是避免打扰，不是 assistant.ask_user 的能力限制。
         5. assistant.ask_user 是通用 Human-in-the-loop 工具，可用于用户主动测试、偏好收集、必要输入、歧义澄清和行动确认；用户明确要求测试 AskUser 时直接调用，不需要加载 Skill，也不需要 Browser Bridge 或 Chrome。
         6. 回答使用中文，简洁直接，配置结果用要点列出。
@@ -34,7 +33,6 @@ public sealed class AssistantService
     private readonly AssistantPreferencesStore? preferencesStore;
     private readonly IUserDecisionBroker userDecisionBroker;
     private readonly BrowserBridgeLeaseManager? browserBridgeLeaseManager;
-    private readonly IPipeline? toolResultPipeline;
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantService> logger;
     private readonly SemaphoreSlim runLock = new(1, 1);
@@ -49,8 +47,7 @@ public sealed class AssistantService
         ILoggerFactory loggerFactory,
         AssistantPreferencesStore? preferencesStore,
         IUserDecisionBroker userDecisionBroker,
-        BrowserBridgeLeaseManager? browserBridgeLeaseManager = null,
-        IPipeline? toolResultPipeline = null)
+        BrowserBridgeLeaseManager? browserBridgeLeaseManager = null)
     {
         this.modelClientFactory = modelClientFactory;
         this.toolRegistry = toolRegistry;
@@ -59,7 +56,6 @@ public sealed class AssistantService
         this.preferencesStore = preferencesStore;
         this.userDecisionBroker = userDecisionBroker;
         this.browserBridgeLeaseManager = browserBridgeLeaseManager;
-        this.toolResultPipeline = toolResultPipeline;
         logger = loggerFactory.CreateLogger<AssistantService>();
         CurrentSession = CreateSession();
     }
@@ -249,17 +245,6 @@ public sealed class AssistantService
         return compact.Length <= 300 ? compact : compact[..300] + "…";
     }
 
-    private async ValueTask<string> ProcessToolResultAsync(
-        string payload,
-        CancellationToken cancellationToken)
-    {
-        if (toolResultPipeline is null) return payload;
-        var result = await toolResultPipeline.ExecuteAsync(payload, cancellationToken);
-        if (result.Outcome == PipelineOutcome.Blocked)
-            throw new InvalidOperationException("工具结果凭据处理失败，已阻止原始结果进入会话。");
-        return result.Payload;
-    }
-
     /// <summary>
     /// 发送用户消息并驱动一轮 Agent 循环，事件通过返回值逐条流出。
     /// 助手模型未配置时抛出 InvalidOperationException（UI 应提示用户先配置模型）。
@@ -300,8 +285,7 @@ public sealed class AssistantService
                     ? BuildApprovalGate()
                     : null;
                 var loop = new AgentLoop(modelClient, toolRegistry, loggerFactory.CreateLogger<AgentLoop>(), approvalGate,
-                    ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded,
-                    toolResultProcessor: ProcessToolResultAsync);
+                    ModelErrorFormatter.FormatException, ModelErrorFormatter.FormatMaxStepsExceeded);
                 await using var enumerator = loop
                     .RunAsync(runSession, userMessage, runCancellation.Token)
                     .GetAsyncEnumerator(runCancellation.Token);

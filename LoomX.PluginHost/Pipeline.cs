@@ -65,10 +65,6 @@ public sealed class Pipeline : IPipeline
                 {
                     IResponseExtension response =>
                         await response.ProcessResponseAsync(context, current, cancellationToken),
-                    IToolResultExtension toolResult =>
-                        await toolResult.ProcessToolResultAsync(context, current, cancellationToken),
-                    IPersistenceExtension persistence =>
-                        await persistence.ProcessPersistenceAsync(context, current, cancellationToken),
                     IRequestExtension request =>
                         await request.ProcessRequestAsync(context, current, cancellationToken),
                     _ => PipelineResult.Pass(current),

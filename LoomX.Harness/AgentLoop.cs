@@ -21,7 +21,6 @@ public sealed class AgentLoop
     private readonly ToolRegistry toolRegistry;
     private readonly ILogger<AgentLoop> logger;
     private readonly ToolApprovalGate? approvalGate;
-    private readonly Func<string, CancellationToken, ValueTask<string>> toolResultProcessor;
     private readonly Func<Exception, string> failureFormatter;
     private readonly Func<int, string> maxStepsFormatter;
     private readonly Func<TimeSpan, CancellationToken, Task> retryDelay;
@@ -33,14 +32,12 @@ public sealed class AgentLoop
         ToolApprovalGate? approvalGate = null,
         Func<Exception, string>? failureFormatter = null,
         Func<int, string>? maxStepsFormatter = null,
-        Func<TimeSpan, CancellationToken, Task>? retryDelay = null,
-        Func<string, CancellationToken, ValueTask<string>>? toolResultProcessor = null)
+        Func<TimeSpan, CancellationToken, Task>? retryDelay = null)
     {
         this.modelClient = modelClient;
         this.toolRegistry = toolRegistry;
         this.logger = logger;
         this.approvalGate = approvalGate;
-        this.toolResultProcessor = toolResultProcessor ?? ((payload, _) => ValueTask.FromResult(payload));
         this.failureFormatter = failureFormatter ?? (exception => exception.Message);
         this.maxStepsFormatter = maxStepsFormatter ?? (steps => $"超过最大步骤数：{steps}");
         this.retryDelay = retryDelay ?? ((delay, token) => Task.Delay(delay, token));
@@ -241,24 +238,7 @@ public sealed class AgentLoop
                 }
 
                 result = result!.EnsureSafeFailure();
-                string protectedContent;
-                try
-                {
-                    protectedContent = await toolResultProcessor(result.Content, cancellationToken);
-                }
-                catch (OperationCanceledException)
-                {
-                    cancelled = true;
-                    break;
-                }
-                catch (Exception exception)
-                {
-                    logger.LogError(exception, "Agent 工具结果凭据处理失败 {SessionId} {ToolName}", session.Id, safeToolCall.Name);
-                    failedDetail = failureFormatter(new InvalidOperationException("工具结果凭据处理失败，已阻止原始结果进入会话。"));
-                    break;
-                }
-
-                session.AddMessage(ChatMessage.ToolResult(safeToolCall, protectedContent));
+                session.AddMessage(ChatMessage.ToolResult(safeToolCall, result.Content));
                 yield return AgentEvent.Create(session.Id, AgentEventKind.MessageCompleted) with { Message = session.Messages[^1] };
 
                 yield return AgentEvent.Create(session.Id, AgentEventKind.ToolCallCompleted) with
