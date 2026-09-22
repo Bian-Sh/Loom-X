@@ -5,7 +5,6 @@
     <Style Selector="Border.endpoint-card"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/></Style>
     <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
     <Style Selector="TextBlock.combo-missing"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}"/></Style>
-    <Style Selector="Button.icon"><Setter Property="Width" Value="34"/><Setter Property="Height" Value="34"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="9"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
     <Style Selector="ComboBox.endpoint-reasoning"><Setter Property="MinWidth" Value="112"/><Setter Property="Height" Value="30"/></Style>
     <Style Selector="Border.drag-handle"><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/><Setter Property="Cursor" Value="SizeAll"/></Style>
     <Style Selector="Border.drag-handle:disabled"><Setter Property="Cursor" Value="No"/><Setter Property="Opacity" Value="0.55"/></Style>
