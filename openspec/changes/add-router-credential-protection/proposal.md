@@ -1,6 +1,6 @@
 ## Why
 
-LoomX Plugin System 的定位是扩展 Router，而不是扩展内置 AI 助手。当前 Router 在把请求正文发送给外部 Provider 前缺少统一的插件处理边界，API Key、Bearer Token 等误入用户消息、Tool Result 或其他请求内容时，可能随模型请求泄露给外部 AI。内置 AI 助手和外部 Agent Client 都应作为 Router 客户复用同一 Provider Pipeline。
+LoomX Plugin System 的定位是扩展 Router Provider 执行核心，而不是扩展内置 AI 助手的会话与 UI。当前 Router 在把请求正文发送给外部 Provider 前缺少统一的插件处理边界，API Key、Bearer Token 等误入用户消息、Tool Result 或其他请求内容时，可能随模型请求泄露给外部 AI。外部 Agent Client 经对外 Server 进入该执行核心；内置 AI 助手则绕过对外接入层，直接依赖 Plugin Runtime 装配的同一 Provider Pipeline。
 
 ## What Changes
 
@@ -29,7 +29,7 @@ LoomX Plugin System 的定位是扩展 Router，而不是扩展内置 AI 助手�
 
 - 新增 `LoomX.Plugin.Abstractions`、宿主侧 Plugin Runtime、`LoomX.PluginPlayground`、第一方 Credential Protection 插件及对应测试。
 - 修改 Router Provider 执行管道与 DI 注册；不在 `AgentLoop`、`AgentSession` 或 `AssistantSessionStore` 挂载 Plugin Pipeline。
-- 内置 AI 助手作为 Router 客户，仅通过 `IProviderExecutionPipeline` 获得 request/response Credential Protection；外部 Agent Client 获得相同保护。
+- 内置 AI 助手不经过对外 HTTP Server、Endpoint 鉴权或 Combo 路由，而是直接依赖 Plugin Runtime 装配的 `IProviderExecutionPipeline` 获得 request/response Credential Protection；外部 Agent Client 经对外接入层进入同一执行链。
 - Credential token 映射新增 `Microsoft.Data.Sqlite` 与 DPAPI 依赖。
 - 安全约束：请求正文未经数据安全 Pipeline 成功处理不得发送给外部模型；响应恢复失败不得静默放行未处理内容。
 - Provider 鉴权 Header 由 Router Core 管理，不纳入请求正文脱敏，避免破坏合法上游认证。

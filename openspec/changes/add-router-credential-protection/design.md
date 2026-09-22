@@ -1,6 +1,6 @@
 ## Context
 
-LoomX Plugin System 是 Router 的扩展系统，内置 AI 助手和外部 Agent Client 都只是 Router 客户。插件只处理 Router 拥有的 Provider request/response 传输边界，不进入 `AgentLoop`、`AgentSession`、助手 UI 或会话 JSONL。
+LoomX Plugin System 是 Router Provider 执行核心的扩展系统。外部 Agent Client 经对外 HTTP Server、鉴权、Combo 路由和协议适配进入该核心；内置 AI 助手不经过这些外部接入层，而是直接依赖 Plugin Runtime 装配的共享 `IProviderExecutionPipeline`。插件只处理 Provider request/response 传输边界，不进入 `AgentLoop`、`AgentSession`、助手 UI 或会话 JSONL。
 
 本 change 实现 Credential Protection Router 插件。旧的 `SecretBoundary`、`BrowserSecretVault`、`BrowserSecretHarvester`、`AssistantSessionStore.SecretLeakScan` 已删除；原 `ToolArgumentSafety` 更名为 `ToolCallProjection`，仅保留工具协议投影职责；原 `SensitiveKeyPolicy` 更名为 `AssistantContentPolicy`，仅保留 TOML 本地配置暴露与 AskUser 禁止索取认证信息的产品策略。这些助手侧行为不是 Router Plugin Extension。
 
@@ -22,7 +22,7 @@ LoomX Plugin System 是 Router 的扩展系统，内置 AI 助手和外部 Agent
 - 在当前 change 新增独立 ToolResult Pipeline。工具结果随下一次模型请求进入 Router Request Pipeline，已受统一保护；未来 RTX 压缩若需要结构化识别 `role=tool`，再在 Router Request 内增加阶段或独立扩展点。
 - 插件 Settings UI、Marketplace、Hot Reload、插件依赖图与全局 Priority DSL。
 - 让 Credential Protection 取代工具参数公开投影、TOML 本地读取权限或 AskUser 产品校验。
-- 首版统一 Native Anthropic 的独立发送链；后续统一发送链时复用同一 Contract。
+- 让内置 Agent 直接使用 Anthropic 原生协议 Provider；当前内置 Agent 仍只创建 OpenAI 兼容模型客户端，后续单独实现对应 `IModelClient`。
 
 ## Decisions
 
@@ -60,7 +60,8 @@ Credential Protection 注册两个 Extension：
 
 ### 5. 助手职责与复用边界
 
-- `AgentLoop`、`AgentSession`、`AssistantSessionStore` 和 Assistant UI 不依赖 Plugin Runtime，也不挂载 Router Pipeline。
+- `AgentLoop`、`AgentSession`、`AssistantSessionStore` 和 Assistant UI 不直接调用插件或挂载 Pipeline；内置助手的模型网络边界通过共享 `IProviderExecutionPipeline` 有意依赖 Plugin Runtime 装配的 Request/Response Pipeline。
+- 内置助手绕过对外 HTTP Server、Endpoint 鉴权与 Combo 路由，直接选择 Provider/Model；因此外部 Router Endpoint 尚未完成配置时，内置助手仍可使用已配置的 Provider，并继续获得插件能力。
 - 内置助手若要在屏幕、历史会话或本地日志中显示 `***`，应实现独立的“数据与隐私”策略；可复用 Credential Protection 的规则思想或提取出的纯检测契约，但不能调用 Router 插件改变会话语义。
 - 删除 `SecretBoundary` 及不可解析的 `secret://provider/...` 展示引用；配置工具仅返回 `api_key_configured`。
 - 删除 Browser 专用 Vault/Harvester 与 `api_key_secret_ref`；Browser 工具返回值是否在助手 UI 中打码，由助手自身策略决定。该结果进入下一次 Provider 请求时，Router Request Pipeline 负责外发脱敏。
@@ -80,7 +81,7 @@ RTX/Tool Result Compression 属于 Router 插件能力。首选在 Request Pipel
 - SQLite/DPAPI 损坏或当前用户上下文变化会导致 token 无法恢复；按 fail closed 处理，不降级猜测或泄露原文。
 - token 长期有效意味着数据库需作为用户配置数据备份；数据库不含明文，但仍应限制访问。
 - 助手 Session 与历史文件不再由 Router 插件处理；如果产品要求防肩窥或历史文件打码，必须单独实现和测试助手隐私选项。
-- Native Anthropic 尚未统一到共享 Provider Pipeline，是明确的后续工作。
+- Native Anthropic 网关发送链已统一到共享 Provider Pipeline；内置 Agent 仍缺少 Anthropic 原生协议 `IModelClient`，作为明确后续工作。
 
 ## Open Questions
 

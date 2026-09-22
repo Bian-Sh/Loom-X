@@ -26,6 +26,7 @@
 - [x] 4.3 内置助手仅通过共享 `IProviderExecutionPipeline` 获得保护
 - [x] 4.4 外部 Agent Client 与内置助手的用户消息、Tool Result 等内容均在请求序列化后统一处理
 - [x] 4.5 请求/响应数据安全处理失败时 fail closed
+- [x] 4.6 Native Anthropic 网关请求统一进入共享 `IProviderExecutionPipeline`
 
 ## 5. 清理职责交叉
 
@@ -42,3 +43,7 @@
 - [x] 6.2 JSON、SSE content 与 SSE tool arguments 恢复测试通过
 - [x] 6.3 验证 Tool Result 位于 Provider 请求正文时由 Router Request Pipeline 统一 token 化
 - [x] 6.4 Router 相关测试、解决方案构建、PluginPlayground 与 OpenSpec strict validation 通过；全量测试仅出现 4 项既有 Avalonia Dispatcher 线程波动，单独复跑 4/4 通过
+
+## 后续 TODO（本次范围外）
+
+- [ ] 为内置 Agent 增加 Anthropic 原生协议 `IModelClient`，使其可直接选择仅支持 Anthropic API Mode 的 Provider/Model；继续复用共享 `IProviderExecutionPipeline`，不经过对外 HTTP Server、Endpoint 鉴权或 Combo 路由。

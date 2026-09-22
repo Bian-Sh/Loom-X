@@ -140,8 +140,9 @@ public static class LoomXHost
                 runtime.GetPipeline("response"));
         });
 
-        // 小助手（Phase 4）：会话门面与持久化。小助手作为 Router 客户，通过
-        // IProviderExecutionPipeline 自动获得 Router 插件收益，不直接依赖 PluginRuntime。
+        // 小助手（Phase 4）：会话门面与持久化。小助手不经过对外 HTTP Server、Endpoint 鉴权或 Combo 路由，
+        // 而是直接复用由 PluginRuntime 装配 Request/Response Pipeline 的 IProviderExecutionPipeline。
+        // 这是内置 Agent 对 PluginRuntime 的有意依赖：无需先完成外部 Router 配置，也能直接选择 Provider/Model 并获得插件能力。
         builder.Services.AddSingleton(services => new Assistant.AssistantSessionStore(
             logger: services.GetRequiredService<ILogger<Assistant.AssistantSessionStore>>()));
         builder.Services.AddSingleton(services => new Assistant.AssistantPreferencesStore(
