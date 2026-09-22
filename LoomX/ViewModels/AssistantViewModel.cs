@@ -1966,7 +1966,7 @@ public sealed class ProcessToolCallViewModel : NotifyViewModel
 
     public ProcessToolCallViewModel(ToolCall toolCall, Action changed)
     {
-        var safeToolCall = ToolArgumentSafety.EnsureSafe(toolCall);
+        var safeToolCall = ToolCallProjection.EnsureSafe(toolCall);
         id = safeToolCall.Id;
         name = safeToolCall.Name;
         argumentsJson = safeToolCall.ArgumentsJson;
@@ -2011,7 +2011,7 @@ public sealed class ProcessToolCallViewModel : NotifyViewModel
 
     public void UpdateDefinition(ToolCall toolCall)
     {
-        var safeToolCall = ToolArgumentSafety.EnsureSafe(toolCall);
+        var safeToolCall = ToolCallProjection.EnsureSafe(toolCall);
         id = safeToolCall.Id;
         name = safeToolCall.Name;
         argumentsJson = safeToolCall.ArgumentsJson;

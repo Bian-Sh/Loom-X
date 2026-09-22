@@ -1,9 +1,10 @@
 namespace LoomX.Plugins;
 
-/// <summary>扩展点类别：Provider 请求、工具结果、持久化。</summary>
+/// <summary>扩展点类别：Provider 请求、Provider 响应、工具结果、持久化。</summary>
 public enum ExtensionKind
 {
     Request,
+    Response,
     ToolResult,
     Persistence,
 }

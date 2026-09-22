@@ -1,97 +1,81 @@
 ## Context
 
-LoomX Plugin System 是 Router 的扩展系统，内置 AI 助手是 Router 的消费者而不是插件宿主。源码确认目前两类客户共享同一 Provider 请求执行后半段：
+LoomX Plugin System 是 Router 的扩展系统，内置 AI 助手是 Router 的消费者。外部网关客户与内置助手共享 `IProviderExecutionPipeline` 的 Provider 请求/响应边界；助手自身还存在 Tool Result 进入 Session/UI 的本地边界，以及会话 JSONL 的持久化边界。
 
-- **外部客户 / 网关**：`LoomXHost` 经 `ProtocolPassthroughClient` 构造上游请求，再调用 `IProviderExecutionPipeline`。
-- **内置 AI 助手**：`AssistantModelClientFactory` 创建 `OpenAiCompatibleModelClient`，后者同样调用 `IProviderExecutionPipeline`；助手不应拥有绕过 Router Plugin Pipeline 的专用通道。
-- **统一出站边界**：`ProviderExecutionPipeline.ExecuteAsync` 与 `ExecuteStreamingAsync` 在完整 `HttpRequestMessage` 构造后执行 `HttpClient.SendAsync`，是网关与助手共享的 Router Provider 执行边界。
-
-既有助手保护（`SecretBoundary`、`SensitiveKeyPolicy`、`ToolArgumentSafety`、`AssistantSessionStore.SecretLeakScan`）继续保留，但它们属于助手自身安全策略，不是 Router Plugin 扩展点。本 change 依据 `.design/LoomX_Plugin_System_Design_CN.md`：脱敏由第一方 Credential Protection Router 插件承载；安全约束由 Router Contract 保证，数据安全类 Extension 失败必须 fail closed；正式修改 LoomX 前先经 PluginPlayground 验证。
+本 change 将 Credential Protection 插件确立为唯一的凭据值检测、结构化 token 化与恢复实现。旧的 `SecretBoundary`、`BrowserSecretVault`、`BrowserSecretHarvester`、`AssistantSessionStore.SecretLeakScan` 已删除；原 `ToolArgumentSafety` 更名为 `ToolCallProjection`，仅保留工具协议投影职责；原 `SensitiveKeyPolicy` 更名为 `AssistantContentPolicy`，仅保留 TOML 本地配置暴露与 AskUser 禁止索取认证信息的产品策略。
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- 最小契约程序集与宿主侧 Plugin Runtime：发现、Manifest 验证、AssemblyLoadContext 动态加载、Router Extension 注册、同一 Pipeline 内按配置顺序执行、异常隔离。
-- Request Pipeline 挂载到 Router 统一 Provider 出站边界，使网关和内置 AI 助手等 Router 客户自动获得相同能力。
-- Credential Protection 第一方插件：Credential Detection、Plugin-owned Sensitive Rule、Mask/Placeholder、失败 fail closed。
-- `LoomX.PluginPlayground` 验证项目：验证 Runtime/Pipeline 与 Sensitive Data 插件组合，验证用 Runtime 与正式迁入的是同一份实现。
+- 建立最小契约程序集与宿主侧 Plugin Runtime：发现、Manifest 验证、AssemblyLoadContext 动态加载、Pipeline 注册、顺序执行与异常隔离。
+- 在 Provider request/response、Assistant Tool Result、Session persistence/history load 四个边界统一执行 Credential Protection。
+- 使用长期有效的唯一结构化 token，支持跨会话、跨进程重启恢复历史内容。
+- token 映射持久化到插件自有 SQLite；原值使用 Windows DPAPI 加密，数据库不保存明文。
+- 普通 JSON、完整 SSE、流式 SSE 以及 tool arguments 中的 token 均可安全恢复；未知或伪造 token 保持原样。
+- 数据安全类 Extension 全部 fail closed。
 
 **Non-Goals:**
 
-- 在 `AgentLoop`、`AgentSession` 或 `AssistantSessionStore` 内挂载 Router Plugin。
-- Settings UI / SettingsProvider / Avalonia 动态 XAML、Hot Reload、Restore / Echo Re-scrubbing、Tool Result Compression 插件、Response 流式处理、Plugin Marketplace、插件间依赖图与全局 Priority DSL。
-- 本 change 不统一 Native Anthropic 的独立发送链；首版生产挂载覆盖经 `IProviderExecutionPipeline` 执行的 OpenAI/Ollama 兼容 Router 请求，后续统一 Anthropic 时复用同一 Contract。
+- 插件 Settings UI、Marketplace、Hot Reload、插件依赖图与全局 Priority DSL。
+- 让 Credential Protection 取代工具参数公开投影、TOML 本地读取权限或 AskUser 产品校验；这些不是凭据 token 化职责。
+- 首版统一 Native Anthropic 的独立发送链；后续统一发送链时复用同一 Contract。
 
 ## Decisions
 
-### 1. 契约程序集 `LoomX.Plugin.Abstractions`
+### 1. 契约与 Runtime
 
-新增独立类库，仅包含：插件 Manifest 模型、`ILoomXPlugin`、Router Extension 接口、Pipeline Entry 描述、执行上下文与结果模型。目标框架与主项目一致（net10.0）。
+`LoomX.Plugin.Abstractions` 仅包含 Manifest、Extension 接口、Pipeline 上下文与结果；`LoomX.PluginHost` 承载发现、ALC 加载、Pipeline 编排与 fail-closed 隔离。主程序与 `LoomX.PluginPlayground` 使用同一 Runtime 实现。
 
-- **为什么独立**：AssemblyLoadContext 类型身份共享要求宿主与插件引用同一个契约程序集；契约放主程序集会让插件被迫依赖宿主全部类型。
-- **边界**：契约不引用 `LoomX.Harness`，插件也不得依赖 `AgentLoop`、`AgentSession` 或助手存储类型。
+### 2. 四个生产边界
 
-### 2. Plugin Runtime 放独立类库 `LoomX.PluginHost`
+Credential Protection 注册四个 Extension：
 
-新增类库承载目录发现、Manifest 验证、ALC 加载、Extension 注册、Pipeline 编排与错误隔离。`LoomX` 主程序与 `LoomX.PluginPlayground` 都引用它。
+| Pipeline | Extension | 行为 |
+|---|---|---|
+| `request` | `credential.request` | Provider 请求正文外发前 token 化 |
+| `response` | `credential.response` | Provider 响应返回本地调用方前恢复 |
+| `tool-result` | `credential.tool-result` | 工具结果进入 Session、事件和 UI 前 token 化 |
+| `persistence` | `credential.persistence` | 会话 JSONL 每条记录写入前 token 化 |
 
-- **为什么**：设计文档要求“先 Playground 验证再迁入”；Runtime 独立成库后，Playground 验证的就是最终迁入的同一份实现，消除验证与迁入之间的重复和漂移。
+历史会话读取逐行经过 `response` Pipeline 恢复。Tool Result Extension 通过 `AgentLoop` 注入的通用处理委托执行，Harness 不依赖 Plugin Runtime；Pipeline 失败时原始工具结果不得进入 Session。
 
-### 3. 生产挂载点：Router Request 出站边界
+### 3. 长期结构化 token
 
-Credential Protection 以 `IRequestExtension` 注册到 `request` Pipeline。`ProviderExecutionPipeline.ExecuteAsync` 与 `ExecuteStreamingAsync` 在发送前读取请求正文并执行该 Pipeline：
+- token 格式：`{{LOOMX_CREDENTIAL_<20 位 Base32>}}`。
+- 使用原值 SHA-256 哈希建立唯一约束，相同凭据跨引擎、跨重启复用稳定 token。
+- 映射存储于插件自有 `credential-tokens.db`。
+- 原值以 DPAPI CurrentUser 加密后存储；禁止把明文、请求正文、响应正文或 token 对应原值写入日志。
+- token 长期有效，不使用进程内 TTL；用户在任意时刻查看历史会话时仍可恢复。
+- 仅恢复 SQLite 中存在且能成功解密的本地签发 token；未知/伪造 token 原样保留。
 
-```text
-Gateway / 内置 AI 助手 / 其他 Router 客户
-        ↓
-完整 HttpRequestMessage
-        ↓
-Router Request Pipeline
-        ↓
-HttpClient.SendAsync
-        ↓
-外部 Provider
-```
+### 4. JSON 与 SSE 恢复
 
-- Pipeline `Passed`：沿用原请求正文。
-- Pipeline `Modified`：使用脱敏后的正文替换 `HttpContent`，同时保留原 Content Header（如 Content-Type）。
-- Pipeline `Blocked` 或执行故障：抛出安全失败，禁止原始正文发送给外部 Provider。
-- 请求无正文时直接通过。
-- Authorization、API Key 和自定义 Header 由 Router Core 负责合法上游认证，不交给请求正文插件修改。
+- 普通 JSON 按字符串节点恢复并重新序列化。
+- `tool_calls[].function.arguments` 按嵌套 JSON 恢复，正确处理引号、反斜杠与换行转义。
+- SSE 按逻辑内容通道缓冲跨事件 token，覆盖 `delta.content` 与 tool arguments。
+- 流结束仍存在未闭合 token 时 fail closed。
+- 响应正文发生修改后移除 `Content-Length`、`Content-MD5`、`Digest`、`Content-Digest`、`ETag` 等失效实体头。
 
-**为什么不挂 AgentLoop：** `AgentLoop` 是 Router 客户内部实现。把插件注入其中会让外部客户无法受益，并把 Router Plugin 架构中心错误地转移到 Agent 生命周期。
+### 5. 删除重复凭据机制，保留非凭据职责
 
-**为什么不挂 AssistantSessionStore：** 助手会话持久化属于 Assistant 领域；现有 `SecretLeakScan` 继续作为助手自身兜底，但不是 Router Persistence Pipeline。
+- 删除 `SecretBoundary` 及不可解析的 `secret://provider/...` 展示引用；配置工具仅返回 `api_key_configured`。
+- 删除 Browser 专用 Vault/Harvester 与 `api_key_secret_ref`；Browser 工具返回结构化结果，由统一 Tool Result Pipeline token 化。模型回传 token 后，Provider Response Pipeline 在工具调用解析前恢复到统一 `api_key` 参数。
+- `ToolCallProjection` 继续隐藏未知工具或无法公开的原始参数，保证历史、审批、UI 与下一轮请求的协议投影一致；它不检测凭据。
+- `AssistantContentPolicy` 继续限制 TOML 本地配置暴露并禁止 AskUser 索取认证信息；它不是运行时凭据 token 化边界。
 
-Tool Result 中的敏感内容若将发送给外部模型，会作为下一次模型请求正文的一部分经过 Router Request Pipeline；因此内置助手与外部 Agent Client 均从 Router 边界获得一致的脱敏收益。未来 Tool Result Compression 也应由 Router 在可识别的请求/中间数据 Contract 中执行，而不是直接依赖 `AgentLoop`。
+### 6. 错误隔离
 
-### 4. Credential Protection 插件形态
-
-- 检测语义迁移自现有 `SensitiveKeyPolicy`（敏感名称集 + 值形态正则 + 自由文本内容检测），作为插件内置规则基线；规则数据 Plugin-owned，持久化到插件自有 JSON 文件，不写宿主核心配置。
-- 脱敏替换统一为固定占位符 `***`。
-- 插件声明 `credential.detect`/`credential.mask` 能力，并以 FailClosed 的 Request Extension 注册到 `request` Pipeline。
-- Restore / Local Resolution 与 Echo Re-scrubbing 首版不做。
-
-### 5. ALC 策略
-
-每个插件一个 collectible `AssemblyLoadContext`，共享程序集（契约库、`System.*`、宿主已加载程序集）经 Default 上下文解析。首版不做 unload 强制验证（属 Hot Reload 后续 change），但结构上不阻碍后续加入。
-
-### 6. 错误隔离与 fail closed
-
-Pipeline Runner 捕获 Extension 异常并记录安全诊断；普通 Entry 失败仅记录并继续，数据安全类 Entry 失败时返回 Blocked。Router Provider 执行边界把 Blocked 映射为安全异常并终止请求，原始正文不得继续流向外部模型。
+普通 Extension 可 ContinueOnError；Credential Protection 的四个 Extension 均为 FailClosed。请求、响应、工具结果或持久化处理失败时只返回安全摘要并终止原始数据继续流动。
 
 ## Risks / Trade-offs
 
-- [ALC 类型身份冲突导致插件无法加载] → 契约程序集唯一且经 Default 上下文共享解析；Playground 专项验证插件只引用契约类型。
-- [读取并替换请求正文改变 HttpContent Header] → 替换内容时复制原始 Content Header，专项测试覆盖 Content-Type 保留。
-- [数据安全插件失败导致请求不可用] → 这是 fail closed 的预期行为；记录仅含 Provider/Model/Pipeline/异常类型的安全摘要。
-- [检测规则误判正常数据] → 规则 Plugin-owned 可禁用可增删；内置基线与现有 `SensitiveKeyPolicy` 语义一致。
-- [流式请求] → 当前模型请求正文仍是一次性 JSON `HttpContent`，响应是否流式不影响发送前正文处理。
-- [Native Anthropic 暂未经过共享 Provider Pipeline] → 在文档明确首版覆盖范围，后续统一发送链时复用相同 Request Pipeline。
-- [Playground 验证与正式迁入重复工作] → Runtime 独立成库、两端共用同一份实现，验证即迁入。
+- SQLite/DPAPI 损坏或当前用户上下文变化会导致历史 token 无法恢复；按 fail closed 处理，不降级泄露原文。
+- token 长期有效意味着数据库需作为用户配置数据备份；数据库不含明文，但仍应限制访问。
+- Tool Result 在进入 Session 前处理增加一次序列化扫描，换取 UI、事件和内存历史不出现浏览器等工具返回的凭据明文。
+- Native Anthropic 尚未统一到共享 Provider Pipeline，是明确的后续工作。
 
 ## Open Questions
 
-- 规则文件修改后的热生效时机：首版按“插件重载后生效”处理，随 Hot Reload change 一并解决，不影响本 change。
-- Router Response 与结构化 Tool Result Extension 的强类型 Contract：本 change 不提前固化，后续结合流式响应和 Tool Result Compression 单独设计。
+- 规则文件热加载随 Hot Reload change 处理。
+- token 撤销、轮换与数据库迁移策略后续单独设计；当前目标是稳定跨会话恢复。

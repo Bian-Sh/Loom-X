@@ -9,25 +9,31 @@ namespace LoomX.CredentialProtection;
 public sealed record DetectionHit(string RuleId, string Kind);
 
 /// <summary>
-/// 凭据检测与脱敏引擎。检测语义迁移自宿主 SensitiveKeyPolicy
+/// 凭据检测与脱敏引擎。检测语义迁移自宿主 旧助手保护基线
 /// （敏感名称集 + 值形态正则 + 自由文本内容检测），规则来自 Plugin-owned 规则存储。
 /// </summary>
 public class CredentialEngine
 {
-    /// <summary>固定占位符：替换结果不含原始值任何片段，也不可逆推。</summary>
-    public const string RedactedPlaceholder = "***";
+    /// <summary>结构化占位符前缀；随机后缀不可用于推导原始值。</summary>
+    public const string PlaceholderPrefix = "{{LOOMX_CREDENTIAL_";
 
+    private static readonly Regex PlaceholderPattern = new(
+        @"\{\{LOOMX_CREDENTIAL_[A-Z2-7]{20}\}\}",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled,
+        TimeSpan.FromSeconds(1));
     private static readonly string[] HeaderContainerNames = ["headers", "custom_headers", "http_headers"];
 
     private readonly SensitiveRuleStore store;
+    private readonly CredentialTokenStore tokenStore;
     private int compiledVersion = -1;
     private HashSet<string> sensitiveNames = new(StringComparer.Ordinal);
     private List<(string RuleId, Regex Pattern)> patterns = [];
 
-    public CredentialEngine(SensitiveRuleStore store)
+    public CredentialEngine(SensitiveRuleStore store, CredentialTokenStore? tokenStore = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         this.store = store;
+        this.tokenStore = tokenStore ?? new CredentialTokenStore(store.DataDirectory);
     }
 
     /// <summary>检测payload中的敏感内容，返回安全摘要（不含原始值）。</summary>
@@ -51,8 +57,8 @@ public class CredentialEngine
     }
 
     /// <summary>
-    /// 脱敏：敏感名称字段值与值形态命中统一替换为固定占位符；
-    /// 无敏感内容时原样返回（changed = false）。
+    /// 脱敏：敏感名称字段值与值形态命中替换为本地可恢复的结构化占位符；
+    /// 同一引擎生命周期内相同原值复用同一个 token，无敏感内容时原样返回。
     /// </summary>
     public virtual string Sanitize(string? payload, out bool changed)
     {
@@ -68,6 +74,148 @@ public class CredentialEngine
         }
 
         return SanitizeText(payload, ref changed);
+    }
+
+    /// <summary>
+    /// 恢复普通文本中的本地占位符。仅恢复本引擎签发且仍在有效期内的 token。
+    /// </summary>
+    public virtual string Restore(string? payload, out bool changed) =>
+        RestoreCore(payload, out changed);
+
+    /// <summary>
+    /// 恢复 Provider JSON/SSE 传输正文中的占位符。JSON 字符串先解码、恢复再重新序列化，
+    /// 避免原值中的引号、反斜杠或换行破坏响应帧与工具参数 JSON；非 JSON 文本按普通文本恢复。
+    /// </summary>
+    public virtual string RestoreTransportPayload(string? payload, out bool changed)
+    {
+        changed = false;
+        if (string.IsNullOrEmpty(payload)) return payload ?? string.Empty;
+
+        if (TryRestoreJson(payload, out var restoredJson, out changed)) return restoredJson;
+        if (TryRestoreSse(payload, out var restoredSse, out changed)) return restoredSse;
+        return RestoreCore(payload, out changed);
+    }
+
+    private string RestoreCore(string? payload, out bool changed)
+    {
+        changed = false;
+        if (string.IsNullOrEmpty(payload)) return payload ?? string.Empty;
+
+        var matches = PlaceholderPattern.Matches(payload).Select(match => match.Value);
+        var snapshot = tokenStore.ResolveTokens(matches);
+        if (snapshot.Count == 0) return payload;
+
+        var didChange = false;
+        var restored = PlaceholderPattern.Replace(payload, match =>
+        {
+            if (!snapshot.TryGetValue(match.Value, out var original)) return match.Value;
+            didChange = true;
+            return original;
+        });
+        changed = didChange;
+        return restored;
+    }
+
+    private bool TryRestoreJson(string payload, out string restored, out bool changed)
+    {
+        restored = payload;
+        changed = false;
+        JsonNode? node;
+        try { node = JsonNode.Parse(payload); }
+        catch (JsonException) { return false; }
+        if (node is null) return false;
+
+        if (node is JsonValue rootValue && rootValue.TryGetValue<string>(out var rootText))
+        {
+            var rootRestored = RestoreCore(rootText, out changed);
+            if (changed) restored = JsonSerializer.Serialize(rootRestored);
+            return true;
+        }
+
+        changed = RestoreJsonNode(node);
+        if (changed) restored = node.ToJsonString();
+        return true;
+    }
+
+    private bool TryRestoreSse(string payload, out string restored, out bool changed)
+    {
+        restored = payload;
+        changed = false;
+        if (!payload.Contains("data:", StringComparison.OrdinalIgnoreCase)) return false;
+
+        var lines = payload.Split('\n');
+        for (var index = 0; index < lines.Length; index++)
+        {
+            var line = lines[index];
+            var carriageReturn = line.EndsWith('\r') ? "\r" : string.Empty;
+            var content = carriageReturn.Length == 0 ? line : line[..^1];
+            if (!content.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var data = content[5..];
+            var leadingWhitespaceLength = data.Length - data.TrimStart().Length;
+            var json = data.Trim();
+            if (json.Length == 0 || string.Equals(json, "[DONE]", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!TryRestoreJson(json, out var restoredJson, out var lineChanged) || !lineChanged) continue;
+
+            lines[index] = content[..5] + data[..leadingWhitespaceLength] + restoredJson + carriageReturn;
+            changed = true;
+        }
+
+        if (changed) restored = string.Join('\n', lines);
+        return true;
+    }
+
+    private string RestoreEmbeddedJson(string text, out bool changed)
+    {
+        if (TryRestoreJson(text, out var restored, out changed)) return restored;
+        return RestoreCore(text, out changed);
+    }
+
+    private bool RestoreJsonNode(JsonNode node)
+    {
+        var changed = false;
+        if (node is JsonObject jsonObject)
+        {
+            foreach (var property in jsonObject.ToArray())
+            {
+                if (property.Value is JsonValue value && value.TryGetValue<string>(out var text))
+                {
+                    var restored = string.Equals(property.Key, "arguments", StringComparison.OrdinalIgnoreCase)
+                        ? RestoreEmbeddedJson(text, out var valueChanged)
+                        : RestoreCore(text, out valueChanged);
+                    if (valueChanged)
+                    {
+                        jsonObject[property.Key] = restored;
+                        changed = true;
+                    }
+                }
+                else if (property.Value is not null)
+                {
+                    changed |= RestoreJsonNode(property.Value);
+                }
+            }
+        }
+        else if (node is JsonArray jsonArray)
+        {
+            for (var index = 0; index < jsonArray.Count; index++)
+            {
+                if (jsonArray[index] is JsonValue value && value.TryGetValue<string>(out var text))
+                {
+                    var restored = RestoreCore(text, out var valueChanged);
+                    if (valueChanged)
+                    {
+                        jsonArray[index] = restored;
+                        changed = true;
+                    }
+                }
+                else if (jsonArray[index] is not null)
+                {
+                    changed |= RestoreJsonNode(jsonArray[index]!);
+                }
+            }
+        }
+
+        return changed;
     }
 
     private void EnsureCompiled()
@@ -165,7 +313,7 @@ public class CredentialEngine
                         continue;
                     }
 
-                    // 敏感名称字段：值整体视为敏感（与 SensitiveKeyPolicy 路径语义一致，
+                    // 敏感名称字段：值整体视为敏感（与 旧助手保护基线 路径语义一致，
                     // 覆盖自定义 Header 容器——其子值无论名称全部脱敏）。
                     result[property.Key] = SanitizeNode(
                         property.Value,
@@ -187,7 +335,10 @@ public class CredentialEngine
                 if (isSensitivePath)
                 {
                     changed = true;
-                    return JsonValue.Create(RedactedPlaceholder);
+                    var original = value.TryGetValue<string>(out var sensitiveText)
+                        ? sensitiveText
+                        : value.ToJsonString();
+                    return JsonValue.Create(GetOrCreatePlaceholder(original));
                 }
 
                 if (!value.TryGetValue<string>(out var text)) return value.DeepClone();
@@ -204,12 +355,28 @@ public class CredentialEngine
         var current = text;
         foreach (var (_, pattern) in patterns)
         {
-            var next = pattern.Replace(current, RedactedPlaceholder);
+            var next = pattern.Replace(current, match => GetOrCreatePlaceholder(match.Value));
             changed |= next != current;
             current = next;
         }
 
         return current;
+    }
+
+    private string GetOrCreatePlaceholder(string original) =>
+        tokenStore.GetOrCreateToken(
+            original,
+            () => PlaceholderPrefix + CreateRandomSuffix() + "}}");
+
+    private static string CreateRandomSuffix()
+    {
+        const string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+        Span<byte> bytes = stackalloc byte[20];
+        System.Security.Cryptography.RandomNumberGenerator.Fill(bytes);
+        Span<char> suffix = stackalloc char[20];
+        for (var index = 0; index < suffix.Length; index++)
+            suffix[index] = alphabet[bytes[index] & 31];
+        return new string(suffix);
     }
 
     private bool IsSensitiveSegment(string segment)
@@ -240,7 +407,7 @@ public class CredentialEngine
         }
     }
 
-    /// <summary>自由文本内容检测：语义与 SensitiveKeyPolicy.ContainsSensitiveContent 的词汇规则一致。</summary>
+    /// <summary>自由文本内容检测：语义与 旧助手保护基线.ContainsSensitiveContent 的词汇规则一致。</summary>
     private static bool ContainsSensitiveWords(string content)
     {
         var words = SplitContentWords(content);

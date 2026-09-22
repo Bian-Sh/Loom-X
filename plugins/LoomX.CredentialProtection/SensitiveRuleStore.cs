@@ -30,12 +30,16 @@ public sealed class SensitiveRuleStore
 
     private readonly string rulesFilePath;
     private readonly object gate = new();
+
+    public string DataDirectory { get; }
     private List<SensitiveRule> rules;
 
     public SensitiveRuleStore(string dataDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dataDirectory);
-        rulesFilePath = Path.Combine(dataDirectory, RulesFileName);
+        DataDirectory = dataDirectory;
+        Directory.CreateDirectory(DataDirectory);
+        rulesFilePath = Path.Combine(DataDirectory, RulesFileName);
         rules = Load();
     }
 
@@ -132,7 +136,7 @@ public sealed class SensitiveRuleStore
     }
 
     /// <summary>
-    /// 内置基线：语义迁移自宿主 SensitiveKeyPolicy（敏感名称集 + 值形态正则）。
+    /// 内置基线：语义迁移自旧助手保护基线（敏感名称集 + 值形态正则）。
     /// </summary>
     internal static List<SensitiveRule> BaselineRules() =>
     [
@@ -147,7 +151,7 @@ public sealed class SensitiveRuleStore
         new("name.headers", SensitiveRuleKind.Name, "headers", true, true),
         new("name.custom-headers", SensitiveRuleKind.Name, "custom_headers", true, true),
         new("name.http-headers", SensitiveRuleKind.Name, "http_headers", true, true),
-        // 值形态（与 SensitiveKeyPolicy.SecretValuePattern 一致，另补 Bearer 形态）
+        // 凭据值形态基线，并覆盖 Bearer 认证头。
         new("pattern.openai-sk", SensitiveRuleKind.Pattern,
             @"(?<![a-z0-9])sk-(?:proj-)?[a-z0-9_-]{12,}(?![a-z0-9])", true, true),
         new("pattern.github-token", SensitiveRuleKind.Pattern,

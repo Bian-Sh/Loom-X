@@ -27,18 +27,42 @@ Credential Protection SHALL 在 Router 请求正文进入外部 Provider 前检�
 - **WHEN** 用户为插件新增一条自定义敏感名称规则并保存
 - **THEN** 后续流经 Router Request Pipeline 的请求正文按新规则执行检测与脱敏
 
-### Requirement: 脱敏替换
+### Requirement: 可恢复的脱敏替换
 
-被判定为敏感的数据值 SHALL 在请求发往外部 Provider 前替换为固定占位符，替换结果 MUST NOT 包含原始敏感值的任何片段，也不得包含可逆推原始值的信息。
+被判定为敏感的数据值 SHALL 替换为随机结构化 token。token MUST NOT 包含原始敏感值的任何片段或可逆推信息；插件 SHALL 在插件自有 SQLite 中长期保存唯一映射，原值 MUST 使用当前用户 DPAPI 加密且不得以明文落库，以便跨会话、跨进程重启恢复。
 
-#### Scenario: 敏感值被占位符替换
+#### Scenario: 敏感值被结构化占位符替换
 
 - **WHEN** 待发送请求正文中含有明文 API Key
-- **THEN** 实际发送给上游的正文中该值被替换为固定占位符，且不包含原始密钥的任何字符
+- **THEN** 实际发送给上游的正文中该值被替换为本次插件引擎签发的结构化占位符，且不包含原始密钥的任何字符
+
+#### Scenario: 未知占位符不被恢复
+
+- **WHEN** Provider 响应包含并非本地 SQLite 映射签发的占位符形态文本
+- **THEN** 该文本原样保留，不被解析为本地凭据
+
+### Requirement: Provider 响应本地恢复
+
+Credential Protection SHALL 在成功的 Provider 响应返回 Router 客户前恢复本地签发的有效占位符。普通 JSON 响应 MUST 保持有效 JSON；SSE 流式响应 MUST 能恢复被拆分到多个内容事件中的占位符，并按独立内容通道隔离缓冲。
+
+#### Scenario: 普通 JSON 响应恢复
+
+- **WHEN** Provider 的 JSON 响应字符串字段中包含当前引擎签发的完整占位符
+- **THEN** Router 返回前将其恢复为原值，且原值中的引号、反斜杠与换行不会破坏 JSON
+
+#### Scenario: SSE content 跨事件恢复
+
+- **WHEN** Provider 将一个占位符拆分到同一 choice 的多个 `delta.content` 事件
+- **THEN** Router 暂存相关事件，待占位符完整后恢复并继续输出，不向客户暴露残缺 token
+
+#### Scenario: SSE tool arguments 跨事件恢复
+
+- **WHEN** Provider 将一个占位符拆分到同一 tool call 的多个 `function.arguments` 事件
+- **THEN** Router 按该 tool call 通道完成恢复，且生成的 arguments 保持有效 JSON 字符串片段
 
 ### Requirement: Router 客户共享保护
 
-Credential Protection SHALL 挂载在 Router 统一 Provider 执行边界，而不是内置 AI 助手的 `AgentLoop` 或会话存储中。所有复用该 Router 边界的客户 MUST 获得相同保护。
+Credential Protection SHALL 挂载在 Router 统一 Provider request/response 边界；内置 AI 助手 SHALL 通过通用 `tool-result` 与 `persistence` Pipeline 在工具结果进入 Session/UI 前及会话写盘前复用同一插件。Harness 只依赖处理委托或 Pipeline Contract，不得依赖具体插件实现。
 
 #### Scenario: 内置 AI 助手获得脱敏收益
 
@@ -49,6 +73,16 @@ Credential Protection SHALL 挂载在 Router 统一 Provider 执行边界，而�
 
 - **WHEN** 外部 Agent Client 通过 LoomX 网关发送包含明文凭据的请求正文
 - **THEN** 同一个 Router Request Pipeline 在转发 Provider 前完成脱敏
+
+#### Scenario: Tool Result 进入会话前脱敏
+
+- **WHEN** Browser 或其他工具返回包含明文凭据的结构化结果
+- **THEN** 结果经 `tool-result` Pipeline token 化后才进入 Session、事件与 UI
+
+#### Scenario: 历史会话跨重启恢复
+
+- **WHEN** token 化后的会话 JSONL 在应用重启后被加载
+- **THEN** `response` Pipeline 使用 SQLite 长期映射恢复原内容，且 JSONL 与 token 数据库均不包含明文凭据
 
 ### Requirement: Provider 鉴权不被破坏
 

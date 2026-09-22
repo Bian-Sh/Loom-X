@@ -96,7 +96,7 @@ public sealed class CredentialProtectionTests : IDisposable
     // ── 脱敏替换 ────────────────────────────────────────────────────────
 
     [Fact]
-    public void Mask_ReplacesJsonFieldValues_WithFixedPlaceholder()
+    public void Mask_ReplacesJsonFieldValues_WithRestorablePlaceholder()
     {
         var engine = CreateEngine();
         const string secret = "sk-abcdefghij0123456789abcd";
@@ -107,8 +107,114 @@ public sealed class CredentialProtectionTests : IDisposable
 
         Assert.True(changed);
         Assert.DoesNotContain(secret, sanitized, StringComparison.Ordinal);
-        Assert.Contains(CredentialEngine.RedactedPlaceholder, sanitized, StringComparison.Ordinal);
+        Assert.Contains(CredentialEngine.PlaceholderPrefix, sanitized, StringComparison.Ordinal);
         Assert.Contains("\"status\":200", sanitized, StringComparison.Ordinal); // 非敏感字段保留
+
+        var restored = engine.RestoreTransportPayload(sanitized, out var restoredChanged);
+        Assert.True(restoredChanged);
+        Assert.Contains(secret, restored, StringComparison.Ordinal);
+        Assert.DoesNotContain(CredentialEngine.PlaceholderPrefix, restored, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RestoreTransportPayload_PreservesJson_WhenSecretContainsEscapes()
+    {
+        var engine = CreateEngine();
+        const string secret = "line1\n\"quoted\"\\tail";
+        var sanitized = engine.Sanitize(
+            $$"""{"api_key":{{System.Text.Json.JsonSerializer.Serialize(secret)}}}""",
+            out var masked);
+
+        var restored = engine.RestoreTransportPayload(sanitized, out var changed);
+
+        Assert.True(masked);
+        Assert.True(changed);
+        using var document = System.Text.Json.JsonDocument.Parse(restored);
+        Assert.Equal(secret, document.RootElement.GetProperty("api_key").GetString());
+    }
+
+    [Fact]
+    public void Restore_LeavesUnknownOrForgedPlaceholderUnchanged()
+    {
+        var engine = CreateEngine();
+        const string forged = "{{LOOMX_CREDENTIAL_ABCDEFGHIJKLMNOPQRST}}";
+
+        var restored = engine.Restore(forged, out var changed);
+
+        Assert.False(changed);
+        Assert.Equal(forged, restored);
+    }
+
+    [Fact]
+    public void Mask_SameSecret_ReusesPlaceholderWithinEngineLifetime()
+    {
+        var engine = CreateEngine();
+        const string secret = "sk-abcdefghij0123456789abcd";
+
+        var first = engine.Sanitize(secret, out _);
+        var second = engine.Sanitize(secret, out _);
+
+        Assert.Equal(first, second);
+        Assert.StartsWith(CredentialEngine.PlaceholderPrefix, first, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RestoreTransportPayload_PreservesEmbeddedToolArgumentsJson()
+    {
+        var engine = CreateEngine();
+        const string secret = "line1\n\"quoted\"\\tail";
+        var sanitizedSource = engine.Sanitize(
+            System.Text.Json.JsonSerializer.Serialize(new { api_key = secret }),
+            out _);
+        using var sanitizedDocument = System.Text.Json.JsonDocument.Parse(sanitizedSource);
+        var token = sanitizedDocument.RootElement.GetProperty("api_key").GetString()!;
+        var arguments = System.Text.Json.JsonSerializer.Serialize(new { api_key = token });
+        var response = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            choices = new[]
+            {
+                new { message = new { tool_calls = new[] { new { function = new { arguments } } } } },
+            },
+        });
+
+        var restored = engine.RestoreTransportPayload(response, out var changed);
+
+        Assert.True(changed);
+        using var outer = System.Text.Json.JsonDocument.Parse(restored);
+        var restoredArguments = outer.RootElement.GetProperty("choices")[0]
+            .GetProperty("message").GetProperty("tool_calls")[0]
+            .GetProperty("function").GetProperty("arguments").GetString();
+        using var inner = System.Text.Json.JsonDocument.Parse(restoredArguments!);
+        Assert.Equal(secret, inner.RootElement.GetProperty("api_key").GetString());
+    }
+
+    [Fact]
+    public void TokenMapping_PersistsAcrossEngineRestart_WithoutPlaintextInDatabase()
+    {
+        Directory.CreateDirectory(dataDirectory);
+        const string secret = "sk-persistent-abcdefghij0123456789";
+        var firstEngine = new CredentialEngine(new SensitiveRuleStore(dataDirectory));
+        var token = firstEngine.Sanitize(secret, out var changed);
+
+        var restartedEngine = new CredentialEngine(new SensitiveRuleStore(dataDirectory));
+        var restored = restartedEngine.Restore(token, out var restoredChanged);
+
+        Assert.True(changed);
+        Assert.True(restoredChanged);
+        Assert.Equal(secret, restored);
+        var databaseBytes = File.ReadAllBytes(Path.Combine(dataDirectory, "credential-tokens.db"));
+        Assert.DoesNotContain(secret, System.Text.Encoding.UTF8.GetString(databaseBytes), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TokenMapping_SameSecretAcrossEngineRestart_ReusesStableToken()
+    {
+        Directory.CreateDirectory(dataDirectory);
+        const string secret = "sk-stable-abcdefghij0123456789";
+        var first = new CredentialEngine(new SensitiveRuleStore(dataDirectory)).Sanitize(secret, out _);
+        var second = new CredentialEngine(new SensitiveRuleStore(dataDirectory)).Sanitize(secret, out _);
+
+        Assert.Equal(first, second);
     }
 
     [Fact]

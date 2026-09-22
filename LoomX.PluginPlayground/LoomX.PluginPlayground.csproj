@@ -20,10 +20,10 @@
       <_PluginOutputDir>@(FirstPartyPlugin->'%(RootDir)%(Directory)')</_PluginOutputDir>
     </PropertyGroup>
     <ItemGroup>
-      <_PluginPayload Include="$(_PluginOutputDir)*" />
+      <_PluginPayload Include="$(_PluginOutputDir)**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(_PluginPayload)"
-          DestinationFolder="$(OutputPath)plugins\loomx.credential-protection\"
+          DestinationFiles="@(_PluginPayload->'$(OutputPath)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

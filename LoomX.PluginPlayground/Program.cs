@@ -45,7 +45,7 @@ var protectedResult = requestPipeline is null
 Check("请求正文中的凭据已脱敏",
     protectedResult.Outcome == PipelineOutcome.Modified
     && !protectedResult.Payload.Contains(secret, StringComparison.Ordinal)
-    && protectedResult.Payload.Contains("***", StringComparison.Ordinal));
+    && protectedResult.Payload.Contains("{{LOOMX_CREDENTIAL_", StringComparison.Ordinal));
 
 const string businessPayload = """{"model":"example-model","status":"ready"}""";
 var businessResult = requestPipeline is null

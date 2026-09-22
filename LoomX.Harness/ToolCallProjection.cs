@@ -3,7 +3,11 @@ using System.Text.Json.Nodes;
 
 namespace LoomX.Assistant;
 
-public static class ToolArgumentSafety
+/// <summary>
+/// 将原始工具调用投影为可进入历史、事件、UI 与批准流程的公开协议形态。
+/// 该组件不负责凭据检测；凭据保护统一由 Credential Protection Pipeline 完成。
+/// </summary>
+public static class ToolCallProjection
 {
     private const string HiddenArgumentsJson = "{\"summary\":\"参数已隐藏\"}";
     internal const string UnknownToolName = "unknown.tool";

@@ -44,8 +44,6 @@ public sealed class PluginLoadContext : AssemblyLoadContext
 
     private static bool IsShared(string assemblyName) =>
         SharedAssemblyNames.Contains(assemblyName)
-        || assemblyName.StartsWith("System.", StringComparison.Ordinal)
-        || assemblyName.StartsWith("Microsoft.", StringComparison.Ordinal)
         || assemblyName is "netstandard" or "mscorlib"
         || Default.Assemblies.Any(assembly =>
             string.Equals(assembly.GetName().Name, assemblyName, StringComparison.OrdinalIgnoreCase));

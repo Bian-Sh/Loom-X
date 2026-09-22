@@ -669,7 +669,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 var calls = new JsonArray();
                 foreach (var rawCall in message.ToolCalls)
                 {
-                    var call = ToolArgumentSafety.EnsureSafe(rawCall);
+                    var call = ToolCallProjection.EnsureSafe(rawCall);
                     calls.Add(new JsonObject
                     {
                         ["id"] = call.Id,

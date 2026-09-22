@@ -53,7 +53,7 @@ public sealed class AgentSession
     public IReadOnlyList<ChatMessage> Messages => messages;
     public IReadOnlyList<AgentEvent> Activities => activities;
 
-    internal void AddMessage(ChatMessage message) => messages.Add(ToolArgumentSafety.EnsureSafe(message));
+    internal void AddMessage(ChatMessage message) => messages.Add(ToolCallProjection.EnsureSafe(message));
 
     /// <summary>补齐中断运行遗留的工具结果，保证下一次请求仍满足工具调用协议。</summary>
     internal int RepairDanglingToolCalls(string cancelledResult)
@@ -88,7 +88,7 @@ public sealed class AgentSession
 
                 messages.Insert(
                     insertIndex++,
-                    ToolArgumentSafety.EnsureSafe(ChatMessage.ToolResult(toolCall, cancelledResult)));
+                    ToolCallProjection.EnsureSafe(ChatMessage.ToolResult(toolCall, cancelledResult)));
                 if (!string.IsNullOrEmpty(toolCall.Id))
                 {
                     respondedCallIds.Add(toolCall.Id);
@@ -120,7 +120,7 @@ public sealed class AgentSession
     }
 
     /// <summary>从持久化恢复消息（不清空系统提示之外的校验，内容由存储层保证安全）。</summary>
-    internal void RestoreMessage(ChatMessage message) => messages.Add(ToolArgumentSafety.EnsureSafe(message));
+    internal void RestoreMessage(ChatMessage message) => messages.Add(ToolCallProjection.EnsureSafe(message));
     internal void RecordActivity(AgentEvent activity) => activities.Add(activity);
 
     /// <summary>从持久化恢复状态；Running 属于崩溃残留，恢复为 Cancelled。</summary>

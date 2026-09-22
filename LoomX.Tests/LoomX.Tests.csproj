@@ -32,6 +32,9 @@
     <ProjectReference Include="..\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- 保留流程探针文件，但不纳入自动化测试，避免访问真实用户数据库。 -->
     <Compile Remove="TempDbProbeTests.cs" />
   </ItemGroup>

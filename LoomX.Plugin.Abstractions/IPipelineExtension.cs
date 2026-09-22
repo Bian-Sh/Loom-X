@@ -26,6 +26,13 @@ public interface IRequestExtension : IPipelineExtension
         PipelineContext context, string payload, CancellationToken cancellationToken);
 }
 
+/// <summary>Router Provider 响应正文扩展点：上游响应返回给 Router 客户前执行。</summary>
+public interface IResponseExtension : IPipelineExtension
+{
+    ValueTask<PipelineResult> ProcessResponseAsync(
+        PipelineContext context, string payload, CancellationToken cancellationToken);
+}
+
 /// <summary>Router 结构化 Tool Result 扩展点（候选契约，生产挂载留待后续 change）。</summary>
 public interface IToolResultExtension : IPipelineExtension
 {

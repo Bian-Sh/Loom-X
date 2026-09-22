@@ -63,6 +63,8 @@ public sealed class Pipeline : IPipeline
             {
                 result = entry.Extension switch
                 {
+                    IResponseExtension response =>
+                        await response.ProcessResponseAsync(context, current, cancellationToken),
                     IToolResultExtension toolResult =>
                         await toolResult.ProcessToolResultAsync(context, current, cancellationToken),
                     IPersistenceExtension persistence =>

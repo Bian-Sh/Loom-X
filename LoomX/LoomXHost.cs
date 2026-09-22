@@ -67,8 +67,7 @@ public static class LoomXHost
             services.GetRequiredService<ILogger<Assistant.AssistantTester>>()));
         builder.Services.AddSingleton(_ => Assistant.SkillStore.ForInstallDirectory());
 
-        // 小助手（Phase 3）：Browser Bridge、浏览器 Secret 保险库、网络探针与诊断工人
-        builder.Services.AddSingleton<Assistant.Browser.BrowserSecretVault>();
+        // 小助手（Phase 3）：Browser Bridge、网络探针与诊断工人
         builder.Services.AddSingleton<Assistant.NetworkProbe>();
         builder.Services.AddSingleton<Assistant.DiagnosticSubagent>();
         builder.Services.AddSingleton<Assistant.AssistantModelClientFactory>();
@@ -105,12 +104,10 @@ public static class LoomXHost
                 services.GetRequiredService<IDatabaseConfigurationProvider>(),
                 services.GetRequiredService<Assistant.AssistantTester>(),
                 services.GetRequiredService<Assistant.SkillStore>(),
-                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>(),
                 services.GetRequiredService<GatewayStateHub>());
             Assistant.Browser.BrowserTools.RegisterAll(
                 registry,
                 services.GetRequiredService<Assistant.Browser.IBrowserBridge>(),
-                services.GetRequiredService<Assistant.Browser.BrowserSecretVault>(),
                 services.GetRequiredService<Assistant.Browser.BrowserBridgeLeaseManager>());
             Assistant.TomlTools.RegisterAll(
                 registry,
@@ -134,17 +131,41 @@ public static class LoomXHost
                 DataRootDirectory = Path.Combine(AppDataPaths.RootDirectory, "plugins"),
             },
             services.GetRequiredService<ILoggerFactory>()));
-        builder.Services.AddSingleton<IProviderExecutionPipeline>(services => new ProviderExecutionPipeline(
-            services.GetRequiredService<ILogger<ProviderExecutionPipeline>>(),
-            services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>().GetPipeline("request")));
+        builder.Services.AddSingleton<IProviderExecutionPipeline>(services =>
+        {
+            var runtime = services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>();
+            return new ProviderExecutionPipeline(
+                services.GetRequiredService<ILogger<ProviderExecutionPipeline>>(),
+                runtime.GetPipeline("request"),
+                runtime.GetPipeline("response"));
+        });
 
         // 小助手（Phase 4）：会话门面与持久化。小助手作为 Router 客户，通过
         // IProviderExecutionPipeline 自动获得 Router 插件收益，不直接依赖 PluginRuntime。
-        builder.Services.AddSingleton<Assistant.AssistantSessionStore>();
+        builder.Services.AddSingleton(services =>
+        {
+            var runtime = services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>();
+            return new Assistant.AssistantSessionStore(
+                logger: services.GetRequiredService<ILogger<Assistant.AssistantSessionStore>>(),
+                persistencePipeline: runtime.GetPipeline("persistence"),
+                responsePipeline: runtime.GetPipeline("response"));
+        });
         builder.Services.AddSingleton(services => new Assistant.AssistantPreferencesStore(
             services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
             services.GetRequiredService<ILogger<Assistant.AssistantPreferencesStore>>()));
-        builder.Services.AddSingleton<Assistant.AssistantService>();
+        builder.Services.AddSingleton(services =>
+        {
+            var runtime = services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>();
+            return new Assistant.AssistantService(
+                services.GetRequiredService<Assistant.AssistantModelClientFactory>(),
+                services.GetRequiredService<Assistant.ToolRegistry>(),
+                services.GetRequiredService<Assistant.AssistantSessionStore>(),
+                services.GetRequiredService<ILoggerFactory>(),
+                services.GetRequiredService<Assistant.AssistantPreferencesStore>(),
+                services.GetRequiredService<Assistant.UserDecisions.IUserDecisionBroker>(),
+                services.GetRequiredService<Assistant.Browser.BrowserBridgeLeaseManager>(),
+                runtime.GetPipeline("tool-result"));
+        });
 
         var app = builder.Build();
         app.Lifetime.ApplicationStopped.Register(startupDb.Dispose);

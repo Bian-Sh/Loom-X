@@ -516,7 +516,7 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(fieldId, "文本默认值超过最大长度。"));
         }
-        else if (SensitiveKeyPolicy.ContainsSensitiveContent(field.DefaultText))
+        else if (AssistantContentPolicy.ContainsSensitiveContent(field.DefaultText))
         {
             errors.Add(new UserDecisionValidationError(fieldId, "文本默认值包含敏感字段模式。"));
         }
@@ -649,7 +649,7 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(field.Id, "文本长度超过最大限制。"));
         }
-        else if (SensitiveKeyPolicy.ContainsSensitiveContent(text))
+        else if (AssistantContentPolicy.ContainsSensitiveContent(text))
         {
             errors.Add(new UserDecisionValidationError(field.Id, "文本内容包含敏感信息。"));
         }
@@ -698,7 +698,7 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}长度超过限制。"));
         }
-        else if (SensitiveKeyPolicy.IsSensitivePath([value]))
+        else if (AssistantContentPolicy.IsSensitivePath([value]))
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}包含敏感字段模式。"));
         }
@@ -726,7 +726,7 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}长度超过限制。"));
         }
-        else if (SensitiveKeyPolicy.ContainsSensitiveContent(value))
+        else if (AssistantContentPolicy.ContainsSensitiveContent(value))
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}包含敏感字段模式。"));
         }

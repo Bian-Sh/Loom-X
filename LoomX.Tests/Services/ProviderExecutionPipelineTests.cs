@@ -2,6 +2,7 @@ using System.Net;
 using System.IO.Compression;
 using System.Text;
 using LoomX.Assistant;
+using LoomX.Plugins;
 using LoomX.Services;
 using Xunit;
 
@@ -95,6 +96,142 @@ public sealed class ProviderExecutionPipelineTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_AppliesResponsePipelineAndRemovesContentLength()
+    {
+        const string token = "{{LOOMX_CREDENTIAL_ABCDEFGHIJKLMNOPQRST}}";
+        const string secret = "secret\n\"quoted\"";
+        var responsePipeline = new ReplacingResponsePipeline(token, secret);
+        var responseBody = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            choices = new[] { new { message = new { content = token } } },
+        });
+        using var httpClient = new HttpClient(new StaticResponseHandler(
+            HttpStatusCode.OK,
+            responseBody,
+            "application/json"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://provider.example/v1/chat/completions");
+        var pipeline = new ProviderExecutionPipeline(responsePipeline: responsePipeline);
+
+        var result = await pipeline.ExecuteAsync(
+            httpClient,
+            request,
+            new ProviderExecutionContext("provider", "model", "openai", "/chat/completions"),
+            CancellationToken.None);
+
+        Assert.True(result.WasNormalized);
+        Assert.DoesNotContain(token, result.BodyText, StringComparison.Ordinal);
+        Assert.Contains("secret", result.BodyText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content-Length", result.Headers.Keys, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteStreamingAsync_RestoresPlaceholderSplitAcrossSseContentEvents()
+    {
+        const string token = "{{LOOMX_CREDENTIAL_ABCDEFGHIJKLMNOPQRST}}";
+        const string secret = "restored-secret";
+        var first = token[..23];
+        var second = token[23..];
+        var body =
+            "data: " + System.Text.Json.JsonSerializer.Serialize(new
+            {
+                choices = new[] { new { index = 0, delta = new { content = first } } },
+            }) + "\n\n" +
+            "data: " + System.Text.Json.JsonSerializer.Serialize(new
+            {
+                choices = new[] { new { index = 0, delta = new { content = second } } },
+            }) + "\n\n" +
+            "data: [DONE]\n\n";
+        using var httpClient = new HttpClient(new StaticResponseHandler(HttpStatusCode.OK, body, "text/event-stream"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://provider.example/v1/chat/completions");
+        var pipeline = new ProviderExecutionPipeline(responsePipeline: new ReplacingResponsePipeline(token, secret));
+
+        await using var result = await pipeline.ExecuteStreamingAsync(
+            httpClient,
+            request,
+            new ProviderExecutionContext("provider", "model", "openai", "/chat/completions"),
+            CancellationToken.None);
+        using var reader = new StreamReader(result.Body, Encoding.UTF8);
+        var restored = await reader.ReadToEndAsync();
+
+        Assert.Contains(secret, restored, StringComparison.Ordinal);
+        Assert.DoesNotContain(token, restored, StringComparison.Ordinal);
+        Assert.EndsWith("data: [DONE]\n\n", restored, StringComparison.Ordinal);
+        var events = restored.Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(3, events.Length);
+        foreach (var item in events.Take(2))
+            System.Text.Json.JsonDocument.Parse(item["data: ".Length..]).Dispose();
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_RestoresPlaceholderSplitAcrossBufferedSseEvents()
+    {
+        const string token = "{{LOOMX_CREDENTIAL_ABCDEFGHIJKLMNOPQRST}}";
+        const string secret = "buffered-secret";
+        var body =
+            "data: " + System.Text.Json.JsonSerializer.Serialize(new
+            {
+                choices = new[] { new { index = 0, delta = new { content = token[..20] } } },
+            }) + "\n\n" +
+            "data: " + System.Text.Json.JsonSerializer.Serialize(new
+            {
+                choices = new[] { new { index = 0, delta = new { content = token[20..] } } },
+            }) + "\n\n" +
+            "data: [DONE]\n\n";
+        using var httpClient = new HttpClient(new StaticResponseHandler(HttpStatusCode.OK, body, "text/event-stream"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://provider.example/v1/chat/completions");
+        var pipeline = new ProviderExecutionPipeline(responsePipeline: new ReplacingResponsePipeline(token, secret));
+
+        var result = await pipeline.ExecuteAsync(
+            httpClient,
+            request,
+            new ProviderExecutionContext("provider", "model", "openai", "/chat/completions"),
+            CancellationToken.None);
+
+        Assert.Contains(secret, result.BodyText, StringComparison.Ordinal);
+        Assert.DoesNotContain(token, result.BodyText, StringComparison.Ordinal);
+        Assert.Equal(3, result.BodyText.Split("\n\n", StringSplitOptions.RemoveEmptyEntries).Length);
+    }
+
+    [Fact]
+    public async Task ExecuteStreamingAsync_RestoresPlaceholderSplitAcrossToolArgumentEvents()
+    {
+        const string token = "{{LOOMX_CREDENTIAL_ABCDEFGHIJKLMNOPQRST}}";
+        const string secret = "tool-secret";
+        var first = token[..19];
+        var second = token[19..];
+        var body =
+            "data: " + System.Text.Json.JsonSerializer.Serialize(new
+            {
+                choices = new[]
+                {
+                    new { index = 0, delta = new { tool_calls = new[] { new { index = 0, function = new { arguments = first } } } } },
+                },
+            }) + "\n\n" +
+            "data: " + System.Text.Json.JsonSerializer.Serialize(new
+            {
+                choices = new[]
+                {
+                    new { index = 0, delta = new { tool_calls = new[] { new { index = 0, function = new { arguments = second } } } } },
+                },
+            }) + "\n\n" +
+            "data: [DONE]\n\n";
+        using var httpClient = new HttpClient(new StaticResponseHandler(HttpStatusCode.OK, body, "text/event-stream"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://provider.example/v1/chat/completions");
+        var pipeline = new ProviderExecutionPipeline(responsePipeline: new ReplacingResponsePipeline(token, secret));
+
+        await using var result = await pipeline.ExecuteStreamingAsync(
+            httpClient,
+            request,
+            new ProviderExecutionContext("provider", "model", "openai", "/chat/completions"),
+            CancellationToken.None);
+        using var reader = new StreamReader(result.Body, Encoding.UTF8);
+        var restored = await reader.ReadToEndAsync();
+
+        Assert.Contains(secret, restored, StringComparison.Ordinal);
+        Assert.DoesNotContain(token, restored, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AssistantClient_UsesInjectedPipelineAndProviderContext()
     {
         var pipeline = new CapturingPipeline();
@@ -116,6 +253,22 @@ public sealed class ProviderExecutionPipelineTests
         Assert.Equal("provider-1", pipeline.Context!.ProviderId);
         Assert.Equal("model-1", pipeline.Context.ModelId);
         Assert.Equal("/chat/completions", pipeline.Context.UpstreamPath);
+    }
+
+    private sealed class ReplacingResponsePipeline(string token, string secret) : IPipeline
+    {
+        public string PipelineId => "response";
+        public ExtensionKind Kind => ExtensionKind.Response;
+
+        public ValueTask<PipelineResult> ExecuteAsync(
+            string payload,
+            CancellationToken cancellationToken = default)
+        {
+            var replaced = payload.Replace(token, secret, StringComparison.Ordinal);
+            return ValueTask.FromResult(string.Equals(payload, replaced, StringComparison.Ordinal)
+                ? PipelineResult.Pass(payload)
+                : PipelineResult.Modify(replaced));
+        }
     }
 
     private sealed class StaticResponseHandler(HttpStatusCode statusCode, string body, string mediaType) : HttpMessageHandler

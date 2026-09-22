@@ -5,7 +5,8 @@ using System.Text.Json.Nodes;
 namespace LoomX.Tests.Assistant;
 
 /// <summary>
-/// 会话持久化：保存/载入回环、列表摘要、Secret 兜底扫描、Running 状态恢复。
+/// 会话持久化：保存/载入回环、列表摘要与 Running 状态恢复。
+/// 凭据脱敏/恢复由独立 Pipeline 集成测试覆盖。
 /// </summary>
 public sealed class AssistantSessionStoreTests : IDisposable
 {
@@ -115,26 +116,16 @@ public sealed class AssistantSessionStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Save_SecretShapedContent_Refused()
-    {
-        var session = new AgentSession();
-        session.RestoreMessage(ChatMessage.User($"我的 Key 是 sk-abcdefghijklmnopqrstuvwxyz012345 帮我存一下"));
-
-        await Assert.ThrowsAsync<InvalidOperationException>(() => store.SaveAsync(session));
-        Assert.Empty(store.List());
-    }
-
-    [Fact]
-    public async Task Save_SecretRefContent_Allowed()
+    public async Task Save_CredentialConfiguredState_Allowed()
     {
         var session = new AgentSession();
         session.RestoreMessage(ChatMessage.ToolResult(
             new ToolCall("c1", "loomx.get_provider", """{"id":"x"}"""),
-            """{"api_key":{"configured":true,"secret_ref":"secret://provider/demo/apikey"}}"""));
+            """{"api_key_configured":true}"""));
         session.MarkRunning();
         session.MarkCompleted();
 
-        await store.SaveAsync(session); // secret_ref 不含明文，必须允许落盘
+        await store.SaveAsync(session);
         Assert.Single(store.List());
     }
 
@@ -274,16 +265,6 @@ public sealed class AssistantSessionStoreTests : IDisposable
         Assert.Equal(2, (await store.LoadAsync(session.Id))!.Messages.Count);
     }
 
-    [Theory]
-    [InlineData("sk-abc123", false)]                       // 太短，不算 Key
-    [InlineData("sk-abcdefghijklmnopqrstuvwxyz012345", true)]
-    [InlineData("Authorization: Bearer abcdef0123456789abcdef", true)]
-    [InlineData("secret://provider/demo/apikey", false)]   // secret_ref 是安全引用
-    [InlineData("普通中文内容，没有任何敏感信息", false)]
-    public void SecretLeakScan_DetectsShapes(string content, bool expected)
-    {
-        Assert.Equal(expected, AssistantSessionStore.SecretLeakScan($"{{\"content\":\"{content}\"}}"));
-    }
     [Fact]
     public async Task LoadAsync_旧Jsonl未标记工具参数时隐藏原文()
     {
