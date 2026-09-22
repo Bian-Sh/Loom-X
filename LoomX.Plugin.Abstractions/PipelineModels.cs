@@ -43,3 +43,15 @@ public interface IPipeline
     /// <summary>按配置顺序执行启用的 Entry，返回最终处理结果。</summary>
     ValueTask<PipelineResult> ExecuteAsync(string payload, CancellationToken cancellationToken = default);
 }
+
+/// <summary>
+/// 可接收 Router Provider 执行元数据的 Pipeline。元数据只包含 Provider/协议/路径等安全摘要，
+/// 不得包含认证 Header、请求正文、响应正文或其他敏感值。
+/// </summary>
+public interface IContextualPipeline : IPipeline
+{
+    ValueTask<PipelineResult> ExecuteAsync(
+        string payload,
+        IReadOnlyDictionary<string, string> metadata,
+        CancellationToken cancellationToken = default);
+}

@@ -17,7 +17,7 @@ public sealed class PipelineEntry(IPipelineExtension extension, string pluginId)
 /// 异常隔离：普通 Entry 失败记录诊断并继续；数据安全类（FailClosed）Entry 失败返回 Blocked，
 /// 原始数据不得放行。插件之间互不感知。
 /// </summary>
-public sealed class Pipeline : IPipeline
+public sealed class Pipeline : IContextualPipeline
 {
     private readonly List<PipelineEntry> entries = [];
     private readonly ILogger logger;
@@ -47,8 +47,17 @@ public sealed class Pipeline : IPipeline
         entries.AddRange(configuredOrder);
     }
 
-    public async ValueTask<PipelineResult> ExecuteAsync(string payload, CancellationToken cancellationToken = default)
+    public ValueTask<PipelineResult> ExecuteAsync(
+        string payload,
+        CancellationToken cancellationToken = default) =>
+        ExecuteAsync(payload, new Dictionary<string, string>(StringComparer.Ordinal), cancellationToken);
+
+    public async ValueTask<PipelineResult> ExecuteAsync(
+        string payload,
+        IReadOnlyDictionary<string, string> metadata,
+        CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(metadata);
         var current = payload ?? string.Empty;
         var modified = false;
 
@@ -57,7 +66,7 @@ public sealed class Pipeline : IPipeline
             cancellationToken.ThrowIfCancellationRequested();
             if (!entry.Enabled) continue;
 
-            var context = new PipelineContext(PipelineId, entry.PluginId, entry.Extension.ExtensionId);
+            var context = new PipelineContext(PipelineId, entry.PluginId, entry.Extension.ExtensionId, metadata);
             PipelineResult result;
             try
             {

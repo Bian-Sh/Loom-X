@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using LoomX.Plugins;
 
 namespace LoomX.CredentialProtection;
@@ -66,16 +68,163 @@ public abstract class CredentialExtensionBase(CredentialEngine engine) : IPipeli
 }
 
 /// <summary>Router 请求扩展点：请求正文发送给外部 Provider 前脱敏。</summary>
-public sealed class CredentialRequestExtension(CredentialEngine engine)
-    : CredentialExtensionBase(engine), IRequestExtension
+public sealed class CredentialRequestExtension(CredentialEngine engine) : IRequestExtension
 {
-    public override string ExtensionId => "credential.request";
+    public string ExtensionId => "credential.request";
 
-    public override ExtensionKind Kind => ExtensionKind.Request;
+    public ExtensionKind Kind => ExtensionKind.Request;
+
+    public ExtensionFailurePolicy FailurePolicy => ExtensionFailurePolicy.FailClosed;
+
+    public IReadOnlyList<string> Capabilities =>
+        ["credential.detect", "credential.mask", "credential.integrity-instruction"];
 
     public ValueTask<PipelineResult> ProcessRequestAsync(
-        PipelineContext context, string payload, CancellationToken cancellationToken) =>
-        Process(payload);
+        PipelineContext context, string payload, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var sanitized = engine.Sanitize(payload, out var sanitizedChanged);
+            var transformed = sanitized;
+            var instructionChanged = false;
+            if (CredentialEngine.ContainsPlaceholderCandidate(sanitized))
+            {
+                transformed = CredentialIntegrityInstructionInjector.Inject(
+                    sanitized,
+                    context.Metadata is not null
+                        && context.Metadata.TryGetValue("api_mode", out var apiMode)
+                            ? apiMode
+                            : null,
+                    out instructionChanged);
+            }
+            var changed = sanitizedChanged || instructionChanged;
+            return ValueTask.FromResult(changed
+                ? PipelineResult.Modify(transformed, "敏感数据已脱敏并应用凭据引用完整性指令。")
+                : PipelineResult.Pass(payload));
+        }
+        catch (Exception)
+        {
+            return ValueTask.FromResult(PipelineResult.Block("凭据保护处理失败，已阻止原始数据。"));
+        }
+    }
+}
+
+internal static class CredentialIntegrityInstructionInjector
+{
+    public static string Inject(string payload, string? apiMode, out bool changed)
+    {
+        changed = false;
+        JsonNode? root;
+        try { root = JsonNode.Parse(payload); }
+        catch (JsonException) { return payload; }
+        if (root is not JsonObject jsonObject) return payload;
+
+        var mode = apiMode?.Trim().ToLowerInvariant();
+        if (mode == "anthropic" || jsonObject["system"] is not null && jsonObject["messages"] is JsonArray)
+        {
+            changed = InjectAnthropicSystem(jsonObject);
+        }
+        else if (jsonObject["messages"] is JsonArray messages)
+        {
+            changed = InjectOpenAiMessages(messages);
+        }
+        else if (jsonObject["contents"] is JsonArray)
+        {
+            changed = InjectGeminiSystemInstruction(jsonObject);
+        }
+        else if (jsonObject["prompt"] is JsonValue promptValue
+                 && promptValue.TryGetValue<string>(out var prompt))
+        {
+            if (prompt.Contains(CredentialEngine.IntegrityInstruction, StringComparison.Ordinal)) return payload;
+            jsonObject["prompt"] = CredentialEngine.IntegrityInstruction + "\n\n" + prompt;
+            changed = true;
+        }
+
+        return changed ? jsonObject.ToJsonString() : payload;
+    }
+
+    private static bool InjectOpenAiMessages(JsonArray messages)
+    {
+        foreach (var item in messages)
+        {
+            if (item is not JsonObject message) continue;
+            var role = message["role"]?.GetValue<string>();
+            if (role is not ("system" or "developer")) continue;
+            if (TryAppendContent(message, CredentialEngine.IntegrityInstruction)) return true;
+            if (ContainsInstruction(message["content"])) return false;
+        }
+
+        messages.Insert(0, new JsonObject
+        {
+            ["role"] = "system",
+            ["content"] = CredentialEngine.IntegrityInstruction,
+        });
+        return true;
+    }
+
+    private static bool InjectAnthropicSystem(JsonObject root)
+    {
+        var system = root["system"];
+        if (system is null)
+        {
+            root["system"] = CredentialEngine.IntegrityInstruction;
+            return true;
+        }
+        if (ContainsInstruction(system)) return false;
+        if (system is JsonValue value && value.TryGetValue<string>(out var text))
+        {
+            root["system"] = text + "\n\n" + CredentialEngine.IntegrityInstruction;
+            return true;
+        }
+        if (system is JsonArray array)
+        {
+            array.Add(new JsonObject
+            {
+                ["type"] = "text",
+                ["text"] = CredentialEngine.IntegrityInstruction,
+            });
+            return true;
+        }
+        return false;
+    }
+
+    private static bool InjectGeminiSystemInstruction(JsonObject root)
+    {
+        var systemInstruction = root["systemInstruction"] as JsonObject;
+        if (systemInstruction is null)
+        {
+            root["systemInstruction"] = new JsonObject
+            {
+                ["parts"] = new JsonArray(new JsonObject { ["text"] = CredentialEngine.IntegrityInstruction }),
+            };
+            return true;
+        }
+        if (ContainsInstruction(systemInstruction)) return false;
+        var parts = systemInstruction["parts"] as JsonArray ?? new JsonArray();
+        systemInstruction["parts"] = parts;
+        parts.Add(new JsonObject { ["text"] = CredentialEngine.IntegrityInstruction });
+        return true;
+    }
+
+    private static bool TryAppendContent(JsonObject message, string instruction)
+    {
+        if (message["content"] is JsonValue value && value.TryGetValue<string>(out var text))
+        {
+            if (text.Contains(instruction, StringComparison.Ordinal)) return false;
+            message["content"] = text + "\n\n" + instruction;
+            return true;
+        }
+        if (message["content"] is JsonArray array)
+        {
+            if (ContainsInstruction(array)) return false;
+            array.Add(new JsonObject { ["type"] = "text", ["text"] = instruction });
+            return true;
+        }
+        return false;
+    }
+
+    private static bool ContainsInstruction(JsonNode? node) =>
+        node?.ToJsonString().Contains(CredentialEngine.IntegrityInstruction, StringComparison.Ordinal) == true;
 }
 
 /// <summary>Router 响应扩展点：只恢复本地签发的有效占位符，未知 token 保持原样。</summary>

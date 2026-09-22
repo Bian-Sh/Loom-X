@@ -18,9 +18,14 @@ public class CredentialEngine
     public const string PlaceholderPrefix = "{{LOOMX_CREDENTIAL_";
 
     private static readonly Regex PlaceholderPattern = new(
-        @"\{\{LOOMX_CREDENTIAL_[A-Z2-7]{20}\}\}",
-        RegexOptions.CultureInvariant | RegexOptions.Compiled,
+        @"\{\{[ \t\r\n]*L[ \t\r\n]*O[ \t\r\n]*O[ \t\r\n]*M[ \t\r\n]*X[ \t\r\n]*_[ \t\r\n]*C[ \t\r\n]*R[ \t\r\n]*E[ \t\r\n]*D[ \t\r\n]*E[ \t\r\n]*N[ \t\r\n]*T[ \t\r\n]*I[ \t\r\n]*A[ \t\r\n]*L[ \t\r\n]*_[ \t\r\n]*(?<id>(?:[A-Z2-7][ \t\r\n]*){20})\}[ \t\r\n]*\}",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled,
         TimeSpan.FromSeconds(1));
+
+    public const string IntegrityInstruction =
+        "LoomX 凭据引用（形如 {{LOOMX_CREDENTIAL_...}}）是不透明且不可变的本地引用。" +
+        "你可以根据目标 JSON、Header、URL、Shell 或工具调用语法放置完整引用，" +
+        "但必须逐字符原样复制引用本身，不得修改大小写、增删空白、拆分、转义、翻译、猜测或重新格式化。";
     private static readonly string[] HeaderContainerNames = ["headers", "custom_headers", "http_headers"];
 
     private readonly SensitiveRuleStore store;
@@ -101,20 +106,37 @@ public class CredentialEngine
         changed = false;
         if (string.IsNullOrEmpty(payload)) return payload ?? string.Empty;
 
-        var matches = PlaceholderPattern.Matches(payload).Select(match => match.Value);
-        var snapshot = tokenStore.ResolveTokens(matches);
+        var candidates = PlaceholderPattern.Matches(payload)
+            .Select(match => new PlaceholderCandidate(match.Value, NormalizePlaceholder(match)))
+            .ToArray();
+        var snapshot = tokenStore.ResolveTokens(candidates.Select(candidate => candidate.Normalized));
         if (snapshot.Count == 0) return payload;
 
         var didChange = false;
         var restored = PlaceholderPattern.Replace(payload, match =>
         {
-            if (!snapshot.TryGetValue(match.Value, out var original)) return match.Value;
+            var normalized = NormalizePlaceholder(match);
+            if (!snapshot.TryGetValue(normalized, out var original)) return match.Value;
             didChange = true;
             return original;
         });
         changed = didChange;
         return restored;
     }
+
+    public static bool ContainsPlaceholderCandidate(string? payload) =>
+        !string.IsNullOrEmpty(payload) && PlaceholderPattern.IsMatch(payload);
+
+    private static string NormalizePlaceholder(Match match)
+    {
+        var id = string.Concat(match.Groups["id"].Value.Where(character => !IsAsciiWhitespace(character)))
+            .ToUpperInvariant();
+        return PlaceholderPrefix + id + "}}";
+    }
+
+    private static bool IsAsciiWhitespace(char character) => character is ' ' or '\t' or '\r' or '\n';
+
+    private sealed record PlaceholderCandidate(string Original, string Normalized);
 
     private bool TryRestoreJson(string payload, out string restored, out bool changed)
     {

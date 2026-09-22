@@ -222,7 +222,9 @@ public sealed class ProviderExecutionPipeline(
         PipelineResult result;
         try
         {
-            result = await requestPipeline.ExecuteAsync(payload, cancellationToken);
+            result = requestPipeline is IContextualPipeline contextualPipeline
+                ? await contextualPipeline.ExecuteAsync(payload, CreatePipelineMetadata(context), cancellationToken)
+                : await requestPipeline.ExecuteAsync(payload, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -268,6 +270,16 @@ public sealed class ProviderExecutionPipeline(
             context.UpstreamPath,
             Encoding.UTF8.GetByteCount(result.Payload));
     }
+
+    private static IReadOnlyDictionary<string, string> CreatePipelineMetadata(
+        ProviderExecutionContext context) =>
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["provider_id"] = context.ProviderId,
+            ["model_id"] = context.ModelId,
+            ["api_mode"] = context.ApiMode,
+            ["upstream_path"] = context.UpstreamPath,
+        };
 
     private async ValueTask<(string Payload, bool Modified)> ApplyResponsePipelineAsync(
         string payload,
@@ -391,13 +403,59 @@ public sealed class ProviderExecutionPipeline(
     }
 }
 
+internal static class PlaceholderStreamSyntax
+{
+    private const string CompactMarker = "{{LOOMX_CREDENTIAL_";
+    public const int MaximumCandidateLength = 96;
+
+    public static bool TryFindIncompleteSuffix(string value, out int candidateStart)
+    {
+        candidateStart = -1;
+        for (var start = value.LastIndexOf("{{", StringComparison.Ordinal);
+             start >= 0;
+             start = start == 0 ? -1 : value.LastIndexOf("{{", start - 1, StringComparison.Ordinal))
+        {
+            var suffix = value[start..];
+            var compact = CompactAsciiWhitespace(suffix).ToUpperInvariant();
+            if (CompactMarker.StartsWith(compact, StringComparison.Ordinal)
+                || compact.StartsWith(CompactMarker, StringComparison.Ordinal)
+                    && !compact.Contains("}}", StringComparison.Ordinal))
+            {
+                candidateStart = start;
+                return true;
+            }
+        }
+
+        var max = Math.Min(value.Length, CompactMarker.Length - 1);
+        for (var length = max; length > 0; length--)
+        {
+            var suffix = CompactAsciiWhitespace(value[^length..]).ToUpperInvariant();
+            if (suffix.Length > 0 && CompactMarker.StartsWith(suffix, StringComparison.Ordinal))
+            {
+                candidateStart = value.Length - length;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string CompactAsciiWhitespace(string value)
+    {
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value)
+            if (character is not (' ' or '\t' or '\r' or '\n'))
+                builder.Append(character);
+        return builder.ToString();
+    }
+}
+
 /// <summary>
 /// SSE 响应恢复包装器。按 JSON 字符串通道识别被模型拆到多个 delta 事件中的占位符，
 /// 暂存相关事件直到 token 完整，再经 Response Pipeline 恢复并按原顺序输出。
 /// </summary>
 internal sealed class SsePipelineRestoringStream : Stream
 {
-    private const string PlaceholderMarker = "{{LOOMX_CREDENTIAL_";
     private readonly StreamReader reader;
     private readonly IPipeline pipeline;
     private readonly ProviderExecutionContext context;
@@ -521,9 +579,9 @@ internal sealed class SsePipelineRestoringStream : Stream
         CancellationToken cancellationToken)
     {
         var combined = pendingChannels.TryGetValue(path, out var pending) ? pending.Text + text : text;
-        if (HasIncompletePlaceholderSuffix(combined))
+        if (PlaceholderStreamSyntax.TryFindIncompleteSuffix(combined, out var candidateStart))
         {
-            if (combined.Length > 64)
+            if (combined.Length - candidateStart > PlaceholderStreamSyntax.MaximumCandidateLength)
                 throw new InvalidOperationException("Router 流式响应中的凭据占位符超过合法长度，已阻止返回。");
             pendingChannels[path] = new PendingChannel(combined);
             return string.Empty;
@@ -598,16 +656,6 @@ internal sealed class SsePipelineRestoringStream : Stream
         catch (JsonException) { return false; }
     }
 
-    private static bool HasIncompletePlaceholderSuffix(string value)
-    {
-        var markerIndex = value.LastIndexOf(PlaceholderMarker, StringComparison.Ordinal);
-        if (markerIndex >= 0 && value.IndexOf("}}", markerIndex, StringComparison.Ordinal) < 0) return true;
-        var max = Math.Min(value.Length, PlaceholderMarker.Length - 1);
-        for (var length = max; length > 0; length--)
-            if (PlaceholderMarker.StartsWith(value[^length..], StringComparison.Ordinal)) return true;
-        return false;
-    }
-
     private static string GetStableArrayKey(JsonNode node, int fallbackIndex)
     {
         if (node is JsonObject jsonObject && jsonObject["index"] is JsonValue indexValue)
@@ -648,7 +696,6 @@ internal sealed class SsePipelineRestoringStream : Stream
 /// </summary>
 internal sealed class PipelineRestoringStream : Stream
 {
-    private const string PlaceholderMarker = "{{LOOMX_CREDENTIAL_";
     private readonly StreamReader reader;
     private readonly IPipeline pipeline;
     private readonly ProviderExecutionContext context;
@@ -709,29 +756,24 @@ internal sealed class PipelineRestoringStream : Stream
         if (read == 0)
         {
             completed = true;
+            if (PlaceholderStreamSyntax.TryFindIncompleteSuffix(pending, out _))
+                throw new InvalidOperationException("Router 流式响应以未闭合凭据占位符结束，已阻止返回。");
             await ProcessAsync(pending, cancellationToken);
             pending = string.Empty;
             return;
         }
 
         pending += new string(readBuffer, 0, read);
-        var markerIndex = pending.LastIndexOf(PlaceholderMarker, StringComparison.Ordinal);
-        var processLength = markerIndex >= 0 && pending.IndexOf("}}", markerIndex, StringComparison.Ordinal) < 0
-            ? markerIndex
-            : pending.Length - GetPartialMarkerSuffixLength(pending);
+        var processLength = PlaceholderStreamSyntax.TryFindIncompleteSuffix(pending, out var candidateStart)
+            ? candidateStart
+            : pending.Length;
+        if (candidateStart >= 0 && pending.Length - candidateStart > PlaceholderStreamSyntax.MaximumCandidateLength)
+            throw new InvalidOperationException("Router 流式响应中的凭据占位符超过合法长度，已阻止返回。");
         if (processLength <= 0) return;
 
         var process = pending[..processLength];
         pending = pending[processLength..];
         await ProcessAsync(process, cancellationToken);
-    }
-
-    private static int GetPartialMarkerSuffixLength(string value)
-    {
-        var max = Math.Min(value.Length, PlaceholderMarker.Length - 1);
-        for (var length = max; length > 0; length--)
-            if (PlaceholderMarker.StartsWith(value[^length..], StringComparison.Ordinal)) return length;
-        return 0;
     }
 
     private async Task ProcessAsync(string payload, CancellationToken cancellationToken)

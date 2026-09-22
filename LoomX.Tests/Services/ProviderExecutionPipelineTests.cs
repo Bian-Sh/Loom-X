@@ -232,6 +232,60 @@ public sealed class ProviderExecutionPipelineTests
     }
 
     [Fact]
+    public async Task ExecuteStreamingAsync_LongTextBeforePartialPlaceholder_DoesNotTriggerLengthFailure()
+    {
+        const string token = "{{LOOMX_CREDENTIAL_ABCDEFGHIJKLMNOPQRST}}";
+        const string secret = "long-prefix-secret";
+        var longPrefix = new string('x', 256);
+        var body =
+            "data: " + System.Text.Json.JsonSerializer.Serialize(new
+            {
+                choices = new[] { new { index = 0, delta = new { content = longPrefix + token[..18] } } },
+            }) + "\n\n" +
+            "data: " + System.Text.Json.JsonSerializer.Serialize(new
+            {
+                choices = new[] { new { index = 0, delta = new { content = token[18..] } } },
+            }) + "\n\n" +
+            "data: [DONE]\n\n";
+        using var httpClient = new HttpClient(new StaticResponseHandler(HttpStatusCode.OK, body, "text/event-stream"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://provider.example/v1/chat/completions");
+        var pipeline = new ProviderExecutionPipeline(responsePipeline: new ReplacingResponsePipeline(token, secret));
+
+        await using var result = await pipeline.ExecuteStreamingAsync(
+            httpClient,
+            request,
+            new ProviderExecutionContext("provider", "model", "openai", "/chat/completions"),
+            CancellationToken.None);
+        using var reader = new StreamReader(result.Body, Encoding.UTF8);
+        var restored = await reader.ReadToEndAsync();
+
+        Assert.Contains(longPrefix, restored, StringComparison.Ordinal);
+        Assert.Contains(secret, restored, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_PassesProviderMetadataToContextualRequestPipeline()
+    {
+        var requestPipeline = new MetadataCapturingPipeline();
+        using var httpClient = new HttpClient(new StaticResponseHandler(HttpStatusCode.OK, "{}", "application/json"));
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://provider.example/v1/messages")
+        {
+            Content = new StringContent("{}", Encoding.UTF8, "application/json"),
+        };
+        var pipeline = new ProviderExecutionPipeline(requestPipeline: requestPipeline);
+
+        await pipeline.ExecuteAsync(
+            httpClient,
+            request,
+            new ProviderExecutionContext("provider-1", "model-1", "anthropic", "/v1/messages"),
+            CancellationToken.None);
+
+        Assert.Equal("anthropic", requestPipeline.Metadata!["api_mode"]);
+        Assert.Equal("provider-1", requestPipeline.Metadata["provider_id"]);
+        Assert.Equal("/v1/messages", requestPipeline.Metadata["upstream_path"]);
+    }
+
+    [Fact]
     public async Task AssistantClient_UsesInjectedPipelineAndProviderContext()
     {
         var pipeline = new CapturingPipeline();
@@ -253,6 +307,27 @@ public sealed class ProviderExecutionPipelineTests
         Assert.Equal("provider-1", pipeline.Context!.ProviderId);
         Assert.Equal("model-1", pipeline.Context.ModelId);
         Assert.Equal("/chat/completions", pipeline.Context.UpstreamPath);
+    }
+
+    private sealed class MetadataCapturingPipeline : IContextualPipeline
+    {
+        public string PipelineId => "request";
+        public ExtensionKind Kind => ExtensionKind.Request;
+        public IReadOnlyDictionary<string, string>? Metadata { get; private set; }
+
+        public ValueTask<PipelineResult> ExecuteAsync(
+            string payload,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(PipelineResult.Pass(payload));
+
+        public ValueTask<PipelineResult> ExecuteAsync(
+            string payload,
+            IReadOnlyDictionary<string, string> metadata,
+            CancellationToken cancellationToken = default)
+        {
+            Metadata = metadata;
+            return ValueTask.FromResult(PipelineResult.Pass(payload));
+        }
     }
 
     private sealed class ReplacingResponsePipeline(string token, string secret) : IPipeline

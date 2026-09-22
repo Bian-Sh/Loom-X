@@ -146,6 +146,105 @@ public sealed class CredentialProtectionTests : IDisposable
     }
 
     [Fact]
+    public void Restore_NormalizesAsciiCaseAndInternalWhitespace_WithoutChangingWrapper()
+    {
+        var engine = CreateEngine();
+        const string secret = "sk-normalized-abcdefghij0123456789";
+        var token = engine.Sanitize(secret, out _);
+        var mutated = token
+            .ToLowerInvariant()
+            .Replace("loomx", "l o o m x", StringComparison.Ordinal)
+            .Replace("credential", "cred\tential", StringComparison.Ordinal)
+            .Replace("_", " _ ", StringComparison.Ordinal)
+            .Replace("}}", " } }", StringComparison.Ordinal);
+
+        var restored = engine.Restore("Bearer \"" + mutated + "\"", out var changed);
+
+        Assert.True(changed);
+        Assert.Equal("Bearer \"" + secret + "\"", restored);
+    }
+
+    [Theory]
+    [InlineData("{{LOOMX_CREDENTIAL_ABCDEFGHIJKLMNOPQRS0}}")]
+    [InlineData("{{LOOMX_CREDENTIAL_ABCDEFGHIJKLMNOPQRS}}")]
+    [InlineData("{{LOOMX_CREDENTIAL_ABCDEFGHIJKLMNOPQRSΤ}}")]
+    public void Restore_DoesNotGuessDamagedOrConfusablePlaceholder(string damaged)
+    {
+        var engine = CreateEngine();
+        var restored = engine.Restore(damaged, out var changed);
+
+        Assert.False(changed);
+        Assert.Equal(damaged, restored);
+    }
+
+    [Fact]
+    public async Task RequestExtension_InjectsIntegrityInstructionForOpenAiPayloadWithPlaceholder()
+    {
+        var engine = CreateEngine();
+        const string secret = "sk-prompt-abcdefghij0123456789";
+        var token = engine.Sanitize(secret, out _);
+        var extension = new CredentialRequestExtension(engine);
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            model = "model",
+            messages = new[] { new { role = "user", content = "run " + token } },
+        });
+
+        var result = await extension.ProcessRequestAsync(
+            new PipelineContext("request", Metadata: new Dictionary<string, string> { ["api_mode"] = "openai" }),
+            payload,
+            CancellationToken.None);
+
+        Assert.Equal(PipelineOutcome.Modified, result.Outcome);
+        using var document = System.Text.Json.JsonDocument.Parse(result.Payload);
+        var messages = document.RootElement.GetProperty("messages");
+        Assert.Equal("system", messages[0].GetProperty("role").GetString());
+        Assert.Contains(CredentialEngine.IntegrityInstruction, messages[0].GetProperty("content").GetString(), StringComparison.Ordinal);
+        Assert.Contains(token, messages[1].GetProperty("content").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RequestExtension_AppendsAnthropicSystemInstruction_WithoutPersistingOutsidePayload()
+    {
+        var engine = CreateEngine();
+        const string secret = "sk-anthropic-abcdefghij0123456789";
+        var token = engine.Sanitize(secret, out _);
+        var extension = new CredentialRequestExtension(engine);
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            system = "You are concise.",
+            messages = new[] { new { role = "user", content = token } },
+        });
+
+        var result = await extension.ProcessRequestAsync(
+            new PipelineContext("request", Metadata: new Dictionary<string, string> { ["api_mode"] = "anthropic" }),
+            payload,
+            CancellationToken.None);
+
+        using var document = System.Text.Json.JsonDocument.Parse(result.Payload);
+        var system = document.RootElement.GetProperty("system").GetString();
+        Assert.StartsWith("You are concise.", system, StringComparison.Ordinal);
+        Assert.Contains(CredentialEngine.IntegrityInstruction, system, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, result.Payload, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RequestExtension_DoesNotInjectInstructionWhenNoPlaceholderExists()
+    {
+        var engine = CreateEngine();
+        var extension = new CredentialRequestExtension(engine);
+        const string payload = "{\"messages\":[{\"role\":\"user\",\"content\":\"hello\"}]}";
+
+        var result = await extension.ProcessRequestAsync(
+            new PipelineContext("request", Metadata: new Dictionary<string, string> { ["api_mode"] = "openai" }),
+            payload,
+            CancellationToken.None);
+
+        Assert.Equal(PipelineOutcome.Passed, result.Outcome);
+        Assert.Equal(payload, result.Payload);
+    }
+
+    [Fact]
     public void Mask_SameSecret_ReusesPlaceholderWithinEngineLifetime()
     {
         var engine = CreateEngine();
