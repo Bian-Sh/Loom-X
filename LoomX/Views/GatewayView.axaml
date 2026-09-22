@@ -1,0 +1,171 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:LoomX.ViewModels" xmlns:l="using:LoomX.Localization" x:Class="LoomX.Views.GatewayView">
+  <UserControl.Styles>
+    <Style Selector="Border.panel"><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="10"/></Style>
+    <Style Selector="ItemsControl.endpoint-list"><Setter Property="Background" Value="Transparent"/></Style>
+    <Style Selector="Border.endpoint-card"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
+    <Style Selector="TextBlock.combo-missing"><Setter Property="Foreground" Value="{DynamicResource DangerBrush}"/></Style>
+    <Style Selector="Button.icon"><Setter Property="Width" Value="34"/><Setter Property="Height" Value="34"/><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="9"/><Setter Property="HorizontalContentAlignment" Value="Center"/><Setter Property="VerticalContentAlignment" Value="Center"/></Style>
+    <Style Selector="ComboBox.endpoint-reasoning"><Setter Property="MinWidth" Value="112"/><Setter Property="Height" Value="30"/></Style>
+    <Style Selector="Border.drag-handle"><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Padding" Value="0"/><Setter Property="Cursor" Value="SizeAll"/></Style>
+    <Style Selector="Border.drag-handle:disabled"><Setter Property="Cursor" Value="No"/><Setter Property="Opacity" Value="0.55"/></Style>
+    <Style Selector="Ellipse.drag-dot"><Setter Property="Width" Value="3"/><Setter Property="Height" Value="3"/><Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="HorizontalAlignment" Value="Center"/><Setter Property="VerticalAlignment" Value="Center"/></Style>
+    <Style Selector="Border.member"><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="10,9"/></Style>
+    <Style Selector="Border.drag-placeholder"><Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="10,9"/><Setter Property="Opacity" Value="0.8"/></Style>
+    <Style Selector="Border.route-drag-preview"><Setter Property="Background" Value="{DynamicResource GlassStrongBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="1"/><Setter Property="CornerRadius" Value="8"/><Setter Property="Padding" Value="10,9"/><Setter Property="Opacity" Value="0.98"/></Style>
+    <Style Selector="Border.member-footbar"><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="BorderThickness" Value="0,1,0,0"/><Setter Property="Padding" Value="8,2"/></Style>
+    <Style Selector="Button.footbar-add"><Setter Property="Width" Value="24"/><Setter Property="Height" Value="24"/></Style>
+  </UserControl.Styles>
+  <Grid RowDefinitions="Auto,*" RowSpacing="12">
+    <TextBlock Text="{Binding Status}" Classes="muted" VerticalAlignment="Center"/>
+    <Grid Grid.Row="1" ColumnDefinitions="3*,2*" ColumnSpacing="14">
+      <Border Classes="panel" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel Margin="16,14,16,12" Spacing="3"><TextBlock Text="{l:Locale gateway.endpoint.header}" FontSize="16" FontWeight="SemiBold"/><TextBlock Text="{l:Locale gateway.endpoint.header.hint}" Classes="muted" FontSize="11"/></StackPanel>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl Classes="endpoint-list" ItemsSource="{Binding Endpoints}">
+              <ItemsControl.ItemTemplate><DataTemplate>
+              <Border Classes="endpoint-card" Padding="14,12" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="0,0,0,1">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="5">
+                  <TextBlock Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold"/>
+                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleEndpointCommand}" CommandParameter="{Binding}" OnContent="" OffContent=""/>
+                  <TextBlock Grid.Row="1" Text="{Binding PublicUrl}" Classes="muted" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                  <Button Grid.Row="1" Grid.Column="1" Classes="icon endpoint-copy" Content="⧉" ToolTip.Tip="{l:Locale gateway.endpoint.copyUrl.tooltip}" AutomationProperties.Name="{l:Locale gateway.endpoint.copyUrl.tooltip}" Click="CopyEndpointUrl_OnClick" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                  <Border Grid.Row="2" Grid.ColumnSpan="2" Classes="endpoint-key-row" IsVisible="{Binding IsApiKeyVisible}">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="7">
+                      <TextBlock Text="API Key" Classes="muted" FontSize="11" VerticalAlignment="Center"/>
+                      <TextBlock Grid.Column="1" Text="{Binding MaskedApiKey}" FontFamily="Consolas" FontSize="11" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="1">
+                        <Button Classes="icon endpoint-refresh" Command="{Binding $parent[UserControl].DataContext.RotateGatewayApiKeyCommand}" CommandParameter="{Binding}" ToolTip.Tip="{l:Locale gateway.endpoint.rotateKey.tooltip}" AutomationProperties.Name="{l:Locale gateway.endpoint.rotateKey.tooltip}"><Path Classes="icon-glyph" Data="M 26,12 A 10,10 0 1,0 23,20 M 26,12 L 20,12 M 26,12 L 26,6" Stroke="{DynamicResource TextSecondaryBrush}" Width="14" Height="14"/></Button>
+                        <Button Classes="icon endpoint-key-copy" Content="⧉" ToolTip.Tip="{l:Locale gateway.endpoint.copyKey.tooltip}" AutomationProperties.Name="{l:Locale gateway.endpoint.copyKey.tooltip}" Click="CopyEndpointApiKey_OnClick"/>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                  <Grid Grid.Row="3" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Button x:Name="comboPickerButton" HorizontalContentAlignment="Stretch" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="8,5" Click="EndpointComboPicker_OnClick">
+                      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBlock Text="{Binding SelectedComboSummary}" TextTrimming="CharacterEllipsis"/><PathIcon Grid.Column="1" Data="M 7,10 L 16,19 L 25,10" Width="12" Height="12"/></Grid>
+                    </Button>
+                    <Popup PlacementTarget="{Binding #comboPickerButton}" Placement="Bottom" IsLightDismissEnabled="True" IsOpen="{Binding IsComboPickerOpen, Mode=TwoWay}" HorizontalOffset="0" VerticalOffset="4">
+                      <Border Width="250" MaxHeight="260" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8" Padding="6">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"><ItemsControl ItemsSource="{Binding ComboOptions}"><ItemsControl.ItemTemplate><DataTemplate>
+                          <CheckBox Tag="{Binding}" IsChecked="{Binding IsSelected, Mode=OneWay}" Click="EndpointComboOption_OnClick" Padding="7,6">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6"><TextBlock Text="{Binding Name}"/><TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="muted" FontSize="10" IsVisible="{Binding !IsDeleted}"/><TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="combo-missing" FontSize="10" IsVisible="{Binding IsDeleted}"/></Grid>
+                          </CheckBox>
+                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer>
+                      </Border>
+                    </Popup>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsOllamaEndpoint}">
+                      <TextBlock Text="Reasoning effort" Classes="muted" FontSize="11" VerticalAlignment="Center"/>
+                      <ComboBox Classes="endpoint-reasoning" ItemsSource="{Binding ReasoningEffortOptions}" SelectedItem="{Binding ReasoningEffort, Mode=TwoWay}" SelectionChanged="ReasoningEffort_OnSelectionChanged"/>
+                    </StackPanel>
+                  </Grid>
+                  <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="4"><TextBlock Text="{l:Locale gateway.endpoint.comboCount.prefix}" Classes="muted" FontSize="11"/><TextBlock Text="{Binding SelectedComboCount}" Classes="muted" FontSize="11"/><TextBlock Text="{l:Locale gateway.endpoint.comboCount.suffix}" Classes="muted" FontSize="11"/></StackPanel>
+                </Grid>
+              </Border>
+              </DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Classes="panel" Padding="16">
+        <Grid RowDefinitions="Auto,*" RowSpacing="10">
+          <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="2"><TextBlock Text="{l:Locale gateway.combo.header}" FontSize="20" FontWeight="SemiBold"/><TextBlock Text="{l:Locale gateway.combo.header.hint}" Classes="muted" FontSize="11"/></StackPanel><Button Grid.Column="1" Classes="icon" Command="{Binding AddComboCommand}" ToolTip.Tip="{l:Locale gateway.combo.add.tooltip}" AutomationProperties.Name="{l:Locale gateway.combo.add.tooltip}"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z"/></Button></Grid>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Combos}">
+              <ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:GatewayComboEditorViewModel}">
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Margin="0,0,0,8" ClipToBounds="True" IsVisible="{Binding !IsDeleted}">
+                  <Grid RowDefinitions="Auto,Auto">
+                    <Border Padding="8,7" Background="{DynamicResource SurfaceSubtleBrush}"><Grid ColumnDefinitions="32,*,Auto,Auto" ColumnSpacing="8">
+                      <Button Classes="icon" Tag="{Binding}" Click="ToggleCombo_OnClick" ToolTip.Tip="{l:Locale gateway.combo.expand.tooltip}"><Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%"><Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform></Path></Button>
+                      <Grid Grid.Column="1" RowDefinitions="Auto,Auto">
+                        <TextBox Classes="input-embedded" Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" FontWeight="SemiBold" BorderThickness="0" VerticalContentAlignment="Center" LostFocus="ComboName_OnLostFocus"/>
+                        <TextBlock Grid.Row="1" Text="{Binding StatusText}" Classes="combo-missing" FontSize="10" IsVisible="{Binding IsDeleted}"/>
+                      </Grid>
+                      <ToggleSwitch Grid.Column="2" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleComboCommand}" CommandParameter="{Binding}" OnContent="" OffContent="" ToolTip.Tip="{l:Locale gateway.combo.toggle.tooltip}"/>
+                      <Button Grid.Column="3" Classes="icon" Command="{Binding $parent[UserControl].DataContext.RemoveComboCommand}" CommandParameter="{Binding}" ToolTip.Tip="{l:Locale gateway.combo.remove.tooltip}" AutomationProperties.Name="{l:Locale gateway.combo.remove.tooltip}"><Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="14" Height="14"/></Button>
+                    </Grid></Border>
+                    <Grid Grid.Row="1" IsVisible="{Binding IsExpanded}" RowDefinitions="Auto,Auto">
+                      <Grid>
+                        <ItemsControl ItemsSource="{Binding Routes}">
+                          <ItemsControl.ItemTemplate><DataTemplate DataType="{x:Type vm:GatewayRouteEditorViewModel}">
+                            <Panel>
+                              <Border Classes="member drag-placeholder" IsVisible="{Binding IsPlaceholder}"><Grid Height="36"/></Border>
+                              <Border Classes="member" IsVisible="{Binding IsRealRoute}" Tag="{Binding}">
+                                <Grid ColumnDefinitions="26,*,Auto,Auto" ColumnSpacing="8">
+                                  <Border Classes="icon drag-handle" Tag="{Binding}" IsEnabled="{Binding IsDragEnabled}" PointerPressed="RouteHandle_OnPointerPressed" ToolTip.Tip="{l:Locale gateway.route.sort.drag.tooltip}" AutomationProperties.Name="{l:Locale gateway.route.sort.drag.tooltip}" Background="Transparent"><Grid Width="12" Height="20" RowDefinitions="*,*,*" ColumnDefinitions="*,*"><Ellipse Classes="drag-dot" Grid.Row="0" Grid.Column="0"/><Ellipse Classes="drag-dot" Grid.Row="0" Grid.Column="1"/><Ellipse Classes="drag-dot" Grid.Row="1" Grid.Column="0"/><Ellipse Classes="drag-dot" Grid.Row="1" Grid.Column="1"/><Ellipse Classes="drag-dot" Grid.Row="2" Grid.Column="0"/><Ellipse Classes="drag-dot" Grid.Row="2" Grid.Column="1"/></Grid></Border>
+                                  <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding ModelName}" FontWeight="SemiBold"/><TextBlock Text="{Binding ProviderName}" Classes="muted" FontSize="11"/></StackPanel>
+                                  <ToggleSwitch Grid.Column="2" IsChecked="{Binding Enabled, Mode=OneWay}" Command="{Binding $parent[UserControl].DataContext.ToggleRouteCommand}" CommandParameter="{Binding}" OnContent="" OffContent="" ToolTip.Tip="{l:Locale gateway.route.sort.toggle.tooltip}"/>
+                                  <Button Grid.Column="3" Classes="icon" Command="{Binding $parent[UserControl].DataContext.RemoveRouteCommand}" CommandParameter="{Binding}" ToolTip.Tip="{l:Locale gateway.route.sort.remove.tooltip}" AutomationProperties.Name="{l:Locale gateway.route.sort.remove.tooltip}"><Path Classes="icon-glyph" Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6" Width="14" Height="14"/></Button>
+                                </Grid>
+                              </Border>
+                            </Panel>
+                          </DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border x:Name="routeDragPreview" Classes="route-drag-preview" IsVisible="{Binding IsDragPreviewOwner}" IsHitTestVisible="False" HorizontalAlignment="Stretch" VerticalAlignment="Top">
+                          <Grid ColumnDefinitions="26,*,Auto" ColumnSpacing="8">
+                            <Grid Width="12" Height="20" RowDefinitions="*,*,*" ColumnDefinitions="*,*"><Ellipse Classes="drag-dot" Grid.Row="0" Grid.Column="0"/><Ellipse Classes="drag-dot" Grid.Row="0" Grid.Column="1"/><Ellipse Classes="drag-dot" Grid.Row="1" Grid.Column="0"/><Ellipse Classes="drag-dot" Grid.Row="1" Grid.Column="1"/><Ellipse Classes="drag-dot" Grid.Row="2" Grid.Column="0"/><Ellipse Classes="drag-dot" Grid.Row="2" Grid.Column="1"/></Grid>
+                            <StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding $parent[UserControl].DataContext.DraggingRoute.ModelName}" FontWeight="SemiBold"/><TextBlock Text="{Binding $parent[UserControl].DataContext.DraggingRoute.ProviderName}" Classes="muted" FontSize="11"/></StackPanel>
+                            <TextBlock Grid.Column="2" Text="{l:Locale gateway.route.sort.dragging}" Foreground="{DynamicResource AccentBrush}" FontSize="11" VerticalAlignment="Center"/>
+                          </Grid>
+                        </Border>
+                      </Grid>
+                      <Grid Grid.Row="1">
+                        <Border Classes="member-footbar">
+                          <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{l:Locale gateway.combo.memberOrder.hint}" Classes="muted" FontSize="11" VerticalAlignment="Center"/><Button Grid.Column="1" Classes="icon footbar-add" Tag="{Binding}" Click="OpenModelPicker_OnClick" ToolTip.Tip="{l:Locale gateway.combo.addModel.tooltip}" AutomationProperties.Name="{l:Locale gateway.combo.addModel.tooltip}"><PathIcon Data="M 15,4 L 17,4 L 17,15 L 28,15 L 28,17 L 17,17 L 17,28 L 15,28 L 15,17 L 4,17 L 4,15 L 15,15 Z" Width="14" Height="14"/></Button></Grid>
+                        </Border>
+                      </Grid>
+                    </Grid>
+                  </Grid>
+                </Border>
+              </DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Grid>
+    <Popup x:Name="modelPopup" Placement="Bottom" IsLightDismissEnabled="True" HorizontalOffset="0" VerticalOffset="5">
+      <Border x:Name="modelPickerPanel" Width="360" MaxHeight="420" Background="{DynamicResource PopupBackgroundBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="8" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+            <TextBox x:Name="modelSearch" Classes="input-transparent search" Watermark="{l:Locale gateway.combo.search.watermark}" TextChanged="ModelSearch_OnTextChanged"/>
+            <Button Grid.Column="1" Classes="icon" Click="ModelSort_OnClick" ToolTip.Tip="{Binding ModelSortToolTip}" AutomationProperties.Name="{Binding ModelSortToolTip}">
+              <Panel Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Path Classes="icon-glyph" Data="M 5,6 L 18,6 M 5,12 L 15,12 M 5,18 L 12,18 M 26,5 L 26,24 M 21,19 L 26,24 L 31,19" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsModelSortAscending}"/>
+                <Path Classes="icon-glyph" Data="M 5,6 L 18,6 M 5,12 L 15,12 M 5,18 L 12,18 M 26,24 L 26,5 M 21,10 L 26,5 L 31,10" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding IsModelSortDescending}"/>
+              </Panel>
+            </Button>
+          </Grid>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <ItemsControl x:Name="modelGroupsItemsControl">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="{x:Type vm:GatewayModelGroup}">
+                  <StackPanel Spacing="2" Margin="0,0,0,6">
+                    <Button Tag="{Binding}" Click="ToggleProviderGroup_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch" Background="{DynamicResource SurfaceSubtleBrush}" BorderThickness="0" Padding="10,9">
+                      <Grid ColumnDefinitions="16,*,Auto" ColumnSpacing="8">
+                        <Path Classes="icon-glyph" Data="M 11,7 L 19,16 L 11,25" Width="14" Height="14" Stroke="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="50%,50%">
+                          <Path.RenderTransform><RotateTransform Angle="{Binding ExpandIconAngle}"/></Path.RenderTransform>
+                        </Path>
+                        <TextBlock Grid.Column="1" Text="{Binding ProviderName}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="{Binding ModelCount}" Classes="muted" VerticalAlignment="Center"/>
+                      </Grid>
+                    </Button>
+                    <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding IsExpanded}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <Button Tag="{Binding}" Click="ModelOption_OnClick" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch" Background="Transparent" BorderThickness="0" Margin="22,0,0,0" Padding="12,8">
+                            <!-- 勾选标记保持 Foreground="{DynamicResource SuccessBrush}" 的语义契约，描边图标实际使用 Stroke 渲染。 -->
+                            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="12"><TextBlock Text="{Binding ModelName}"/><Path Grid.Column="1" Classes="icon-glyph" Data="M 5,16 L 12,23 L 27,7" Width="15" Height="15" Stroke="{DynamicResource SuccessBrush}" IsVisible="{Binding IsSelected}"/></Grid>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Popup>
+  </Grid>
+</UserControl>

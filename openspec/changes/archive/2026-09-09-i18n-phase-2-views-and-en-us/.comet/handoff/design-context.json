@@ -1,0 +1,14 @@
+{
+  "change": "i18n-phase-2-views-and-en-us",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "70b980c7021419b3db56c7cd8d01804f1fcbe311324789e8d331071a1d40a8a7",
+  "files": [
+    { "path": "openspec/changes/i18n-phase-2-views-and-en-us/proposal.md", "sha256": "6e801add1f90df2c72fbc0480ca752582c9f60da6f5cc9ae5f948048c64eea40" },
+    { "path": "openspec/changes/i18n-phase-2-views-and-en-us/design.md", "sha256": "082935ae4d6220299f6d1dce4b9923ed8fbd4b1318c49fe32a7285bd45cab7c4" },
+    { "path": "openspec/changes/i18n-phase-2-views-and-en-us/tasks.md", "sha256": "cd6d5e71ccdcab7933f446dd41479b5ce55aee13b1a88f366dea8d0b0face655" },
+    { "path": "openspec/changes/i18n-phase-2-views-and-en-us/specs/localization/spec.md", "sha256": "92f4a4b158dbd5bd5046d2a4079aaea4df51d62f976129bc9fb1d115e5e8b928" }
+  ]
+}

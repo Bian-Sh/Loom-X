@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"D:/AppData/Github/Loom-X - Copy/.trae-cn/skills/comet/scripts/comet-hook-router.mjs\" --platform \"trae-cn\" --project-root \"D:/AppData/Github/Loom-X - Copy\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

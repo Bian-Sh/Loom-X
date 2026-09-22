@@ -1,0 +1,5 @@
+{
+  "name": "generic-openai-compatible",
+  "description": "通用 OpenAI 兼容服务（官方 OpenAI 及各类兼容端点）的接入知识",
+  "when_to_use": "用户要接入 OpenAI 或任何自称 OpenAI Compatible 的服务"
+}

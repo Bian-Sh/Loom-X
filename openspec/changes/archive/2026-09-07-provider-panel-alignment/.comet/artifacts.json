@@ -1,0 +1,9 @@
+{
+  "openspec_proposal": "openspec/changes/provider-panel-alignment/proposal.md",
+  "openspec_design": "openspec/changes/provider-panel-alignment/design.md",
+  "openspec_tasks": "openspec/changes/provider-panel-alignment/tasks.md",
+  "openspec_delta_spec": "openspec/changes/provider-panel-alignment/specs/provider-panel/spec.md",
+  "design_document": "docs/superpowers/specs/2026-08-29-provider-panel-alignment-design.md",
+  "build_tasks_complete": "openspec/changes/provider-panel-alignment/tasks.md",
+  "verification_report": "docs/superpowers/reports/2026-08-29-provider-panel-alignment-verify.md"
+}

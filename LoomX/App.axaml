@@ -1,0 +1,188 @@
+<Application xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:LoomX.ViewModels" xmlns:views="using:LoomX.Views" x:Class="LoomX.App">
+  <Application.DataTemplates>
+    <DataTemplate DataType="{x:Type vm:OverviewViewModel}"><views:OverviewView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:ProvidersViewModel}"><views:ProvidersView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:ConsoleViewModel}"><views:ConsoleView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:ActivityViewModel}"><views:ActivityView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:SettingsViewModel}"><views:SettingsView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:GatewayViewModel}"><views:GatewayView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:AssistantViewModel}"><views:AssistantView Margin="0,0,-32,-20" /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:PlaceholderViewModel}"><views:PlaceholderView /></DataTemplate>
+  </Application.DataTemplates>
+  <Application.Resources>
+    <ResourceDictionary>
+      <ControlTheme x:Key="ChatScrollButtonTheme" TargetType="RepeatButton">
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Border Background="Transparent">
+              <ContentPresenter HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+            </Border>
+          </ControlTemplate>
+        </Setter>
+      </ControlTheme>
+      <ControlTheme x:Key="ChatScrollThumbTheme" TargetType="Thumb">
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Border Background="Transparent">
+              <Border x:Name="Capsule" Width="6" CornerRadius="3"
+                      HorizontalAlignment="Center" Background="{DynamicResource TextTertiaryBrush}" Opacity="0.45"/>
+            </Border>
+          </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#Capsule">
+          <Setter Property="Opacity" Value="0.75"/>
+        </Style>
+        <Style Selector="^:pressed /template/ Border#Capsule">
+          <Setter Property="Opacity" Value="1"/>
+        </Style>
+      </ControlTheme>
+      <ControlTheme x:Key="ChatScrollBarTheme" TargetType="ScrollBar">
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Border Background="Transparent">
+              <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True"
+                     Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                     Value="{TemplateBinding Value, Mode=TwoWay}" ViewportSize="{TemplateBinding ViewportSize}">
+                <Track.DecreaseButton><RepeatButton x:Name="PART_PageUpButton" Theme="{StaticResource ChatScrollButtonTheme}"/></Track.DecreaseButton>
+                <Track.Thumb><Thumb Theme="{StaticResource ChatScrollThumbTheme}"/></Track.Thumb>
+                <Track.IncreaseButton><RepeatButton x:Name="PART_PageDownButton" Theme="{StaticResource ChatScrollButtonTheme}"/></Track.IncreaseButton>
+              </Track>
+            </Border>
+          </ControlTemplate>
+        </Setter>
+      </ControlTheme>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://LoomX/Styles/VisualTokens.axaml" />
+        <ResourceInclude Source="avares://LiveMarkdown.Avalonia/Defaults.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="avares://LiveMarkdown.Avalonia/Styles.axaml" />
+    <Style Selector="ScrollBar"><Setter Property="Theme" Value="{StaticResource ChatScrollBarTheme}" /></Style>
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{DynamicResource WindowBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="Path.icon-glyph">
+      <Setter Property="Fill" Value="Transparent" />
+      <Setter Property="Stroke" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="StrokeThickness" Value="1.7" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="Stretch" Value="Uniform" />
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="Button:pressed">
+      <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}" />
+    </Style>
+    <!-- 主行动按钮：一屏只出现一次 -->
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Opacity" Value="0.88" />
+    </Style>
+    <Style Selector="Button.primary:pressed">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Opacity" Value="0.78" />
+    </Style>
+    <Style Selector="Button.primary:disabled">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="TextBox, ComboBox, NumericUpDown">
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="Padding" Value="10,7" />
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBox:focus, ComboBox:focus, NumericUpDown:focus">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="TextBox /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" />
+    </Style>
+    <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" />
+    </Style>
+    <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+      <Setter Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" />
+    </Style>
+    <Style Selector="NumericUpDown /template/ TextBox">
+      <Setter Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}" />
+    </Style>
+    <Style Selector="TextBox.input-transparent, ComboBox.input-transparent, NumericUpDown.input-transparent">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="TextBox.input-embedded, ComboBox.input-embedded, NumericUpDown.input-embedded">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="TextBox.search">
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox.search:not(:empty)">
+      <Setter Property="InnerRightContent">
+        <Template>
+          <Button Classes="search-clear" Command="{Binding $parent[TextBox].Clear}" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Path Classes="icon-glyph" Data="M 7,7 L 25,25 M 25,7 L 7,25" Width="13" Height="13" />
+          </Button>
+        </Template>
+      </Setter>
+    </Style>
+    <Style Selector="Button.search-clear">
+      <Setter Property="Width" Value="30" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="0,0,4,0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="Padding" Value="14,9" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TabItem:selected">
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="ToggleSwitch">
+      <Setter Property="MinHeight" Value="28" />
+    </Style>
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+  </Application.Styles>
+</Application>

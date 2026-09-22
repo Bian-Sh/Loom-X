@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "pre_write_code": [
+      {
+        "command": "node \"D:/AppData/Github/Loom-X - Copy/.devin/skills/comet/scripts/comet-hook-router.mjs\" --platform \"windsurf\" --project-root \"D:/AppData/Github/Loom-X - Copy\"",
+        "show_output": true
+      }
+    ]
+  }
+}

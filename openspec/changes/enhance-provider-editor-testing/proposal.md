@@ -1,0 +1,30 @@
+## Why
+
+当前 Provider 编辑器将接口协议和 OpenAI 请求格式拆成两个技术字段，Provider ID 需要用户手工输入，API Key 与常用基础信息分离；现有“测试连接”仅探测模型列表，无法验证真实模型推理、流式响应、代理与 CLI 身份模拟是否生效。需要将配置入口收敛为更直观的兼容类型，并提供紧凑、可观察的轻量请求测试器。
+
+## What Changes
+
+- 基础 Tab 隐藏 Provider ID，为新 Provider 自动生成稳定且唯一的内部业务 ID，已有 Provider ID 保持不变。
+- 将 Provider 类型与 OpenAI 请求格式合并为三个接口兼容类型：OpenAI Chat Completions、OpenAI Responses、Anthropic Messages。
+- 将 API Key 从请求 Tab 移至基础 Tab，并保留安全显示/隐藏交互。
+- 将请求 Tab 更名为高级，仅保留代理、自定义请求头和 CLI/UA 身份模拟配置。
+- 移除高级 Tab 内旧的模型列表连接测试区块，保留页面顶部健康统计与“验证全部”能力。
+- 新增测试 Tab，可选择模型、常规或流式请求模式及 Prompt，并默认使用“每日一言”。
+- 新增真实 Provider 请求测试能力，按当前兼容类型、代理、API Key、自定义 Header 和 CLI 身份发送请求；请求前实时展示当前页不可见的安全摘要，失败时展示原始上游响应或安全错误 JSON。
+- 流式测试按接收顺序读取至 EOF 并展示所有 SSE `data:` payload：有效 JSON 压缩为单行 JSONL，非 JSON 与 `[DONE]` 原样保留，完成事件后的 usage 或结束帧也不得丢失。发送按钮在请求中切换为“停止”，显式停止后保留已接收内容。Response 使用无标题、无可见清空按钮的可选择只读文本，自定义右键菜单仅提供复制、删除和全选；没有响应内容时显示多语言空态并隐藏文本框，避免空内容显示滚动条。请求结束后可删除任意非空选区，全选删除回到空态；超过安全展示上限时追加显式截断标记；切换 Provider 时在内部取消未完成测试并重置上下文。
+- 新增相关中英文资源、单元测试、视图契约测试和发布验证。
+
+## Capabilities
+
+### New Capabilities
+- `provider-request-testing`: 定义 Provider 编辑器内真实模型请求测试器的输入、配置继承、普通/流式执行、响应展示及安全边界。
+
+### Modified Capabilities
+- `provider-panel`: 调整 Provider 详情 Tab 结构、自动内部 ID、兼容类型选择、API Key 位置及高级配置范围。
+
+## Impact
+
+- 影响 Avalonia Provider 页面、Provider 编辑与测试 ViewModel、本地化资源和相关 UI 契约测试。
+- 新增独立 Provider 测试服务和统一测试请求/响应 DTO，并复用现有 Provider 发送管线和代理配置读取能力。
+- 不修改数据库结构，不迁移或重写已有 Provider ID，不改变模型 Tab、Gateway 对外 API 或运行时数据库路径。
+- 日志继续只记录 Provider、Model、协议、路径、状态码、字节数和耗时等安全摘要，不记录密钥、Header 值、Prompt 或响应正文。

@@ -1,0 +1,167 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="using:LoomX.Localization"
+             x:Class="LoomX.Views.AssistantHistoryPanel">
+
+  <UserControl.Styles>
+    <Style Selector="Button.history-icon">
+      <Setter Property="Width" Value="22"/>
+      <Setter Property="Height" Value="22"/>
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+
+    <!-- 整行 hover 底色：必须是独立的最底层 Border，不能挂在标题按钮的 :pointerover 上 ——
+         否则鼠标移到行尾的铅笔/删除上时，标题按钮已不在命中链里，整行底色会整块消失。 -->
+    <Style Selector="Border.session-row-fill">
+      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="IsHitTestVisible" Value="False"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Grid.session-row:pointerover Border.session-row-fill">
+      <Setter Property="Opacity" Value="1"/>
+    </Style>
+
+    <!-- 操作区底衬：右对齐、只包住两个按钮，划入该行才从右往左展开。
+         它自己是透明渐变（OpacityMask），所以被盖住的标题尾部是柔和淡出，而不是被硬切一刀。
+         颜色用面板底色 PopupBackgroundBrush（α 0xE0）而不是 SurfaceMutedBrush（α 0x80）：
+         后者叠在整行底色上只有 ~10 个色阶差，肉眼等于没有（用户反馈"看不到渐变"）。
+         注意底衬是"把下层渐变隐去"的画法，所以它下面必须有整行底色 / 文字才看得出来。 -->
+    <Style Selector="Border.row-action-backdrop">
+      <Setter Property="Width" Value="0"/>
+      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="IsHitTestVisible" Value="False"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Width" Duration="0:0:0.22" Easing="CubicEaseOut"/>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.14" Easing="CubicEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Grid.session-row:pointerover Border.row-action-backdrop">
+      <Setter Property="Width" Value="64"/>
+      <Setter Property="Opacity" Value="1"/>
+    </Style>
+
+    <!-- 铅笔 / 删除：默认完全透明，随底衬稍晚一拍半透明浮现。
+         注意<b>不要</b>在这里配 IsHitTestVisible=False —— 那会让命中测试依赖于 hover 伪类，
+         而 hover 状态与指针位置之间存在一拍延迟：鼠标快速划过时点击会穿透到下面的
+         "载入会话"按钮上，表现成"点删除结果切换了会话"。可见性靠 Opacity 表达就够了。 -->
+    <Style Selector="Grid.session-row Button.row-action">
+      <Setter Property="Opacity" Value="0"/>
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.14" Delay="0:0:0.07" Easing="CubicEaseOut"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Grid.session-row:pointerover Button.row-action">
+      <Setter Property="Opacity" Value="1"/>
+    </Style>
+    <Style Selector="Button.row-action:pointerover">
+      <Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/>
+    </Style>
+    <Style Selector="Button.session-row-button">
+      <Setter Property="MinHeight" Value="0"/>
+      <Setter Property="Padding" Value="12,0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Button.session-row-button:pointerover">
+      <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/></Style>
+  </UserControl.Styles>
+
+  <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto">
+    <StackPanel Spacing="2">
+      <ItemsControl ItemsSource="{Binding Sessions}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <!-- 单层 Grid：标题铺满整行，操作按钮浮在行尾之上 -->
+            <Grid Classes="session-row" Height="46">
+
+              <!-- 整行 hover 底色：最底层，圆角与行一致；不参与命中测试。
+                   用 SurfaceMutedBrush（α 0x80）而不是 SurfaceSubtleBrush（α 0xA4）：
+                   后者叠在面板底色上只差 12 个色阶，行尾底衬把它"渐变隐去"时几乎没有可视幅度。 -->
+              <Border Classes="session-row-fill" IsVisible="{Binding IsNotEditing}"
+                      CornerRadius="9" Background="{DynamicResource SurfaceMutedBrush}"/>
+
+              <!-- 展示态：点主体载入会话。横向铺满，长标题一直排到弹窗右边缘 -->
+              <Button Classes="session-row-button" Tag="{Binding}"
+                      Click="LoadItem_OnClick" IsVisible="{Binding IsNotEditing}"
+                      HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                      VerticalContentAlignment="Center">
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Title}" FontSize="13"
+                             TextTrimming="CharacterEllipsis" HorizontalAlignment="Left"/>
+                  <TextBlock Text="{Binding DisplayUpdatedAt}" Classes="muted" FontSize="11" HorizontalAlignment="Left"/>
+                </StackPanel>
+              </Button>
+
+              <!-- 编辑态：文本框替换标题，回车提交 / Esc 取消 / 失焦提交 -->
+              <TextBox Text="{Binding EditText}" IsVisible="{Binding IsEditing}"
+                       x:Name="renameBox" Tag="{Binding}"
+                       KeyDown="RenameBox_OnKeyDown" LostFocus="RenameBox_OnLostFocus"
+                       VerticalAlignment="Center" FontSize="13"
+                       MinHeight="28" Padding="8,2" CornerRadius="8"
+                       Background="{DynamicResource SurfaceBrush}"/>
+
+              <!-- 操作区底衬：宽度只包住按钮，渐变让标题尾部在按钮下方柔和隐去。
+                   颜色取面板底色，右端接近不透明 -> 标题是真的"淡出"，而不是只加了一层浅灰。 -->
+              <Border Classes="row-action-backdrop"
+                      IsVisible="{Binding IsNotEditing}"
+                      HorizontalAlignment="Right" VerticalAlignment="Stretch"
+                      CornerRadius="0,9,9,0"
+                      Background="{DynamicResource PopupBackgroundBrush}">
+                <Border.OpacityMask>
+                  <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                    <GradientStop Offset="0" Color="#00000000"/>
+                    <GradientStop Offset="0.40" Color="#59000000"/>
+                    <GradientStop Offset="1" Color="#FF000000"/>
+                  </LinearGradientBrush>
+                </Border.OpacityMask>
+              </Border>
+
+              <!-- 改名铅笔：与删除同样浮在行尾，不挤压文字 -->
+              <Button Classes="history-icon row-action" Tag="{Binding}"
+                      Click="BeginRename_OnClick" IsVisible="{Binding IsNotEditing}"
+                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,24,0"
+                      ToolTip.Tip="{l:Locale assistant.history.rename.tooltip}"
+                      AutomationProperties.Name="{l:Locale assistant.history.rename.tooltip}">
+                <Path Classes="icon-glyph"
+                      Data="M 3,21 L 4,17 L 17.5,3.5 A 2,2 0 0 1 20.5,6.5 L 7,20 Z M 13.5,7.5 L 16.5,10.5"
+                      Width="13" Height="13"/>
+              </Button>
+
+              <!-- 删除 -->
+              <Button Classes="history-icon row-action" Tag="{Binding}"
+                      Click="DeleteItem_OnClick" IsVisible="{Binding IsNotEditing}"
+                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,2,0"
+                      ToolTip.Tip="{l:Locale assistant.history.delete.tooltip}"
+                      AutomationProperties.Name="{l:Locale assistant.history.delete.tooltip}">
+                <Path Classes="icon-glyph"
+                      Data="M 10,11 V 17 M 14,11 V 17 M 19,6 V 20 A 2,2 0 0 1 17,22 H 7 A 2,2 0 0 1 5,20 V 6 M 3,6 H 21 M 8,6 V 4 A 2,2 0 0 1 10,2 H 14 A 2,2 0 0 1 16,4 V 6"
+                      Width="13" Height="13"/>
+              </Button>
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- 空态 -->
+      <TextBlock Text="{l:Locale assistant.history.empty}" Classes="muted" FontSize="12"
+                 HorizontalAlignment="Center" Margin="8,14,8,10"
+                 IsVisible="{Binding HasNoSessions, FallbackValue=False, TargetNullValue=False}"/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

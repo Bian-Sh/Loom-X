@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "project": "OllamaHub Control Center",
+  "entryPage": "overview",
+  "sourceArchive": ".kun-design/ceed315c",
+  "ownership": "codex",
+  "syncPolicy": "one-way-snapshot",
+  "pages": [
+    {
+      "key": "overview",
+      "title": "概览",
+      "path": ".design/pages/overview/index.html",
+      "route": "/overview",
+      "status": "active",
+      "responsibility": "确认本地服务健康、复制 endpoint、查看 Provider 状态和最近活动。",
+      "source": { "artifactId": "899ef30d", "versionId": "899ef30d-v2" }
+    },
+    {
+      "key": "gateway",
+      "title": "网关",
+      "path": ".design/pages/gateway/index.html",
+      "route": "/gateway",
+      "status": "active",
+      "responsibility": "维护 OpenAI、Ollama、Azure Endpoint 及其模型路由顺序。",
+      "source": { "artifactId": "a9213c1e", "versionId": "a9213c1e-v3" }
+    },
+    {
+      "key": "providers",
+      "title": "Provider",
+      "path": ".design/pages/providers/index.html",
+      "route": "/providers",
+      "status": "active",
+      "responsibility": "以 SQLite 为配置真源，管理 Provider 身份、上游协议、受保护 API key、自定义请求头、连接测试、模型同步、排序与能力。",
+      "source": { "artifactId": "689f5fad", "versionId": "689f5fad-v1" }
+    },
+    {
+      "key": "activity",
+      "title": "活动",
+      "path": ".design/pages/activity/index.html",
+      "route": "/activity",
+      "status": "active",
+      "responsibility": "诊断请求、协议转换、延迟、状态码和脱敏日志上下文。",
+      "source": { "artifactId": "de3c9aba", "versionId": "de3c9aba-v2" }
+    },
+    {
+      "key": "console",
+      "title": "控制台",
+      "path": ".design/pages/console/index.html",
+      "route": "/console",
+      "status": "active",
+      "responsibility": "实时查看本地网关、代理和配置模块的脱敏运行日志。",
+      "source": { "artifactId": "a9213c1e", "versionId": "a9213c1e-v4" }
+    },
+    {
+      "key": "settings",
+      "title": "设置",
+      "path": ".design/pages/settings/index.html",
+      "route": "/settings",
+      "status": "active",
+      "responsibility": "管理界面语言、主题、代理、更新、数据与隐私及关于信息。",
+      "source": { "artifactId": "codex-settings", "versionId": "codex-settings-v1" }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "change": "enhance-provider-editor-testing",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "e8b698d83636770edd2e742df51433fa2627ffd97abc7ce4f436daea11466992",
+  "files": [
+    { "path": "openspec/changes/enhance-provider-editor-testing/proposal.md", "sha256": "f6acd44bf30eebc627a11607d234a1aab22e307ca79f2d9c61054a26d10fb04a" },
+    { "path": "openspec/changes/enhance-provider-editor-testing/design.md", "sha256": "684128a7f640f30ba49e1f67b2ec1e2300ef6a0c5a1280c60831c0dec5902ffd" },
+    { "path": "openspec/changes/enhance-provider-editor-testing/tasks.md", "sha256": "d12f0e261e05260779ee279d8279c2b2fa56a24a0f5772166505980f9e49bf54" },
+    { "path": "openspec/changes/enhance-provider-editor-testing/specs/provider-panel/spec.md", "sha256": "278488ad8fc6270443eabaaa71536d9f5ca49e83cbeade1e0dbe2d018fcfb2cc" },
+    { "path": "openspec/changes/enhance-provider-editor-testing/specs/provider-request-testing/spec.md", "sha256": "25b17e2ec3e9597beb8eb5dcef22e03abe6c7805a3278c78d29f09b58fecec8f" }
+  ]
+}

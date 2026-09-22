@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Route each write to the selected Comet Native or Classic phase guard",
+  "description": "Route each write to the selected Comet Native or Classic phase guard",
+  "version": "1",
+  "when": {
+    "type": "preToolUse",
+    "toolName": "write"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "node \"D:/AppData/Github/Loom-X - Copy/.kiro/skills/comet/scripts/comet-hook-router.mjs\" --platform \"kiro\" --project-root \"D:/AppData/Github/Loom-X - Copy\""
+  }
+}

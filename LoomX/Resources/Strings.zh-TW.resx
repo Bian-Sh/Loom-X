@@ -1,0 +1,1568 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <!-- Traditional Chinese (zh-TW) -->
+  <data name="app.loading.title">
+    <value>加載中</value>
+  </data>
+  <data name="app.loading.description">
+    <value>正在加載 Loom-X。</value>
+  </data>
+  <data name="app.loading.failed">
+    <value>加載失敗</value>
+  </data>
+  <data name="app.loading.failed.description">
+    <value>數據中心加載失敗：{0}，請通過頁面刷新重試。</value>
+  </data>
+  <data name="nav.overview">
+    <value>概覽</value>
+  </data>
+  <data name="nav.overview.description">
+    <value>確認本地服務健康，快速查看網關與模型配置。</value>
+  </data>
+  <data name="nav.gateway">
+    <value>網關</value>
+  </data>
+  <data name="nav.gateway.description">
+    <value>組合對外 Endpoint 的模型路由，並按優先級自動故障轉移。</value>
+  </data>
+  <data name="nav.providers">
+    <value>提供商</value>
+  </data>
+  <data name="nav.providers.description">
+    <value>管理上游連接、請求協議、密鑰與可用模型。</value>
+  </data>
+  <data name="nav.activity">
+    <value>活動</value>
+  </data>
+  <data name="nav.activity.title">
+    <value>請求活動</value>
+  </data>
+  <data name="nav.activity.description">
+    <value>定位協議轉換、上游延遲與 HTTP 錯誤，保留可追溯的脫敏上下文。</value>
+  </data>
+  <data name="nav.assistant">
+    <value>AI 助手</value>
+  </data>
+  <data name="nav.assistant.description">
+    <value>用自然語言配置 Provider、診斷連通性、接入中轉站。</value>
+  </data>
+  <data name="nav.console">
+    <value>控制檯</value>
+  </data>
+  <data name="nav.console.description">
+    <value>查看本地網關、協議轉換與上游請求的脫敏運行日誌。</value>
+  </data>
+  <data name="nav.settings">
+    <value>設置</value>
+  </data>
+  <data name="nav.settings.description">
+    <value>調整 Loom-X 的顯示、連接、更新與隱私偏好。</value>
+  </data>
+  <data name="settings.tab.general">
+    <value>通用</value>
+  </data>
+  <data name="settings.tab.proxy">
+    <value>代理</value>
+  </data>
+  <data name="settings.tab.updates">
+    <value>更新</value>
+  </data>
+  <data name="settings.tab.data">
+    <value>數據與隱私</value>
+  </data>
+  <data name="settings.tab.about">
+    <value>關於</value>
+  </data>
+  <data name="settings.language.label">
+    <value>界面語言</value>
+  </data>
+  <data name="settings.language.hint">
+    <value>切換界面顯示語言。</value>
+  </data>
+  <data name="settings.theme.label">
+    <value>主題</value>
+  </data>
+  <data name="settings.theme.hint">
+    <value>選擇適合當前工作環境的配色。</value>
+  </data>
+  <data name="settings.transparency.label">
+    <value>透明窗口</value>
+  </data>
+  <data name="settings.transparency.hint">
+    <value>使用系統材質爲窗口提供輕微的層次感。</value>
+  </data>
+  <data name="settings.opacity.label">
+    <value>透明程度</value>
+  </data>
+  <data name="settings.opacity.hint">
+    <value>數值越高，內容區域越不透明。</value>
+  </data>
+  <data name="settings.blur.label">
+    <value>磨砂程度</value>
+  </data>
+  <data name="settings.blur.hint">
+    <value>控制材質的系統模糊強度（0-64）。</value>
+  </data>
+  <data name="settings.proxy.mode.label">
+    <value>代理模式</value>
+  </data>
+  <data name="settings.proxy.mode.hint">
+    <value>控制上游請求如何通過代理訪問網絡。</value>
+  </data>
+  <data name="settings.proxy.host.label">
+    <value>代理地址</value>
+  </data>
+  <data name="settings.proxy.port.label">
+    <value>端口</value>
+  </data>
+  <data name="settings.proxy.username.label">
+    <value>用戶名（可選）</value>
+  </data>
+  <data name="settings.proxy.password.label">
+    <value>密碼（可選）</value>
+  </data>
+  <data name="settings.proxy.password.saved.hint">
+    <value>已有代理密碼已保存，輸入新密碼後保存即可替換。</value>
+  </data>
+  <data name="settings.proxy.password.clear">
+    <value>清除已保存的代理密碼</value>
+  </data>
+  <data name="settings.proxy.status.label">
+    <value>連接狀態</value>
+  </data>
+  <data name="settings.proxy.test.button">
+    <value>測試連接</value>
+  </data>
+  <data name="settings.update.version.label">
+    <value>當前版本</value>
+  </data>
+  <data name="settings.update.version.hint">
+    <value>本地桌面端版本信息。</value>
+  </data>
+  <data name="settings.update.auto.check">
+    <value>自動檢查更新</value>
+  </data>
+  <data name="settings.update.auto.check.hint">
+    <value>啟動時檢查，並在應用程式執行期間每 24 小時檢查一次；發現相容版本後會在背景下載並等待確認安裝。</value>
+  </data>
+  <data name="settings.update.use.proxy">
+    <value>更新時使用代理</value>
+  </data>
+  <data name="settings.update.use.proxy.hint">
+    <value>默認跟隨上方代理模式；關閉後更新請求直連。</value>
+  </data>
+  <data name="settings.update.check.button">
+    <value>檢查更新</value>
+  </data>
+  <data name="settings.diagnostic.send">
+    <value>發送匿名診斷數據</value>
+  </data>
+  <data name="settings.diagnostic.send.hint">
+    <value>不包含 API key、請求正文或模型內容。</value>
+  </data>
+  <data name="settings.log.stacktrace">
+    <value>記錄日誌堆棧信息</value>
+  </data>
+  <data name="settings.log.stacktrace.hint">
+    <value>默認關閉；開啓後便於定位異常，但日誌會包含更完整的調用路徑。</value>
+  </data>
+  <data name="settings.log.retention.label">
+    <value>日誌保留週期</value>
+  </data>
+  <data name="settings.log.retention.hint">
+    <value>控制檯日誌會在週期結束後自動清理。</value>
+  </data>
+  <data name="settings.local.data">
+    <value>本地數據</value>
+  </data>
+  <data name="settings.local.data.path.label">
+    <value>數據目錄：</value>
+  </data>
+  <data name="settings.local.data.open">
+    <value>打開數據目錄</value>
+  </data>
+  <data name="settings.local.data.clear">
+    <value>清除日誌</value>
+  </data>
+  <data name="settings.about.description">
+    <value>Loom-X 爲本地與雲端 AI 服務提供統一接入層，支持基於 OpenAI、Anthropic、Ollama 三種Endpoint，讓 IDE 與 GitHub Copilot 能接入你選擇的模型。把模型選擇權交還給開發者，讓日常編碼更自由、更高效，不再 Token 焦慮。</value>
+  </data>
+  <data name="settings.about.homepage">
+    <value>項目主頁</value>
+  </data>
+  <data name="settings.about.issues">
+    <value>反饋問題</value>
+  </data>
+  <data name="settings.about.export.label">
+    <value>導出診斷信息</value>
+  </data>
+  <data name="settings.about.export.hint">
+    <value>生成不含密鑰和請求正文的診斷摘要。</value>
+  </data>
+  <data name="settings.about.export.button">
+    <value>導出診斷</value>
+  </data>
+  <data name="settings.status.loading">
+    <value>正在加載設置…</value>
+  </data>
+  <data name="settings.status.loaded">
+    <value>設置已加載</value>
+  </data>
+  <data name="settings.status.load.failed">
+    <value>加載設置失敗：{0}</value>
+  </data>
+  <data name="settings.status.saving">
+    <value>正在保存設置…</value>
+  </data>
+  <data name="settings.status.saved">
+    <value>設置已保存 · {0}</value>
+  </data>
+  <data name="settings.status.save.failed">
+    <value>保存設置失敗：{0}</value>
+  </data>
+  <data name="settings.status.save.failed.toast">
+    <value>設置自動保存失敗，請查看狀態欄。</value>
+  </data>
+  <data name="settings.status.waiting">
+    <value>等待自動保存…</value>
+  </data>
+  <data name="settings.proxy.test.direct.success">
+    <value>直連模式配置有效。</value>
+  </data>
+  <data name="settings.proxy.test.system.success">
+    <value>系統代理模式已選擇，將跟隨 Windows 設置。</value>
+  </data>
+  <data name="settings.proxy.test.invalid">
+    <value>代理測試失敗：請填寫有效的 HTTP/HTTPS 地址和端口。</value>
+  </data>
+  <data name="settings.proxy.test.invalid.toast">
+    <value>代理測試配置無效</value>
+  </data>
+  <data name="settings.proxy.test.running">
+    <value>正在測試代理連接…</value>
+  </data>
+  <data name="settings.proxy.test.success">
+    <value>代理連接正常 · {0}</value>
+  </data>
+  <data name="settings.proxy.test.response">
+    <value>代理已響應 · {0}</value>
+  </data>
+  <data name="settings.proxy.test.toast.success">
+    <value>代理連接測試成功</value>
+  </data>
+  <data name="settings.proxy.test.toast.response">
+    <value>代理已響應，請檢查配置</value>
+  </data>
+  <data name="settings.proxy.test.toast.failed">
+    <value>代理連接測試失敗</value>
+  </data>
+  <data name="settings.proxy.test.exception">
+    <value>代理測試失敗：{0}</value>
+  </data>
+  <data name="settings.update.check.status.running">
+    <value>正在檢查更新…</value>
+  </data>
+  <data name="settings.update.check.status.latest">
+    <value>當前版本 {0}，已是最新版本。</value>
+  </data>
+  <data name="settings.update.check.status.found">
+    <value>發現新版本 v{0}，請查看右下角更新提示。</value>
+  </data>
+  <data name="settings.update.check.toast.latest">
+    <value>已是最新版本</value>
+  </data>
+  <data name="settings.update.check.toast.found">
+    <value>發現新版本 v{0}</value>
+  </data>
+  <data name="settings.local.data.opened">
+    <value>已打開本地數據目錄。</value>
+  </data>
+  <data name="settings.local.data.open.failed">
+    <value>打開數據目錄失敗：{0}</value>
+  </data>
+  <data name="settings.local.data.logs.empty">
+    <value>沒有可清理的日誌。</value>
+  </data>
+  <data name="settings.local.data.logs.cleared">
+    <value>已清理 {0} 個日誌文件。</value>
+  </data>
+  <data name="settings.local.data.logs.clear.failed">
+    <value>清理日誌失敗：{0}</value>
+  </data>
+  <data name="settings.local.data.export.done">
+    <value>診斷摘要已導出。</value>
+  </data>
+  <data name="settings.local.data.export.failed">
+    <value>導出診斷失敗：{0}</value>
+  </data>
+  <data name="settings.local.data.export.content" xml:space="preserve">
+    <value>Loom-X 診斷摘要
+版本：{0}
+系統：{1}
+數據目錄：{2}
+代理模式：{3}
+日誌保留：{4} 天</value>
+  </data>
+  <data name="settings.option.language.zh-CN">
+    <value>簡體中文</value>
+  </data>
+  <data name="settings.option.language.zh-TW">
+    <value>繁體中文</value>
+  </data>
+  <data name="settings.option.language.en-US">
+    <value>English</value>
+  </data>
+  <data name="settings.option.language.ja-JP">
+    <value>日本語</value>
+  </data>
+  <data name="settings.option.theme.system">
+    <value>跟隨系統</value>
+  </data>
+  <data name="settings.option.theme.dark">
+    <value>深色</value>
+  </data>
+  <data name="settings.option.theme.light">
+    <value>淺色</value>
+  </data>
+  <data name="settings.option.proxy.direct">
+    <value>直連</value>
+  </data>
+  <data name="settings.option.proxy.system">
+    <value>系統代理</value>
+  </data>
+  <data name="settings.option.proxy.custom">
+    <value>自定義代理</value>
+  </data>
+  <data name="settings.option.retention.7">
+    <value>7 天</value>
+  </data>
+  <data name="settings.option.retention.30">
+    <value>30 天</value>
+  </data>
+  <data name="settings.option.retention.90">
+    <value>90 天</value>
+  </data>
+  <data name="settings.option.retention.365">
+    <value>365 天</value>
+  </data>
+  <data name="settings.option.retention.3650">
+    <value>永久保留</value>
+  </data>
+  <data name="window.minimize">
+    <value>最小化</value>
+  </data>
+  <data name="window.maximize">
+    <value>最大化或還原</value>
+  </data>
+  <data name="window.close">
+    <value>關閉</value>
+  </data>
+  <data name="sidebar.service">
+    <value>本地服務</value>
+  </data>
+  <data name="sidebar.version">
+    <value>服務版本</value>
+  </data>
+  <data name="update.card.title">
+    <value>發現新版本</value>
+  </data>
+  <data name="update.card.release.notes">
+    <value>更新日誌</value>
+  </data>
+  <data name="update.card.later">
+    <value>稍後</value>
+  </data>
+  <data name="update.card.download">
+    <value>立即下載</value>
+  </data>
+  <data name="update.card.later.tip">
+    <value>稍後處理</value>
+  </data>
+  <data name="update.card.close">
+    <value>關閉</value>
+  </data>
+  <data name="overview.graph.hint">
+    <value>滾輪縮放 · 拖動平移</value>
+  </data>
+  <data name="overview.endpoint.focus.tip">
+    <value>聚焦 Endpoint</value>
+  </data>
+  <data name="overview.graph.fit.tooltip">
+    <value>適應畫布</value>
+  </data>
+  <data name="overview.gateway.label">
+    <value>本地網關</value>
+  </data>
+  <data name="overview.gateway.endpoint.label">
+    <value>監聽地址</value>
+  </data>
+  <data name="overview.gateway.version.label">
+    <value>接口狀態</value>
+  </data>
+  <data name="overview.gateway.lastchecked.label">
+    <value>最後檢查</value>
+  </data>
+  <data name="overview.recent.label">
+    <value>最近請求</value>
+  </data>
+  <data name="overview.recent.count">
+    <value>最近 {0} 條</value>
+  </data>
+  <data name="overview.recent.empty">
+    <value>暫無請求活動</value>
+  </data>
+  <data name="overview.gateway.status.not_running">
+    <value>未運行</value>
+  </data>
+  <data name="overview.gateway.status.running">
+    <value>運行中</value>
+  </data>
+  <data name="overview.gateway.status.starting">
+    <value>啓動中</value>
+  </data>
+  <data name="overview.gateway.status.stopping">
+    <value>停止中</value>
+  </data>
+  <data name="overview.gateway.status.failed">
+    <value>異常：{0}</value>
+  </data>
+  <data name="overview.endpoint.unconfigured">
+    <value>未配置</value>
+  </data>
+  <data name="overview.version.unknown">
+    <value>未知</value>
+  </data>
+  <data name="overview.version.online">
+    <value>Loom-X API 在線</value>
+  </data>
+  <data name="overview.version.disconnected">
+    <value>未連接</value>
+  </data>
+  <data name="overview.lastchecked.none">
+    <value>尚未檢查</value>
+  </data>
+  <data name="overview.graph.waiting">
+    <value>等待網關啓動</value>
+  </data>
+  <data name="overview.graph.connected">
+    <value>實時拓撲已連接</value>
+  </data>
+  <data name="overview.graph.failed">
+    <value>概覽加載失敗</value>
+  </data>
+  <data name="overview.gateway.action.start">
+    <value>啓動網關</value>
+  </data>
+  <data name="overview.gateway.action.stop">
+    <value>停止網關</value>
+  </data>
+  <data name="overview.gateway.action.starting">
+    <value>啓動中</value>
+  </data>
+  <data name="overview.gateway.action.stopping">
+    <value>停止中</value>
+  </data>
+  <data name="overview.request.status.success">
+    <value>成功</value>
+  </data>
+  <data name="overview.request.status.failed">
+    <value>失敗</value>
+  </data>
+  <data name="overview.request.model.unknown">
+    <value>未知模型</value>
+  </data>
+  <data name="overview.endpoint.status.disabled">
+    <value>已停用</value>
+  </data>
+  <data name="overview.endpoint.status.no_routes">
+    <value>無路由</value>
+  </data>
+  <data name="overview.endpoint.status.active">
+    <value>有請求</value>
+  </data>
+  <data name="overview.endpoint.status.ready">
+    <value>已就緒</value>
+  </data>
+  <data name="overview.route.status.active">
+    <value>活躍</value>
+  </data>
+  <data name="overview.route.status.idle">
+    <value>待命</value>
+  </data>
+  <data name="overview.lateness.dash">
+    <value>—</value>
+  </data>
+  <data name="overview.latency.format">
+    <value>{0} ms</value>
+  </data>
+  <data name="activity.stat.requestcount.label">
+    <value>請求數</value>
+  </data>
+  <data name="activity.stat.requestcount.sub">
+    <value>當前篩選結果</value>
+  </data>
+  <data name="activity.stat.conversion.label">
+    <value>協議轉換</value>
+  </data>
+  <data name="activity.stat.conversion.sub">
+    <value>OpenAI → Anthropic</value>
+  </data>
+  <data name="activity.stat.failures.label">
+    <value>失敗請求</value>
+  </data>
+  <data name="activity.stat.failures.sub">
+    <value>HTTP 5xx</value>
+  </data>
+  <data name="activity.stat.p95.label">
+    <value>P95 延遲</value>
+  </data>
+  <data name="activity.stat.p95.sub">
+    <value>最近活動</value>
+  </data>
+  <data name="activity.search.placeholder">
+    <value>搜索模型、Provider 或 request ID</value>
+  </data>
+  <data name="activity.column.time">
+    <value>時間 / request ID</value>
+  </data>
+  <data name="activity.column.model">
+    <value>模型 / Provider</value>
+  </data>
+  <data name="activity.column.route">
+    <value>入口與轉換路徑</value>
+  </data>
+  <data name="activity.column.status">
+    <value>狀態</value>
+  </data>
+  <data name="activity.column.latency">
+    <value>延遲</value>
+  </data>
+  <data name="activity.detail.title">
+    <value>SELECTED REQUEST</value>
+  </data>
+  <data name="activity.detail.fallback.model">
+    <value>暫無選中請求</value>
+  </data>
+  <data name="activity.detail.fallback.requestid">
+    <value>選擇左側請求查看詳情</value>
+  </data>
+  <data name="activity.detail.copy.requestid">
+    <value>複製 request ID</value>
+  </data>
+  <data name="activity.detail.field.protocol">
+    <value>入口協議</value>
+  </data>
+  <data name="activity.detail.field.route">
+    <value>轉換路徑</value>
+  </data>
+  <data name="activity.detail.field.upstream">
+    <value>上游響應</value>
+  </data>
+  <data name="activity.detail.field.size">
+    <value>響應大小</value>
+  </data>
+  <data name="activity.detail.field.error">
+    <value>錯誤分類</value>
+  </data>
+  <data name="activity.detail.summary.label">
+    <value>脫敏診斷摘要</value>
+  </data>
+  <data name="activity.detail.summary.fallback">
+    <value>暫無診斷摘要</value>
+  </data>
+  <data name="activity.route.openai.passthrough">
+    <value>OpenAI 直通</value>
+  </data>
+  <data name="activity.route.anthropic.passthrough">
+    <value>Anthropic 直通</value>
+  </data>
+  <data name="activity.route.ollama.passthrough">
+    <value>Ollama 直通</value>
+  </data>
+  <data name="activity.filter.status.all">
+    <value>全部狀態</value>
+  </data>
+  <data name="activity.filter.status.success">
+    <value>成功</value>
+  </data>
+  <data name="activity.filter.status.failed">
+    <value>失敗</value>
+  </data>
+  <data name="activity.filter.status.warning">
+    <value>警告</value>
+  </data>
+  <data name="activity.filter.protocol.all">
+    <value>全部入口協議</value>
+  </data>
+  <data name="activity.status.loading">
+    <value>正在加載活動…</value>
+  </data>
+  <data name="activity.status.empty">
+    <value>暫無請求活動</value>
+  </data>
+  <data name="activity.status.loaded">
+    <value>已加載 {0} 條活動</value>
+  </data>
+  <data name="activity.status.load.failed">
+    <value>活動加載失敗：{0}</value>
+  </data>
+  <data name="activity.status.history.more">
+    <value>已加載 {0} 條活動，可繼續查看歷史</value>
+  </data>
+  <data name="activity.status.history.end">
+    <value>已加載 {0} 條活動，已到歷史末尾</value>
+  </data>
+  <data name="activity.status.history.failed">
+    <value>歷史活動加載失敗：{0}</value>
+  </data>
+  <data name="activity.status.returned">
+    <value>已回到最新活動</value>
+  </data>
+  <data name="activity.status.return.failed">
+    <value>返回最新活動失敗：{0}</value>
+  </data>
+  <data name="activity.result.count">
+    <value>顯示 {0} 條活動</value>
+  </data>
+  <data name="activity.pending.count">
+    <value>有 {0} 條新活動，回到最新</value>
+  </data>
+  <data name="activity.pending.back">
+    <value>回到最新</value>
+  </data>
+  <data name="activity.loadmore.loading">
+    <value>正在加載歷史活動…</value>
+  </data>
+  <data name="activity.loadmore.continue">
+    <value>繼續上拉加載更早活動</value>
+  </data>
+  <data name="activity.loadmore.end">
+    <value>已到活動歷史末尾</value>
+  </data>
+  <data name="activity.item.model.unknown">
+    <value>未識別模型</value>
+  </data>
+  <data name="activity.item.provider.unknown">
+    <value>未匹配 Provider</value>
+  </data>
+  <data name="activity.latency.format">
+    <value>{0} ms</value>
+  </data>
+  <data name="activity.bytes.format">
+    <value>{0:N0} B</value>
+  </data>
+  <data name="activity.dash">
+    <value>—</value>
+  </data>
+  <data name="console.search.placeholder">
+    <value>搜索 request ID、模型或錯誤信息</value>
+  </data>
+  <data name="console.toggle.info">
+    <value>普通日誌</value>
+  </data>
+  <data name="console.toggle.warning">
+    <value>警告日誌</value>
+  </data>
+  <data name="console.toggle.error">
+    <value>錯誤日誌</value>
+  </data>
+  <data name="console.copy.tip">
+    <value>複製日誌</value>
+  </data>
+  <data name="console.empty">
+    <value>沒有匹配當前篩選條件的日誌。</value>
+  </data>
+  <data name="console.jump.tip">
+    <value>跳轉到底部</value>
+  </data>
+  <data name="console.clear">
+    <value>清空</value>
+  </data>
+  <data name="console.count.format">
+    <value>共 {0} 條</value>
+  </data>
+  <data name="console.copied">
+    <value>日誌已複製</value>
+  </data>
+  <data name="providers.header.list">
+    <value>供應商列表</value>
+  </data>
+  <data name="providers.header.list.hint">
+    <value>按當前路由順序顯示</value>
+  </data>
+  <data name="providers.button.new">
+    <value>新增 Provider</value>
+  </data>
+  <data name="providers.search.watermark">
+    <value>搜索 Provider</value>
+  </data>
+  <data name="providers.toggle.tooltip.enabled">
+    <value>綠色表示已啓用</value>
+  </data>
+  <data name="providers.toggle.tooltip">
+    <value>啓用 Provider</value>
+  </data>
+  <data name="providers.delete.tooltip">
+    <value>刪除 Provider</value>
+  </data>
+  <data name="providers.count.enabled">
+    <value>個已啓用</value>
+  </data>
+  <data name="providers.count.models">
+    <value>個模型</value>
+  </data>
+  <data name="providers.count.models.suffix">
+    <value>個模型 ·</value>
+  </data>
+  <data name="providers.model.count.suffix">
+    <value> ·</value>
+  </data>
+  <data name="providers.key.configured">
+    <value>密鑰已配置</value>
+  </data>
+  <data name="providers.key.protected">
+    <value>密鑰已保護</value>
+  </data>
+  <data name="providers.card.providers.label">
+    <value>Provider</value>
+  </data>
+  <data name="providers.card.models.label">
+    <value>可用模型</value>
+  </data>
+  <data name="providers.card.models.status">
+    <value>遠程模型已發現</value>
+  </data>
+  <data name="providers.card.keys.label">
+    <value>受保護密鑰</value>
+  </data>
+  <data name="providers.card.keys.status">
+    <value>DPAPI CurrentUser</value>
+  </data>
+  <data name="providers.card.health.label">
+    <value>連接健康</value>
+  </data>
+  <data name="providers.card.health.status">
+    <value>等待驗證</value>
+  </data>
+  <data name="providers.health.verify.all"><value>全部驗證</value></data>
+  <data name="providers.health.summary.none"><value>沒有啟用的 Provider</value></data>
+  <data name="providers.health.summary.checking"><value>驗證中 {0}/{1}</value></data>
+  <data name="providers.health.summary.healthy"><value>{0} 個正常</value></data>
+  <data name="providers.health.summary.warning"><value>{0} 個警告</value></data>
+  <data name="providers.health.summary.error"><value>{0} 個異常</value></data>
+  <data name="providers.health.summary.pending"><value>{0} 個待驗證</value></data>
+  <data name="providers.health.summary.separator"><value> · </value></data>
+  <data name="providers.health.status.pending"><value>待驗證</value></data>
+  <data name="providers.health.status.checking"><value>驗證中</value></data>
+  <data name="providers.health.status.healthy"><value>正常</value></data>
+  <data name="providers.health.status.empty"><value>正常但沒有模型</value></data>
+  <data name="providers.health.status.auth"><value>API Key 無效</value></data>
+  <data name="providers.health.status.config"><value>設定錯誤</value></data>
+  <data name="providers.health.status.endpoint"><value>位址不相容</value></data>
+  <data name="providers.health.status.unavailable"><value>無法存取</value></data>
+  <data name="providers.health.status.rate"><value>上游限流</value></data>
+  <data name="providers.health.status.request"><value>要求被拒絕</value></data>
+  <data name="providers.health.status.upstream"><value>上游異常</value></data>
+  <data name="providers.health.status.protocol"><value>回應格式不相容</value></data>
+  <data name="providers.health.status.disabled"><value>已停用</value></data>
+  <data name="providers.health.detail.pending"><value>尚未驗證連線</value></data>
+  <data name="providers.health.detail.checking"><value>正在驗證連線…</value></data>
+  <data name="providers.health.detail.disabled"><value>Provider 已停用</value></data>
+  <data name="providers.health.detail.healthy"><value>正常 · HTTP {0} · {1} ms · 發現 {2} 個模型</value></data>
+  <data name="providers.health.detail.empty"><value>連線正常 · HTTP {0} · {1} ms · 未發現模型</value></data>
+  <data name="providers.health.detail.auth"><value>連線失敗 · API Key 無效或權限不足（HTTP {0}）</value></data>
+  <data name="providers.health.detail.config"><value>設定錯誤，請檢查 Base URL、模型清單位址或要求標頭</value></data>
+  <data name="providers.health.detail.incomplete.headers"><value>要求標頭未填寫完整，請補齊名稱和值</value></data>
+  <data name="providers.health.detail.endpoint"><value>位址不相容（HTTP {0}），請檢查模型清單路徑</value></data>
+  <data name="providers.health.detail.timeout"><value>上游在 8 秒內沒有回應，請檢查網路或 Proxy</value></data>
+  <data name="providers.health.detail.unavailable"><value>無法存取上游，請檢查網路、Proxy 或伺服器狀態</value></data>
+  <data name="providers.health.detail.rate"><value>上游要求過於頻繁，請稍後重試</value></data>
+  <data name="providers.health.detail.request"><value>要求被上游拒絕（HTTP {0}）</value></data>
+  <data name="providers.health.detail.upstream"><value>上游服務異常（HTTP {0}）</value></data>
+  <data name="providers.health.detail.protocol"><value>上游回應不是相容的模型清單格式</value></data>
+  <data name="providers.tab.basic">
+    <value>基礎</value>
+  </data>
+  <data name="providers.tab.request">
+    <value>請求</value>
+  </data>
+  <data name="providers.tab.models">
+    <value>模型</value>
+  </data>
+  <data name="providers.basic.header">
+    <value>身份與上游</value>
+  </data>
+  <data name="providers.request.header">
+    <value>鑑權與網絡</value>
+  </data>
+  <data name="providers.name.label">
+    <value>顯示名稱</value>
+  </data>
+  <data name="providers.name.watermark">
+    <value>例如：DeepSeek</value>
+  </data>
+  <data name="providers.id.label">
+    <value>Provider ID</value>
+  </data>
+  <data name="providers.id.watermark">
+    <value>唯一標識</value>
+  </data>
+  <data name="providers.type.label">
+    <value>Provider 類型</value>
+  </data>
+  <data name="providers.baseurl.label">
+    <value>Base URL</value>
+  </data>
+  <data name="providers.baseurl.tooltip">
+    <value>加不加 v1 是個問題，請遵循供應商手冊</value>
+  </data>
+  <data name="providers.endpointformat.label">
+    <value>請求格式</value>
+  </data>
+  <data name="providers.proxy.checkbox">
+    <value>使用代理</value>
+  </data>
+  <data name="providers.headers.label">
+    <value>自定義請求頭</value>
+  </data>
+  <data name="providers.headers.add">
+    <value>添加</value>
+  </data>
+  <data name="providers.headers.name.watermark">
+    <value>Header 名稱</value>
+  </data>
+  <data name="providers.headers.value.watermark">
+    <value>Header 值</value>
+  </data>
+  <data name="providers.headers.remove.tooltip">
+    <value>刪除請求頭</value>
+  </data>
+  <data name="providers.headers.incomplete">
+    <value>有 {0} 個請求頭未完成，補全名稱和值後纔會保存。</value>
+  </data>
+  <data name="providers.headers.incomplete.prefix">
+    <value>有</value>
+  </data>
+  <data name="providers.headers.incomplete.suffix">
+    <value>個請求頭未完成，補全名稱和值後纔會保存。</value>
+  </data>
+  <data name="providers.headers.empty">
+    <value>尚未添加自定義請求頭</value>
+  </data>
+  <data name="providers.cli.button">
+    <value>模擬 CLI</value>
+  </data>
+  <data name="providers.cli.button.tooltip">
+    <value>一鍵寫入官方 CLI 身份請求頭</value>
+  </data>
+  <data name="providers.cli.identity">
+    <value>CLI 身份</value>
+  </data>
+  <data name="providers.cli.apply">
+    <value>套用</value>
+  </data>
+  <data name="providers.cli.refresh">
+    <value>重新整理版本</value>
+  </data>
+  <data name="providers.cli.applied">
+    <value>已套用</value>
+  </data>
+  <data name="providers.cli.recommended">
+    <value>推薦</value>
+  </data>
+  <data name="providers.cli.newVersion">
+    <value>有新版本</value>
+  </data>
+  <data name="providers.cli.source.npmRegistry">
+    <value>npm 來源</value>
+  </data>
+  <data name="providers.cli.source.githubReleases">
+    <value>GitHub 來源</value>
+  </data>
+  <data name="providers.cli.source.default">
+    <value>預設</value>
+  </data>
+  <data name="providers.cli.source.cached">
+    <value>快取</value>
+  </data>
+  <data name="providers.cli.source.userOverridden">
+    <value>手動</value>
+  </data>
+  <data name="providers.cli.refreshing">
+    <value>重新整理中…</value>
+  </data>
+  <data name="providers.cli.current.prefix">
+    <value>目前：{0}</value>
+  </data>
+  <data name="providers.cli.current.none">
+    <value>目前：未套用 CLI 身分</value>
+  </data>
+  <data name="providers.cli.version.tooltip">
+    <value>Grok 版本可手動修改</value>
+  </data>
+  <data name="providers.connection.label">
+    <value>連接狀態</value>
+  </data>
+  <data name="providers.connection.test">
+    <value>測試連接</value>
+  </data>
+  <data name="providers.models.url.label">
+    <value>模型列表 URL（可選）</value>
+  </data>
+  <data name="providers.models.url.watermark">
+    <value>例如：https://api.example.com/v1/models</value>
+  </data>
+  <data name="providers.models.url.hint">
+    <value>留空時根據 Base URL 自動推導；填寫後僅用此地址刷新模型，不影響聊天請求。</value>
+  </data>
+  <data name="providers.models.search.watermark">
+    <value>搜索模型</value>
+  </data>
+  <data name="providers.models.sync.tooltip">
+    <value>同步模型</value>
+  </data>
+  <data name="providers.models.sync.button">
+    <value>同步模型</value>
+  </data>
+  <data name="providers.models.toggleAll.tooltip">
+    <value>啓用或停用全部模型</value>
+  </data>
+  <data name="providers.models.sort.drag.tooltip">
+    <value>拖動調整模型順序</value>
+  </data>
+  <data name="providers.models.sort.toggle.tooltip">
+    <value>控制模型是否暴露給下游</value>
+  </data>
+  <data name="providers.models.sort.toggle.automation">
+    <value>啓用模型</value>
+  </data>
+  <data name="providers.models.vision.tooltip">
+    <value>支持圖片輸入</value>
+  </data>
+  <data name="providers.models.ctx.suffix">
+    <value> ctx · </value>
+  </data>
+  <data name="providers.models.delete.tooltip">
+    <value>刪除模型</value>
+  </data>
+  <data name="providers.dragging">
+    <value>拖動中</value>
+  </data>
+  <data name="providers.models.empty">
+    <value>沒有匹配的模型</value>
+  </data>
+  <data name="providers.empty.title">
+    <value>暫無 Provider</value>
+  </data>
+  <data name="providers.empty.hint">
+    <value>請先從左側目錄添加 Provider。</value>
+  </data>
+  <data name="providers.edit.new.displayname">
+    <value>新 Provider</value>
+  </data>
+  <data name="providers.status.edit.new">
+    <value>正在編輯新 Provider</value>
+  </data>
+  <data name="providers.status.loaded">
+    <value>已加載 {0} 個 Provider</value>
+  </data>
+  <data name="providers.loading.failure">
+    <value>加載失敗：{0}</value>
+  </data>
+  <data name="providers.save.success">
+    <value>Provider 已保存</value>
+  </data>
+  <data name="providers.save.success.pendingHeaders">
+    <value>Provider 已保存 · {0} 個請求頭待補全</value>
+  </data>
+  <data name="providers.save.failure">
+    <value>保存失敗：{0}</value>
+  </data>
+  <data name="providers.delete.success">
+    <value>Provider 已刪除</value>
+  </data>
+  <data name="providers.delete.failure">
+    <value>刪除失敗：{0}</value>
+  </data>
+  <data name="providers.headers.pending">
+    <value>請補全 {0} 個自定義請求頭</value>
+  </data>
+  <data name="providers.sync.beforeProvider">
+    <value>請先保存 Provider，再添加模型</value>
+  </data>
+  <data name="providers.sync.beforeModel">
+    <value>請先保存 Provider，再同步模型</value>
+  </data>
+  <data name="providers.sync.invalidUrl">
+    <value>模型列表 URL 必須是 HTTP 或 HTTPS 絕對地址</value>
+  </data>
+  <data name="providers.sync.running">
+    <value>正在同步模型…</value>
+  </data>
+  <data name="providers.sync.failure.http">
+    <value>模型同步失敗 · {0} {1}</value>
+  </data>
+  <data name="providers.sync.failure.toast.http">
+    <value>模型同步失敗 · {0}</value>
+  </data>
+  <data name="providers.sync.failure.empty">
+    <value>模型同步失敗 · 響應中沒有可用模型</value>
+  </data>
+  <data name="providers.sync.failure.parse">
+    <value>模型同步失敗 · 響應格式無法解析</value>
+  </data>
+  <data name="providers.sync.failure.exception">
+    <value>模型同步失敗 · {0}</value>
+  </data>
+  <data name="providers.sync.failure.toast.exception">
+    <value>模型同步失敗</value>
+  </data>
+  <data name="providers.sync.success">
+    <value>模型同步完成 · 發現 {0} 個，新增 {1} 個，更新 {2} 個</value>
+  </data>
+  <data name="providers.test.baseurl.required">
+    <value>請先填寫 Base URL</value>
+  </data>
+  <data name="providers.test.baseurl.required.toast">
+    <value>請先填寫 Provider Base URL</value>
+  </data>
+  <data name="providers.test.running">
+    <value>正在測試連接…</value>
+  </data>
+  <data name="providers.test.success">
+    <value>連接正常 · {0} · {1} ms</value>
+  </data>
+  <data name="providers.test.failure">
+    <value>連接失敗 · {0} {1}</value>
+  </data>
+  <data name="providers.test.failure.exception">
+    <value>連接失敗 · {0}</value>
+  </data>
+  <data name="providers.test.toast.success">
+    <value>Provider 連通性測試成功</value>
+  </data>
+  <data name="providers.test.toast.failure">
+    <value>Provider 連通性測試失敗</value>
+  </data>
+  <data name="providers.model.edit.new">
+    <value>正在編輯新模型</value>
+  </data>
+  <data name="providers.model.save.success">
+    <value>模型已保存</value>
+  </data>
+  <data name="providers.model.save.failure">
+    <value>模型保存失敗：{0}</value>
+  </data>
+  <data name="providers.model.delete.success">
+    <value>模型已刪除</value>
+  </data>
+  <data name="providers.model.delete.failure">
+    <value>模型刪除失敗：{0}</value>
+  </data>
+  <data name="providers.model.order.saved">
+    <value>模型順序已保存</value>
+  </data>
+  <data name="providers.model.order.save.failure">
+    <value>模型排序保存失敗：{0}</value>
+  </data>
+  <data name="providers.model.order.save.failure.toast">
+    <value>模型排序保存失敗</value>
+  </data>
+  <data name="providers.model.enable.all">
+    <value>已啓用全部模型</value>
+  </data>
+  <data name="providers.model.disable.all">
+    <value>已停用全部模型</value>
+  </data>
+  <data name="providers.model.summary">
+    <value>已啓用 {0} / {1} 個模型</value>
+  </data>
+  <data name="providers.model.unknown">
+    <value>未知模型</value>
+  </data>
+  <data name="providers.model.context.missing">
+    <value>AI 提供商模型接口未返回上下文配置</value>
+  </data>
+  <data name="providers.model.capability.vision">
+    <value>視覺</value>
+  </data>
+  <data name="providers.model.capability.text">
+    <value>文本</value>
+  </data>
+  <data name="providers.apikey.visibility.show">
+    <value>顯示 API Key</value>
+  </data>
+  <data name="providers.apikey.visibility.hide">
+    <value>隱藏 API Key</value>
+  </data>
+  <data name="providers.apikey.watermark">
+    <value>請輸入 API Key</value>
+  </data>
+  <data name="providers.apikey.configured">
+    <value>已配置 API Key</value>
+  </data>
+  <data name="providers.apikey.notGenerated">
+    <value>未生成</value>
+  </data>
+  <data name="gateway.endpoint.header">
+    <value>Endpoint</value>
+  </data>
+  <data name="gateway.endpoint.header.hint">
+    <value>獨立維護模型組合與故障轉移順序</value>
+  </data>
+  <data name="gateway.endpoint.copyUrl.tooltip">
+    <value>複製 Base URL</value>
+  </data>
+  <data name="gateway.endpoint.rotateKey.tooltip">
+    <value>重新生成 API Key</value>
+  </data>
+  <data name="gateway.endpoint.copyKey.tooltip">
+    <value>複製 API Key</value>
+  </data>
+  <data name="gateway.endpoint.comboCount">
+    <value>已暴露 {0} 個 Combo</value>
+  </data>
+  <data name="gateway.endpoint.comboCount.prefix">
+    <value>已暴露</value>
+  </data>
+  <data name="gateway.endpoint.comboCount.suffix">
+    <value>個 Combo</value>
+  </data>
+  <data name="gateway.combo.header">
+    <value>模型組合</value>
+  </data>
+  <data name="gateway.combo.header.hint">
+    <value>跨 Endpoint 共享，按成員順序故障轉移</value>
+  </data>
+  <data name="gateway.combo.add.tooltip">
+    <value>新增 Combo 模型</value>
+  </data>
+  <data name="gateway.combo.expand.tooltip">
+    <value>展開或摺疊 Combo</value>
+  </data>
+  <data name="gateway.combo.toggle.tooltip">
+    <value>啓用或停用 Combo</value>
+  </data>
+  <data name="gateway.combo.remove.tooltip">
+    <value>移除 Combo 模型</value>
+  </data>
+  <data name="gateway.route.sort.drag.tooltip">
+    <value>拖動調整故障轉移順序</value>
+  </data>
+  <data name="gateway.route.sort.toggle.tooltip">
+    <value>啓用或停用成員</value>
+  </data>
+  <data name="gateway.route.sort.remove.tooltip">
+    <value>從 Combo 移除模型</value>
+  </data>
+  <data name="gateway.route.sort.dragging">
+    <value>拖動中</value>
+  </data>
+  <data name="gateway.combo.memberOrder.hint">
+    <value>成員模型按順序故障轉移</value>
+  </data>
+  <data name="gateway.combo.addModel.tooltip">
+    <value>向 Combo 添加模型</value>
+  </data>
+  <data name="gateway.combo.search.watermark">
+    <value>搜索模型...</value>
+  </data>
+  <data name="gateway.sort.ascending.tooltip">
+    <value>按字母升序排序</value>
+  </data>
+  <data name="gateway.sort.descending.tooltip">
+    <value>按字母降序排序</value>
+  </data>
+  <data name="gateway.url.copied">
+    <value>地址已複製</value>
+  </data>
+  <data name="gateway.apikey.copied">
+    <value>API Key 已複製</value>
+  </data>
+  <data name="gateway.status.loaded">
+    <value>已加載 {0} 個 Provider、{1} 個模型、{2} 個 Endpoint 和 {3} 個 Combo</value>
+  </data>
+  <data name="gateway.status.load.failure">
+    <value>網關加載失敗：{0}</value>
+  </data>
+  <data name="gateway.combo.new.name">
+    <value>新 Combo</value>
+  </data>
+  <data name="gateway.combo.new.name.dup">
+    <value>新 Combo {0}</value>
+  </data>
+  <data name="gateway.combo.add.success">
+    <value>模型組合已添加</value>
+  </data>
+  <data name="gateway.combo.add.failure">
+    <value>添加 Combo 模型失敗：{0}</value>
+  </data>
+  <data name="gateway.combo.save.success">
+    <value>Combo 模型已保存</value>
+  </data>
+  <data name="gateway.combo.save.failure">
+    <value>保存 Combo 模型失敗：{0}</value>
+  </data>
+  <data name="gateway.combo.remove.success">
+    <value>模型組合已移除</value>
+  </data>
+  <data name="gateway.combo.remove.failure">
+    <value>移除 Combo 模型失敗：{0}</value>
+  </data>
+  <data name="gateway.endpoint.comboScope.saved">
+    <value>{0} 的 Combo 暴露範圍已保存</value>
+  </data>
+  <data name="gateway.endpoint.comboScope.failure">
+    <value>Endpoint Combo 更新失敗：{0}</value>
+  </data>
+  <data name="gateway.endpoint.comboScope.failure.toast">
+    <value>Endpoint Combo 更新失敗</value>
+  </data>
+  <data name="gateway.route.reorder.saved">
+    <value>故障轉移順序已保存</value>
+  </data>
+  <data name="gateway.route.reorder.failure">
+    <value>保存排序失敗：{0}</value>
+  </data>
+  <data name="gateway.model.available.empty">
+    <value>沒有可加入的已啓用模型，請先在 Provider 中啓用模型</value>
+  </data>
+  <data name="gateway.model.available.loaded">
+    <value>已加載 {0} 個可加入模型</value>
+  </data>
+  <data name="gateway.model.available.load.failure">
+    <value>加載可加入模型失敗：{0}</value>
+  </data>
+  <data name="gateway.model.combo.add.success">
+    <value>模型已加入 Combo</value>
+  </data>
+  <data name="gateway.model.combo.add.failure">
+    <value>加入 Combo 失敗：{0}</value>
+  </data>
+  <data name="gateway.model.combo.remove.success">
+    <value>模型已從 Combo 移除</value>
+  </data>
+  <data name="gateway.model.combo.remove.failure">
+    <value>移除成員失敗：{0}</value>
+  </data>
+  <data name="gateway.route.member.save.success">
+    <value>成員狀態已保存</value>
+  </data>
+  <data name="gateway.route.member.save.failure">
+    <value>成員保存失敗：{0}</value>
+  </data>
+  <data name="gateway.endpoint.toggle.success">
+    <value>{0} 已{1}</value>
+  </data>
+  <data name="gateway.endpoint.toggle.failure">
+    <value>Endpoint 更新失敗：{0}</value>
+  </data>
+  <data name="gateway.endpoint.enable">
+    <value>啓用</value>
+  </data>
+  <data name="gateway.endpoint.disable">
+    <value>停用</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerated">
+    <value>{0} API Key 已重新生成</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerated.toast">
+    <value>API Key 已重新生成</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerate.failure">
+    <value>API Key 重新生成失敗：{0}</value>
+  </data>
+  <data name="gateway.endpoint.apikey.regenerate.failure.toast">
+    <value>API Key 重新生成失敗</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.saved">
+    <value>{0} Reasoning effort 已保存</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.saved.toast">
+    <value>Reasoning effort 已保存</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.failure">
+    <value>Reasoning effort 保存失敗：{0}</value>
+  </data>
+  <data name="gateway.endpoint.reasoning.failure.toast">
+    <value>Reasoning effort 保存失敗</value>
+  </data>
+  <data name="gateway.combo.summary.empty">
+    <value>未暴露 Combo</value>
+  </data>
+  <data name="gateway.combo.summary.separator">
+    <value>、</value>
+  </data>
+  <data name="gateway.combo.disabled">
+    <value>停用</value>
+  </data>
+  <data name="gateway.combo.missing">
+    <value>不存在</value>
+  </data>
+  <data name="gateway.endpoint.noRoutes">
+    <value>無路由</value>
+  </data>
+  <data name="gateway.endpoint.hasRequests">
+    <value>有請求</value>
+  </data>
+  <data name="gateway.endpoint.ready">
+    <value>已就緒</value>
+  </data>
+  <data name="gateway.endpoint.active">
+    <value>活躍</value>
+  </data>
+  <data name="gateway.endpoint.standby">
+    <value>待命</value>
+  </data>
+  <data name="gateway.request.success">
+    <value>成功</value>
+  </data>
+  <data name="gateway.request.failure">
+    <value>失敗</value>
+  </data>
+  <data name="providers.connection.status.pending">
+    <value>尚未測試連接</value>
+  </data>
+  <data name="placeholder.empty.body">
+    <value>此頁面已完成導航接入，業務功能將在後續迭代中逐步實現。</value>
+  </data>
+  <data name="assistant.history.placeholder">
+    <value>歷史會話…</value>
+  </data>
+  <data name="assistant.session.new"><value>新會話</value></data>
+  <data name="assistant.history.list.tooltip"><value>歷史對話</value></data>
+  <data name="assistant.history.empty"><value>尚無歷史對話</value></data>
+  <data name="assistant.empty.title"><value>還沒有對話</value></data>
+  <data name="assistant.empty.description"><value>輸入第一則訊息開始，或從右上角的歷史對話繼續。</value></data>
+  <data name="assistant.new_session">
+    <value>＋ 新會話</value>
+  </data>
+  <data name="assistant.send">
+    <value>傳送</value>
+  </data>
+  <data name="assistant.cancel">
+    <value>取消</value>
+  </data>
+  <data name="assistant.stop"><value>停止生成</value></data>
+  <data name="assistant.copy.tooltip"><value>複製訊息</value></data>
+  <data name="assistant.copied"><value>訊息已複製</value></data>
+  <data name="assistant.jump.tooltip"><value>跳至最新訊息</value></data>
+  <data name="assistant.process.thinking"><value>思考</value></data>
+  <data name="assistant.process.summary"><value>思考摘要</value></data>
+  <data name="assistant.process.elapsed"><value>已處理 {0}</value></data>
+  <data name="assistant.process.completed"><value>已完成 {0}</value></data>
+  <data name="assistant.process.steps"><value>工具呼叫</value></data>
+  <data name="assistant.tool.function"><value>函式</value></data>
+  <data name="assistant.tool.arguments"><value>參數</value></data>
+  <data name="assistant.tool.result"><value>結果</value></data>
+  <data name="assistant.tool.failed"><value>{0} 失敗</value></data>
+  <data name="assistant.step.call"><value>呼叫工具 {0}</value></data>
+  <data name="assistant.step.approval"><value>等待你批准修改：{0}</value></data>
+  <data name="assistant.step.completed"><value>{0} 完成</value></data>
+  <data name="assistant.step.failed"><value>{0} 失敗：{1}</value></data>
+  <data name="assistant.task.cancelled"><value>已取消。</value></data>
+  <data name="assistant.persistence.failed"><value>目前對話包含敏感內容或儲存失敗，後續訊息未儲存。</value></data>
+  <data name="assistant.status.working"><value>思考中…</value></data>
+  <data name="assistant.error.service_unavailable"><value>AI 助理服務初始化失敗，請查看主控台記錄。</value></data>
+  <data name="assistant.error.unexpected"><value>請求失敗，請重試或查看主控台記錄。</value></data>
+  <data name="assistant.error.retry"><value>重試</value></data>
+  <data name="assistant.error.dismiss"><value>關閉</value></data>
+  <data name="assistant.status.failed"><value>請求失敗</value></data>
+  <data name="assistant.input.watermark">
+    <value>輸入訊息，Enter 傳送…</value>
+  </data>
+  <data name="assistant.history.delete.tooltip">
+    <value>刪除此對話</value>
+  </data>
+  <data name="assistant.history.rename.tooltip">
+    <value>重新命名會話</value>
+  </data>
+  <data name="assistant.history.renamed">
+    <value>會話已重新命名</value>
+  </data>
+  <data name="assistant.history.rename.failed">
+    <value>重新命名失敗</value>
+  </data>
+  <data name="assistant.permission.auto">
+    <value>自動批准</value>
+  </data>
+  <data name="assistant.permission.ask">
+    <value>逐條批准</value>
+  </data>
+  <data name="assistant.model.none">
+    <value>未設定模型</value>
+  </data>
+  <data name="assistant.model.select.tooltip">
+    <value>指定助手模型（僅 Provider 模型）</value>
+  </data>
+  <data name="assistant.model.search.watermark">
+    <value>搜尋模型…</value>
+  </data>
+  <data name="assistant.model.empty">
+    <value>暫無可用模型，請先在 Provider 中啟用 openai 相容模型</value>
+  </data>
+  <data name="assistant.reasoning.label">
+    <value>思考等級</value>
+  </data>
+  <data name="assistant.reasoning.default">
+    <value>預設</value>
+  </data>
+  <data name="assistant.reasoning.minimal">
+    <value>極低</value>
+  </data>
+  <data name="assistant.reasoning.low">
+    <value>低</value>
+  </data>
+  <data name="assistant.reasoning.medium">
+    <value>中</value>
+  </data>
+  <data name="assistant.reasoning.high">
+    <value>高</value>
+  </data>
+  <data name="assistant.approval.title">
+    <value>AI 助手請求修改</value>
+  </data>
+  <data name="assistant.approval.approve">
+    <value>批准</value>
+  </data>
+  <data name="assistant.approval.reject">
+    <value>拒絕</value>
+  </data>
+  <data name="assistant.task.failed">
+    <value>任務失敗</value>
+  </data>
+  <data name="assistant.error.max_steps">
+    <value>已超過最大步驟數 {0}，任務中止。</value>
+  </data>
+  <data name="assistant.error.kind.unknown">
+    <value>模型請求失敗。可能是模型傳回了非標準回應，請重試或更換模型。</value>
+  </data>
+  <data name="assistant.error.kind.connection_failed">
+    <value>無法連線模型服務，請檢查 Base URL 與網路連線。</value>
+  </data>
+  <data name="assistant.error.kind.timeout">
+    <value>模型請求逾時，請稍後重試或檢查網路。</value>
+  </data>
+  <data name="assistant.error.kind.authentication">
+    <value>API Key 無效、缺失或已過期，請在 Provider 設定中檢查金鑰。</value>
+  </data>
+  <data name="assistant.error.kind.permission_denied">
+    <value>目前金鑰沒有存取該模型或資源的權限，請檢查帳戶權限。</value>
+  </data>
+  <data name="assistant.error.kind.model_not_found">
+    <value>模型不存在或已下線，請檢查模型 ID 或改選其他模型。</value>
+  </data>
+  <data name="assistant.error.kind.invalid_request">
+    <value>請求被模型服務拒絕（參數無效）。</value>
+  </data>
+  <data name="assistant.error.kind.context_length">
+    <value>對話內容超出模型上下文長度限制，請開啟新對話或精簡上下文。</value>
+  </data>
+  <data name="assistant.error.kind.rate_limited">
+    <value>請求過於頻繁，已觸發速率限制，請稍後重試。</value>
+  </data>
+  <data name="assistant.error.kind.insufficient_quota">
+    <value>帳戶額度不足或已欠費，請檢查 Provider 帳戶餘額。</value>
+  </data>
+  <data name="assistant.error.kind.content_filtered">
+    <value>內容被模型服務的安全策略過濾，請調整輸入後重試。</value>
+  </data>
+  <data name="assistant.error.kind.overloaded">
+    <value>模型服務目前過載，請稍後重試。</value>
+  </data>
+  <data name="assistant.error.kind.server_error">
+    <value>模型服務內部錯誤，請稍後重試。</value>
+  </data>
+  <data name="assistant.error.status">
+    <value>HTTP 狀態碼：{0}</value>
+  </data>
+  <data name="assistant.error.code">
+    <value>錯誤碼：{0}</value>
+  </data>
+  <data name="assistant.error.upstream">
+    <value>服務描述：{0}</value>
+  </data>
+  <data name="assistant.decision.validation_failed"><value>請檢查決策欄位後再試一次。</value></data>
+  <data name="providers.tab.advanced"><value>進階</value></data>
+  <data name="providers.tab.test"><value>測試</value></data>
+  <data name="providers.advanced.header"><value>代理與請求增強</value></data>
+  <data name="providers.compatibility.label"><value>介面相容類型</value></data>
+  <data name="providers.compat.chat.title"><value>OpenAI Chat-compatible</value></data>
+  <data name="providers.compat.chat.description"><value>使用 /chat/completions</value></data>
+  <data name="providers.compat.responses.title"><value>OpenAI Responses-compatible</value></data>
+  <data name="providers.compat.responses.description"><value>使用 /responses</value></data>
+  <data name="providers.compat.anthropic.title"><value>Anthropic Messages-compatible</value></data>
+  <data name="providers.compat.anthropic.description"><value>使用 /messages</value></data>
+  <data name="providers.apikey.label"><value>API Key</value></data>
+  <data name="providers.test.model.label"><value>測試模型</value></data>
+  <data name="providers.test.mode.label"><value>測試模式</value></data>
+  <data name="providers.test.mode.regular"><value>一般請求</value></data>
+  <data name="providers.test.mode.streaming"><value>串流請求</value></data>
+  <data name="providers.test.prompt.watermark"><value>輸入測試提示詞</value></data>
+  <data name="providers.test.send"><value>傳送</value></data>
+  <data name="providers.test.stop"><value>停止</value></data>
+  <data name="providers.test.response.copy"><value>複製</value></data>
+  <data name="providers.test.response.delete"><value>刪除</value></data>
+  <data name="providers.test.response.selectAll"><value>全選</value></data>
+  <data name="providers.delete.dialog.title"><value>提示</value></data>
+  <data name="providers.delete.dialog.cancel"><value>取消</value></data>
+  <data name="providers.delete.dialog.confirm"><value>刪除</value></data>
+  <data name="providers.delete.dialog.message"><value>確定刪除 Provider「{0}」嗎？</value></data>
+  <data name="providers.test.response.empty"><value>傳送測試請求後，回應會顯示在這裡</value></data>
+  <data name="providers.test.model.empty"><value>尚未啟用任何模型，請先前往模型分頁啟用。</value></data>
+  <data name="assistant.decision.skip"><value>略過</value></data>
+  <data name="assistant.decision.continue"><value>繼續</value></data>
+  <data name="assistant.decision.submit"><value>提交</value></data>
+  <data name="assistant.decision.previous"><value>上一項</value></data>
+  <data name="assistant.decision.next"><value>下一項</value></data>
+  <data name="assistant.decision.close"><value>關閉</value></data>
+  <data name="assistant.decision.cancel_input"><value>取消本次輸入</value></data>
+  <data name="assistant.queue.title"><value>排隊訊息</value></data>
+  <data name="assistant.queue.delete"><value>刪除排隊訊息</value></data>
+  <data name="update.entry.downloading"><value>正在下載更新</value></data>
+  <data name="update.entry.verifying"><value>正在驗證更新</value></data>
+  <data name="update.entry.ready"><value>{0} 已準備完成</value></data>
+  <data name="update.entry.error"><value>更新需要處理</value></data>
+  <data name="update.entry.install"><value>安裝</value></data>
+  <data name="update.entry.retry"><value>重試</value></data>
+  <data name="update.dialog.close"><value>關閉</value></data>
+  <data name="update.dialog.later"><value>稍後</value></data>
+  <data name="update.dialog.install"><value>重新啟動並安裝</value></data>
+  <data name="update.dialog.retry"><value>重試</value></data>
+  <data name="update.progress.unknown"><value>未知</value></data>
+  <data name="update.progress.second"><value>秒</value></data>
+  <data name="update.progress.calculating"><value>計算中</value></data>
+  <data name="update.status.idle"><value>尚未檢查更新</value></data>
+  <data name="update.status.checking"><value>正在檢查更新…</value></data>
+  <data name="update.status.downloading"><value>正在下載更新…</value></data>
+  <data name="update.status.verifying"><value>正在驗證更新套件…</value></data>
+  <data name="update.status.ready"><value>更新已準備完成</value></data>
+  <data name="update.status.installing"><value>安裝程式已啟動，應用程式即將結束…</value></data>
+  <data name="update.status.latest"><value>已是最新版本</value></data>
+  <data name="update.status.error"><value>更新失敗</value></data>
+  <data name="update.error.check"><value>無法檢查更新，請稍後重試。</value></data>
+  <data name="update.error.prepare"><value>無法準備更新套件，請重試。</value></data>
+  <data name="update.error.install"><value>無法啟動更新安裝程式，請重試。</value></data>
+  <data name="update.error.exit"><value>更新安裝程式已啟動，但應用程式無法自動結束。請手動關閉應用程式。</value></data>
+  <data name="release.notes.empty"><value>此版本暫無發行說明。</value></data>
+  <data name="settings.update.history.title"><value>版本歷史</value></data>
+  <data name="settings.update.history.refresh"><value>重新整理</value></data>
+  <data name="settings.update.history.loading"><value>正在載入版本歷史…</value></data>
+  <data name="settings.update.history.empty"><value>暫無正式版本</value></data>
+  <data name="settings.update.history.error.load"><value>無法載入版本歷史，請重試。</value></data>
+  <data name="settings.update.history.retry"><value>重試</value></data>
+  <data name="settings.update.history.load.more"><value>載入更多</value></data>
+  <data name="settings.update.history.loading.more"><value>正在載入更多…</value></data>
+  <data name="settings.update.history.badge.latest"><value>最新</value></data>
+  <data name="settings.update.history.badge.current"><value>目前</value></data>
+  <data name="update.dialog.open_release"><value>前往發佈頁</value></data>
+  <data name="update.release.open.failed"><value>無法開啟發佈頁，請稍後重試。</value></data>
+  <data name="update.install.confirm.title"><value>安裝更新？</value></data>
+  <data name="update.install.confirm.message"><value>安裝將關閉並重新啟動 Loom-X。期間路由服務會短暫中斷，正在進行的請求可能失敗。請先儲存重要工作。</value></data>
+  <data name="update.install.confirm.accept"><value>安裝並重新啟動</value></data>
+  <data name="update.install.confirm.cancel"><value>暫不安裝</value></data>
+</root>

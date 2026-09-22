@@ -1,0 +1,302 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Markup.Xaml;
+using Avalonia.Media;
+using Avalonia.Styling;
+using LoomX;
+using System.IO;
+using Xunit;
+
+namespace LoomX.Tests.Views;
+
+[Collection("Avalonia UI")]
+public sealed class SettingsViewContractTests
+{
+    [Fact]
+    public void EditableSettingsUseImmediateSourceUpdatesAndDirectSaveEvents()
+    {
+        var viewSource = ReadDesktopFile("Views", "SettingsView.axaml");
+        var viewModelSource = ReadDesktopFile("ViewModels", "SettingsViewModel.cs");
+
+        Assert.Contains("Text=\"{Binding ProxyHost, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", viewSource, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding ProxyPassword, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}\"", viewSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("DebouncedAutoSaver", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("private readonly SemaphoreSlim saveLock", viewModelSource, StringComparison.Ordinal);
+        Assert.Contains("private void SaveAfterEdit()", viewModelSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ThemeSelectionAppliesAvaloniaVariantAndProvidesDistinctDarkTokens()
+    {
+        var appSource = ReadDesktopFile("App.axaml.cs");
+        var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
+        var mainViewModelSource = ReadDesktopFile("ViewModels", "MainWindowViewModel.cs");
+        var settingsViewModelSource = ReadDesktopFile("ViewModels", "SettingsViewModel.cs");
+        var tokenSource = ReadDesktopFile("Styles", "VisualTokens.axaml");
+
+        Assert.Contains("applyTheme: mainWindow.ApplyTheme", appSource, StringComparison.Ordinal);
+        Assert.Contains("public void ApplyTheme(string theme)", windowSource, StringComparison.Ordinal);
+        Assert.Contains("ThemeVariant.Dark", windowSource, StringComparison.Ordinal);
+        Assert.Contains("ThemeVariant.Light", windowSource, StringComparison.Ordinal);
+        Assert.Contains("ThemeVariant.Default", windowSource, StringComparison.Ordinal);
+        Assert.Contains("applyTheme?.Invoke(settings.Theme);", mainViewModelSource, StringComparison.Ordinal);
+        Assert.Contains("if (!suppressAutoSave) ApplyThemePreview();", settingsViewModelSource, StringComparison.Ordinal);
+        Assert.Contains("<ResourceDictionary x:Key=\"Light\">", tokenSource, StringComparison.Ordinal);
+        Assert.Contains("<ResourceDictionary x:Key=\"Dark\">", tokenSource, StringComparison.Ordinal);
+        Assert.Contains("Color=\"#E6172226\"", tokenSource, StringComparison.Ordinal);
+        Assert.Contains("Color=\"#F1F6F7\"", tokenSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AppearanceValuesUseIntegerSlidersWithStableReadouts()
+    {
+        var source = ReadDesktopFile("Views", "SettingsView.axaml");
+
+        Assert.Contains("<Slider Value=\"{Binding TransparencyOpacity, Mode=TwoWay}\" Minimum=\"0\" Maximum=\"100\" TickFrequency=\"1\" IsSnapToTickEnabled=\"True\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Slider Value=\"{Binding BlurAmount, Mode=TwoWay}\" Minimum=\"0\" Maximum=\"64\" TickFrequency=\"1\" IsSnapToTickEnabled=\"True\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.opacity.label}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.opacity.hint}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.blur.label}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{l:Locale settings.blur.hint}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding TransparencyOpacity, StringFormat='{}{0}%'}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding BlurAmount}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<NumericUpDown Grid.Column=\"1\" Value=\"{Binding TransparencyOpacity}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<NumericUpDown Grid.Column=\"1\" Value=\"{Binding BlurAmount}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("磨砂算法", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Acrylic（亚克力）", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("TransparencyAlgorithmOptions", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SelectedTransparencyAlgorithm", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("<ComboBox ItemsSource=\"{Binding TransparencyAlgorithmOptions}\"", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AppearancePipelineUsesAContinuousZeroToHundredOpacityRange()
+    {
+        var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
+        var servicePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "Configuration", "ConfigurationManagementService.cs");
+        var serviceSource = File.ReadAllText(servicePath);
+
+        Assert.Contains("Math.Clamp(opacity, 0, 100)", windowSource, StringComparison.Ordinal);
+        Assert.Contains("TransparencyOpacity is < 0 or > 100", serviceSource, StringComparison.Ordinal);
+
+        var tint = MainWindow.CalculateBlurTintFactor(24);
+        var alphaAtZero = MainWindow.CalculateBrushAlpha(230, 0, tint);
+        var alphaAtOne = MainWindow.CalculateBrushAlpha(230, 1, tint);
+        var alphaAtFour = MainWindow.CalculateBrushAlpha(230, 4, tint);
+        var alphaAtHundred = MainWindow.CalculateBrushAlpha(230, 100, tint);
+
+        Assert.True(alphaAtZero > 0);
+        Assert.True(alphaAtOne > alphaAtZero);
+        Assert.True(alphaAtFour > alphaAtOne);
+        Assert.True(alphaAtHundred > alphaAtFour);
+        Assert.Equal(0.16, MainWindow.CalculateOpacityFactor(0), 3);
+        Assert.Equal(1, MainWindow.CalculateOpacityFactor(100), 3);
+    }
+
+    [Fact]
+    public void BlurTintChangesSmoothlyWithoutChangingTheOpacityScale()
+    {
+        var lowBlur = MainWindow.CalculateBlurTintFactor(0);
+        var highBlur = MainWindow.CalculateBlurTintFactor(64);
+
+        Assert.Equal(0.35, lowBlur, 3);
+        Assert.Equal(1, highBlur, 3);
+        Assert.True(highBlur > lowBlur);
+        Assert.True(
+            MainWindow.CalculateBrushAlpha(230, 86, highBlur)
+            > MainWindow.CalculateBrushAlpha(230, 86, lowBlur));
+    }
+
+    [Fact]
+    public void AppearancePipelineKeepsOneMaterialPriorityAcrossTheBlurRange()
+    {
+        var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
+
+        Assert.Contains("WindowTransparencyLevel.Transparent", windowSource, StringComparison.Ordinal);
+        Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(algorithm);", windowSource, StringComparison.Ordinal);
+        Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
+        Assert.Contains("0.35 + (Math.Clamp(blurAmount, 0, 64) / 64d * 0.65)", windowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("TransparencyLevelHint = !enabled", windowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("[WindowTransparencyLevel.None]", windowSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TransparencyAlgorithmAlwaysUsesAcrylicMaterial()
+    {
+        var expected = new[]
+        {
+            WindowTransparencyLevel.AcrylicBlur,
+            WindowTransparencyLevel.Transparent
+        };
+
+        Assert.Equal(expected, MainWindow.BuildTransparencyLevels("acrylic"));
+        Assert.Equal(expected, MainWindow.BuildTransparencyLevels("blur"));
+        Assert.Equal(expected, MainWindow.BuildTransparencyLevels("mica"));
+    }
+
+    [Fact]
+    public void AppearanceBrushUpdatesKeepTheSharedBrushAndUseItsBaseColor()
+    {
+        var brush = new SolidColorBrush(Color.FromArgb(230, 213, 228, 233));
+        var resources = new ResourceDictionary { ["WindowBackgroundBrush"] = brush };
+        var baseColors = new Dictionary<string, Color>(StringComparer.Ordinal);
+
+        Assert.True(AppearanceBrushUpdater.TryApply(resources, "WindowBackgroundBrush", baseColors, 92));
+        Assert.Same(brush, resources["WindowBackgroundBrush"]);
+        Assert.Equal(Color.FromArgb(92, 213, 228, 233), brush.Color);
+
+        Assert.True(AppearanceBrushUpdater.TryApply(resources, "WindowBackgroundBrush", baseColors, 184));
+        Assert.Same(brush, resources["WindowBackgroundBrush"]);
+        Assert.Equal(Color.FromArgb(184, 213, 228, 233), brush.Color);
+    }
+
+    [Fact]
+    public void TransparencyAlgorithmIsFixedToAcrylic()
+    {
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Transparent
+            },
+            MainWindow.BuildTransparencyLevels(" acrylic "));
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Transparent
+            },
+            MainWindow.BuildTransparencyLevels("BLUR"));
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Transparent
+            },
+            MainWindow.BuildTransparencyLevels("mica"));
+    }
+
+    [Fact]
+    public void LegacyTransparencyAlgorithmValuesAlwaysUseAcrylicLevel()
+    {
+        var expected = new[]
+        {
+            WindowTransparencyLevel.AcrylicBlur,
+            WindowTransparencyLevel.Transparent
+        };
+
+        Assert.Equal(
+            expected,
+            MainWindow.BuildTransparencyLevels("mica"));
+        Assert.Equal(
+            expected,
+            MainWindow.BuildTransparencyLevels("blur"));
+    }
+
+    [Fact]
+    public void VisualTokenResourcesLoadAsMutableSolidColorBrushes()
+    {
+        EnsureAvaloniaSetup();
+
+        var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
+            new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
+
+        Assert.True(dictionary.TryGetResource("WindowBackgroundBrush", ThemeVariant.Light, out var lightResource));
+        Assert.True(dictionary.TryGetResource("WindowBackgroundBrush", ThemeVariant.Dark, out var darkResource));
+        var lightBrush = Assert.IsType<SolidColorBrush>(lightResource);
+        var darkBrush = Assert.IsType<SolidColorBrush>(darkResource);
+        var originalColor = lightBrush.Color;
+        lightBrush.Color = Color.FromArgb(12, originalColor.R, originalColor.G, originalColor.B);
+
+        Assert.Equal(12, lightBrush.Color.A);
+        Assert.NotEqual(lightBrush.Color.R, darkBrush.Color.R);
+    }
+
+    [Fact]
+    public void ApplyAppearanceChangesRuntimeBrushesForDifferentOpacityAndBlurValues()
+    {
+        EnsureAvaloniaSetup();
+        var window = new MainWindow();
+        window.ApplyTheme("light");
+        var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
+            new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
+        window.Resources.MergedDictionaries.Add(dictionary);
+
+        window.ApplyAppearance(true, 0, 64, "acrylic");
+        Assert.True(dictionary.TryGetResource("WindowBackgroundBrush", ThemeVariant.Light, out var highBlurResource));
+        var highBlurSurfaceAlpha = Assert.IsType<SolidColorBrush>(highBlurResource).Color.A;
+
+        window.ApplyAppearance(true, 100, 0, "mica");
+        Assert.True(dictionary.TryGetResource("WindowBackgroundBrush", ThemeVariant.Light, out var lowBlurResource));
+        var lowBlurSurfaceAlpha = Assert.IsType<SolidColorBrush>(lowBlurResource).Color.A;
+
+        Assert.Equal(MainWindow.CalculateBrushAlpha(230, 0, MainWindow.CalculateBlurTintFactor(64)), highBlurSurfaceAlpha);
+        Assert.Equal(MainWindow.CalculateBrushAlpha(230, 100, MainWindow.CalculateBlurTintFactor(0)), lowBlurSurfaceAlpha);
+        Assert.True(lowBlurSurfaceAlpha > highBlurSurfaceAlpha);
+
+        Assert.Equal(Brushes.Transparent, window.Background);
+        Assert.Equal(
+            new[]
+            {
+                WindowTransparencyLevel.AcrylicBlur,
+                WindowTransparencyLevel.Transparent
+            },
+            window.TransparencyLevelHint);
+    }
+
+    [Fact]
+    public void ApplyAppearanceResolvesBrushesFromApplicationResources()
+    {
+        EnsureAvaloniaSetup();
+        var app = Assert.IsType<App>(Application.Current);
+        app.RequestedThemeVariant = ThemeVariant.Light;
+        Assert.True(app.TryGetResource("WindowBackgroundBrush", ThemeVariant.Light, out var resource));
+        var brush = Assert.IsType<SolidColorBrush>(resource);
+        var originalAlpha = brush.Color.A;
+
+        var window = new MainWindow();
+        window.ApplyAppearance(true, 20, 0, "acrylic");
+
+        Assert.NotEqual(originalAlpha, brush.Color.A);
+    }
+
+    [Fact]
+    public void 更新页保留原设置并提供完整版本历史分栏状态()
+    {
+        var source = ReadDesktopFile("Views", "SettingsView.axaml");
+
+        Assert.Contains("<TabControl SelectedIndex=\"{Binding SelectedTabIndex, Mode=TwoWay}\">", source, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding VersionLabel}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding AutoCheckUpdates}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsChecked=\"{Binding UseProxyForUpdates}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding CheckUpdateCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Height=\"430\"", source, StringComparison.Ordinal);
+        Assert.Contains("ColumnDefinitions=\"200,*\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding ReleaseHistory.RefreshCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding ReleaseHistory.Releases}\"", source, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem=\"{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.CanShowLoadMore}\"", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Command=\"{Binding ReleaseHistory.LoadMoreCommand}\" IsVisible=\"{Binding ReleaseHistory.HasMore}\"", source, StringComparison.Ordinal);
+        Assert.Contains("<views:ReleaseNotesView DataContext=\"{Binding ReleaseHistory.Content}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Content=\"{l:Locale update.dialog.open_release}\"", source, StringComparison.Ordinal);
+        Assert.Contains("CommandParameter=\"{Binding ReleaseHistory.Content.ReleaseUrl}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Click=\"SelectedReleasePageButton_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsInitialLoading}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsEmpty}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.HasError}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.HasCachedContent}\"", source, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding ReleaseHistory.IsLoadingMore}\"", source, StringComparison.Ordinal);
+    }
+
+    private static void EnsureAvaloniaSetup()
+    {
+        AvaloniaTestBootstrap.Ensure();
+    }
+
+    private static string ReadDesktopFile(params string[] segments)
+    {
+        var path = Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]);
+        return File.ReadAllText(path);
+    }
+}

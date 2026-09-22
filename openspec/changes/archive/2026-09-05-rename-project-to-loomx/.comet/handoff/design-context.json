@@ -1,0 +1,15 @@
+{
+  "change": "rename-project-to-loomx",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "bb954d4dd3ea3b66e43e0860fb94031aeffc51187af9fe086457152c081e08ad",
+  "files": [
+    { "path": "openspec/changes/rename-project-to-loomx/proposal.md", "sha256": "91fbbd4fcaeb87f7470011f026742fd6cf2be4a610b1ab6a065ac4cab45576c2" },
+    { "path": "openspec/changes/rename-project-to-loomx/design.md", "sha256": "da5110f053a5643ff257756f0b284420d60e09318511e1ef941ba26857440e47" },
+    { "path": "openspec/changes/rename-project-to-loomx/tasks.md", "sha256": "aa668dbe2df2bb8cf4a321399bd578c447a1ef9cb3cd95ef5a8265e91c693d20" },
+    { "path": "openspec/changes/rename-project-to-loomx/specs/app-data-migration/spec.md", "sha256": "e270a3d80be4c6f6c31cd6e5bc02def5292f47d82af77176a5ea33215a415791" },
+    { "path": "openspec/changes/rename-project-to-loomx/specs/project-identity/spec.md", "sha256": "5886eca88ef6d1cf76b58d31d9e926f696d855d10b4da5da9f3fdd5b836b9583" }
+  ]
+}

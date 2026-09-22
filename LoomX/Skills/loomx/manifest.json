@@ -1,0 +1,5 @@
+{
+  "name": "loomx",
+  "description": "LoomX 自身的数据模型、工具用法与配置修改原则",
+  "when_to_use": "需要理解 LoomX 的 Endpoint/Combo/Provider/Model 关系，或执行任何配置修改前"
+}

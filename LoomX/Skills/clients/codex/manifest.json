@@ -1,0 +1,5 @@
+{
+  "name": "codex",
+  "description": "OpenAI Codex CLI 客户端的配置知识：让 Codex 走 LoomX 网关",
+  "when_to_use": "用户要求把 Codex CLI 配置为使用 LoomX"
+}

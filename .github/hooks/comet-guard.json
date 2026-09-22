@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "matcher": "create|edit|str_replace_editor|apply_patch",
+        "bash": "node \"D:/AppData/Github/Loom-X - Copy/.github/skills/comet/scripts/comet-hook-router.mjs\" --platform \"github-copilot\" --project-root \"D:/AppData/Github/Loom-X - Copy\"",
+        "powershell": "node \"D:/AppData/Github/Loom-X - Copy/.github/skills/comet/scripts/comet-hook-router.mjs\" --platform \"github-copilot\" --project-root \"D:/AppData/Github/Loom-X - Copy\""
+      }
+    ]
+  }
+}

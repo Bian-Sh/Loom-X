@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "D:\\AppData\\Github\\Loom-X - Copy\\.claude\\skills\\comet\\scripts\\comet-hook-router.mjs",
+              "--platform",
+              "claude",
+              "--project-root",
+              "D:\\AppData\\Github\\Loom-X - Copy"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
