@@ -405,6 +405,25 @@ public sealed class ProviderEditorViewModelTests
     }
 
     [Fact]
+    public void CompatibilityTypeLineReflectsSelectedCompatibilityAndNotifiesChanges()
+    {
+        var provider = new ProviderEditorViewModel();
+        var changed = new List<string?>();
+        provider.PropertyChanged += (_, args) => changed.Add(args.PropertyName);
+
+        provider.SelectedCompatibility = ProviderCompatibilityOption.OpenAiChat;
+        var chatLine = provider.CompatibilityTypeLine;
+        Assert.Contains("OpenAI Chat-compatible", chatLine, StringComparison.Ordinal);
+
+        provider.SelectedCompatibility = ProviderCompatibilityOption.AnthropicMessages;
+        var anthropicLine = provider.CompatibilityTypeLine;
+
+        Assert.Contains("Anthropic Messages-compatible", anthropicLine, StringComparison.Ordinal);
+        Assert.NotEqual(chatLine, anthropicLine);
+        Assert.Contains(nameof(provider.CompatibilityTypeLine), changed);
+    }
+
+    [Fact]
     public void ModelLocalizationRefreshDoesNotCreateUnsavedChanges()
     {
         var viewModel = ModelEditorViewModel.FromResponse(new ModelResponse(

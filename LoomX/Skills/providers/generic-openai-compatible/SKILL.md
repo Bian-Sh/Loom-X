@@ -22,3 +22,6 @@
 - 部分兼容服务的 `/models` 不需要鉴权但 chat 需要，`test_provider` 通过不代表模型可用，务必再跑 `test_model`。
 - 服务需要代理才能连通时设 `use_proxy: true`；按 User-Agent / 自定义头校验客户端时用 `headers` 补齐——
   具体识别信号与处理流程见 relays/new-api Skill 的"需要代理的中转站"与"卡客户端的中转站"两节。
+- 不要把 OpenAI 系（`gpt-*`、`deepseek-*`）与 Claude 系（`claude-*`）模型混挂到同一个 Provider：一个 Provider
+  同一时刻只有一种接口兼容模式。混挂后模型会"显示在列表里却调不通"，AI 助手（只走 OpenAI 兼容协议）也会选错。
+  排查与告知口径见 loomx Skill 的「诊断要点：一个 Provider 只能有一种接口兼容模式」。

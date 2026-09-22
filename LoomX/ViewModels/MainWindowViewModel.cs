@@ -1782,10 +1782,11 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     private bool suppressDirtyTracking;
     private bool suppressCliIdentityVersionChange;
     public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ModelListUrl { get => modelListUrl; set => SetProperty(ref modelListUrl, value); }
-    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); OnPropertyChanged(nameof(SelectedCompatibility)); UpdateCliIdentityRecommendations(); } }
-    public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); OnPropertyChanged(nameof(SelectedCompatibility)); } }
+    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); OnPropertyChanged(nameof(SelectedCompatibility)); OnPropertyChanged(nameof(CompatibilityTypeLine)); UpdateCliIdentityRecommendations(); } }
+    public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); OnPropertyChanged(nameof(SelectedCompatibility)); OnPropertyChanged(nameof(CompatibilityTypeLine)); } }
     public IReadOnlyList<ProviderCompatibilityOption> CompatibilityOptions { get; } = ProviderCompatibilityOption.All;
     public ProviderCompatibilityOption SelectedCompatibility { get => ProviderCompatibilityOption.FromFields(ApiMode, EndpointFormat); set => value?.ApplyTo(this); }
+    public string CompatibilityTypeLine => string.Format(CultureInfo.CurrentCulture, ResourceLookup.Resolve("providers.models.sort.toggle.currenttype"), ResourceLookup.Resolve(SelectedCompatibility.TitleKey));
     public IReadOnlyList<EndpointFormatOption> EndpointFormatOptions { get; } = EndpointFormatOption.All;
     public EndpointFormatOption SelectedEndpointFormat { get => EndpointFormatOption.FromValue(EndpointFormat); set { if (value is not null) EndpointFormat = value.Value; } }
     public bool IsEndpointFormatVisible => string.Equals(ApiMode, "openai", StringComparison.OrdinalIgnoreCase);
