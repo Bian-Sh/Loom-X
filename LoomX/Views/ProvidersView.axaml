@@ -28,7 +28,7 @@
   <Grid RowDefinitions="Auto,*" RowSpacing="12">
       <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
         <Border Classes="stat">
-          <StackPanel Spacing="3"><TextBlock Text="{l:Locale providers.card.providers.label}" Classes="muted"/><TextBlock Text="{Binding Providers.Count}" FontSize="21" FontWeight="Bold"/><TextBlock Text="{Binding EnabledProviderCount}" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/><TextBlock Text="{l:Locale providers.count.enabled}" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/></StackPanel>
+          <StackPanel Spacing="3"><TextBlock Text="{l:Locale providers.card.providers.label}" Classes="muted"/><TextBlock Text="{Binding Providers.Count}" FontSize="21" FontWeight="Bold"/><StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="{Binding EnabledProviderCount}" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/><TextBlock Text="{l:Locale providers.count.enabled}" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/></StackPanel></StackPanel>
         </Border>
         <Border Grid.Column="1" Classes="stat">
           <StackPanel Spacing="3"><TextBlock Text="{l:Locale providers.card.models.label}" Classes="muted"/><TextBlock Text="{Binding TotalModelCount}" FontSize="21" FontWeight="Bold"/><TextBlock Text="{l:Locale providers.card.models.status}" Foreground="{DynamicResource SuccessBrush}" FontSize="11"/></StackPanel>
