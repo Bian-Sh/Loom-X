@@ -2,6 +2,7 @@
 change: add-plugin-ui-contributions
 design-doc: openspec/changes/add-plugin-ui-contributions/design.md
 base-ref: 4e7fba1567d1f6833703b0ecd17d621088aee2a7
+archived-with: 2026-09-24-add-plugin-ui-contributions
 ---
 
 # 插件 UI Contribution 与凭据保护观测实施计划

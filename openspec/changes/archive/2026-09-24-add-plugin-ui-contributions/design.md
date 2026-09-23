@@ -2,6 +2,8 @@
 comet_change: add-plugin-ui-contributions
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-09-24-add-plugin-ui-contributions
+status: final
 ---
 
 ## Context
