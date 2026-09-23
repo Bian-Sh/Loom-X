@@ -83,6 +83,15 @@ public partial class AskUserCard : UserControl
         }
     }
 
+    private void SelectionCustomInput_OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && !e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            AdvanceOrSubmit();
+            e.Handled = true;
+        }
+    }
+
     private void NumberInput_OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter && !e.KeyModifiers.HasFlag(KeyModifiers.Control))

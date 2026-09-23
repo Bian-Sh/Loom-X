@@ -9,6 +9,8 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
 {
     private static readonly IReadOnlyDictionary<string, object?> EmptyValues =
         new ReadOnlyDictionary<string, object?>(new Dictionary<string, object?>());
+    private static readonly IReadOnlyDictionary<string, string> EmptyCustomInputs =
+        new ReadOnlyDictionary<string, string>(new Dictionary<string, string>());
 
     private readonly UserDecisionRequest request;
     private readonly TaskCompletionSource<bool?> completion =
@@ -116,7 +118,7 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
             return true;
         }
 
-        return ValidateFields(BuildValues());
+        return ValidateFields(BuildValues(), BuildCustomInputs());
     }
 
     public bool TrySkipCurrentField(out bool shouldSubmit)
@@ -134,7 +136,7 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
             return true;
         }
 
-        shouldSubmit = ValidateFields(BuildValues());
+        shouldSubmit = ValidateFields(BuildValues(), BuildCustomInputs());
         return shouldSubmit;
     }
 
@@ -153,16 +155,24 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
 
     internal bool TryAbort() => completion.TrySetResult(null);
 
-    public bool TryBuildResult(out IReadOnlyDictionary<string, object?> values)
+    public bool TryBuildResult(out IReadOnlyDictionary<string, object?> values) =>
+        TryBuildResult(out values, out _);
+
+    public bool TryBuildResult(
+        out IReadOnlyDictionary<string, object?> values,
+        out IReadOnlyDictionary<string, string> customInputs)
     {
-        var projected = BuildValues();
-        if (!ValidateFields(projected))
+        var projectedValues = BuildValues();
+        var projectedCustomInputs = BuildCustomInputs();
+        if (!ValidateFields(projectedValues, projectedCustomInputs))
         {
             values = EmptyValues;
+            customInputs = EmptyCustomInputs;
             return false;
         }
 
-        values = new ReadOnlyDictionary<string, object?>(projected);
+        values = new ReadOnlyDictionary<string, object?>(projectedValues);
+        customInputs = new ReadOnlyDictionary<string, string>(projectedCustomInputs);
         return true;
     }
 
@@ -186,6 +196,20 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
         return values;
     }
 
+    private Dictionary<string, string> BuildCustomInputs()
+    {
+        var customInputs = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var field in Fields)
+        {
+            if (field.GetCustomInput() is { } customInput)
+            {
+                customInputs.Add(field.Id, customInput);
+            }
+        }
+
+        return customInputs;
+    }
+
     private void OnFieldChanged()
     {
         ValidateCurrentField(showError: true);
@@ -193,7 +217,7 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
     }
 
     private UserDecisionValidationError? FindCurrentError() =>
-        UserDecisionValidator.ValidateSubmission(request, BuildValues())
+        UserDecisionValidator.ValidateSubmission(request, BuildValues(), BuildCustomInputs())
             .FirstOrDefault(error => string.Equals(error.FieldId, CurrentField.Id, StringComparison.Ordinal));
 
     private bool ValidateCurrentField(bool showError)
@@ -210,9 +234,11 @@ public sealed class AskUserDialogViewModel : NotifyViewModel
         return error is null;
     }
 
-    private bool ValidateFields(IReadOnlyDictionary<string, object?> values)
+    private bool ValidateFields(
+        IReadOnlyDictionary<string, object?> values,
+        IReadOnlyDictionary<string, string> customInputs)
     {
-        var errors = UserDecisionValidator.ValidateSubmission(request, values);
+        var errors = UserDecisionValidator.ValidateSubmission(request, values, customInputs);
         foreach (var field in Fields)
         {
             field.ErrorMessage = errors.FirstOrDefault(error =>
@@ -283,6 +309,8 @@ public abstract class AskUserFieldViewModel : NotifyViewModel
 
     internal object? GetValue() => isSkipped ? null : GetValueCore();
 
+    internal string? GetCustomInput() => isSkipped ? null : GetCustomInputCore();
+
     internal void ClearValue()
     {
         clearingValue = true;
@@ -313,12 +341,15 @@ public abstract class AskUserFieldViewModel : NotifyViewModel
 
     protected abstract object? GetValueCore();
 
+    protected virtual string? GetCustomInputCore() => null;
+
     protected abstract void ClearValueCore();
 }
 
 public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
 {
     private bool updatingSelection;
+    private string customInput = string.Empty;
 
     public AskUserSingleSelectFieldViewModel(UserDecisionField field, Action changed)
         : base(field, changed)
@@ -332,6 +363,27 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
     }
 
     public IReadOnlyList<AskUserOptionViewModel> Options { get; }
+
+    public bool AllowsCustomInput => Field.AllowCustomInput;
+
+    public string CustomInputPlaceholder => Field.CustomInputPlaceholder ?? ResourceLookup.Resolve("assistant.decision.custom_input_placeholder");
+
+    public int CustomInputMaxLength => Field.MaxLength ?? 1000;
+
+    public string CustomInput
+    {
+        get => customInput;
+        set
+        {
+            value ??= string.Empty;
+            if (!SetProperty(ref customInput, value))
+            {
+                return;
+            }
+
+            NotifyValueChanged();
+        }
+    }
 
     public string? SelectedOptionId
     {
@@ -358,7 +410,14 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
 
     protected override object? GetValueCore() => SelectedOptionId;
 
-    protected override void ClearValueCore() => SelectedOptionId = null;
+    protected override string? GetCustomInputCore() =>
+        string.IsNullOrWhiteSpace(CustomInput) ? null : CustomInput;
+
+    protected override void ClearValueCore()
+    {
+        ClearSelectionsWithoutNotification();
+        SetCustomInputWithoutSelectionReset(string.Empty);
+    }
 
     private void OnOptionChanged(AskUserOptionViewModel selected)
     {
@@ -389,30 +448,109 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
         OnPropertyChanged(nameof(SelectedOptionId));
         NotifyValueChanged();
     }
+
+    private void ClearSelectionsWithoutNotification()
+    {
+        updatingSelection = true;
+        try
+        {
+            foreach (var option in Options)
+            {
+                option.IsSelected = false;
+            }
+        }
+        finally
+        {
+            updatingSelection = false;
+        }
+
+        OnPropertyChanged(nameof(SelectedOptionId));
+    }
+
+    private void SetCustomInputWithoutSelectionReset(string value)
+    {
+        SetProperty(ref customInput, value, nameof(CustomInput));
+    }
 }
 
 public sealed class AskUserMultiSelectFieldViewModel : AskUserFieldViewModel
 {
+    private bool updatingSelection;
+    private string customInput = string.Empty;
+
     public AskUserMultiSelectFieldViewModel(UserDecisionField field, Action changed)
         : base(field, changed)
     {
         var defaults = field.DefaultOptionIds.ToHashSet(StringComparer.Ordinal);
         Options = field.Options
-            .Select(option => new AskUserOptionViewModel(option, defaults.Contains(option.Id), _ => NotifyValueChanged()))
+            .Select(option => new AskUserOptionViewModel(option, defaults.Contains(option.Id), OnOptionChanged))
             .ToArray();
     }
 
     public IReadOnlyList<AskUserOptionViewModel> Options { get; }
 
+    public bool AllowsCustomInput => Field.AllowCustomInput;
+
+    public string CustomInputPlaceholder => Field.CustomInputPlaceholder ?? ResourceLookup.Resolve("assistant.decision.custom_input_placeholder");
+
+    public int CustomInputMaxLength => Field.MaxLength ?? 1000;
+
+    public string CustomInput
+    {
+        get => customInput;
+        set
+        {
+            value ??= string.Empty;
+            if (!SetProperty(ref customInput, value))
+            {
+                return;
+            }
+
+            NotifyValueChanged();
+        }
+    }
+
     protected override object GetValueCore() =>
         Array.AsReadOnly(Options.Where(option => option.IsSelected).Select(option => option.Id).ToArray());
 
+    protected override string? GetCustomInputCore() =>
+        string.IsNullOrWhiteSpace(CustomInput) ? null : CustomInput;
+
     protected override void ClearValueCore()
     {
-        foreach (var option in Options)
+        ClearSelectionsWithoutNotification();
+        SetCustomInputWithoutSelectionReset(string.Empty);
+    }
+
+    private void OnOptionChanged(AskUserOptionViewModel option)
+    {
+        if (updatingSelection)
         {
-            option.IsSelected = false;
+            return;
         }
+
+        NotifyValueChanged();
+    }
+
+    private void ClearSelectionsWithoutNotification()
+    {
+        updatingSelection = true;
+        try
+        {
+            foreach (var option in Options)
+            {
+                option.IsSelected = false;
+            }
+        }
+        finally
+        {
+            updatingSelection = false;
+        }
+    }
+
+    private void SetCustomInputWithoutSelectionReset(string value)
+    {
+        SetProperty(ref customInput, value, nameof(CustomInput));
     }
 }
 

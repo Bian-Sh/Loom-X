@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using LoomX.Assistant;
 using LoomX.Assistant.UserDecisions;
 using LoomX.Services;
@@ -223,6 +224,55 @@ public sealed class AgentLoopTests
         Assert.DoesNotContain(events, item => item.Kind == AgentEventKind.TaskCompleted);
     }
 
+    [Fact]
+    public async Task AskUser返回取消结果_应继续总结且不再展示AskUser()
+    {
+        var handlerCalls = 0;
+        var registry = new ToolRegistry();
+        registry.Register(new ToolDefinition
+        {
+            Name = "assistant.ask_user",
+            Description = "测试 AskUser 取消链路。",
+            ParametersSchema = new JsonObject(),
+            Handler = (_, _) =>
+            {
+                Interlocked.Increment(ref handlerCalls);
+                return Task.FromResult(ToolResult.Ok(
+                    "{\"cancelled\":true,\"values\":{},\"custom_inputs\":{}}"));
+            },
+        });
+        var modelClient = new ScriptedModelClient(
+            [
+                new ModelToolCallEvent(new ToolCall("ask_cancelled", "assistant.ask_user", "{}")),
+                new ModelCompletedEvent("tool_calls"),
+            ],
+            [
+                new ModelToolCallEvent(new ToolCall("ask_repeated", "assistant.ask_user", "{}")),
+                new ModelCompletedEvent("tool_calls"),
+            ],
+            [
+                new TextDeltaEvent("面板已取消（cancelled: true）。"),
+                new ModelCompletedEvent("stop"),
+            ]);
+        var session = new AgentSession();
+
+        var events = await CollectAsync(
+            CreateLoop(modelClient, registry).RunAsync(session, "请显示 AskUser 测试面板"));
+
+        Assert.Equal(AgentSessionState.Completed, session.State);
+        Assert.Equal(AgentEventKind.TaskCompleted, events[^1].Kind);
+        Assert.Equal(1, Volatile.Read(ref handlerCalls));
+        Assert.Equal(3, modelClient.Requests.Count);
+        Assert.All(modelClient.Requests.Skip(1), request =>
+            Assert.DoesNotContain(
+                request.Tools,
+                tool => string.Equals(tool.Name, "assistant.ask_user", StringComparison.OrdinalIgnoreCase)));
+        var toolResults = session.Messages.Where(item => item.Role == ChatRole.Tool).ToArray();
+        Assert.Equal(2, toolResults.Length);
+        Assert.All(toolResults, result =>
+            Assert.Contains("\"cancelled\":true", result.Content, StringComparison.Ordinal));
+        Assert.Equal("面板已取消（cancelled: true）。", session.Messages[^1].Content);
+    }
     [Fact]
     public async Task ModelTimeout_FailsTask()
     {

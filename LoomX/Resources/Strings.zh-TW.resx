@@ -1569,6 +1569,7 @@
   <data name="assistant.decision.next"><value>下一項</value></data>
   <data name="assistant.decision.close"><value>關閉</value></data>
   <data name="assistant.decision.cancel_input"><value>取消本次輸入</value></data>
+  <data name="assistant.decision.custom_input_placeholder"><value>我有其他想法...</value></data>
   <data name="assistant.queue.title"><value>排隊訊息</value></data>
   <data name="assistant.queue.delete"><value>刪除排隊訊息</value></data>
   <data name="update.entry.downloading"><value>正在下載更新</value></data>

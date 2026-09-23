@@ -80,6 +80,39 @@ public sealed class UserDecisionBrokerTests
     }
 
     [Fact]
+    public async Task Submit_复制自由输入并返回独立结果映射()
+    {
+        var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var task = broker.RequestAsync(
+            "owner",
+            new UserDecisionRequest(
+                "确认",
+                "请选择",
+                [new UserDecisionField(
+                    "mode",
+                    "运行模式",
+                    UserDecisionFieldType.SingleSelect,
+                    isRequired: true,
+                    options: [new UserDecisionOption("safe", "安全模式")],
+                    allowCustomInput: true)]),
+            CancellationToken.None);
+        var request = await pending.Task;
+        var customInputs = new Dictionary<string, string> { ["mode"] = "自定义模式" };
+
+        Assert.True(broker.Submit(
+            request.RequestId,
+            UserDecisionBrokerTestExtensions.ClaimantId,
+            new Dictionary<string, object?> { ["mode"] = null },
+            customInputs));
+        customInputs["mode"] = "提交后篡改";
+
+        var result = await task;
+        Assert.Null(result.Values["mode"]);
+        Assert.Equal("自定义模式", result.CustomInputs["mode"]);
+    }
+
+    [Fact]
     public async Task Cancel_返回不含字段值的取消结果()
     {
         var broker = CreateBroker();
@@ -93,6 +126,7 @@ public sealed class UserDecisionBrokerTests
         Assert.True(result.Cancelled);
         Assert.Equal("页面关闭", result.CancellationReason);
         Assert.Empty(result.Values);
+        Assert.Empty(result.CustomInputs);
     }
 
     [Fact]
@@ -456,8 +490,10 @@ public sealed class UserDecisionBrokerTests
     }
 
     [Fact]
-    public async Task 日志_不包含用户提交值或取消原因()
+    public async Task 日志_不包含普通文本与选择题自由输入原文()
     {
+        const string textMarker = "TEXT_VALUE_7F31";
+        const string customMarker = "CUSTOM_VALUE_8A42";
         var logger = new RecordingLogger<UserDecisionBroker>();
         var broker = new UserDecisionBroker(logger);
         var pending = new ConcurrentQueue<PendingUserDecision>();
@@ -467,11 +503,37 @@ public sealed class UserDecisionBrokerTests
             pending.Enqueue(request);
         };
 
-        var submitted = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
+        var submitted = broker.RequestAsync(
+            "owner",
+            new UserDecisionRequest(
+                "确认设置",
+                "请补充说明。",
+                [
+                    new UserDecisionField(
+                        "note",
+                        "说明",
+                        UserDecisionFieldType.Text,
+                        isRequired: true,
+                        maxLength: 100),
+                    new UserDecisionField(
+                        "mode",
+                        "模式",
+                        UserDecisionFieldType.SingleSelect,
+                        isRequired: true,
+                        options: [new("safe", "安全")],
+                        allowCustomInput: true),
+                ]),
+            CancellationToken.None);
         Assert.True(pending.TryDequeue(out var submitRequest));
         Assert.True(broker.Submit(
             submitRequest.RequestId,
-            new Dictionary<string, object?> { ["note"] = "绝密用户自由文本" }));
+            UserDecisionBrokerTestExtensions.ClaimantId,
+            new Dictionary<string, object?>
+            {
+                ["note"] = textMarker,
+                ["mode"] = null,
+            },
+            new Dictionary<string, string> { ["mode"] = customMarker }));
         await submitted;
 
         var cancelled = broker.RequestAsync("owner", CreateRequest(), CancellationToken.None);
@@ -479,7 +541,9 @@ public sealed class UserDecisionBrokerTests
         Assert.True(broker.Cancel(cancelRequest.RequestId, "包含私密原因"));
         await cancelled;
 
-        Assert.DoesNotContain(logger.Messages, message => message.Contains("绝密用户自由文本", StringComparison.Ordinal));
+        var logs = string.Join(Environment.NewLine, logger.Messages.Concat(logger.States).Concat(logger.Exceptions));
+        Assert.DoesNotContain(textMarker, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(customMarker, logs, StringComparison.Ordinal);
         Assert.DoesNotContain(logger.Messages, message => message.Contains("包含私密原因", StringComparison.Ordinal));
     }
 

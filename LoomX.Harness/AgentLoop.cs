@@ -68,6 +68,8 @@ public sealed class AgentLoop
         var completed = false;
         var cancelled = false;
         string? failedDetail = null;
+        // 用户取消 AskUser 后，本轮不再展示面板；若模型仍重复调用则复用原取消结果。
+        var disabledToolResults = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         for (var step = 0; step < session.Options.MaxSteps && !completed && !cancelled && failedDetail is null; step++)
         {
@@ -80,8 +82,11 @@ public sealed class AgentLoop
             var completionReceived = false;
 
             // 逐条拉取模型流。yield 不允许出现在带 catch 的 try 内，因此仅在 try 中移动枚举器，事件在 try 外处理。
+            var availableTools = disabledToolResults.Count == 0
+                ? toolRegistry.All
+                : toolRegistry.All.Where(tool => !disabledToolResults.ContainsKey(tool.Name)).ToArray();
             await using var enumerator = StreamWithRetryAsync(
-                new ModelRequest(session.Messages, toolRegistry.All), session.Options.ModelTimeout,
+                new ModelRequest(session.Messages, availableTools), session.Options.ModelTimeout,
                 session.Id, step + 1, cancellationToken).GetAsyncEnumerator(cancellationToken);
 
             while (failedDetail is null && !cancelled)
@@ -230,7 +235,19 @@ public sealed class AgentLoop
                     }
                 }
 
-                var (result, toolCancelled) = await ExecuteToolAsync(toolCall, cancellationToken);
+                ToolResult? result;
+                bool toolCancelled;
+                if (disabledToolResults.TryGetValue(toolCall.Name, out var disabledResult))
+                {
+                    result = ToolResult.Ok(disabledResult);
+                    toolCancelled = false;
+                    logger.LogInformation("Agent 忽略了已取消的重复工具调用 {ToolName}", safeToolCall.Name);
+                }
+                else
+                {
+                    (result, toolCancelled) = await ExecuteToolAsync(toolCall, cancellationToken);
+                }
+
                 if (toolCancelled)
                 {
                     cancelled = true;
@@ -248,6 +265,10 @@ public sealed class AgentLoop
                     Success = result.Success,
                     Detail = result.Success ? null : ModelErrorClassifier.SanitizeUpstreamMessage(result.Content),
                 };
+                if (IsCancelledAskUserResult(safeToolCall.Name, result.Content))
+                {
+                    disabledToolResults.TryAdd(safeToolCall.Name, result.Content);
+                }
             }
         }
 
@@ -395,6 +416,26 @@ public sealed class AgentLoop
         if (string.IsNullOrWhiteSpace(argumentsJson)) return string.Empty;
         var compact = argumentsJson.Replace('\n', ' ').Replace('\r', ' ').Trim();
         return compact.Length <= 300 ? compact : compact[..300] + "…";
+    }
+
+    private static bool IsCancelledAskUserResult(string toolName, string content)
+    {
+        if (!string.Equals(toolName, "assistant.ask_user", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        try
+        {
+            return JsonNode.Parse(content) is JsonObject result
+                && result["cancelled"] is JsonValue cancelledValue
+                && cancelledValue.TryGetValue<bool>(out var cancelled)
+                && cancelled;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

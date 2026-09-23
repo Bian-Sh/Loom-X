@@ -100,6 +100,45 @@ public sealed class UserDecisionModelsTests
     }
 
     [Fact]
+    public void 选择字段校验_允许自由输入属性与长度限制()
+    {
+        var field = new UserDecisionField(
+            id: "mode",
+            label: "运行模式",
+            type: UserDecisionFieldType.SingleSelect,
+            options: [new UserDecisionOption("safe", "安全模式")],
+            allowCustomInput: true,
+            customInputPlaceholder: "描述你的模式",
+            maxLength: 120);
+
+        Assert.Empty(UserDecisionValidator.ValidateRequest(CreateRequest(field)));
+        Assert.True(field.AllowCustomInput);
+        Assert.Equal("描述你的模式", field.CustomInputPlaceholder);
+        Assert.Equal(120, field.MaxLength);
+    }
+
+    [Fact]
+    public void 选择字段校验_拒绝未启用时提供Placeholder及非选择字段启用自由输入()
+    {
+        var disabled = new UserDecisionField(
+            id: "mode",
+            label: "运行模式",
+            type: UserDecisionFieldType.SingleSelect,
+            options: [new UserDecisionOption("safe", "安全模式")],
+            customInputPlaceholder: "不应接受");
+        var number = new UserDecisionField(
+            id: "count",
+            label: "数量",
+            type: UserDecisionFieldType.Number,
+            allowCustomInput: true);
+
+        var errors = UserDecisionValidator.ValidateRequest(CreateRequest(disabled, number));
+
+        Assert.Contains(errors, error => error.FieldId == "mode" && error.Message.Contains("不适用"));
+        Assert.Contains(errors, error => error.FieldId == "count" && error.Message.Contains("不适用"));
+    }
+
+    [Fact]
     public void 提交校验_拒绝必填空文本()
     {
         var request = CreateRequest(CreateTextField("note", isRequired: true, maxLength: 20));
@@ -123,6 +162,96 @@ public sealed class UserDecisionModelsTests
 
         Assert.Equal("note", error.FieldId);
         Assert.Contains("长度", error.Message);
+    }
+
+    [Fact]
+    public void 提交校验_选择题自由输入满足必填并允许与预设选项共存()
+    {
+        var single = new UserDecisionField(
+            "mode",
+            "运行模式",
+            UserDecisionFieldType.SingleSelect,
+            isRequired: true,
+            options: [new UserDecisionOption("safe", "安全模式")],
+            allowCustomInput: true,
+            maxLength: 20);
+        var multi = new UserDecisionField(
+            "features",
+            "能力",
+            UserDecisionFieldType.MultiSelect,
+            isRequired: true,
+            options: [new UserDecisionOption("search", "搜索")],
+            minSelections: 1,
+            allowCustomInput: true);
+        var request = CreateRequest(single, multi);
+        var values = new Dictionary<string, object?>
+        {
+            ["mode"] = null,
+            ["features"] = Array.Empty<string>(),
+        };
+        var customInputs = new Dictionary<string, string>
+        {
+            ["mode"] = "我想手动控制",
+            ["features"] = "只启用本地索引",
+        };
+
+        Assert.Empty(UserDecisionValidator.ValidateSubmission(request, values, customInputs));
+
+        values["mode"] = "safe";
+        values["features"] = new[] { "search" };
+        Assert.Empty(UserDecisionValidator.ValidateSubmission(request, values, customInputs));
+
+        values["mode"] = "unknown";
+        Assert.Contains(
+            UserDecisionValidator.ValidateSubmission(request, values, customInputs),
+            error => error.FieldId == "mode" && error.Message.Contains("未知选项"));
+        values["mode"] = "safe";
+
+        var unauthorized = CreateRequest(new UserDecisionField(
+            "plain",
+            "普通单选",
+            UserDecisionFieldType.SingleSelect,
+            options: [new UserDecisionOption("a", "A")]));
+        Assert.Contains(
+            UserDecisionValidator.ValidateSubmission(
+                unauthorized,
+                new Dictionary<string, object?> { ["plain"] = null },
+                new Dictionary<string, string> { ["plain"] = "未授权" }),
+            error => error.FieldId == "plain" && error.Message.Contains("不允许"));
+    }
+
+    [Fact]
+    public void 提交校验_拒绝空白超长与未知自由输入()
+    {
+        var field = new UserDecisionField(
+            "mode",
+            "运行模式",
+            UserDecisionFieldType.SingleSelect,
+            isRequired: true,
+            options: [new UserDecisionOption("safe", "安全模式")],
+            allowCustomInput: true,
+            maxLength: 3);
+        var request = CreateRequest(field);
+        var values = new Dictionary<string, object?> { ["mode"] = null };
+
+        Assert.Contains(
+            UserDecisionValidator.ValidateSubmission(
+                request,
+                values,
+                new Dictionary<string, string> { ["mode"] = "   " }),
+            error => error.FieldId == "mode" && error.Message.Contains("空白"));
+        Assert.Contains(
+            UserDecisionValidator.ValidateSubmission(
+                request,
+                values,
+                new Dictionary<string, string> { ["mode"] = "超过长度" }),
+            error => error.FieldId == "mode" && error.Message.Contains("长度"));
+        Assert.Contains(
+            UserDecisionValidator.ValidateSubmission(
+                request,
+                values,
+                new Dictionary<string, string> { ["missing"] = "未知" }),
+            error => error.FieldId == UserDecisionValidationError.RequestFieldId);
     }
 
     [Theory]
@@ -307,6 +436,7 @@ public sealed class UserDecisionModelsTests
         Assert.True(result.Cancelled);
         Assert.Equal("用户取消", result.CancellationReason);
         Assert.Empty(result.Values);
+        Assert.Empty(result.CustomInputs);
     }
 
     [Fact]
@@ -324,16 +454,19 @@ public sealed class UserDecisionModelsTests
         var request = new UserDecisionRequest("确认设置", "请选择运行模式。", fields);
         var submitted = new List<string> { "safe" };
         var values = new Dictionary<string, object?> { ["mode"] = submitted };
-        var result = UserDecisionResult.Submit(values);
+        var customInputs = new Dictionary<string, string> { ["mode"] = "自定义模式" };
+        var result = UserDecisionResult.Submit(values, customInputs);
 
         options.Add(new UserDecisionOption("fast", "快速模式"));
         fields.Clear();
         submitted.Add("fast");
         values.Clear();
+        customInputs["mode"] = "提交后篡改";
 
         Assert.Single(request.Fields);
         Assert.Single(request.Fields[0].Options);
         Assert.Equal(["safe"], Assert.IsAssignableFrom<IReadOnlyList<string>>(result.Values["mode"]));
+        Assert.Equal("自定义模式", result.CustomInputs["mode"]);
     }
 
     private static UserDecisionField CreateValidField(UserDecisionFieldType type) => type switch

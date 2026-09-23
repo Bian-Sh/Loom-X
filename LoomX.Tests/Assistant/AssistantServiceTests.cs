@@ -1,4 +1,4 @@
-﻿using Xunit;
+using Xunit;
 using LoomX.Assistant;
 using LoomX.Assistant.Browser;
 using LoomX.Assistant.UserDecisions;
@@ -58,6 +58,20 @@ public sealed class AssistantServiceTests : IDisposable
         AssertNoSearchSecretConfiguration(prompt);
     }
 
+
+    [Fact]
+    public void NewSession_SystemPrompt_选择题同页输入使用自由输入而非独立字段()
+    {
+        var service = CreateService(new StubModelClientFactory(null));
+
+        var prompt = Assert.IsType<string>(service.CurrentSession.Options.SystemPrompt);
+        Assert.Contains("fields 中每个字段独立分页", prompt, StringComparison.Ordinal);
+        Assert.Contains("allow_custom_input=true", prompt, StringComparison.Ordinal);
+        Assert.Contains("不要额外创建 text 字段", prompt, StringComparison.Ordinal);
+        Assert.Contains("max_length", prompt, StringComparison.Ordinal);
+        Assert.Contains("输入框80字", prompt, StringComparison.Ordinal);
+        Assert.Contains("预设选项与自由输入可以同时提交", prompt, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void NewSession_SystemPrompt_允许直接测试AskUser且不依赖外部能力()
@@ -327,9 +341,9 @@ public sealed class AssistantServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SendAsync_AskUser提交后安全保留结构化结果并继续最终回答()
+    public async Task SendAsync_AskUser提交后保留实际文本并继续最终回答()
     {
-        const string originalText = "自由文本原文-绝不可进入模型上下文-981273";
+        const string originalText = "自由文本原文-需要进入模型上下文-981273";
         using var broker = CreateDecisionBroker();
         var pending = CaptureNext(broker);
         var registry = CreateAskUserRegistry(broker);
@@ -361,19 +375,16 @@ public sealed class AssistantServiceTests : IDisposable
         var toolResult = System.Text.Json.Nodes.JsonNode.Parse(toolMessage.Content!)!;
         Assert.Equal("safe", toolResult["values"]!["mode"]!.GetValue<string>());
         Assert.Equal(3m, toolResult["values"]!["count"]!.GetValue<decimal>());
-        Assert.True(toolResult["values"]!["note"]!["provided"]!.GetValue<bool>());
-        Assert.DoesNotContain(originalText, toolMessage.Content!, StringComparison.Ordinal);
-        Assert.DoesNotContain(messages, message => message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
-        Assert.DoesNotContain(events, item =>
-            item.Kind == AgentEventKind.MessageCompleted
-            && item.Message?.Content?.Contains(originalText, StringComparison.Ordinal) == true);
+        Assert.Equal(originalText, toolResult["values"]!["note"]!.GetValue<string>());
+        Assert.Empty(toolResult["custom_inputs"]!.AsObject());
         Assert.Contains(messages, message => message.Role == ChatRole.Assistant && message.Content == "已按安全模式继续。");
         Assert.Contains(events, item => item.Kind == AgentEventKind.TaskCompleted);
         Assert.Equal(2, model.Requests.Count);
         Assert.Contains(model.Requests[1].Messages,
             message => message.Role == ChatRole.Tool && message.ToolName == "assistant.ask_user");
-        Assert.DoesNotContain(model.Requests[1].Messages,
-            message => message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
+        Assert.Contains(model.Requests[1].Messages,
+            message => message.Role == ChatRole.Tool
+                && message.Content?.Contains(originalText, StringComparison.Ordinal) == true);
     }
 
     [Fact]
@@ -633,8 +644,9 @@ public sealed class AssistantServiceTests : IDisposable
         public bool Submit(
             string requestId,
             string claimantId,
-            IReadOnlyDictionary<string, object?> values) =>
-            inner.Submit(requestId, claimantId, values);
+            IReadOnlyDictionary<string, object?> values,
+            IReadOnlyDictionary<string, string>? customInputs = null) =>
+            inner.Submit(requestId, claimantId, values, customInputs);
 
         public bool Cancel(string requestId, string claimantId, string reason) =>
             inner.Cancel(requestId, claimantId, reason);
@@ -742,3 +754,4 @@ public sealed class AssistantServiceTests : IDisposable
             return Task.CompletedTask;
         }
     }}
+

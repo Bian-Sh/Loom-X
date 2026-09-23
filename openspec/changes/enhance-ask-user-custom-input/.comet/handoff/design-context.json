@@ -1,0 +1,16 @@
+{
+  "change": "enhance-ask-user-custom-input",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "task_hash_policy": "task-content-v1",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "a85b264386c9ca66b7f4f80e05eaa65713e837c171ce5e56f15799e2632b431e",
+  "files": [
+    { "path": "openspec/changes/enhance-ask-user-custom-input/proposal.md", "sha256": "270d6c0605f47d4fb3fc27a952815676430b6c9fbc27ac44192f91d8d55c435c" },
+    { "path": "openspec/changes/enhance-ask-user-custom-input/design.md", "sha256": "b1939b29ff29a5e14634ef6d56b1f3cf093aa3b234b8d2e1cd9b214ad162771f" },
+    { "path": "openspec/changes/enhance-ask-user-custom-input/tasks.md", "sha256": "a0845d54f31c78d26ae1b7d7798fd5825e333870c835f71d574216c4fed440e1" },
+    { "path": "openspec/changes/enhance-ask-user-custom-input/.openspec.yaml", "sha256": "38b9a21742cd7082f58c6fd05e35c7787002fc92efecda464d1d11ad04b8cc65" },
+    { "path": "openspec/changes/enhance-ask-user-custom-input/specs/assistant-user-decisions/spec.md", "sha256": "665b27f2306ef37a8dc89bd2c60630433b1009c1851af81afb6518e468eb0cb7" }
+  ]
+}
