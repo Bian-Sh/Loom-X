@@ -70,7 +70,7 @@ Windows 是当前唯一支持的桌面发布目标。现有启动流程已经支
 - [可执行文件位置在更新后发生变化] → 每次正常启动和设置保存时重新写入当前路径。
 - [用户点击启动后网关实际启动失败] → `GatewayRunning` 保持 `true`，现有失败状态明确展示，下一次 APP 启动继续尝试。
 - [意图写入与网关操作并发] → 复用 `AppDataStore` 和配置服务现有串行写入边界，概览页切换命令继续禁止启动/停止过渡期重复点击。
-- [设置页普通保存覆盖 GatewayRunning] → 构造 `AppSettingsInput` 时使用当前设置快照中的 `GatewayRunning`，网关意图另走单字段更新接口。
+- [设置页普通保存覆盖 GatewayRunning] → `AppSettingsInput` 不包含 `GatewayRunning`，普通设置保存不会写入该字段，网关意图仅走单字段更新接口。
 
 ## Configuration Change Plan
 

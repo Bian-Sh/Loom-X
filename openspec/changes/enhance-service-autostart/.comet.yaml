@@ -8,13 +8,13 @@ subagent_dispatch: null
 tdd_mode: tdd
 review_mode: standard
 isolation: worktree
-verify_mode: null
+verify_mode: full
 auto_transition: true
 base_ref: ef5d3c06af011bf6e9c58d61e76d1d74457a6cb6
 design_doc: openspec/changes/enhance-service-autostart/design.md
 plan: docs/superpowers/plans/2026-09-23-enhance-service-autostart.md
-verify_result: pending
-verify_failures: 0
+verify_result: fail
+verify_failures: 1
 verification_report: null
 branch_status: pending
 created_at: 2026-09-23
@@ -28,4 +28,4 @@ handoff_hash: e5de34f88f18ccdf36302a91a3750f6370988a832a1bc13faaab289a2ddf5d61
 classic_profile: full
 classic_migration: 1
 run_id: a304ad20-ff10-4063-8c9c-5dfc6bc39db5
-check_epoch: 2
+check_epoch: 4
