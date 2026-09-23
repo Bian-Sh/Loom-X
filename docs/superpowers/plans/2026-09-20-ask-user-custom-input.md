@@ -2,6 +2,7 @@
 change: enhance-ask-user-custom-input
 design-doc: docs/superpowers/specs/2026-09-20-ask-user-custom-input-design.md
 base-ref: e364174ae800c15d97106d3b5f8b90ddbf34d823
+archived-with: 2026-09-24-enhance-ask-user-custom-input
 ---
 
 <!-- comet-task-authority: openspec/changes/enhance-ask-user-custom-input/tasks.md -->

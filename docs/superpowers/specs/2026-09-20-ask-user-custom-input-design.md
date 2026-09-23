@@ -1,3 +1,7 @@
+---
+archived-with: 2026-09-24-enhance-ask-user-custom-input
+status: final
+---
 ﻿---
 comet_change: enhance-ask-user-custom-input
 role: technical-design
