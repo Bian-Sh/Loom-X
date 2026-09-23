@@ -40,9 +40,15 @@ public partial class MainWindow : Window
     private double navigationSelectionAnimationTarget;
     private const double NavigationSelectionAnimationDurationMs = 200;
     private static readonly CubicEaseOut NavigationSelectionEasing = new();
-    // 窗口宽度低于该阈值时自动折叠侧栏；放宽时不会自动展开，需用户手动展开。
+    // 窗口宽度收窄到该阈值以下时自动折叠侧栏；放宽时不会自动展开，需用户手动展开。
     private const double SidebarAutoCollapseWidth = 1000;
+    // 同方向拖拽位移累计超过该值才认定用户在压缩/拉宽窗口；±死区内的抖动不响应。
+    private const double SidebarAutoCollapseDeadzone = 5;
     private bool isSidebarCollapsed;
+    // 上一次处理自动折叠时记录的窗口宽度；<= 0 表示尚未记录（首次布局）。
+    private double lastClientWidthForSidebar = -1;
+    // 当前方向上累计的拖拽位移（带符号，负数为收窄）；方向反转或确认意图后清零重算。
+    private double sidebarResizeAccumulatedDelta;
 
     public ToastService ToastService => toastService;
     public UpdateWindowPresentation UpdatePresentation => updatePresentation;
@@ -381,8 +387,49 @@ public partial class MainWindow : Window
     private void AutoCollapseSidebar()
     {
         var width = ClientSize.Width;
-        if (width <= 0 || width >= SidebarAutoCollapseWidth || isSidebarCollapsed) return;
-        SetSidebarCollapsed(true);
+        if (width <= 0) return;
+        var shouldCollapse = ShouldAutoCollapseSidebar(
+            lastClientWidthForSidebar,
+            width,
+            sidebarResizeAccumulatedDelta,
+            isSidebarCollapsed,
+            out var accumulatedDelta);
+        lastClientWidthForSidebar = width;
+        sidebarResizeAccumulatedDelta = accumulatedDelta;
+        if (shouldCollapse) SetSidebarCollapsed(true);
+    }
+
+    // 折叠判定：delta 仅用于判断拖拽方向，不按单次大小裁决；同方向位移累计超过 ±死区 才确认用户意图。
+    // 首次布局即低于阈值时直接折叠；确认"在压缩"且宽度低于阈值时折叠；确认"在拉宽"时不响应并清零累计。
+    internal static bool ShouldAutoCollapseSidebar(
+        double previousWidth,
+        double width,
+        double accumulatedDelta,
+        bool isCollapsed,
+        out double nextAccumulatedDelta)
+    {
+        nextAccumulatedDelta = accumulatedDelta;
+        if (previousWidth <= 0)
+        {
+            nextAccumulatedDelta = 0;
+            return !isCollapsed && width < SidebarAutoCollapseWidth;
+        }
+
+        var delta = width - previousWidth;
+        if (delta == 0) return false;
+
+        nextAccumulatedDelta = Math.Sign(delta) == Math.Sign(accumulatedDelta)
+            ? accumulatedDelta + delta
+            : delta;
+
+        if (nextAccumulatedDelta < -SidebarAutoCollapseDeadzone)
+        {
+            nextAccumulatedDelta = 0;
+            return !isCollapsed && width < SidebarAutoCollapseWidth;
+        }
+
+        if (nextAccumulatedDelta > SidebarAutoCollapseDeadzone) nextAccumulatedDelta = 0;
+        return false;
     }
 
     private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
