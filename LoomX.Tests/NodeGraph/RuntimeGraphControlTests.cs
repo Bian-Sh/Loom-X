@@ -1,11 +1,15 @@
 using Avalonia;
 using LoomX.NodeGraph;
+using LoomX.Tests.Views;
 using Xunit;
 
 namespace LoomX.Tests.NodeGraph;
 
+[Collection("Avalonia UI")]
 public sealed class RuntimeGraphControlTests
 {
+    public RuntimeGraphControlTests() => AvaloniaTestBootstrap.Ensure();
+
     [Fact]
     public void ControlMeasuresFromProvidedLayout()
     {

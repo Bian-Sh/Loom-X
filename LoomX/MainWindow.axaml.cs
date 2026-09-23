@@ -14,6 +14,7 @@ using LoomX.Services;
 using LoomX.ViewModels;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
 
@@ -75,7 +76,7 @@ public partial class MainWindow : Window
         updateReleasePreviewHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(160) };
         updateReleasePreviewHideTimer.Tick += (_, _) => CloseUpdateReleasePreview();
         UpdateSidebarCollapseToolTip();
-        LocaleService.CultureChanged += (_, _) => UpdateSidebarCollapseToolTip();
+        LocaleService.CultureChanged += MainWindow_OnCultureChanged;
         appearanceCoordinator = new WindowAppearanceCoordinator(this);
         TransparencyLevelHint = BuildTransparencyLevels("acrylic");
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
@@ -91,6 +92,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             toastService.Requested -= ToastServiceOnRequested;
+            LocaleService.CultureChanged -= MainWindow_OnCultureChanged;
             updateReleasePreviewHideTimer.Stop();
             DetachUpdateCoordinator();
             DetachNavigationViewModel();
@@ -370,6 +372,12 @@ public partial class MainWindow : Window
         if (collapsed) sidebar.Classes.Add("collapsed");
         else sidebar.Classes.Remove("collapsed");
         UpdateSidebarCollapseToolTip();
+    }
+
+    private void MainWindow_OnCultureChanged(object? sender, CultureInfo culture)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) UpdateSidebarCollapseToolTip();
+        else Dispatcher.UIThread.Post(UpdateSidebarCollapseToolTip);
     }
 
     private void UpdateSidebarCollapseToolTip()
