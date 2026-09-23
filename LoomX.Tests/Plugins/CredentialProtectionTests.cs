@@ -345,6 +345,33 @@ public sealed class CredentialProtectionTests : IDisposable
         Assert.DoesNotContain(secret[4..20], sanitized, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Sanitize_ReturnsActualReplacementCountForJsonAndRepeatedText()
+    {
+        var engine = CreateEngine();
+        const string secret = "sk-proj-abcdefghij0123456789";
+        var payload = $$"""{"api_key":"private-a","nested":{"token":"private-b"},"text":"{{secret}} + {{secret}}"}""";
+
+        var sanitized = engine.Sanitize(payload, out var changed, out var replacementCount);
+
+        Assert.True(changed);
+        Assert.Equal(4, replacementCount);
+        Assert.DoesNotContain("private-a", sanitized, StringComparison.Ordinal);
+        Assert.DoesNotContain("private-b", sanitized, StringComparison.Ordinal);
+        Assert.DoesNotContain(secret, sanitized, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ExistingSanitizeOverloadRemainsCompatible()
+    {
+        var engine = CreateEngine();
+
+        var sanitized = engine.Sanitize("sk-abcdefghij0123456789abcd", out var changed);
+
+        Assert.True(changed);
+        Assert.Contains("{{LOOMX_CREDENTIAL_", sanitized, StringComparison.Ordinal);
+    }
+
     // ── 规则管理（Plugin-owned） ─────────────────────────────────────────
 
     [Fact]
@@ -407,12 +434,71 @@ public sealed class CredentialProtectionTests : IDisposable
         Assert.Empty(engine.Detect(payload));
     }
 
+    [Fact]
+    public async Task Observability_CountsSanitizationButNotIntegrityInstruction()
+    {
+        var engine = CreateEngine();
+        var observability = new CredentialProtectionObservability();
+        var extension = new CredentialRequestExtension(engine, observability);
+        const string secret = "sk-observe-abcdefghij0123456789";
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            messages = new[] { new { role = "user", content = secret } },
+        });
+
+        var result = await extension.ProcessRequestAsync(
+            new PipelineContext("request", Metadata: new Dictionary<string, string> { ["api_mode"] = "openai" }),
+            payload,
+            CancellationToken.None);
+
+        Assert.Equal(PipelineOutcome.Modified, result.Outcome);
+        Assert.Equal(new CredentialProtectionSnapshot(1, 1, 1, 0, 0), observability.Snapshot());
+    }
+
+    [Fact]
+    public async Task Observability_IntegrityInstructionAloneDoesNotCountAsSanitization()
+    {
+        var engine = CreateEngine();
+        var token = engine.Sanitize("sk-existing-abcdefghij0123456789", out _);
+        var observability = new CredentialProtectionObservability();
+        var extension = new CredentialRequestExtension(engine, observability);
+        var payload = System.Text.Json.JsonSerializer.Serialize(new
+        {
+            messages = new[] { new { role = "user", content = token } },
+        });
+
+        await extension.ProcessRequestAsync(
+            new PipelineContext("request", Metadata: new Dictionary<string, string> { ["api_mode"] = "openai" }),
+            payload,
+            CancellationToken.None);
+
+        Assert.Equal(new CredentialProtectionSnapshot(1, 0, 0, 0, 0), observability.Snapshot());
+    }
+
+    [Fact]
+    public async Task Observability_CountsOneRestoredResponseForMultiplePlaceholders()
+    {
+        var engine = CreateEngine();
+        var token = engine.Sanitize("sk-response-abcdefghij0123456789", out _);
+        var observability = new CredentialProtectionObservability();
+        var extension = new CredentialResponseExtension(engine, observability);
+
+        var result = await extension.ProcessResponseAsync(
+            new PipelineContext("response"),
+            $"{{\"content\":\"{token} and {token}\"}}",
+            CancellationToken.None);
+
+        Assert.Equal(PipelineOutcome.Modified, result.Outcome);
+        Assert.Equal(new CredentialProtectionSnapshot(0, 0, 0, 1, 0), observability.Snapshot());
+    }
+
     // ── fail closed ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task ProcessingFailure_BlocksRawData()
     {
-        var extension = new CredentialRequestExtension(new ThrowingEngine(dataDirectory));
+        var observability = new CredentialProtectionObservability();
+        var extension = new CredentialRequestExtension(new ThrowingEngine(dataDirectory), observability);
         const string payload = "raw sk-abcdefghij0123456789abcd";
 
         var result = await extension.ProcessRequestAsync(
@@ -421,6 +507,7 @@ public sealed class CredentialProtectionTests : IDisposable
         Assert.Equal(PipelineOutcome.Blocked, result.Outcome);
         Assert.Empty(result.Payload);
         Assert.Equal(ExtensionFailurePolicy.FailClosed, extension.FailurePolicy);
+        Assert.Equal(new CredentialProtectionSnapshot(1, 0, 0, 0, 1), observability.Snapshot());
     }
 
     /// <summary>处理过程必抛异常的引擎，验证插件侧 fail closed。</summary>
@@ -432,6 +519,9 @@ public sealed class CredentialProtectionTests : IDisposable
         }
 
         public override string Sanitize(string? payload, out bool changed) =>
+            throw new InvalidOperationException("模拟处理失败。");
+
+        public override string Sanitize(string? payload, out bool changed, out int replacementCount) =>
             throw new InvalidOperationException("模拟处理失败。");
     }
 }

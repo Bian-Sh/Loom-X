@@ -65,20 +65,29 @@ public class CredentialEngine
     /// 脱敏：敏感名称字段值与值形态命中替换为本地可恢复的结构化占位符；
     /// 同一引擎生命周期内相同原值复用同一个 token，无敏感内容时原样返回。
     /// </summary>
-    public virtual string Sanitize(string? payload, out bool changed)
+    public virtual string Sanitize(string? payload, out bool changed) =>
+        Sanitize(payload, out changed, out _);
+
+    /// <summary>脱敏并返回实际替换位置数量；重复命中按实际替换次数累计。</summary>
+    public virtual string Sanitize(string? payload, out bool changed, out int replacementCount)
     {
         changed = false;
+        replacementCount = 0;
         if (string.IsNullOrWhiteSpace(payload)) return payload ?? string.Empty;
         EnsureCompiled();
 
         var root = TryParseJson(payload, out var consumed);
         if (root is not null && consumed)
         {
-            var sanitized = SanitizeNode(root, isSensitivePath: false, ref changed);
+            var sanitized = SanitizeNode(
+                root,
+                isSensitivePath: false,
+                ref changed,
+                ref replacementCount);
             return changed ? sanitized.ToJsonString() : payload;
         }
 
-        return SanitizeText(payload, ref changed);
+        return SanitizeText(payload, ref changed, ref replacementCount);
     }
 
     /// <summary>
@@ -320,7 +329,11 @@ public class CredentialEngine
             hits.Add(new DetectionHit("content.sensitive-words", "content"));
     }
 
-    private JsonNode SanitizeNode(JsonNode node, bool isSensitivePath, ref bool changed)
+    private JsonNode SanitizeNode(
+        JsonNode node,
+        bool isSensitivePath,
+        ref bool changed,
+        ref int replacementCount)
     {
         switch (node)
         {
@@ -340,7 +353,8 @@ public class CredentialEngine
                     result[property.Key] = SanitizeNode(
                         property.Value,
                         isSensitivePath || IsSensitiveSegment(property.Key),
-                        ref changed);
+                        ref changed,
+                        ref replacementCount);
                 }
 
                 return result;
@@ -349,7 +363,9 @@ public class CredentialEngine
             {
                 var result = new JsonArray();
                 foreach (var item in jsonArray)
-                    result.Add(item is null ? null : SanitizeNode(item, isSensitivePath, ref changed));
+                    result.Add(item is null
+                        ? null
+                        : SanitizeNode(item, isSensitivePath, ref changed, ref replacementCount));
                 return result;
             }
             case JsonValue value:
@@ -357,6 +373,7 @@ public class CredentialEngine
                 if (isSensitivePath)
                 {
                     changed = true;
+                    replacementCount++;
                     var original = value.TryGetValue<string>(out var sensitiveText)
                         ? sensitiveText
                         : value.ToJsonString();
@@ -364,7 +381,7 @@ public class CredentialEngine
                 }
 
                 if (!value.TryGetValue<string>(out var text)) return value.DeepClone();
-                var sanitized = SanitizeText(text, ref changed);
+                var sanitized = SanitizeText(text, ref changed, ref replacementCount);
                 return JsonValue.Create(sanitized);
             }
             default:
@@ -372,13 +389,22 @@ public class CredentialEngine
         }
     }
 
-    private string SanitizeText(string text, ref bool changed)
+    private string SanitizeText(string text, ref bool changed, ref int replacementCount)
     {
         var current = text;
         foreach (var (_, pattern) in patterns)
         {
-            var next = pattern.Replace(current, match => GetOrCreatePlaceholder(match.Value));
-            changed |= next != current;
+            var patternReplacementCount = 0;
+            var next = pattern.Replace(current, match =>
+            {
+                patternReplacementCount++;
+                return GetOrCreatePlaceholder(match.Value);
+            });
+            if (patternReplacementCount > 0)
+            {
+                changed = true;
+                replacementCount += patternReplacementCount;
+            }
             current = next;
         }
 

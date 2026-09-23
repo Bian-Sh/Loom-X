@@ -157,4 +157,62 @@ public sealed class PluginCatalogTests : IDisposable
         Assert.Empty(discovered);
         Assert.Contains(diagnostics, item => item.Contains("kind"));
     }
+    [Fact]
+    public void ManifestUiContributions_AreParsedAsOptionalDeclarations()
+    {
+        WritePlugin("demo", """
+            {
+              "id": "demo.plugin", "version": "1.0.0", "assembly": "Demo.Plugin.dll",
+              "plugin_type": "Demo.Plugin.Plugin", "capabilities": ["demo.capability"],
+              "ui": { "contributions": [
+                { "id": "summary", "slot": "card-body" },
+                { "id": "settings", "slot": "detail-body" }
+              ] },
+              "extensions": [
+                { "id": "demo.request", "kind": "request", "pipeline": "request",
+                  "failure_policy": "fail-closed", "capabilities": ["demo.capability"] }
+              ]
+            }
+            """);
+        var diagnostics = new List<string>();
+
+        var plugin = Assert.Single(PluginCatalog.Discover(rootDirectory, diagnostics));
+
+        Assert.Empty(diagnostics);
+        Assert.Collection(
+            plugin.Manifest.Ui!.Contributions,
+            item => Assert.Equal(("summary", PluginUiSlot.CardBody), (item.Id, item.Slot)),
+            item => Assert.Equal(("settings", PluginUiSlot.DetailBody), (item.Id, item.Slot)));
+    }
+
+    [Fact]
+    public void InvalidUiDeclarations_AreIgnoredWithoutRejectingRuntimePlugin()
+    {
+        WritePlugin("demo", """
+            {
+              "id": "demo.plugin", "version": "1.0.0", "assembly": "Demo.Plugin.dll",
+              "plugin_type": "Demo.Plugin.Plugin", "capabilities": ["demo.capability"],
+              "ui": { "contributions": [
+                { "id": "summary", "slot": "card-body" },
+                { "id": "summary", "slot": "detail-body" },
+                { "id": "future", "slot": "floating-window" }
+              ] },
+              "extensions": [
+                { "id": "demo.request", "kind": "request", "pipeline": "request",
+                  "failure_policy": "fail-closed", "capabilities": ["demo.capability"] }
+              ]
+            }
+            """);
+        var diagnostics = new List<string>();
+
+        var plugin = Assert.Single(PluginCatalog.Discover(rootDirectory, diagnostics));
+
+        var contribution = Assert.Single(plugin.Manifest.Ui!.Contributions);
+        Assert.Equal("summary", contribution.Id);
+        Assert.Equal(PluginUiSlot.CardBody, contribution.Slot);
+        Assert.Contains(diagnostics, item => item.Contains("UI", StringComparison.Ordinal));
+        Assert.Contains(diagnostics, item => item.Contains("重复", StringComparison.Ordinal));
+        Assert.Contains(diagnostics, item => item.Contains("floating-window", StringComparison.Ordinal));
+    }
+
 }

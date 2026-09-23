@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:l="using:LoomX.Localization"
+             xmlns:controls="using:LoomX.Controls"
              x:Class="LoomX.Views.PluginsView">
   <UserControl.Styles>
     <Style Selector="Border.surface-card">
@@ -33,7 +34,8 @@
     </Style>
   </UserControl.Styles>
 
-  <Grid RowDefinitions="Auto,*" RowSpacing="14">
+  <Grid>
+    <Grid IsVisible="{Binding IsPluginListVisible}" RowDefinitions="Auto,*" RowSpacing="14">
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="16">
       <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
         <Border Classes="metric-card">
@@ -81,7 +83,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <Border Classes="surface-card" Padding="16" Margin="0,0,0,10">
-                <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="11">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="11">
                   <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Border Width="38" Height="38" Background="{DynamicResource AccentSoftBrush}" CornerRadius="9">
                       <PathIcon Data="M 8,13 L 13,13 L 13,8 L 19,8 L 19,13 L 24,13 L 24,19 L 19,19 L 19,24 L 13,24 L 13,19 L 8,19 Z" Foreground="{DynamicResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -98,6 +100,12 @@
                         <TextBlock Text="{Binding StatusLabel}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
                         <TextBlock Text="{Binding Version, StringFormat='v{0}'}" Classes="tertiary" HorizontalAlignment="Right" FontSize="10"/>
                       </StackPanel>
+                      <Button Width="32" Height="32" MinWidth="0" MinHeight="0" Padding="6"
+                              IsVisible="{Binding HasDetailUi}"
+                              Command="{Binding OpenDetailCommand}"
+                              ToolTip.Tip="{l:Locale plugins.detail.open}">
+                        <PathIcon Data="M 16,4 L 18,7 L 22,7 L 24,10 L 22,13 L 24,16 L 22,19 L 18,19 L 16,22 L 14,19 L 10,19 L 8,16 L 10,13 L 8,10 L 10,7 L 14,7 Z M 16,10 A 3,3 0 1 1 16,16 A 3,3 0 1 1 16,10" Width="16" Height="16"/>
+                      </Button>
                       <ToggleSwitch IsChecked="{Binding Enabled, Mode=TwoWay}" IsEnabled="{Binding CanToggle}"/>
                     </StackPanel>
                   </Grid>
@@ -109,7 +117,9 @@
                     <TextBlock Grid.Column="1" Text="{Binding CapabilitySummary}" Classes="tertiary" FontSize="11" TextWrapping="Wrap"/>
                   </Grid>
 
-                  <Border Grid.Row="3" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9">
+                  <controls:PluginUiPresenter Grid.Row="3" Contributions="{Binding CardContributions}" IsVisible="{Binding HasCardUi}"/>
+
+                  <Border Grid.Row="4" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="9">
                       <PathIcon Data="M 16,5 L 27,10 L 27,17 C 27,24 22,29 16,31 C 10,29 5,24 5,17 L 5,10 Z M 11,17 L 15,21 L 22,13" Foreground="{DynamicResource AccentBrush}" Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,0,0"/>
                       <TextBlock Grid.Column="1" Text="{Binding LifecycleNote}" Classes="muted" FontSize="11" TextWrapping="Wrap"/>
@@ -139,6 +149,39 @@
         </Border>
 
         <TextBlock Text="{Binding Status}" Classes="tertiary" FontSize="11" HorizontalAlignment="Right" Margin="0,0,2,4"/>
+      </StackPanel>
+    </ScrollViewer>
+    </Grid>
+
+    <ScrollViewer IsVisible="{Binding IsPluginDetailVisible}" VerticalScrollBarVisibility="Auto">
+      <StackPanel Spacing="14" Margin="0,0,8,0">
+        <Button Command="{Binding BackToPluginListCommand}" HorizontalAlignment="Left" Padding="10,6">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <PathIcon Data="M 21,7 L 12,16 L 21,25" Width="14" Height="14"/>
+            <TextBlock Text="{l:Locale plugins.detail.back}" VerticalAlignment="Center"/>
+          </StackPanel>
+        </Button>
+
+        <Border Classes="surface-card" Padding="18">
+          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="14">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+              <Border Width="42" Height="42" Background="{DynamicResource AccentSoftBrush}" CornerRadius="10">
+                <PathIcon Data="M 8,13 L 13,13 L 13,8 L 19,8 L 19,13 L 24,13 L 24,19 L 19,19 L 19,24 L 13,24 L 13,19 L 8,19 Z" Foreground="{DynamicResource AccentBrush}" Width="21" Height="21" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              </Border>
+              <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                <TextBlock Text="{Binding SelectedPlugin.DisplayName}" FontSize="18" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding SelectedPlugin.Id}" Classes="tertiary" FontSize="11" FontFamily="Consolas"/>
+              </StackPanel>
+              <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                <TextBlock Text="{Binding SelectedPlugin.StatusLabel}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding SelectedPlugin.Version, StringFormat='v{0}'}" Classes="tertiary" HorizontalAlignment="Right" FontSize="10"/>
+              </StackPanel>
+            </Grid>
+
+            <TextBlock Grid.Row="1" Text="{Binding SelectedPlugin.Description}" Classes="muted" TextWrapping="Wrap"/>
+            <controls:PluginUiPresenter Grid.Row="2" Contributions="{Binding SelectedPlugin.DetailContributions}"/>
+          </Grid>
+        </Border>
       </StackPanel>
     </ScrollViewer>
   </Grid>

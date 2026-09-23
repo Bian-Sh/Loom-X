@@ -4,6 +4,11 @@
   "assembly": "LoomX.CredentialProtection.dll",
   "plugin_type": "LoomX.CredentialProtection.CredentialProtectionPlugin",
   "capabilities": ["credential.detect", "credential.mask", "credential.integrity-instruction", "credential.restore"],
+  "ui": {
+    "contributions": [
+      { "id": "observability", "slot": "card-body" }
+    ]
+  },
   "extensions": [
     {
       "id": "credential.request",

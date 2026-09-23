@@ -28,10 +28,17 @@ public sealed record PluginManifestExtension(
 /// 插件清单。必备字段：id、version、extensions、capabilities；
 /// assembly 与 pluginType 指示宿主加载入口。
 /// </summary>
+/// <summary>Manifest 中声明的 UI Contribution；内容由插件运行时 Provider 提供。</summary>
+public sealed record PluginManifestUiContribution(string Id, PluginUiSlot Slot);
+
+/// <summary>插件可选的 UI 声明集合。</summary>
+public sealed record PluginManifestUi(IReadOnlyList<PluginManifestUiContribution> Contributions);
+
 public sealed record PluginManifest(
     string Id,
     string Version,
     string Assembly,
     string PluginType,
     IReadOnlyList<string> Capabilities,
-    IReadOnlyList<PluginManifestExtension> Extensions);
+    IReadOnlyList<PluginManifestExtension> Extensions,
+    PluginManifestUi? Ui = null);

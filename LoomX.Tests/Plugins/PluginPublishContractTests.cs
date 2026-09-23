@@ -14,6 +14,21 @@ public sealed class PluginPublishContractTests
         Assert.Contains("$(PublishDir)plugins\\loomx.credential-protection", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void FirstPartyPluginPublishPayloadIncludesManifestAndCardContribution()
+    {
+        var project = File.ReadAllText(GetRepositoryFile(
+            "plugins", "LoomX.CredentialProtection", "LoomX.CredentialProtection.csproj"));
+        var manifest = File.ReadAllText(GetRepositoryFile(
+            "plugins", "LoomX.CredentialProtection", "plugin.manifest.json"));
+
+        Assert.Contains("Content Include=\"plugin.manifest.json\"", project, StringComparison.Ordinal);
+        Assert.Contains("CopyToOutputDirectory=\"PreserveNewest\"", project, StringComparison.Ordinal);
+        Assert.Contains("\"id\": \"observability\"", manifest, StringComparison.Ordinal);
+        Assert.Contains("\"slot\": \"card-body\"", manifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("detail-body", manifest, StringComparison.Ordinal);
+    }
+
     private static string GetRepositoryFile(params string[] segments)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);

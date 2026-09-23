@@ -35,6 +35,44 @@ public sealed class PluginsViewContractTests
         Assert.Contains("保留 Vault", resources, StringComparison.Ordinal);
     }
 
+
+    [Fact]
+    public void PluginCardsRenderOnlyGenericCardBodyContributions()
+    {
+        var viewModel = File.ReadAllText(Path.Combine(Root, "LoomX", "ViewModels", "PluginsViewModel.cs"));
+        var view = File.ReadAllText(Path.Combine(Root, "LoomX", "Views", "PluginsView.axaml"));
+
+        Assert.Contains("pluginRuntime.GetUiContributions(", viewModel, StringComparison.Ordinal);
+        Assert.Contains("PluginUiSlot.CardBody", viewModel, StringComparison.Ordinal);
+        Assert.Contains("<controls:PluginUiPresenter", view, StringComparison.Ordinal);
+        Assert.Contains("Contributions=\"{Binding CardContributions}\"", view, StringComparison.Ordinal);
+        Assert.DoesNotContain("已脱敏请求", viewModel + view, StringComparison.Ordinal);
+        Assert.DoesNotContain("SanitizedRequests", viewModel + view, StringComparison.Ordinal);
+        Assert.DoesNotContain("RestoredResponses", viewModel + view, StringComparison.Ordinal);
+    }
+    [Fact]
+    public void DetailBodyUsesHostNavigationShellAndManifestDrivenGear()
+    {
+        var view = File.ReadAllText(Path.Combine(Root, "LoomX", "Views", "PluginsView.axaml"));
+
+        Assert.Contains("IsVisible=\"{Binding HasDetailUi}\"", view, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding OpenDetailCommand}\"", view, StringComparison.Ordinal);
+        Assert.Contains("IsVisible=\"{Binding IsPluginDetailVisible}\"", view, StringComparison.Ordinal);
+        Assert.Contains("Command=\"{Binding BackToPluginListCommand}\"", view, StringComparison.Ordinal);
+        Assert.Contains("Contributions=\"{Binding SelectedPlugin.DetailContributions}\"", view, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PluginUiRefreshUsesDispatcherCoalescingAndCultureSpecificSnapshots()
+    {
+        var viewModel = File.ReadAllText(Path.Combine(Root, "LoomX", "ViewModels", "PluginsViewModel.cs"));
+
+        Assert.Contains("runtime.PluginUiInvalidated += OnPluginUiInvalidated", viewModel, StringComparison.Ordinal);
+        Assert.Contains("uiRefreshQueue.Enqueue(args.PluginId)", viewModel, StringComparison.Ordinal);
+        Assert.Contains("RefreshPluginUi(plugin.Id, culture.Name)", viewModel, StringComparison.Ordinal);
+        Assert.Contains("Dispatcher.UIThread", viewModel, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void PluginPageReadsRuntimeSummariesWithoutExposingSensitivePayloads()
     {

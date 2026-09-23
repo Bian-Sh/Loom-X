@@ -659,4 +659,6 @@
   <data name="update.install.confirm.message"><value>Installing will close and restart Loom-X. Routing will be interrupted briefly and in-flight requests may fail. Save important work first.</value></data>
   <data name="update.install.confirm.accept"><value>Install and restart</value></data>
   <data name="update.install.confirm.cancel"><value>Not now</value></data>
+  <data name="plugins.detail.open"><value>Open plugin details</value></data>
+  <data name="plugins.detail.back"><value>Back to plugins</value></data>
 </root>

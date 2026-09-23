@@ -204,5 +204,82 @@
     <Style Selector="CheckBox">
       <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
     </Style>
+    <Style Selector="Border.plugin-ui-surface">
+      <Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+    </Style>
+    <Style Selector="Border.plugin-ui-surface.tone-accent">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderSoftBrush}" />
+    </Style>
+    <Style Selector="Border.plugin-ui-surface.tone-success">
+      <Setter Property="Background" Value="{DynamicResource SuccessSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource SuccessBorderBrush}" />
+    </Style>
+    <Style Selector="Border.plugin-ui-surface.tone-warning">
+      <Setter Property="Background" Value="{DynamicResource WarningSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource WarningBorderBrush}" />
+    </Style>
+    <Style Selector="Border.plugin-ui-surface.tone-danger">
+      <Setter Property="Background" Value="{DynamicResource DangerSoftBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource DangerBorderBrush}" />
+    </Style>
+    <Style Selector="TextBlock.plugin-ui-text.role-title">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.plugin-ui-text.role-metric">
+      <Setter Property="FontSize" Value="25" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.plugin-ui-text.role-caption">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.plugin-ui-text.tone-default">
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.plugin-ui-text.tone-accent">
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="PathIcon.plugin-ui-icon.tone-accent">
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="TextBlock.plugin-ui-text.tone-success">
+      <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+    </Style>
+    <Style Selector="PathIcon.plugin-ui-icon.tone-success">
+      <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+    </Style>
+    <Style Selector="TextBlock.plugin-ui-text.tone-warning">
+      <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+    </Style>
+    <Style Selector="PathIcon.plugin-ui-icon.tone-warning">
+      <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+    </Style>
+    <Style Selector="TextBlock.plugin-ui-text.tone-danger">
+      <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+    </Style>
+    <Style Selector="PathIcon.plugin-ui-icon.tone-danger">
+      <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+    </Style>
+    <Style Selector="PathIcon.plugin-ui-icon.tone-default">
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Border.plugin-ui-divider">
+      <Setter Property="Background" Value="{DynamicResource BorderBrush}" />
+    </Style>
+    <Style Selector="Border.plugin-ui-divider.tone-accent">
+      <Setter Property="Background" Value="{DynamicResource AccentBorderSoftBrush}" />
+    </Style>
+    <Style Selector="Border.plugin-ui-divider.tone-success">
+      <Setter Property="Background" Value="{DynamicResource SuccessBorderBrush}" />
+    </Style>
+    <Style Selector="Border.plugin-ui-divider.tone-warning">
+      <Setter Property="Background" Value="{DynamicResource WarningBorderBrush}" />
+    </Style>
+    <Style Selector="Border.plugin-ui-divider.tone-danger">
+      <Setter Property="Background" Value="{DynamicResource DangerBorderBrush}" />
+    </Style>
   </Application.Styles>
 </Application>
