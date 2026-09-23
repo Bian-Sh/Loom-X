@@ -1,0 +1,518 @@
+using System.Collections.Concurrent;
+using System.Globalization;
+using Microsoft.Extensions.Localization;
+using Microsoft.Extensions.Logging;
+using LoomX.Localization;
+using LoomX.Services;
+using LoomX.Tests.Logging;
+using LoomX.ViewModels;
+using Xunit;
+
+namespace LoomX.Tests.ViewModels;
+
+public sealed class ReleaseHistoryViewModelTests
+{
+    private static readonly UpdateProxySettings DirectSettings = new(false, "direct", string.Empty, 0, null, null);
+
+    [Fact]
+    public async Task Release正文与凭据不会进入历史日志()
+    {
+        const string releaseBody = "release-body-secret";
+        const string apiKey = "test-api-key-secret";
+        const string proxyPassword = "proxy-password-secret";
+        const string responseBody = "response-body-secret";
+        var logger = new RecordingLogger<ReleaseHistoryViewModel>();
+        var service = FakeUpdateService.WithPages(Page(1, false, Release("0.13.0", $"{releaseBody} {apiKey}")));
+        var failure = new HttpRequestException(
+            $"{responseBody} {apiKey} {proxyPassword}",
+            new InvalidOperationException("Authorization bearer-secret"),
+            System.Net.HttpStatusCode.ServiceUnavailable);
+        service.EnqueueFailure(failure);
+        using var vm = new ReleaseHistoryViewModel(
+            service,
+            _ => Task.FromResult(new UpdateProxySettings(true, "custom", "https://proxy.example", 7890, "proxy-user", proxyPassword)),
+            logger,
+            dispatch: action => action());
+
+        await vm.EnsureLoadedAsync();
+        vm.RefreshCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+        await WaitForAsync(() => !vm.IsRefreshing);
+
+        var logs = string.Join("\n", logger.Messages);
+        var warning = Assert.Single(logger.Entries, entry => entry.Exception is not null);
+        Assert.DoesNotContain(releaseBody, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(apiKey, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(proxyPassword, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain(responseBody, logs, StringComparison.Ordinal);
+        Assert.DoesNotContain("bearer-secret", logs, StringComparison.Ordinal);
+        var diagnostic = Assert.IsType<SafeUpdateDiagnosticException>(warning.Exception);
+        Assert.Null(diagnostic.InnerException);
+        Assert.Equal(failure.HResult, diagnostic.HResult);
+        Assert.Contains("LoadFirstPageAsync", warning.Exception.StackTrace, StringComparison.Ordinal);
+        Assert.Equal(typeof(HttpRequestException).FullName, warning.Properties["ExceptionType"]);
+        Assert.Equal(failure.HResult, warning.Properties["HResult"]);
+        Assert.Equal((int)System.Net.HttpStatusCode.ServiceUnavailable, warning.Properties["HttpStatusCode"]);
+        Assert.Equal("refresh", warning.Properties["Stage"]);
+    }
+
+    [Fact]
+    public async Task 首次加载固定请求十条并默认选择最高正式版本()
+    {
+        var service = FakeUpdateService.WithPages(
+            Page(1, false, Release("0.12.8", "较早"), Release("0.13.0", "最新"), Release("0.12.9", "中间")));
+        using var vm = CreateHistory(service);
+
+        await vm.EnsureLoadedAsync();
+
+        Assert.Equal([(1, 10)], service.Requests);
+        Assert.Equal("0.13.0", vm.SelectedRelease?.Release.Version);
+        Assert.Equal("最新", vm.Content.Markdown.ToString());
+        Assert.False(vm.IsInitialLoading);
+        Assert.False(vm.IsEmpty);
+        Assert.False(vm.HasError);
+    }
+
+    [Fact]
+    public async Task 最新版本徽标和当前版本徽标彼此独立()
+    {
+        var service = FakeUpdateService.WithPages(
+            Page(1, false, Release("0.13.0"), Release(AppVersion.Current)));
+        using var vm = CreateHistory(service);
+
+        await vm.EnsureLoadedAsync();
+
+        var latest = vm.Releases.Single(item => item.Release.Version == "0.13.0");
+        var current = vm.Releases.Single(item => item.Release.Version == AppVersion.Current);
+        Assert.True(latest.IsLatest);
+        Assert.False(latest.IsCurrent);
+        Assert.True(current.IsCurrent);
+        Assert.False(current.IsLatest);
+    }
+
+    [Fact]
+    public async Task 切换版本只替换共享正文且不增加网络调用()
+    {
+        var service = FakeUpdateService.WithPages(
+            Page(1, false, Release("0.13.0", "新正文"), Release("0.12.9", "旧正文")));
+        using var vm = CreateHistory(service);
+        await vm.EnsureLoadedAsync();
+        var content = vm.Content;
+        var previousBuilder = content.Markdown;
+
+        vm.SelectedRelease = vm.Releases.Single(item => item.Release.Version == "0.12.9");
+
+        Assert.Same(content, vm.Content);
+        Assert.NotSame(previousBuilder, vm.Content.Markdown);
+        Assert.Equal("旧正文", vm.Content.Markdown.ToString());
+        Assert.Single(service.Requests);
+    }
+
+    [Fact]
+    public async Task 加载更多按标准化版本去重并保留选择和正文()
+    {
+        var service = FakeUpdateService.WithPages(
+            Page(1, true, Release("0.13.0", "最新正文"), Release("0.12.9", "选中正文")),
+            Page(2, false, Release("v0.12.9", "重复正文"), Release("0.12.8", "更早正文")));
+        using var vm = CreateHistory(service);
+        await vm.EnsureLoadedAsync();
+        vm.SelectedRelease = vm.Releases.Single(item => item.Release.Version == "0.12.9");
+        var selected = vm.SelectedRelease;
+        var contentBuilder = vm.Content.Markdown;
+
+        vm.LoadMoreCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+        await WaitForAsync(() => !vm.IsLoadingMore);
+
+        Assert.Equal(new[] { "0.13.0", "0.12.9", "0.12.8" }, vm.Releases.Select(item => item.Release.Version));
+        Assert.Same(selected, vm.SelectedRelease);
+        Assert.Same(contentBuilder, vm.Content.Markdown);
+        Assert.Equal("选中正文", vm.Content.Markdown.ToString());
+        Assert.Equal([(1, 10), (2, 10)], service.Requests);
+        Assert.False(vm.HasMore);
+    }
+
+    [Fact]
+    public async Task 加载更多期间隐藏加载按钮并在仍有后续页时恢复()
+    {
+        var completion = new TaskCompletionSource<UpdateReleasePage>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = FakeUpdateService.WithPages(Page(1, true, Release("0.13.0")));
+        service.EnqueueResponse(completion.Task);
+        using var vm = CreateHistory(service);
+        await vm.EnsureLoadedAsync();
+
+        Assert.True(vm.CanShowLoadMore);
+        vm.LoadMoreCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+
+        Assert.True(vm.IsLoadingMore);
+        Assert.False(vm.CanShowLoadMore);
+
+        completion.SetResult(Page(2, true, Release("0.12.9")));
+        await WaitForAsync(() => !vm.IsLoadingMore);
+
+        Assert.True(vm.HasMore);
+        Assert.True(vm.CanShowLoadMore);
+    }
+
+    [Fact]
+    public async Task 后续页出现更高版本时重算全局最新徽标并保持选择和正文()
+    {
+        var service = FakeUpdateService.WithPages(
+            Page(1, true, Release("0.12.9", "第一页正文")),
+            Page(2, false, Release("0.13.0", "后续页正文")));
+        using var vm = CreateHistory(service);
+        await vm.EnsureLoadedAsync();
+        var selected = vm.SelectedRelease;
+        var builder = vm.Content.Markdown;
+
+        vm.LoadMoreCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+        await WaitForAsync(() => !vm.IsLoadingMore);
+
+        Assert.False(vm.Releases.Single(item => item.Release.Version == "0.12.9").IsLatest);
+        Assert.True(vm.Releases.Single(item => item.Release.Version == "0.13.0").IsLatest);
+        Assert.Same(selected, vm.SelectedRelease);
+        Assert.Same(builder, vm.Content.Markdown);
+        Assert.Equal("第一页正文", vm.Content.Markdown.ToString());
+    }
+
+    [Fact]
+    public async Task 延迟响应期间销毁会取消请求且不再更新状态或抛后台异常()
+    {
+        var service = new DelayedUpdateService();
+        var vm = CreateHistory(service);
+        var loadTask = vm.EnsureLoadedAsync();
+        await service.Requested.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var collection = vm.Releases;
+        var builder = vm.Content.Markdown;
+        var notifications = 0;
+        vm.PropertyChanged += (_, _) => notifications++;
+
+        vm.Dispose();
+        service.Complete(Page(1, false, Release("0.13.0", "销毁后正文")));
+        var exception = await Record.ExceptionAsync(() => loadTask.WaitAsync(TimeSpan.FromSeconds(2)));
+
+        Assert.True(service.ObservedCancellationToken.IsCancellationRequested);
+        Assert.Null(exception);
+        Assert.Equal(0, notifications);
+        Assert.Same(collection, vm.Releases);
+        Assert.Same(builder, vm.Content.Markdown);
+        Assert.Empty(vm.Releases);
+        Assert.Equal(string.Empty, vm.Content.Markdown.ToString());
+    }
+
+    [Fact]
+    public async Task 刷新失败保留集合选择和正文并标记缓存内容()
+    {
+        const string secret = "不应出现在用户文案中的上游正文";
+        var service = FakeUpdateService.WithPages(
+            Page(1, false, Release("0.13.0", "缓存正文"), Release("0.12.9", "选中正文")));
+        using var vm = CreateHistory(service);
+        await vm.EnsureLoadedAsync();
+        vm.SelectedRelease = vm.Releases.Single(item => item.Release.Version == "0.12.9");
+        var collection = vm.Releases;
+        var selected = vm.SelectedRelease;
+        var builder = vm.Content.Markdown;
+        service.EnqueueFailure(new InvalidOperationException(secret));
+
+        vm.RefreshCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+        await WaitForAsync(() => !vm.IsRefreshing);
+
+        Assert.Same(collection, vm.Releases);
+        Assert.Same(selected, vm.SelectedRelease);
+        Assert.Same(builder, vm.Content.Markdown);
+        Assert.Equal("选中正文", vm.Content.Markdown.ToString());
+        Assert.True(vm.HasError);
+        Assert.True(vm.HasCachedContent);
+        Assert.DoesNotContain(secret, vm.ErrorText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task 刷新成功优先恢复原版本并一次替换缓存集合()
+    {
+        var service = FakeUpdateService.WithPages(
+            Page(1, false, Release("0.13.0", "旧最新"), Release("0.12.9", "旧选择")));
+        using var vm = CreateHistory(service);
+        await vm.EnsureLoadedAsync();
+        vm.SelectedRelease = vm.Releases.Single(item => item.Release.Version == "0.12.9");
+        var previousCollection = vm.Releases;
+        service.EnqueuePage(Page(1, false, Release("0.13.1", "新最新"), Release("0.12.9", "刷新选择")));
+
+        vm.RefreshCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+        await WaitForAsync(() => !vm.IsRefreshing);
+
+        Assert.NotSame(previousCollection, vm.Releases);
+        Assert.Equal("0.12.9", vm.SelectedRelease?.Release.Version);
+        Assert.Equal("刷新选择", vm.Content.Markdown.ToString());
+        Assert.False(vm.HasError);
+        Assert.False(vm.HasCachedContent);
+    }
+
+    [Fact]
+    public async Task 首次空响应进入空态并清空选择()
+    {
+        var service = FakeUpdateService.WithPages(Page(1, false));
+        using var vm = CreateHistory(service);
+
+        await vm.EnsureLoadedAsync();
+
+        Assert.True(vm.IsEmpty);
+        Assert.False(vm.HasError);
+        Assert.Null(vm.SelectedRelease);
+        Assert.True(vm.Content.IsEmpty);
+    }
+
+    [Fact]
+    public async Task 首次失败进入错误态且可通过加载命令重试()
+    {
+        const string secret = "私密异常详情";
+        var service = FakeUpdateService.WithFailure(new InvalidOperationException(secret));
+        using var vm = CreateHistory(service);
+
+        await vm.EnsureLoadedAsync();
+
+        Assert.True(vm.HasError);
+        Assert.False(vm.HasCachedContent);
+        Assert.False(vm.IsEmpty);
+        Assert.DoesNotContain(secret, vm.ErrorText, StringComparison.Ordinal);
+        Assert.True(vm.LoadCommand.CanExecute(null));
+
+        service.EnqueuePage(Page(1, false, Release("0.13.0", "重试成功")));
+        vm.LoadCommand.Execute(null);
+        await service.WaitForRequestCountAsync(2);
+        await WaitForAsync(() => !vm.IsInitialLoading);
+
+        Assert.False(vm.HasError);
+        Assert.Equal("0.13.0", vm.SelectedRelease?.Release.Version);
+    }
+
+    [Fact]
+    public async Task 文化切换只刷新日期和用户文案而不请求网络()
+    {
+        var originalCulture = LocaleService.CurrentCulture.Name;
+        try
+        {
+            LocaleService.SetCulture("en-US");
+            var service = FakeUpdateService.WithPages(
+                Page(1, false, Release("0.13.0", publishedAt: new DateTimeOffset(2026, 9, 20, 8, 0, 0, TimeSpan.Zero))));
+            using var vm = CreateHistory(service);
+            await vm.EnsureLoadedAsync();
+            service.EnqueueFailure(new InvalidOperationException("private-response"));
+            vm.RefreshCommand.Execute(null);
+            await service.WaitForRequestCountAsync(2);
+            await WaitForAsync(() => !vm.IsRefreshing);
+            var englishDate = vm.Releases[0].PublishedAtText;
+            var englishBadge = vm.Releases[0].LatestBadgeText;
+            var englishError = vm.ErrorText;
+            var requestCount = service.Requests.Count;
+
+            LocaleService.SetCulture("zh-CN");
+
+            Assert.NotEqual(englishDate, vm.Releases[0].PublishedAtText);
+            Assert.NotEqual(englishBadge, vm.Releases[0].LatestBadgeText);
+            Assert.NotEqual(englishError, vm.ErrorText);
+            Assert.Equal(requestCount, service.Requests.Count);
+        }
+        finally
+        {
+            LocaleService.SetCulture(originalCulture);
+        }
+    }
+
+    [Fact]
+    public async Task 缺失资源时错误文案使用安全回退且所有状态变更经由注入调度()
+    {
+        var dispatchCalls = 0;
+        var service = FakeUpdateService.WithFailure(new InvalidOperationException("不得显示"));
+        using var vm = CreateHistory(
+            service,
+            localizer: new MissingLocalizer(),
+            dispatch: action =>
+            {
+                dispatchCalls++;
+                action();
+            });
+
+        await vm.EnsureLoadedAsync();
+
+        Assert.Equal("settings.update.history.error.load", vm.ErrorText);
+        Assert.True(dispatchCalls >= 2);
+    }
+
+    private static ReleaseHistoryViewModel CreateHistory(
+        IUpdateService service,
+        IStringLocalizer<ReleaseHistoryViewModel>? localizer = null,
+        Action<Action>? dispatch = null) =>
+        new(
+            service,
+            _ => Task.FromResult(DirectSettings),
+            logger: new TestLogger<ReleaseHistoryViewModel>(),
+            localizer: localizer,
+            dispatch: dispatch ?? (action => action()));
+
+    private static UpdateReleasePage Page(int page, bool hasMore, params UpdateRelease[] releases) =>
+        new(releases, page, 10, hasMore);
+
+    private static UpdateRelease Release(
+        string version,
+        string body = "正文",
+        DateTimeOffset? publishedAt = null) =>
+        new(
+            $"v{version.TrimStart('v', 'V')}",
+            version,
+            $"Loom-X {version}",
+            body,
+            $"https://github.com/Bian-Sh/Loom-X/releases/tag/v{version.TrimStart('v', 'V')}",
+            publishedAt ?? new DateTimeOffset(2026, 9, 20, 8, 0, 0, TimeSpan.Zero),
+            [],
+            null,
+            null);
+
+    private static async Task WaitForAsync(Func<bool> predicate)
+    {
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (!predicate())
+        {
+            if (DateTime.UtcNow >= timeout) throw new TimeoutException("等待 ViewModel 状态超时。");
+            await Task.Delay(10);
+        }
+    }
+
+    private sealed class DelayedUpdateService : IUpdateService
+    {
+        private readonly TaskCompletionSource<UpdateReleasePage> response = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource Requested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public CancellationToken ObservedCancellationToken { get; private set; }
+
+        public Task<UpdateReleasePage> GetStableReleasesAsync(
+            UpdateProxySettings settings,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            ObservedCancellationToken = cancellationToken;
+            cancellationToken.Register(() => response.TrySetCanceled(cancellationToken));
+            Requested.TrySetResult();
+            return response.Task;
+        }
+
+        public void Complete(UpdateReleasePage page) => response.TrySetResult(page);
+
+        public Task<UpdateCheckResult> CheckAsync(UpdateProxySettings settings, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<PreparedUpdate> PrepareUpdateAsync(
+            UpdateRelease release,
+            UpdateProxySettings settings,
+            IProgress<UpdateDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void LaunchInstaller(PreparedUpdate preparedUpdate) => throw new NotSupportedException();
+    }
+
+    private sealed class FakeUpdateService : IUpdateService
+    {
+        private readonly ConcurrentQueue<object> responses = new();
+        private readonly object sync = new();
+        private TaskCompletionSource requestChanged = NewSignal();
+
+        public List<(int Page, int PageSize)> Requests { get; } = [];
+
+        public static FakeUpdateService WithPages(params UpdateReleasePage[] pages)
+        {
+            var service = new FakeUpdateService();
+            foreach (var page in pages) service.EnqueuePage(page);
+            return service;
+        }
+
+        public static FakeUpdateService WithFailure(Exception exception)
+        {
+            var service = new FakeUpdateService();
+            service.EnqueueFailure(exception);
+            return service;
+        }
+
+        public void EnqueuePage(UpdateReleasePage page) => responses.Enqueue(page);
+        public void EnqueueFailure(Exception exception) => responses.Enqueue(exception);
+        public void EnqueueResponse(Task<UpdateReleasePage> response) => responses.Enqueue(response);
+
+        public async Task WaitForRequestCountAsync(int expected)
+        {
+            var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+            while (true)
+            {
+                Task signal;
+                lock (sync)
+                {
+                    if (Requests.Count >= expected) return;
+                    signal = requestChanged.Task;
+                }
+
+                var remaining = timeout - DateTime.UtcNow;
+                if (remaining <= TimeSpan.Zero) throw new TimeoutException("等待 Release 请求超时。");
+                await signal.WaitAsync(remaining);
+            }
+        }
+
+        public Task<UpdateReleasePage> GetStableReleasesAsync(
+            UpdateProxySettings settings,
+            int page,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            lock (sync)
+            {
+                Requests.Add((page, pageSize));
+                requestChanged.TrySetResult();
+                requestChanged = NewSignal();
+            }
+
+            if (!responses.TryDequeue(out var response))
+                throw new InvalidOperationException("测试未配置 Release 响应。");
+            if (response is Exception exception) return Task.FromException<UpdateReleasePage>(exception);
+            if (response is Task<UpdateReleasePage> task) return task;
+            return Task.FromResult((UpdateReleasePage)response);
+        }
+
+        public Task<UpdateCheckResult> CheckAsync(UpdateProxySettings settings, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<PreparedUpdate> PrepareUpdateAsync(
+            UpdateRelease release,
+            UpdateProxySettings settings,
+            IProgress<UpdateDownloadProgress>? progress = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void LaunchInstaller(PreparedUpdate preparedUpdate) => throw new NotSupportedException();
+
+        private static TaskCompletionSource NewSignal() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    private sealed class MissingLocalizer : IStringLocalizer<ReleaseHistoryViewModel>
+    {
+        public LocalizedString this[string name] => new(name, name, resourceNotFound: true);
+        public LocalizedString this[string name, params object[] arguments] => new(name, name, resourceNotFound: true);
+        public IEnumerable<LocalizedString> GetAllStrings(bool includeParentCultures) => [];
+    }
+
+    private sealed class TestLogger<T> : ILogger<T>
+    {
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+        }
+    }
+}

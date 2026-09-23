@@ -6,7 +6,7 @@ namespace LoomX.Assistant.Browser;
 
 /// <summary>
 /// browser.* 工具组：通过 Browser Bridge 操作用户自己 Chrome 中的自动化标签页。
-/// 读类结果（read/network）统一经过 BrowserSecretHarvester，Secret 以 secret_ref 呈现。
+/// 读类结果在进入 Session、事件和 UI 前统一经过 Tool Result Pipeline。
 /// </summary>
 public static class BrowserTools
 {
@@ -20,12 +20,10 @@ public static class BrowserTools
     public static void RegisterAll(
         ToolRegistry registry,
         IBrowserBridge bridge,
-        BrowserSecretVault vault,
         BrowserBridgeLeaseManager leaseManager)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(bridge);
-        ArgumentNullException.ThrowIfNull(vault);
         ArgumentNullException.ThrowIfNull(leaseManager);
 
         registry.Register(new ToolDefinition
@@ -119,7 +117,7 @@ public static class BrowserTools
                         ["maxLength"] = GetInt(args, "max_length", 20000),
                     },
                     cancellationToken);
-                return Ok(BrowserSecretHarvester.Harvest(result, vault).AsObject());
+                return Ok(result.AsObject());
             }),
         });
 
@@ -226,7 +224,7 @@ public static class BrowserTools
                         ["limit"] = GetInt(args, "limit", 50),
                     },
                     cancellationToken);
-                return Ok(BrowserSecretHarvester.Harvest(result, vault).AsObject());
+                return Ok(result.AsObject());
             }),
         });
 

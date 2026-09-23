@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Data.Common;
 using LoomX.Configuration;
+using LoomX.Localization;
 using LoomX.ViewModels;
 using Xunit;
 
@@ -49,17 +50,26 @@ public sealed class ConfigurationManagementServiceTests
     [Fact]
     public void ProviderEditor_ApiKeyVisibilityTogglesEyeIcon()
     {
-        var editor = new ProviderEditorViewModel();
+        var previousCulture = LocaleService.CurrentCulture.Name;
+        try
+        {
+            LocaleService.SetCulture("zh-CN");
+            var editor = new ProviderEditorViewModel();
 
-        Assert.False(editor.IsApiKeyVisible);
-        Assert.True(editor.IsApiKeyHidden);
-        Assert.Equal("显示 API Key", editor.ApiKeyVisibilityToolTip);
+            Assert.False(editor.IsApiKeyVisible);
+            Assert.True(editor.IsApiKeyHidden);
+            Assert.Equal("显示 API Key", editor.ApiKeyVisibilityToolTip);
 
-        editor.ToggleApiKeyVisibility();
+            editor.ToggleApiKeyVisibility();
 
-        Assert.True(editor.IsApiKeyVisible);
-        Assert.False(editor.IsApiKeyHidden);
-        Assert.Equal("隐藏 API Key", editor.ApiKeyVisibilityToolTip);
+            Assert.True(editor.IsApiKeyVisible);
+            Assert.False(editor.IsApiKeyHidden);
+            Assert.Equal("隐藏 API Key", editor.ApiKeyVisibilityToolTip);
+        }
+        finally
+        {
+            LocaleService.SetCulture(previousCulture);
+        }
     }
 
     [Fact]

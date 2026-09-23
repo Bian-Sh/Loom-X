@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Icon="/Assets/app.ico" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" xmlns:views="using:LoomX.Views" xmlns:controls="using:LoomX.Controls" x:Class="LoomX.MainWindow" Width="1180" Height="760" MinWidth="920" MinHeight="600" Title="Loom-X" Icon="/Assets/app.ico" Background="Transparent" TransparencyLevelHint="AcrylicBlur,Transparent" TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}" SystemDecorations="None" ExtendClientAreaToDecorationsHint="True" ExtendClientAreaChromeHints="NoChrome" ExtendClientAreaTitleBarHeightHint="0">
   <Window.Styles>
     <Style Selector="Button.nav-button">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -65,6 +65,88 @@
       <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
       <Setter Property="BorderThickness" Value="0,0,1,0" />
+      <Setter Property="Width" Value="228" />
+      <Setter Property="Padding" Value="16,24" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Width" Duration="0:0:0.22" Easing="CubicEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <!-- 折叠状态：只保留图标，文字隐藏，按钮居中 -->
+    <Style Selector="Border.glass-sidebar.collapsed">
+      <Setter Property="Width" Value="72" />
+      <Setter Property="Padding" Value="12,24" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed TextBlock.sidebar-label">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed StackPanel.sidebar-label">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed StackPanel.sidebar-brand">
+      <Setter Property="Margin" Value="0,0,0,28" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed Button.nav-button">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed Panel.sidebar-status-dot">
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <!-- 分割线折叠把手：默认透明隐藏在分割线上，悬停时像液体一样浮现并弹性伸展 -->
+    <Style Selector="Border.sidebar-collapse-hotspot">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="160" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,-12,0" />
+    </Style>
+    <Style Selector="Button.sidebar-collapse-handle">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.sidebar-collapse-handle /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.sidebar-collapse-pill">
+      <Setter Property="Width" Value="5" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="{DynamicResource TextTertiaryBrush}" />
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="CubicEaseOut" />
+          <DoubleTransition Property="Width" Duration="0:0:0.32" Easing="ElasticEaseOut" />
+          <DoubleTransition Property="Height" Duration="0:0:0.32" Easing="ElasticEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.sidebar-collapse-hotspot:pointerover Border.sidebar-collapse-pill">
+      <Setter Property="Opacity" Value="0.9" />
+    </Style>
+    <Style Selector="Button.sidebar-collapse-handle:pointerover Border.sidebar-collapse-pill">
+      <Setter Property="Opacity" Value="1" />
+      <Setter Property="Width" Value="7" />
+      <Setter Property="Height" Value="52" />
+      <Setter Property="Background" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.sidebar-collapse-handle:pressed Border.sidebar-collapse-pill">
+      <Setter Property="Height" Value="40" />
     </Style>
     <Style Selector="Border.topbar">
       <Setter Property="Background" Value="{DynamicResource GlassStrongBrush}" />
@@ -125,14 +207,86 @@
       <Setter Property="BorderBrush" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
     </Style>
+    <Style Selector="Border.toast-layer">
+      <Setter Property="Panel.ZIndex" Value="2" />
+    </Style>
+    <Style Selector="Button.update-entry">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="Width" Value="32" />
+      <Setter Property="MinWidth" Value="32" />
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector="Button.update-entry:pointerover">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Button.update-entry:focus">
+      <Setter Property="Width" Value="NaN" />
+    </Style>
+    <Style Selector="Button.update-entry /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <Style Selector="Border.update-entry-text">
+      <Setter Property="MaxWidth" Value="0" />
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="MaxWidth" Duration="0:0:0.18" Easing="CubicEaseOut" />
+          <DoubleTransition Property="Opacity" Duration="0:0:0.14" Easing="CubicEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.update-entry:pointerover Border.update-entry-text">
+      <Setter Property="MaxWidth" Value="200" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Button.update-entry:focus Border.update-entry-text">
+      <Setter Property="MaxWidth" Value="200" />
+      <Setter Property="Opacity" Value="1" />
+    </Style>
+    <Style Selector="Path.update-entry-arrow">
+      <Setter Property="Stroke" Value="{DynamicResource TextPrimaryBrush}" />
+      <Setter Property="StrokeThickness" Value="1.8" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+      <Style.Animations>
+        <Animation Duration="0:0:1.2" IterationCount="Infinite">
+          <KeyFrame Cue="0%">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="TranslateTransform.Y" Value="-3" />
+          </KeyFrame>
+          <KeyFrame Cue="35%">
+            <Setter Property="Opacity" Value="1" />
+          </KeyFrame>
+          <KeyFrame Cue="70%">
+            <Setter Property="Opacity" Value="1" />
+          </KeyFrame>
+          <KeyFrame Cue="100%">
+            <Setter Property="Opacity" Value="0" />
+            <Setter Property="TranslateTransform.Y" Value="3" />
+          </KeyFrame>
+        </Animation>
+      </Style.Animations>
+    </Style>
   </Window.Styles>
   <Grid Background="{DynamicResource WindowBackgroundBrush}">
-    <Grid ColumnDefinitions="228,*">
-      <Border Grid.Column="0" Classes="glass-sidebar" Padding="16,24">
+    <Grid ColumnDefinitions="Auto,*">
+      <Grid Grid.Column="0" ZIndex="1">
+      <Border x:Name="sidebar" Classes="glass-sidebar" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*,Auto">
-          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28" PointerPressed="WindowChrome_OnPointerPressed">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28" Classes="sidebar-brand" PointerPressed="WindowChrome_OnPointerPressed">
             <Image Source="/Assets/icon-transparent.png" Width="30" Height="30" HorizontalAlignment="Left" VerticalAlignment="Center" />
-            <StackPanel Spacing="1" VerticalAlignment="Center">
+            <StackPanel Spacing="1" VerticalAlignment="Center" Classes="sidebar-label">
               <TextBlock Text="Loom-X" FontSize="16" FontWeight="SemiBold" />
             </StackPanel>
           </StackPanel>
@@ -146,10 +300,10 @@
               <ItemsControl ItemsSource="{Binding NavigationItems}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Button Command="{Binding NavigateCommand}" Classes="nav-button" Classes.active="{Binding IsActive}">
+                    <Button Command="{Binding NavigateCommand}" Classes="nav-button" Classes.active="{Binding IsActive}" ToolTip.Tip="{Binding Title}">
                       <StackPanel Orientation="Horizontal" Spacing="11">
                         <Path Classes="nav-icon" Data="{Binding IconData}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" Classes="sidebar-label" />
                       </StackPanel>
                     </Button>
                   </DataTemplate>
@@ -164,8 +318,8 @@
           </ScrollViewer>
           <Border x:Name="sidebarRuntimeStatus" Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="8,16,8,0">
             <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="{Binding GatewayStatusText}" AutomationProperties.Name="{Binding GatewayStatusText}">
-              <TextBlock Text="{Binding VersionLabel}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-              <Panel Grid.Column="1" Width="8" Height="8" VerticalAlignment="Center">
+              <TextBlock Text="{Binding VersionLabel}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Classes="sidebar-label" />
+              <Panel Grid.Column="1" Width="8" Height="8" VerticalAlignment="Center" Classes="sidebar-status-dot">
                 <Ellipse Width="8" Height="8" Fill="{DynamicResource SuccessBrush}" IsVisible="{Binding IsGatewayRunning}" />
                 <Ellipse Width="8" Height="8" Fill="{DynamicResource WarningBrush}" IsVisible="{Binding IsGatewayTransitioning}" />
                 <Ellipse Width="8" Height="8" Fill="{DynamicResource DangerBrush}" IsVisible="{Binding IsGatewayFailed}" />
@@ -175,6 +329,12 @@
           </Border>
         </Grid>
       </Border>
+      <Border x:Name="sidebarCollapseHotspot" Classes="sidebar-collapse-hotspot">
+        <Button x:Name="sidebarCollapseButton" Classes="sidebar-collapse-handle" Click="SidebarCollapseButton_OnClick">
+          <Border Classes="sidebar-collapse-pill" />
+        </Button>
+      </Border>
+      </Grid>
       <Grid Grid.Column="1" RowDefinitions="104,*">
         <Border Grid.Row="0" Classes="topbar">
           <StackPanel Margin="32,40,32,0" VerticalAlignment="Center" Spacing="5">
@@ -188,55 +348,94 @@
       </Grid>
       <!-- 标题栏覆盖两列，品牌区与内容区都可拖动；按钮位于同一层避免命中区被遮挡。 -->
       <Border Grid.ColumnSpan="2" Classes="window-chrome" Height="32" VerticalAlignment="Top" PointerPressed="WindowChrome_OnPointerPressed">
-        <Grid ColumnDefinitions="*,42,42,42" ColumnSpacing="0" Margin="0">
-          <Button Grid.Column="1" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="{l:Locale window.minimize}" AutomationProperties.Name="{l:Locale window.minimize}">
+        <Grid ColumnDefinitions="*,Auto,42,42,42" ColumnSpacing="0" Margin="0">
+          <Button x:Name="updateEntryButton" Grid.Column="1" Classes="update-entry" Height="32" MinWidth="32"
+                  DataContext="{Binding $parent[Window].UpdatePresentation}"
+                  IsVisible="{Binding Update.IsUpdateEntryVisible}"
+                  Command="{Binding Update.ActivateUpdateEntryCommand}"
+                  PointerEntered="UpdateEntryButton_OnPointerEntered"
+                  PointerExited="UpdateEntryButton_OnPointerExited"
+                  ToolTip.Tip="{Binding Update.UpdateEntryHint}"
+                  AutomationProperties.Name="{Binding Update.UpdateEntryHint}">
+            <Grid ClipToBounds="True">
+              <Border Background="{DynamicResource UpdateEntryActiveBrush}" IsVisible="{Binding Update.IsPreparing}" CornerRadius="8" IsHitTestVisible="False" />
+              <Border Background="{DynamicResource AccentSoftBrush}" IsVisible="{Binding Update.IsReady}" CornerRadius="8" IsHitTestVisible="False" />
+              <Border Background="{DynamicResource DangerSoftBrush}" IsVisible="{Binding Update.IsError}" CornerRadius="8" IsHitTestVisible="False" />
+              <Grid ColumnDefinitions="32,Auto">
+                <!-- 下载中：箭头从上往下循环流动渐隐，底部横线固定不动 -->
+                <Grid Width="16" Height="16" ClipToBounds="True" HorizontalAlignment="Center" VerticalAlignment="Center"
+                      IsVisible="{Binding Update.IsPreparing}">
+                  <Path Data="M 2.5,12.5 L 13.5,12.5 L 13.5,15 L 2.5,15 Z" Fill="{DynamicResource TextPrimaryBrush}" />
+                  <Path Classes="update-entry-arrow" Data="M 8,1.5 L 8,8.5 M 4.5,5 L 8,8.5 L 11.5,5">
+                    <Path.RenderTransform>
+                      <TranslateTransform Y="-3" />
+                    </Path.RenderTransform>
+                  </Path>
+                </Grid>
+                <!-- 下载完成：静止的下载完成图标（Material Design download） -->
+                <PathIcon Data="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"
+                          Foreground="{DynamicResource TextPrimaryBrush}" Width="16" Height="16"
+                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                          IsVisible="{Binding Update.IsReady}" />
+                <PathIcon Data="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"
+                          Foreground="{DynamicResource TextPrimaryBrush}" Width="16" Height="16"
+                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                          IsVisible="{Binding Update.IsError}" />
+                <Border Grid.Column="1" Classes="update-entry-text" ClipToBounds="True">
+                  <TextBlock Text="{Binding Update.UpdateEntryHint}" MinWidth="28" Margin="0,0,12,0"
+                             Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                </Border>
+              </Grid>
+            </Grid>
+          </Button>
+          <Popup x:Name="updateReleasePreviewPopup"
+                 DataContext="{Binding $parent[Window].UpdatePresentation}"
+                 PlacementTarget="{Binding #updateEntryButton}"
+                 Placement="BottomEdgeAlignedRight"
+                 IsLightDismissEnabled="False"
+                 VerticalOffset="-2">
+            <Border Padding="16,8,16,24" Background="Transparent"
+                    PointerEntered="UpdateReleasePreview_OnPointerEntered"
+                    PointerExited="UpdateReleasePreview_OnPointerExited">
+              <Border Width="380" MaxHeight="420"
+                      Padding="16,14"
+                      Background="{DynamicResource PopupBackgroundBrush}"
+                      BorderBrush="{DynamicResource BorderStrongBrush}"
+                      BorderThickness="1"
+                      CornerRadius="12"
+                      BoxShadow="0 8 24 0 #40000000">
+                <Grid RowDefinitions="Auto,1,*">
+                  <StackPanel Spacing="3" Margin="0,0,0,10">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                      <TextBlock Text="{Binding Update.LatestVersion}" FontSize="12" />
+                      <TextBlock Text="{l:Locale update.card.release.notes}" FontSize="12" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding Update.ReleaseNotesContent.PublishedAtText}"
+                               FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" />
+                  </StackPanel>
+                  <Border Grid.Row="1" Background="{DynamicResource BorderSoftBrush}" />
+                  <views:ReleaseNotesView DataContext="{Binding Update.ReleaseNotesContent}"
+                                          Grid.Row="2" Margin="0,8,0,0" />
+                </Grid>
+              </Border>
+            </Border>
+          </Popup>
+          <Button Grid.Column="2" Classes="window-control" Click="MinimizeButton_OnClick" ToolTip.Tip="{l:Locale window.minimize}" AutomationProperties.Name="{l:Locale window.minimize}">
             <Border Width="12" Height="1" Background="{DynamicResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0" />
           </Button>
-          <Button Grid.Column="2" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="{l:Locale window.maximize}" AutomationProperties.Name="{l:Locale window.maximize}">
+          <Button Grid.Column="3" Classes="window-control" Click="MaximizeButton_OnClick" ToolTip.Tip="{l:Locale window.maximize}" AutomationProperties.Name="{l:Locale window.maximize}">
             <Path Data="M 5,5 L 19,5 L 19,19 L 5,19 Z" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
-          <Button Grid.Column="3" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="{l:Locale window.close}" AutomationProperties.Name="{l:Locale window.close}">
+          <Button Grid.Column="4" Classes="window-control window-close" Click="CloseButton_OnClick" ToolTip.Tip="{l:Locale window.close}" AutomationProperties.Name="{l:Locale window.close}">
             <Path Data="M 5,5 L 19,19 M 19,5 L 5,19" Fill="Transparent" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="0.8" Stretch="Uniform" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Button>
         </Grid>
       </Border>
     </Grid>
-    <Border IsVisible="{Binding Update.CardVisible}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Width="330" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="16" BoxShadow="0 8 24 #40000000">
-      <StackPanel Spacing="10">
-        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
-          <PathIcon Data="M 12,2 L 12,14 M 7,9 L 12,14 L 17,9 M 4,16 L 20,16 L 20,20 L 4,20 Z" Foreground="{DynamicResource AccentBrush}" Width="18" Height="18" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Text="{l:Locale update.card.title}" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <Button Grid.Column="2" Content="×" Command="{Binding Update.LaterCommand}" Padding="5,0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="{l:Locale update.card.later.tip}" />
-        </Grid>
-        <TextBlock Text="{Binding Update.VersionComparison}" Foreground="{DynamicResource TextSecondaryBrush}" />
-        <Button Content="{l:Locale update.card.release.notes}" Command="{Binding Update.OpenReleaseNotesCommand}" HorizontalAlignment="Left" Padding="0" MinHeight="26" Background="Transparent" BorderBrush="Transparent" Foreground="{DynamicResource AccentBrush}" />
-        <ProgressBar IsVisible="{Binding Update.IsBusy}" Value="{Binding Update.DownloadPercent}" Minimum="0" Maximum="100" Height="6" />
-        <Grid IsVisible="{Binding Update.IsBusy}" ColumnDefinitions="*,*" ColumnSpacing="8">
-          <TextBlock Text="{Binding Update.ProgressText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" />
-          <TextBlock Grid.Column="1" Text="{Binding Update.SpeedText}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" HorizontalAlignment="Right" />
-        </Grid>
-        <TextBlock IsVisible="{Binding Update.CanRetry}" Text="{Binding Update.ErrorMessage}" Foreground="#B42318" TextWrapping="Wrap" FontSize="11" />
-        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-          <Button Content="{l:Locale update.card.later}" Command="{Binding Update.LaterCommand}" />
-          <Button Grid.Column="1" Content="{l:Locale update.card.download}" Command="{Binding Update.DownloadCommand}" IsEnabled="{Binding Update.CanDownload}" Classes="primary" />
-        </Grid>
-      </StackPanel>
-    </Border>
-    <Border IsVisible="{Binding Update.ReleaseNotesVisible}" Background="#99000000" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Padding="40">
-      <Border Width="650" MaxHeight="620" HorizontalAlignment="Center" VerticalAlignment="Center" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="8" Padding="20">
-        <Grid RowDefinitions="Auto,*" RowSpacing="14">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="{l:Locale update.card.release.notes}" FontSize="18" FontWeight="SemiBold" />
-            <Button Grid.Column="1" Content="×" Command="{Binding Update.CloseReleaseNotesCommand}" Padding="6,0" MinHeight="28" Background="Transparent" BorderBrush="Transparent" ToolTip.Tip="{l:Locale update.card.close}" />
-          </Grid>
-          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <TextBlock Text="{Binding Update.ReleaseNotes}" TextWrapping="Wrap" LineHeight="22" />
-          </ScrollViewer>
-        </Grid>
-      </Border>
-    </Border>
-    <Border x:Name="toastBorder" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,28,24" Background="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="14,11" MaxWidth="420">
+    <Border x:Name="toastBorder" Classes="toast-layer" IsVisible="False" IsHitTestVisible="False" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16,0,0,24" Background="{DynamicResource TextPrimaryBrush}" BorderBrush="{DynamicResource BorderStrongBrush}" BorderThickness="1" CornerRadius="10" Padding="14,11" MaxWidth="196">
       <TextBlock x:Name="toastText" Foreground="White" TextWrapping="Wrap" />
     </Border>
+    <controls:AppModalHost x:Name="appModalHost" ZIndex="300" />
   </Grid>
 </Window>

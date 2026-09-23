@@ -15,7 +15,10 @@ public sealed class LocalizationNoCjkTest
         var files = Directory.EnumerateFiles(Path.Combine(SolutionRoot, "LoomX", "Views"), "*.axaml")
             .Concat([
                 Path.Combine(SolutionRoot, "LoomX", "ViewModels", "GatewayViewModel.cs"),
-                Path.Combine(SolutionRoot, "LoomX", "ViewModels", "MainWindowViewModel.cs")])
+                Path.Combine(SolutionRoot, "LoomX", "ViewModels", "MainWindowViewModel.cs"),
+                Path.Combine(SolutionRoot, "LoomX", "ViewModels", "UpdateCoordinator.cs"),
+                Path.Combine(SolutionRoot, "LoomX", "ViewModels", "ReleaseHistoryViewModel.cs"),
+                Path.Combine(SolutionRoot, "LoomX", "ViewModels", "ReleaseNotesContentViewModel.cs")])
             .Distinct(StringComparer.OrdinalIgnoreCase);
         var offenders = new List<string>();
 

@@ -67,6 +67,12 @@
   <data name="nav.overview.description">
     <value>确认本地服务健康，快速查看网关与模型配置。</value>
   </data>
+  <data name="nav.plugins">
+    <value>插件</value>
+  </data>
+  <data name="nav.plugins.description">
+    <value>查看已加载扩展、运行状态、能力与安全生命周期。</value>
+  </data>
   <data name="nav.gateway">
     <value>网关</value>
   </data>
@@ -106,6 +112,43 @@
   <data name="nav.settings.description">
     <value>调整 Loom-X 的显示、连接、更新与隐私偏好。</value>
   </data>
+
+  <!-- ============================================================ -->
+  <!-- Plugins                                                       -->
+  <!-- ============================================================ -->
+  <data name="plugins.summary.loaded.label"><value>已加载</value></data>
+  <data name="plugins.summary.enabled.label"><value>运行中</value></data>
+  <data name="plugins.summary.diagnostics.label"><value>诊断</value></data>
+  <data name="plugins.summary.loaded"><value>{0} 个插件</value></data>
+  <data name="plugins.summary.enabled"><value>{0} 个已启用</value></data>
+  <data name="plugins.summary.diagnostics"><value>{0} 条诊断</value></data>
+  <data name="plugins.action.refresh"><value>刷新</value></data>
+  <data name="plugins.empty.title"><value>尚未发现插件</value></data>
+  <data name="plugins.empty.description"><value>插件运行时已经就绪，但应用目录下暂未加载可用插件。</value></data>
+  <data name="plugins.error.title"><value>插件信息加载失败</value></data>
+  <data name="plugins.error.description"><value>无法读取插件运行时。请重试刷新，并在控制台查看不含敏感信息的错误摘要。</value></data>
+  <data name="plugins.diagnostics.title"><value>运行时诊断</value></data>
+  <data name="plugins.diagnostics.description"><value>这里只显示不含密钥、请求正文或工具参数的安全摘要。</value></data>
+  <data name="plugins.status.waiting"><value>进入页面后将读取插件运行时。</value></data>
+  <data name="plugins.status.loading"><value>正在初始化插件运行时…</value></data>
+  <data name="plugins.status.runtime_unavailable"><value>插件运行时不可用。</value></data>
+  <data name="plugins.status.ready"><value>已加载 {0} 个插件。</value></data>
+  <data name="plugins.status.failed"><value>插件信息加载失败，请查看控制台。</value></data>
+  <data name="plugins.status.enabled"><value>已启用</value></data>
+  <data name="plugins.status.disabled"><value>已停用</value></data>
+  <data name="plugins.toast.refresh_failed"><value>插件信息加载失败</value></data>
+  <data name="plugins.toast.toggle_failed"><value>插件状态未改变，请刷新后重试</value></data>
+  <data name="plugins.toast.enabled"><value>已启用“{0}”</value></data>
+  <data name="plugins.toast.disabled"><value>已停用“{0}”</value></data>
+  <data name="plugins.category.system"><value>系统插件</value></data>
+  <data name="plugins.category.extension"><value>扩展插件</value></data>
+  <data name="plugins.credential.name"><value>凭据保护</value></data>
+  <data name="plugins.credential.description"><value>在 Router 请求链路中识别并掩码敏感凭据，向模型注入 placeholder 完整性约束，并在响应链路恢复原值。</value></data>
+  <data name="plugins.credential.lifecycle"><value>当前版本暂不允许从界面停用：历史会话中的 token 仍依赖兼容解析能力。后续将把“主动保护”和“兼容恢复”拆分，并为卸载提供保留 Vault 的强警告流程。</value></data>
+  <data name="plugins.generic.description"><value>为 Loom-X Router Pipeline 提供可组合的请求或响应扩展。</value></data>
+  <data name="plugins.generic.lifecycle"><value>停用只影响当前运行时执行，不会删除插件文件或插件自有数据；重启后的持久化开关将在后续版本接入。</value></data>
+  <data name="plugins.extension_count"><value>{0} 个扩展点</value></data>
+  <data name="plugins.capabilities.none"><value>未声明能力</value></data>
 
   <!-- ============================================================ -->
   <!-- Settings - tab headers                                       -->
@@ -198,16 +241,13 @@
   <!-- Settings - Updates                                           -->
   <!-- ============================================================ -->
   <data name="settings.update.version.label">
-    <value>当前版本</value>
-  </data>
-  <data name="settings.update.version.hint">
-    <value>本地桌面端版本信息。</value>
+    <value>当前版本：</value>
   </data>
   <data name="settings.update.auto.check">
     <value>自动检查更新</value>
   </data>
   <data name="settings.update.auto.check.hint">
-    <value>启动后检查，并在应用运行期间每 24 小时检查一次；不会自动安装。</value>
+    <value>启动时检查，并在应用运行期间每 24 小时检查一次；发现兼容版本后会在后台下载并等待确认安装。</value>
   </data>
   <data name="settings.update.use.proxy">
     <value>更新时使用代理</value>
@@ -453,6 +493,12 @@
   </data>
   <data name="window.close">
     <value>关闭</value>
+  </data>
+  <data name="sidebar.collapse">
+    <value>折叠侧边栏</value>
+  </data>
+  <data name="sidebar.expand">
+    <value>展开侧边栏</value>
   </data>
 
   <!-- ============================================================ -->
@@ -1075,7 +1121,10 @@
     <value>拖动调整模型顺序</value>
   </data>
   <data name="providers.models.sort.toggle.tooltip">
-    <value>控制模型是否暴露给下游</value>
+    <value>请勾选接口兼容类型支持的模型</value>
+  </data>
+  <data name="providers.models.sort.toggle.currenttype">
+    <value>当前类型：{0}</value>
   </data>
   <data name="providers.models.sort.toggle.automation">
     <value>启用模型</value>
@@ -1275,6 +1324,9 @@
   </data>
   <data name="gateway.endpoint.comboCount.suffix">
     <value>个 Combo</value>
+  </data>
+  <data name="gateway.endpoint.comboCount.invalid">
+    <value>{0}个无效</value>
   </data>
   <data name="gateway.combo.header">
     <value>模型组合</value>
@@ -1671,7 +1723,49 @@
   <data name="assistant.decision.next"><value>下一项</value></data>
   <data name="assistant.decision.close"><value>关闭</value></data>
   <data name="assistant.decision.cancel_input"><value>取消本次输入</value></data>
-  <data name="assistant.decision.custom_input_placeholder"><value>我有其他想法...</value></data>
   <data name="assistant.queue.title"><value>排队消息</value></data>
   <data name="assistant.queue.delete"><value>删除排队消息</value></data>
+  <data name="update.entry.downloading"><value>正在下载更新</value></data>
+  <data name="update.entry.verifying"><value>正在校验更新</value></data>
+  <data name="update.entry.ready"><value>{0} 已准备好</value></data>
+  <data name="update.entry.error"><value>更新需要处理</value></data>
+  <data name="update.entry.install"><value>安装</value></data>
+  <data name="update.entry.retry"><value>重试</value></data>
+  <data name="update.dialog.close"><value>关闭</value></data>
+  <data name="update.dialog.later"><value>稍后</value></data>
+  <data name="update.dialog.install"><value>重启并安装</value></data>
+  <data name="update.dialog.retry"><value>重试</value></data>
+  <data name="update.progress.unknown"><value>未知</value></data>
+  <data name="update.progress.second"><value>秒</value></data>
+  <data name="update.progress.calculating"><value>计算中</value></data>
+  <data name="update.status.idle"><value>尚未检查更新</value></data>
+  <data name="update.status.checking"><value>正在检查更新…</value></data>
+  <data name="update.status.downloading"><value>正在下载更新…</value></data>
+  <data name="update.status.verifying"><value>正在校验更新包…</value></data>
+  <data name="update.status.ready"><value>更新已准备好</value></data>
+  <data name="update.status.installing"><value>安装器已启动，应用即将退出…</value></data>
+  <data name="update.status.latest"><value>已是最新版本</value></data>
+  <data name="update.status.error"><value>更新失败</value></data>
+  <data name="update.error.check"><value>检查更新失败，请稍后重试。</value></data>
+  <data name="update.error.prepare"><value>更新包准备失败，请重试。</value></data>
+  <data name="update.error.install"><value>无法启动更新安装器，请重试。</value></data>
+  <data name="update.error.exit"><value>更新安装器已启动，但应用无法自动退出。请手动关闭应用。</value></data>
+  <data name="release.notes.empty"><value>此版本暂无发布说明。</value></data>
+  <data name="settings.update.history.title"><value>版本历史</value></data>
+  <data name="settings.update.history.refresh"><value>刷新</value></data>
+  <data name="settings.update.history.open.release.tip"><value>点击前往此版本的发布页</value></data>
+  <data name="settings.update.history.loading"><value>正在加载版本历史…</value></data>
+  <data name="settings.update.history.empty"><value>暂无正式版本</value></data>
+  <data name="settings.update.history.error.load"><value>无法加载版本历史，请重试。</value></data>
+  <data name="settings.update.history.retry"><value>重试</value></data>
+  <data name="settings.update.history.load.more"><value>加载更多</value></data>
+  <data name="settings.update.history.loading.more"><value>正在加载更多…</value></data>
+  <data name="settings.update.history.badge.latest"><value>最新</value></data>
+  <data name="settings.update.history.badge.current"><value>当前</value></data>
+  <data name="update.dialog.open_release"><value>前往发布页</value></data>
+  <data name="update.release.open.failed"><value>无法打开发布页，请稍后重试。</value></data>
+  <data name="update.install.confirm.title"><value>安装更新？</value></data>
+  <data name="update.install.confirm.message"><value>安装将关闭并重启 Loom-X。期间路由服务会短暂中断，正在进行的请求可能失败。请先保存重要工作。</value></data>
+  <data name="update.install.confirm.accept"><value>安装并重启</value></data>
+  <data name="update.install.confirm.cancel"><value>暂不安装</value></data>
 </root>

@@ -38,6 +38,17 @@
 
 - 新增事件驱动、函数驱动或异常驱动的业务流程时，同步补齐能够判断开始、完成、降级和失败的日志；测试必须覆盖敏感信息不会进入日志。
 
+## Credential Protection 开发约束
+
+详细权威设计与验收场景见 `openspec/changes/add-router-credential-protection/`。修改 Router Plugin Runtime、Provider Request/Response Pipeline、Credential Protection、插件启停/卸载或凭据 Vault 时，必须同步阅读并遵守该 change；以下规则属于不可静默改变的开发约束：
+
+- `{{LOOMX_CREDENTIAL_<20 位 Base32>}}` 是长期有效的不透明本地凭据引用。模型可能改写它，因此最终 Provider 请求含 placeholder 时，必须临时注入 system/developer 级完整性指令；这是 placeholder 协议必选项，不得提供独立关闭开关，不得退化成 user message，也不得污染 Agent Session 或会话 JSONL。产品必须明确披露该插件会修改发送给 Provider 的系统指令。
+- Prompt 只降低模型改写概率，不是安全边界。恢复必须依赖确定性解析、SQLite 精确查表和 fail closed；只允许 ASCII 大小写及 token 语法内部明确空白的受限归一化，禁止全局删空格、Unicode/易混字符替换、缺字补全、编辑距离或其他模糊猜测。
+- Credential Protection 只规范和替换 placeholder 自身，不修改外围 Markdown、JSON、Header、URL、Shell 或 Tool Call 语法。JSON 结构引号由解析/序列化管理；解析后仍属于字段值的引号是实际数据，由 Tool Schema、执行器或目标协议判断是否合法。
+- “暂停主动保护”与“解析既有 placeholder”是不同生命周期。普通禁用只能停止新明文检测与 token 化，历史 placeholder 的识别、完整性 Prompt、归一化和恢复必须继续有效；同时必须强警告新请求及历史会话中的明文可能直接发送给 Provider。
+- Credential Protection 属于受保护的第一方系统能力，不得无提示一键卸载。卸载 Runtime 必须强警告历史会话、外部 Agent 缓存、导出文件与备份中的引用会失效并要求二次确认；卸载默认保留 Vault。销毁 Vault 是独立、不可逆且更高风险的操作，必须单独确认，不得与卸载绑定。
+- 流式恢复必须覆盖跨网络 chunk 和跨 SSE event 的 token；候选长度保护只计算实际未闭合 placeholder，未知、残缺、歧义、异常超长、无法解密或恢复后破坏 JSON 时不得猜测并按安全边界 fail closed。
+
 ## 桌面端 Toast 反馈
 
 - 全局即时反馈统一使用注入的 `ToastService`，由 `MainWindow` 负责渲染和自动隐藏。

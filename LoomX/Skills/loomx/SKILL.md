@@ -15,6 +15,19 @@ Client → Endpoint → Combo → Provider → Model → 上游 AI 服务
 - **Provider**：上游 AI 服务（base_url + api_mode + 加密存储的 api_key）。
 - **Model**：Provider 下的具体模型，可覆盖 Provider 的 base_url / api_mode / api_key。
 
+## 诊断要点：一个 Provider 只能有一种接口兼容模式
+
+- `api_mode` 决定 Provider 对外呈现的接口协议（`openai` / `anthropic`），**同一时刻只有一种模式生效**。
+- 已知陷阱：存储层允许多值写法（如 `openai;anthropic`）。一旦写成多值，所有模型都会被判定为两端可达，
+  原本互斥的模型便混在一起——OpenAI 系 ID（`gpt-*`、`deepseek-*`）与 Claude 系 ID（`claude-*`）同时挂在同一个 Provider 下。
+- 排查信号：`loomx.list_providers` 或模型列表中，同一个 Provider 同时出现 OpenAI 系与 Claude 系模型 ID。
+- 发现后**不要当作正常状态略过**，必须明确向用户说明这三点：
+  1. 该 Provider 的 `api_mode` 是混合值，需要收敛成单一模式；
+  2. AI 助手只走 OpenAI 兼容协议，设为 Claude Messages 模式的 Provider，其模型不会出现在助手的模型选择列表中；
+  3. 建议按协议拆成两个 Provider（一个 openai、一个 anthropic），或将该 Provider 收敛为目标模式后复查。
+- 反例：不要仅凭某次 `test_model` 通过就判定配置合理。混合模式下部分模型是"侥幸命中"当前路径工作，
+  一旦场景切换（改用助手、改走网关另一条 Route）就会失效。
+
 ## 配置修改原则（必须遵守）
 
 ```text

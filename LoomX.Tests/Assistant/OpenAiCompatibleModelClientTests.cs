@@ -193,49 +193,6 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
-    public async Task StreamAsync_Responses禁用工具后仍保留历史工具名映射()
-    {
-        const string responsesSse = """
-        event: response.output_item.added
-        data: {"type":"response.output_item.added","item":{"id":"fc_repeat","type":"function_call","call_id":"call_repeat","name":"assistant_ask_user"}}
-
-        event: response.function_call_arguments.delta
-        data: {"type":"response.function_call_arguments.delta","item_id":"fc_repeat","delta":"{}"}
-
-        event: response.completed
-        data: {"type":"response.completed","response":{"id":"resp_repeat"}}
-
-        data: [DONE]
-
-        """;
-        var handler = new FakeHttpHandler(HttpStatusCode.OK, responsesSse);
-        var client = new OpenAiCompatibleModelClient(
-            new HttpClient(handler), "https://api.example.com/v1", "test-model",
-            endpointFormat: "responses");
-        var history = new List<ChatMessage>
-        {
-            ChatMessage.User("显示测试面板"),
-            ChatMessage.AssistantToolCalls([new ToolCall("call_cancelled", "assistant.ask_user", "{}")]),
-            ChatMessage.ToolResult(
-                new ToolCall("call_cancelled", "assistant.ask_user", "{}"),
-                "{\"cancelled\":true,\"values\":{},\"custom_inputs\":{}}"),
-        };
-
-        var events = await CollectAsync(client.StreamAsync(
-            new ModelRequest(history, []),
-            CancellationToken.None));
-
-        var body = JsonNode.Parse(handler.LastRequestBody!)!.AsObject();
-        Assert.Null(body["tools"]);
-        var historicalCall = body["input"]!.AsArray()
-            .Single(item => item?["type"]?.GetValue<string>() == "function_call");
-        Assert.Equal("assistant_ask_user", historicalCall!["name"]!.GetValue<string>());
-        Assert.Equal(
-            "assistant.ask_user",
-            Assert.IsType<ModelToolCallEvent>(events[0]).ToolCall.Name);
-    }
-
-    [Fact]
     public async Task StreamAsync_Responses参数Done使用最终快照而不是拼接增量()
     {
         const string responsesSse = """

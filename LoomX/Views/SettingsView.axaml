@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" x:Class="LoomX.Views.SettingsView">
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:l="using:LoomX.Localization" xmlns:views="using:LoomX.Views" x:Class="LoomX.Views.SettingsView">
   <UserControl.Resources>
     <DataTemplate x:Key="SettingsOptionTemplate"><TextBlock Text="{Binding DisplayName}"/></DataTemplate>
   </UserControl.Resources>
@@ -8,9 +8,10 @@
     <Style Selector="TextBlock.hint"><Setter Property="FontSize" Value="11"/><Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/><Setter Property="TextWrapping" Value="Wrap"/></Style>
     <Style Selector="Button.outline"><Setter Property="MinHeight" Value="34"/><Setter Property="Padding" Value="11,7"/><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/></Style>
     <Style Selector="Button.primary"><Setter Property="MinHeight" Value="36"/><Setter Property="Padding" Value="16,8"/><Setter Property="Background" Value="{DynamicResource AccentBrush}"/><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/></Style>
+    <Style Selector="ListBox.release-history-list ListBoxItem"><Setter Property="Cursor" Value="Hand"/></Style>
   </UserControl.Styles>
   <Grid MinHeight="450">
-    <TabControl>
+    <TabControl SelectedIndex="{Binding SelectedTabIndex, Mode=TwoWay}">
       <TabItem Header="{l:Locale settings.tab.general}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="12" Margin="0,14,8,20">
@@ -57,13 +58,82 @@
       <TabItem Header="{l:Locale settings.tab.updates}">
         <ScrollViewer VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="12" Margin="0,14,8,20">
-            <Border Classes="panel" Padding="18">
-              <StackPanel Spacing="14">
-                <Grid ColumnDefinitions="*,Auto"><StackPanel Spacing="3"><TextBlock Text="{l:Locale settings.update.version.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.update.version.hint}" Classes="hint"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding VersionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
-                <CheckBox Content="{l:Locale settings.update.auto.check}" IsChecked="{Binding AutoCheckUpdates}"/><TextBlock Text="{l:Locale settings.update.auto.check.hint}" Classes="hint" Margin="24,-10,0,0"/>
-                <CheckBox Content="{l:Locale settings.update.use.proxy}" IsChecked="{Binding UseProxyForUpdates}"/><TextBlock Text="{l:Locale settings.update.use.proxy.hint}" Classes="hint" Margin="24,-10,0,0"/>
-                <Button Content="{l:Locale settings.update.check.button}" Command="{Binding CheckUpdateCommand}" Classes="outline" HorizontalAlignment="Left" IsEnabled="{Binding IsNotBusy}"/>
+            <Border Classes="panel" Padding="16,12">
+              <StackPanel Spacing="9">
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4"><TextBlock Text="{l:Locale settings.update.version.label}" FontWeight="SemiBold" VerticalAlignment="Center"/><TextBlock Grid.Column="1" Text="{Binding VersionLabel}" FontWeight="SemiBold" VerticalAlignment="Center"/></Grid>
+                <CheckBox Content="{l:Locale settings.update.auto.check}" IsChecked="{Binding AutoCheckUpdates}"/>
+                <TextBlock Text="{l:Locale settings.update.auto.check.hint}" Classes="hint" Margin="24,-7,0,0"/>
+                <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto" ColumnSpacing="12" RowSpacing="9"><CheckBox Content="{l:Locale settings.update.use.proxy}" IsChecked="{Binding UseProxyForUpdates}"/><TextBlock Grid.Row="1" Text="{l:Locale settings.update.use.proxy.hint}" Classes="hint" Margin="24,-7,0,0"/><Button Grid.RowSpan="2" Grid.Column="1" Content="{l:Locale settings.update.check.button}" Command="{Binding CheckUpdateCommand}" Classes="outline" HorizontalAlignment="Right" VerticalAlignment="Bottom" IsEnabled="{Binding IsNotBusy}"/></Grid>
               </StackPanel>
+            </Border>
+            <Border Classes="panel" Height="430" ClipToBounds="True">
+              <Grid RowDefinitions="Auto,1,*">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="16,8">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="{l:Locale settings.update.history.title}" FontWeight="SemiBold"/>
+                    <TextBlock Text="{Binding ReleaseHistory.ErrorText}" IsVisible="{Binding ReleaseHistory.HasCachedContent}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap"/>
+                  </StackPanel>
+                  <ProgressBar Grid.Column="1" Width="70" IsIndeterminate="True" IsVisible="{Binding ReleaseHistory.IsRefreshing}" VerticalAlignment="Center"/>
+                </Grid>
+                <Border Grid.Row="1" Background="{DynamicResource BorderBrush}"/>
+                <Grid Grid.Row="2">
+                  <Grid ColumnDefinitions="200,*">
+                    <Grid Grid.Column="0" RowDefinitions="*,Auto" Background="{DynamicResource SurfaceBrush}">
+                      <ListBox Classes="release-history-list selection-rail-list" ItemsSource="{Binding ReleaseHistory.Releases}" SelectedItem="{Binding ReleaseHistory.SelectedRelease, Mode=TwoWay}" Background="Transparent" BorderThickness="0" Margin="8">
+                        <ListBox.ItemTemplate>
+                          <DataTemplate>
+                            <Border Classes="selection-rail-card" Padding="10,8">
+                              <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto">
+                                <TextBlock Text="{Binding VersionText}" FontWeight="SemiBold"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                  <Border IsVisible="{Binding IsLatest}" Background="{DynamicResource AccentSoftBrush}" CornerRadius="5" Padding="5,1"><TextBlock Text="{Binding LatestBadgeText}" Foreground="{DynamicResource AccentBrush}" FontSize="10"/></Border>
+                                  <Border IsVisible="{Binding IsCurrent}" Background="{DynamicResource SuccessSoftBrush}" CornerRadius="5" Padding="5,1"><TextBlock Text="{Binding CurrentBadgeText}" Foreground="{DynamicResource SuccessBrush}" FontSize="10"/></Border>
+                                </StackPanel>
+                                <TextBlock Grid.Row="1" Text="{Binding PublishedAtText}" Classes="hint"/>
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ListBox.ItemTemplate>
+                      </ListBox>
+                      <StackPanel Grid.Row="1" Spacing="6" Margin="10,6,10,10">
+                        <Button Content="{l:Locale settings.update.history.load.more}" Command="{Binding ReleaseHistory.LoadMoreCommand}" IsVisible="{Binding ReleaseHistory.CanShowLoadMore}" Classes="outline" HorizontalAlignment="Stretch"/>
+                        <TextBlock Text="{l:Locale settings.update.history.loading.more}" IsVisible="{Binding ReleaseHistory.IsLoadingMore}" Classes="hint" HorizontalAlignment="Center"/>
+                      </StackPanel>
+                    </Grid>
+                    <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="16,12,16,16">
+                      <Grid Margin="0,0,0,8">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding ReleaseHistory.SelectedRelease.VersionText}"
+                                     FontSize="16"
+                                     FontWeight="SemiBold"
+                                     Foreground="{DynamicResource AccentBrush}"
+                                     TextDecorations="Underline"
+                                     Cursor="Hand"
+                                     Tag="{Binding ReleaseHistory.SelectedRelease.Release.HtmlUrl}"
+                                     ToolTip.Tip="{l:Locale settings.update.history.open.release.tip}"
+                                     PointerPressed="ReleaseVersion_OnPointerPressed"/>
+                          <TextBlock Text="{Binding ReleaseHistory.Content.PublishedAtText}" Classes="hint"/>
+                        </StackPanel>
+                      </Grid>
+                      <views:ReleaseNotesView DataContext="{Binding ReleaseHistory.Content}" Grid.Row="1"/>
+                    </Grid>
+                  </Grid>
+                  <Border Background="{DynamicResource SurfaceBrush}" IsVisible="{Binding ReleaseHistory.IsInitialLoading}">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10"><ProgressBar Width="140" IsIndeterminate="True"/><TextBlock Text="{l:Locale settings.update.history.loading}" Classes="hint"/></StackPanel>
+                  </Border>
+                  <Border Background="{DynamicResource SurfaceBrush}" IsVisible="{Binding ReleaseHistory.IsEmpty}">
+                    <TextBlock Text="{l:Locale settings.update.history.empty}" Classes="hint" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  </Border>
+                  <Grid IsVisible="{Binding ReleaseHistory.HasError}">
+                    <Border Background="{DynamicResource SurfaceBrush}" IsVisible="{Binding !ReleaseHistory.HasCachedContent}">
+                      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="360">
+                        <TextBlock Text="{Binding ReleaseHistory.ErrorText}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" TextAlignment="Center"/>
+                        <Button Content="{l:Locale settings.update.history.retry}" Command="{Binding ReleaseHistory.LoadCommand}" Classes="outline" HorizontalAlignment="Center"/>
+                      </StackPanel>
+                    </Border>
+                  </Grid>
+                </Grid>
+              </Grid>
             </Border>
           </StackPanel>
         </ScrollViewer>
@@ -73,7 +143,6 @@
           <StackPanel Spacing="12" Margin="0,14,8,20">
             <Border Classes="panel" Padding="18">
               <StackPanel Spacing="14">
-                <CheckBox Content="{l:Locale settings.diagnostic.send}" IsChecked="{Binding DiagnosticsEnabled}"/><TextBlock Text="{l:Locale settings.diagnostic.send.hint}" Classes="hint" Margin="24,-10,0,0"/>
                 <CheckBox Content="{l:Locale settings.log.stacktrace}" IsChecked="{Binding LogStackTrace}"/><TextBlock Text="{l:Locale settings.log.stacktrace.hint}" Classes="hint" Margin="24,-10,0,0"/>
                 <StackPanel Spacing="4"><TextBlock Text="{l:Locale settings.log.retention.label}" FontWeight="SemiBold"/><TextBlock Text="{l:Locale settings.log.retention.hint}" Classes="hint"/><ComboBox ItemsSource="{Binding LogRetentionOptions}" ItemTemplate="{StaticResource SettingsOptionTemplate}" SelectionBoxItemTemplate="{StaticResource SettingsOptionTemplate}" SelectedItem="{Binding SelectedLogRetention, Mode=TwoWay}"/></StackPanel>
                 <StackPanel Spacing="8"><TextBlock Text="{l:Locale settings.local.data}" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal" Spacing="5"><TextBlock Text="{l:Locale settings.local.data.path.label}" Classes="hint"/><TextBlock Text="{Binding DataDirectory}" Classes="hint" TextWrapping="Wrap"/></StackPanel><StackPanel Orientation="Horizontal" Spacing="10"><Button Content="{l:Locale settings.local.data.open}" Command="{Binding OpenDataDirectoryCommand}" Classes="outline"/><Button Content="{l:Locale settings.local.data.clear}" Command="{Binding ClearLogsCommand}" Classes="outline"/></StackPanel></StackPanel>

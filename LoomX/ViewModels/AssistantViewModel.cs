@@ -472,7 +472,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
 
         if (submitted == true)
         {
-            if (!dialogViewModel.TryBuildResult(out var values, out var customInputs))
+            if (!dialogViewModel.TryBuildResult(out var values))
             {
                 logger.LogWarning("助手决策卡片校验未通过 {RequestId}", pending.RequestId);
                 CancelOwnedUserDecision(broker, pending.RequestId, "assistant_ui_validation_failed");
@@ -480,11 +480,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
                 return;
             }
 
-            var submitSucceeded = SubmitOwnedUserDecision(
-                broker,
-                pending.RequestId,
-                values,
-                customInputs);
+            var submitSucceeded = SubmitOwnedUserDecision(broker, pending.RequestId, values);
             if (submitSucceeded is null)
             {
                 logger.LogDebug("助手决策提交结果因 Ownership 已结束被忽略 {RequestId}", pending.RequestId);
@@ -527,8 +523,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     private bool? SubmitOwnedUserDecision(
         IUserDecisionBroker broker,
         string requestId,
-        IReadOnlyDictionary<string, object?> values,
-        IReadOnlyDictionary<string, string> customInputs)
+        IReadOnlyDictionary<string, object?> values)
     {
         lock (userDecisionGate)
         {
@@ -538,7 +533,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             }
 
             logger.LogInformation("助手决策开始提交 {RequestId}", requestId);
-            var submitted = broker.Submit(requestId, userDecisionClaimantId, values, customInputs);
+            var submitted = broker.Submit(requestId, userDecisionClaimantId, values);
             if (!submitted)
             {
                 broker.Cancel(requestId, userDecisionClaimantId, "assistant_ui_submit_failed");
@@ -1971,7 +1966,7 @@ public sealed class ProcessToolCallViewModel : NotifyViewModel
 
     public ProcessToolCallViewModel(ToolCall toolCall, Action changed)
     {
-        var safeToolCall = ToolArgumentSafety.EnsureSafe(toolCall);
+        var safeToolCall = ToolCallProjection.EnsureSafe(toolCall);
         id = safeToolCall.Id;
         name = safeToolCall.Name;
         argumentsJson = safeToolCall.ArgumentsJson;
@@ -2016,7 +2011,7 @@ public sealed class ProcessToolCallViewModel : NotifyViewModel
 
     public void UpdateDefinition(ToolCall toolCall)
     {
-        var safeToolCall = ToolArgumentSafety.EnsureSafe(toolCall);
+        var safeToolCall = ToolCallProjection.EnsureSafe(toolCall);
         id = safeToolCall.Id;
         name = safeToolCall.Name;
         argumentsJson = safeToolCall.ArgumentsJson;

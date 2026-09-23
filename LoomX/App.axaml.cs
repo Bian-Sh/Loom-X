@@ -140,7 +140,10 @@ public partial class App : Application
             gatewayService = new GatewayProcessService();
             var toastService = new ToastService();
             dataStore = new AppDataStore(configService, gatewayService, loggerFactory.CreateLogger<AppDataStore>());
-            mainWindow = new MainWindow(toastService, loggerFactory.CreateLogger<MainWindow>());
+            mainWindow = new MainWindow(
+                toastService,
+                loggerFactory.CreateLogger<MainWindow>(),
+                loggerFactory.CreateLogger<AppModalService>());
             mainWindow.DataContext = new MainWindowViewModel(
                 gatewayService,
                 toastService,
@@ -148,7 +151,10 @@ public partial class App : Application
                 configService,
                 mainWindow.ApplyAppearance,
                 dataStore,
-                LocalizerFactory.Create<MainWindowViewModel>());
+                LocalizerFactory.Create<MainWindowViewModel>(),
+                requestApplicationExit: () => desktop.Shutdown(),
+                confirmUpdateInstall: mainWindow.ConfirmUpdateInstallAsync,
+                applyTheme: mainWindow.ApplyTheme);
             desktop.MainWindow = mainWindow;
             if (activationPending)
                 mainWindow.ActivateFromSecondaryLaunch();

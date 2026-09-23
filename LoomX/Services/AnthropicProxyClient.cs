@@ -16,9 +16,22 @@ public interface IAnthropicProxyClient
     Task<(HttpStatusCode StatusCode, Stream? Stream, string? Error)> SendStreamAsync(ResolvedModelConfig model, AnthropicMessagesRequest request, CancellationToken cancellationToken);
 }
 
-public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<AnthropicProxyClient> logger) : IAnthropicProxyClient
+public sealed class AnthropicProxyClient : IAnthropicProxyClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly HttpClient httpClient;
+    private readonly ILogger<AnthropicProxyClient> logger;
+    private readonly IProviderExecutionPipeline executionPipeline;
+
+    public AnthropicProxyClient(
+        HttpClient httpClient,
+        ILogger<AnthropicProxyClient> logger,
+        IProviderExecutionPipeline? executionPipeline = null)
+    {
+        this.httpClient = httpClient;
+        this.logger = logger;
+        this.executionPipeline = executionPipeline ?? new ProviderExecutionPipeline();
+    }
 
     public async Task<(HttpStatusCode StatusCode, AnthropicMessagesResponse? Response, string? Error)> SendAsync(ResolvedModelConfig model, AnthropicMessagesRequest request, CancellationToken cancellationToken)
     {
@@ -27,24 +40,28 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
         {
             using var message = BuildRequestMessage(model, request);
             LogEndpointAnomaly(model, message.RequestUri);
-            using var response = await httpClient.SendAsync(message, cancellationToken);
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
-            var responseBytes = Encoding.UTF8.GetByteCount(body);
+            var execution = await executionPipeline.ExecuteAsync(
+                httpClient,
+                message,
+                new ProviderExecutionContext(model.ProviderId, model.ModelId, "anthropic", "/v1/messages"),
+                cancellationToken);
+            var body = execution.BodyText;
+            var contentType = execution.ContentType ?? "application/json";
+            var responseBytes = execution.Body.Length;
             var elapsedMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
 
-            if (!response.IsSuccessStatusCode)
+            if (!execution.IsSuccess)
             {
                 logger.LogError(
                     "Anthropic 请求失败 {ProviderId}/{ModelId} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
                     model.ProviderId,
                     model.ModelId,
                     message.RequestUri?.AbsolutePath ?? "/v1/messages",
-                    (int)response.StatusCode,
+                    (int)execution.StatusCode,
                     contentType,
                     responseBytes,
                     elapsedMs);
-                return (response.StatusCode, null, ReadError(body, response.StatusCode));
+                return (execution.StatusCode, null, ReadError(body, execution.StatusCode));
             }
 
             var result = JsonSerializer.Deserialize<AnthropicMessagesResponse>(body, JsonOptions);
@@ -55,7 +72,7 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
                     model.ProviderId,
                     model.ModelId,
                     message.RequestUri?.AbsolutePath ?? "/v1/messages",
-                    (int)response.StatusCode,
+                    (int)execution.StatusCode,
                     contentType,
                     responseBytes,
                     elapsedMs);
@@ -67,12 +84,12 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
                 model.ProviderId,
                 model.ModelId,
                 message.RequestUri?.AbsolutePath ?? "/v1/messages",
-                (int)response.StatusCode,
+                (int)execution.StatusCode,
                 contentType,
                 responseBytes,
                 elapsedMs);
 
-            return (response.StatusCode, result, null);
+            return (execution.StatusCode, result, null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -102,29 +119,32 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
         var startedAt = Stopwatch.GetTimestamp();
         try
         {
-            var message = BuildRequestMessage(model, request);
+            using var message = BuildRequestMessage(model, request);
             LogEndpointAnomaly(model, message.RequestUri);
-            var response = await httpClient.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            var execution = await executionPipeline.ExecuteStreamingAsync(
+                httpClient,
+                message,
+                new ProviderExecutionContext(model.ProviderId, model.ModelId, "anthropic", "/v1/messages"),
+                cancellationToken);
             var path = message.RequestUri?.AbsolutePath ?? "/v1/messages";
-            var contentType = response.Content.Headers.ContentType?.ToString() ?? "text/event-stream";
+            var contentType = execution.ContentType ?? "text/event-stream";
 
-            if (!response.IsSuccessStatusCode)
+            if (!execution.IsSuccess)
             {
-                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                await using var failedExecution = execution;
+                using var reader = new StreamReader(execution.Body, Encoding.UTF8);
+                var body = await reader.ReadToEndAsync(cancellationToken);
                 logger.LogError(
                     "Anthropic 流式请求失败 {ProviderId}/{ModelId} {Path} {StatusCode} {ContentType} {ResponseBytes}B {ElapsedMs:F0}ms",
                     model.ProviderId,
                     model.ModelId,
                     path,
-                    (int)response.StatusCode,
+                    (int)execution.StatusCode,
                     contentType,
                     Encoding.UTF8.GetByteCount(body),
                     Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
 
-                var error = ReadError(body, response.StatusCode);
-                response.Dispose();
-                message.Dispose();
-                return (response.StatusCode, null, error);
+                return (execution.StatusCode, null, ReadError(body, execution.StatusCode));
             }
 
             logger.LogInformation(
@@ -132,12 +152,11 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
                 model.ProviderId,
                 model.ModelId,
                 path,
-                (int)response.StatusCode,
+                (int)execution.StatusCode,
                 contentType,
                 Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
 
-            message.Dispose();
-            return (response.StatusCode, await response.Content.ReadAsStreamAsync(cancellationToken), null);
+            return (execution.StatusCode, new ProviderStreamingBodyStream(execution), null);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -194,6 +213,55 @@ public sealed class AnthropicProxyClient(HttpClient httpClient, ILogger<Anthropi
         }
 
         return message;
+    }
+
+    /// <summary>把 ProviderStreamingResult 的生命周期绑定到返回给协议映射层的响应流。</summary>
+    private sealed class ProviderStreamingBodyStream(ProviderStreamingResult owner) : Stream
+    {
+        private readonly Stream inner = owner.Body;
+        private bool disposed;
+
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => inner.CanWrite;
+        public override long Length => inner.Length;
+        public override long Position { get => inner.Position; set => inner.Position = value; }
+        public override void Flush() => inner.Flush();
+        public override Task FlushAsync(CancellationToken cancellationToken) => inner.FlushAsync(cancellationToken);
+        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+        public override int Read(Span<byte> buffer) => inner.Read(buffer);
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) =>
+            inner.ReadAsync(buffer, cancellationToken);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            inner.ReadAsync(buffer, offset, count, cancellationToken);
+        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+        public override void SetLength(long value) => inner.SetLength(value);
+        public override void Write(byte[] buffer, int offset, int count) => inner.Write(buffer, offset, count);
+        public override void Write(ReadOnlySpan<byte> buffer) => inner.Write(buffer);
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default) =>
+            inner.WriteAsync(buffer, cancellationToken);
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+            inner.WriteAsync(buffer, offset, count, cancellationToken);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && !disposed)
+            {
+                disposed = true;
+                owner.DisposeAsync().AsTask().GetAwaiter().GetResult();
+            }
+            base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (!disposed)
+            {
+                disposed = true;
+                await owner.DisposeAsync();
+            }
+            GC.SuppressFinalize(this);
+        }
     }
 
     private static string ReadError(string body, HttpStatusCode statusCode)

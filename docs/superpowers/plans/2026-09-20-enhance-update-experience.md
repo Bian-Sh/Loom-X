@@ -2,11 +2,45 @@
 change: enhance-update-experience
 design-doc: docs/superpowers/specs/2026-09-20-enhance-update-experience-design.md
 base-ref: e0e1dde3ebd11c130a77935313372a332016a1fb
+archived-with: 2026-09-21-enhance-update-experience
 ---
+
+<!-- comet-task-authority: openspec/changes/enhance-update-experience/tasks.md -->
+<!-- comet-task-ref:e4a05700-8775-4fe2-bc3f-7b3ea93eb46c -->
+<!-- comet-task-ref:c741dd3b-fca4-412b-bb51-5d113854351e -->
+<!-- comet-task-ref:5883d1d3-ba19-4b7a-ba63-33e8e4f8de37 -->
+<!-- comet-task-ref:8ebc1515-7e79-4a75-b3a8-163c3270a3ee -->
+<!-- comet-task-ref:018e4db9-6083-42b4-bf53-08c1007d610d -->
+<!-- comet-task-ref:c0a422cc-d932-4bad-93c2-6660c065f82d -->
+<!-- comet-task-ref:dca76ff5-20ee-4d96-8901-1f4843133064 -->
+<!-- comet-task-ref:cbccc188-e9d0-45bd-8a34-0902a436c24c -->
+<!-- comet-task-ref:4940c2eb-26c8-4e1d-b215-d4490945123e -->
+<!-- comet-task-ref:d2a7b929-f10f-4494-9635-7b942de2f520 -->
+<!-- comet-task-ref:30347da4-671a-435e-a115-f303a58cc8fc -->
+<!-- comet-task-ref:e4b31920-ee71-46e6-9979-b2edd57f4051 -->
+<!-- comet-task-ref:f2f017d9-815c-4e52-96d0-40dabe1afdc9 -->
+<!-- comet-task-ref:adf6294f-5f85-4097-b36f-9e63ff9d419e -->
+<!-- comet-task-ref:80883e85-89e2-4fd4-9cb9-84cc2d443fe3 -->
+<!-- comet-task-ref:4630a1ee-9224-4db6-a4b1-c6b2a0c31891 -->
+<!-- comet-task-ref:68d86b48-6984-4993-9e0a-af0d5f93e1a4 -->
+<!-- comet-task-ref:769ab435-65ec-4fce-a0ab-1fed06603a24 -->
+<!-- comet-task-ref:18416923-e484-4367-9334-e6c4aa504488 -->
+<!-- comet-task-ref:306b389c-d609-49e5-85d2-8aa1c9a769cd -->
+<!-- comet-task-ref:1e00806c-1003-4407-bb4b-28ecc4d00719 -->
+<!-- comet-task-ref:aa115763-31df-42d5-af5a-87774b46be6a -->
+<!-- comet-task-ref:a8424e08-e7a4-49e4-9471-267eb7d13514 -->
+<!-- comet-task-ref:0e29205f-2c44-4631-ac35-9122cc63c40e -->
+<!-- comet-task-ref:498183c6-ffa5-460b-91da-e7539296171f -->
+<!-- comet-task-ref:632cb215-6a6b-4ea2-aef0-ac2613eecd13 -->
+<!-- comet-task-ref:05e3eaa0-bb65-4b61-ae4a-2b16583311bb -->
+<!-- comet-task-ref:4ecfd11c-09a6-434e-a09e-d74784c2cfad -->
+<!-- comet-task-ref:bfe6c322-d777-4332-b68e-7cb5bc644c7f -->
+<!-- comet-task-ref:fc1ab8c3-338c-454d-9e62-8d59b9aad60b -->
+<!-- comet-task-ref:64fd542b-9cc6-4e80-b551-7cd3a4771992 -->
 
 # Loom-X 更新体验实施计划
 
-> **供代理执行者使用：** 必须逐项执行本计划；推荐使用 superpowers:subagent-driven-development，也可使用 superpowers:executing-plans。所有步骤使用复选框追踪，任何测试、构建或运行异常都先加载 systematic-debugging，不得直接猜测修复。
+> **供代理执行者使用：** 必须逐项执行本计划；推荐使用 superpowers:subagent-driven-development，也可使用 superpowers:executing-plans。任务完成状态以 OpenSpec `tasks.md` 为唯一权威，本计划仅保留实施步骤与稳定 task ID 映射；任何测试、构建或运行异常都先加载 systematic-debugging，不得直接猜测修复。
 
 **目标：** 将 Loom-X 更新流程改造成“自动检查并后台下载、标题栏持久入口、浮窗内直接阅读 Release Notes、用户确认后重启安装”，并在设置页提供最近 10 个正式版本的 Markdown 历史浏览、切换、刷新与分页。
 
@@ -126,7 +160,7 @@ public interface IUpdateService
 }
 ~~~
 
-- [ ] **步骤 1：编写 Release 分页和可安装筛选失败测试**
+**步骤 1：编写 Release 分页和可安装筛选失败测试**
 
 在 UpdateServiceTests 中新增以下测试方法，并把 StubHandler 扩展为记录 RequestUri：
 
@@ -177,7 +211,7 @@ private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> r
 }
 ~~~
 
-- [ ] **步骤 2：运行定向测试并确认红灯**
+**步骤 2：运行定向测试并确认红灯**
 
 运行：
 
@@ -187,7 +221,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "Ful
 
 预期：FAIL，编译错误指出 IUpdateService、UpdateReleasePage 或 GetStableReleasesAsync 不存在；现有 CheckAsync 也会错误选择缺少安装资产的 v0.13.0。
 
-- [ ] **步骤 3：实现接口、正式分页和安全日志**
+**步骤 3：实现接口、正式分页和安全日志**
 
 将固定 ApiUrl 改为基础地址，并用 Link 响应头判断原始 GitHub 页是否还有下一页：
 
@@ -240,13 +274,13 @@ private static bool HasNextPage(HttpResponseMessage response) =>
 
 CheckAsync 调用第一页正式 Release 数据，按 StableVersion 降序选择 Version 高于 CurrentVersion 且 InstallerAsset、ChecksumAsset 均非空的条目。日志只能包含当前版本、目标版本、条目数和耗时，不记录 Body 或 URL 查询中的敏感值。
 
-- [ ] **步骤 4：运行服务测试并确认绿灯**
+**步骤 4：运行服务测试并确认绿灯**
 
 运行同一步骤 2 命令。
 
 预期：PASS；分页请求包含 page=1 和 page=2；历史结果包含无安装资产的正式版本；自动检查只选择兼容安装目标。
 
-- [ ] **步骤 5：勾选 OpenSpec 1.1、1.2 并提交**
+**步骤 5：勾选 OpenSpec 1.1、1.2 并提交**
 
 ~~~powershell
 git add LoomX/Services/UpdateService.cs LoomX.Tests/UpdateServiceTests.cs openspec/changes/enhance-update-experience/tasks.md
@@ -286,7 +320,7 @@ public sealed record PreparedUpdate(
     DateTimeOffset VerifiedAt);
 ~~~
 
-- [ ] **步骤 1：把旧“下载即安装”测试改成失败优先测试**
+**步骤 1：把旧“下载即安装”测试改成失败优先测试**
 
 用以下测试替换 DownloadAndInstallAsync_ShouldVerifyChecksumBeforeLaunchingInstaller，并新增缓存与校验失败用例：
 
@@ -344,7 +378,7 @@ public async Task PrepareUpdateAsync_校验失败删除当前版本临时文件(
 }
 ~~~
 
-- [ ] **步骤 2：运行测试并确认红灯**
+**步骤 2：运行测试并确认红灯**
 
 ~~~powershell
 dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateServiceTests"
@@ -352,7 +386,7 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "Ful
 
 预期：FAIL，PrepareUpdateAsync、PreparedUpdate 和 LaunchInstaller 尚不存在；旧实现会在准备完成后立即记录 Launcher.Path。
 
-- [ ] **步骤 3：实现 .partial 下载、缓存复验和准备阶段进度**
+**步骤 3：实现 .partial 下载、缓存复验和准备阶段进度**
 
 PrepareUpdateAsync 使用以下固定顺序：
 
@@ -438,13 +472,13 @@ public void LaunchInstaller(PreparedUpdate preparedUpdate)
 
 删除 UpdateInstallResult 和 DownloadAndInstallAsync；下载方法继续只记录版本、资产名、字节数、耗时和结果。
 
-- [ ] **步骤 4：运行测试并确认绿灯**
+**步骤 4：运行测试并确认绿灯**
 
 运行步骤 2 命令。
 
 预期：PASS；准备成功时启动次数为 0，显式调用后为 1；有效缓存不新增请求；校验失败不留下 .partial 文件。
 
-- [ ] **步骤 5：勾选 OpenSpec 1.3、1.4 并提交**
+**步骤 5：勾选 OpenSpec 1.3、1.4 并提交**
 
 ~~~powershell
 git add LoomX/Services/UpdateService.cs LoomX.Tests/UpdateServiceTests.cs openspec/changes/enhance-update-experience/tasks.md
@@ -466,11 +500,11 @@ git commit -m "拆分更新包准备与安装器启动"
 - 产出：ReleaseNotesMarkdownPolicy.Sanitize(string?) 返回可交给 LiveMarkdown 的安全 Markdown。
 - 产出：ReleaseNotesContentViewModel.SetRelease(UpdateRelease?)，以及 Title、PublishedAtText、Markdown、IsEmpty、EmptyText。
 
-- [ ] **步骤 1：先用 Context7 核对 API**
+**步骤 1：先用 Context7 核对 API**
 
 依次执行 resolve-library-id：Markdig（查询 0.43.0 的 Markdown.Parse、Descendants、SourceSpan、LinkInline.Url、LinkInline.IsImage），再 query-docs 查询 AST 节点遍历；对 LiveMarkdown.Avalonia 1.12.2 重复 resolve-library-id 和 query-docs，查询 MarkdownRenderer.MarkdownBuilder 与 ObservableStringBuilder。Context7 无 LiveMarkdown 条目时读取本机 NuGet README 和 XML，并在最终报告记录降级。
 
-- [ ] **步骤 2：写失败测试**
+**步骤 2：写失败测试**
 
 ~~~csharp
 [Fact]
@@ -507,13 +541,13 @@ public void SetRelease_替换版本时创建全新Builder()
 }
 ~~~
 
-- [ ] **步骤 3：运行红灯**
+**步骤 3：运行红灯**
 
 运行：dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~ReleaseNotesContentViewModelTests"
 
 预期：FAIL，新类型不存在。
 
-- [ ] **步骤 4：实现最小安全策略和内容替换**
+**步骤 4：实现最小安全策略和内容替换**
 
 ReleaseNotesMarkdownPolicy 用 Markdown.Parse 解析，收集 HtmlBlock、HtmlInline、LinkInline 的 SourceSpan；HTML 替换为空，图片替换为替代文本，非绝对 HTTPS 链接替换为可见文本，按 Span.Start 降序应用编辑。HTTPS 判定固定为：
 
@@ -525,7 +559,7 @@ private static bool IsSafeHttps(string? value) =>
 
 SetRelease 每次创建 new ObservableStringBuilder，只在安全正文非空时 Append；监听 LocaleService.CultureChanged，重新计算日期和 EmptyText。所有 builder 操作在 UI 线程发生。
 
-- [ ] **步骤 5：运行绿灯并提交**
+**步骤 5：运行绿灯并提交**
 
 运行同一步骤 3 命令，预期 PASS。勾选 OpenSpec 3.1，然后执行：
 
@@ -560,7 +594,7 @@ public UpdateCoordinator(
 
 产出 CheckNowAsync、ToggleDialogCommand、DismissDialogCommand、RetryCommand、InstallAndRestartCommand，以及 IsUpdateEntryVisible、IsDialogVisible、IsProgressVisible、IsProgressIndeterminate、CanInstall、CanRetry、UpdateEntryText。
 
-- [ ] **步骤 1：写失败测试**
+**步骤 1：写失败测试**
 
 UpdateCoordinatorTests 固定覆盖：自动检查依次进入 Downloading、Verifying、Ready；两个并发 CheckNowAsync 只调用一次服务；稍后只关闭浮窗且 Prepare Token 未取消；准备失败保留 Release，Retry 不重新检查；Ready 连点两次只 Launch 一次且只请求一次退出；启动器失败不退出并恢复 Ready；手动无更新进入 Latest，自动无更新回 Idle 且入口隐藏。
 
@@ -585,13 +619,13 @@ public async Task Ready重复安装只启动一次()
 }
 ~~~
 
-- [ ] **步骤 2：运行红灯**
+**步骤 2：运行红灯**
 
 运行：dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateCoordinatorTests"
 
 预期：FAIL，Ready、新命令和 IUpdateService 注入边界不存在。
 
-- [ ] **步骤 3：实现状态机**
+**步骤 3：实现状态机**
 
 删除 Available、CardVisible、ReleaseNotesVisible、DownloadCommand、OpenReleaseNotesCommand、CloseReleaseNotesCommand 和纯文本 SanitizeMarkdown。以 checkTask、prepareTask 复用并发任务；Progress.Phase 为 Verifying 时切换校验态。所有状态变化只经 TransitionTo，集中刷新派生属性、命令状态和结构化日志。发现 Release 后立即显示浮窗并后台 Prepare；Dismiss 只隐藏浮窗。InstallAndRestartAsync 用 Interlocked 防重复，LaunchInstaller 成功后调用 requestApplicationExit；Launch 失败不退出。
 
@@ -604,7 +638,7 @@ public bool CanInstall => Stage == UpdateStage.Ready && PreparedUpdate is not nu
 public bool CanRetry => Stage == UpdateStage.Error && ErrorKind is UpdateErrorKind.Check or UpdateErrorKind.Prepare;
 ~~~
 
-- [ ] **步骤 4：运行绿灯并提交**
+**步骤 4：运行绿灯并提交**
 
 运行步骤 2 命令，预期 PASS。勾选 OpenSpec 2.1、2.2：
 
@@ -627,7 +661,7 @@ git commit -m "实现自动准备更新的全局状态机"
 - MainWindowViewModel 创建一个 IUpdateService，同时传给 UpdateCoordinator 和 ReleaseHistoryViewModel。
 - App 传入 requestApplicationExit: () => desktop.Shutdown()，继续复用 desktop.Exit 的网关、数据存储、ViewModel 和日志释放路径。
 
-- [ ] **步骤 1：写接线契约红灯**
+**步骤 1：写接线契约红灯**
 
 ~~~csharp
 [Fact]
@@ -646,7 +680,7 @@ public void 更新安装请求复用正常退出路径和共享服务()
 
 预期：FAIL。
 
-- [ ] **步骤 2：实现生产接线**
+**步骤 2：实现生产接线**
 
 ~~~csharp
 IUpdateService updateService = new UpdateService(
@@ -665,7 +699,7 @@ releaseHistoryViewModel = new ReleaseHistoryViewModel(
 
 MainWindowViewModel 负责释放共享协调器和历史模型；SettingsViewModel 对外部注入实例不重复 Dispose。
 
-- [ ] **步骤 3：运行绿灯并提交**
+**步骤 3：运行绿灯并提交**
 
 运行步骤 1 命令，预期 PASS。
 
@@ -708,7 +742,7 @@ public sealed class ReleaseHistoryViewModel : NotifyViewModel, IDisposable
 
 构造函数接收 IUpdateService、Func<CancellationToken, Task<UpdateProxySettings>>、ILogger 和可选 localizer/dispatch。
 
-- [ ] **步骤 1：写失败测试**
+**步骤 1：写失败测试**
 
 覆盖六个确定行为：首次请求 page=1,pageSize=10 并选择最高版本；最新与当前标记独立；切换版本不增加服务调用；加载更多按 Version 去重且保留选择；刷新失败保留集合和 Content；首次空响应进入 IsEmpty，首次失败进入 HasError 且可重试。
 
@@ -731,17 +765,17 @@ public async Task 加载更多保留选择并去重追加()
 }
 ~~~
 
-- [ ] **步骤 2：运行红灯**
+**步骤 2：运行红灯**
 
 运行：dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~ReleaseHistoryViewModelTests"
 
 预期：FAIL，新 ViewModel 不存在。
 
-- [ ] **步骤 3：实现加载规则**
+**步骤 3：实现加载规则**
 
 首次加载与刷新先写临时列表，成功后一次替换；刷新优先恢复原版本选择，否则选择最高 StableVersion。LoadMore 请求 currentPage+1，按标准化 Version 去重追加，不修改当前 Content。错误只设置本地化安全摘要，不使用 exception.Message；有缓存时 HasCachedContent=true，正文保持。CultureChanged 只刷新日期和用户可见状态，不发网络请求。
 
-- [ ] **步骤 4：运行绿灯并提交**
+**步骤 4：运行绿灯并提交**
 
 运行步骤 2 命令，预期 PASS。勾选 OpenSpec 5.1、5.2：
 
@@ -764,7 +798,7 @@ git commit -m "实现正式版本历史状态模型"
 - DataContext 固定为 ReleaseNotesContentViewModel。
 - 唯一正文控件为 md:MarkdownRenderer MarkdownBuilder={Binding Markdown}；组件不包含网络、安装命令或外部 URL 逻辑。
 
-- [ ] **步骤 1：写 AXAML 契约红灯**
+**步骤 1：写 AXAML 契约红灯**
 
 ~~~csharp
 [Fact]
@@ -782,7 +816,7 @@ public void 共享视图使用LiveMarkdown且只有一个滚动正文区()
 
 预期：FAIL，文件不存在。
 
-- [ ] **步骤 2：实现视图**
+**步骤 2：实现视图**
 
 ~~~xml
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -804,7 +838,7 @@ public void 共享视图使用LiveMarkdown且只有一个滚动正文区()
 
 ReleaseNotesContentViewModel 明确定义 public bool HasContent => !IsEmpty；SetRelease 刷新 IsEmpty 时同时通知 HasContent，不新增转换器依赖。
 
-- [ ] **步骤 3：运行绿灯并提交**
+**步骤 3：运行绿灯并提交**
 
 运行步骤 1 命令，预期 PASS。勾选 OpenSpec 3.2：
 
@@ -828,7 +862,7 @@ git commit -m "提取共享更新说明视图"
 - 标题栏 Grid 从 *,42,42,42 改为 *,Auto,42,42,42；入口在最小化按钮左侧。
 - 浮窗绑定 Update.ReleaseNotesContent、进度和四类 Footer；Escape 与关闭按钮执行 DismissDialogCommand。
 
-- [ ] **步骤 1：写视图契约红灯**
+**步骤 1：写视图契约红灯**
 
 断言 MainWindow.axaml 含 ColumnDefinitions="*,Auto,42,42,42"、Update.IsUpdateEntryVisible、Update.UpdateEntryText、Update.ToggleDialogCommand、views:ReleaseNotesView；不再含 Update.CardVisible、Update.ReleaseNotesVisible、Update.OpenReleaseNotesCommand 或旧 TextBlock ReleaseNotes。断言 Footer 分别绑定 IsDownloading、IsVerifying、CanInstall、CanRetry；Toast border 仍存在且位于浮窗后方的独立层。
 
@@ -836,17 +870,17 @@ git commit -m "提取共享更新说明视图"
 
 预期：FAIL，旧卡片仍存在且标题栏列数不符。
 
-- [ ] **步骤 2：实现紧凑入口**
+**步骤 2：实现紧凑入口**
 
 入口按钮高度 32、最小命中区 32，默认只显示图标；内部文字 Width=0、Opacity=0，Button:pointerover 和 Button:focus 时 Width 展开到 220、Opacity=1，使用 DoubleTransition。背景按 IsReady、IsError 和准备中状态绑定现有 AccentSoftBrush、DangerSoftBrush、SurfaceMutedBrush；ToolTip.Tip 与 AutomationProperties.Name 均绑定 UpdateEntryText。
 
-- [ ] **步骤 3：实现单层浮窗**
+**步骤 3：实现单层浮窗**
 
 浮窗最大宽度 760、最大高度为窗口可用区，Header 显示版本、发布日期与状态；正文只放 ReleaseNotesView；Footer：Downloading 显示字节、速度、百分比和确定进度；Verifying 显示不确定进度；Ready 显示“稍后 / 重启并安装”；Error 显示安全摘要、“稍后 / 重试”。所有颜色使用 DynamicResource，遮罩不使用参考图黑金色。
 
 MainWindow.axaml.cs 在 Update.IsDialogVisible 变为 true 后通过 Dispatcher.UIThread.Post 聚焦主操作或关闭按钮；KeyDown 收到 Escape 时执行 DismissDialogCommand；现有 IsInsideButton 保证点击入口不会触发拖动。
 
-- [ ] **步骤 4：运行绿灯、勾选 4.1 至 4.4 并提交**
+**步骤 4：运行绿灯、勾选 4.1 至 4.4 并提交**
 
 运行步骤 1 命令，预期 PASS。
 
@@ -875,7 +909,7 @@ git commit -m "实现标题栏更新入口与更新浮窗"
 - SettingsViewModel 新增 int SelectedTabIndex 和 ReleaseHistoryViewModel ReleaseHistory。
 - SelectedTabIndex 切换到索引 1 时调用 ReleaseHistory.EnsureLoadedAsync；重复进入不重复请求。
 
-- [ ] **步骤 1：写设置页和本地化红灯**
+**步骤 1：写设置页和本地化红灯**
 
 SettingsViewContractTests 断言原 VersionLabel、AutoCheckUpdates、UseProxyForUpdates、CheckUpdateCommand 四项仍存在；TabControl 双向绑定 SelectedTabIndex；历史区包含 RefreshCommand、Releases、SelectedRelease、LoadMoreCommand、ReleaseNotesView 和加载/空/无缓存错误/有缓存错误状态。LocalizationNoCjkTest 将 UpdateCoordinator.cs、ReleaseHistoryViewModel.cs、ReleaseNotesContentViewModel.cs 纳入扫描。ResourceParity 继续要求 neutral、en-US、zh-TW 键完全一致，ja-JP 所有值非空。
 
@@ -887,17 +921,17 @@ dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "Ful
 
 预期：FAIL，历史分栏、选项卡生命周期和资源键不存在。
 
-- [ ] **步骤 2：实现设置页布局**
+**步骤 2：实现设置页布局**
 
 保留现有更新设置 panel；把自动检查提示改为“启动及每 24 小时检查，发现兼容版本后在后台下载并等待确认安装”。新增固定高度约 430 的 Release Notes panel：Header 为标题、非阻塞错误、刷新按钮；左列宽 200，ListBox 显示版本、日期、“最新/当前”徽标，底部加载更多；右列显示标题、日期和共享 ReleaseNotesView。首次加载、空态、无缓存错误覆盖整个阅读区；有缓存错误只显示 Header 提示。
 
-- [ ] **步骤 3：补齐资源和动态刷新**
+**步骤 3：补齐资源和动态刷新**
 
 新增键前缀：update.entry.*、update.dialog.*、update.progress.*、release.notes.empty、settings.update.history.*。四个 resx 都写非空值；en-US 与 zh-TW 占位符顺序与 neutral 完全一致。UpdateCoordinator 和 ReleaseHistoryViewModel 监听 CultureChanged 后重新计算状态、入口文案、日期和错误摘要，不缓存已格式化字符串。
 
 日志测试使用 RecordingLogger 断言消息不含 Release Body、测试 API Key、代理密码或响应正文；仅允许版本、页码、条数、阶段、字节数和耗时。
 
-- [ ] **步骤 4：运行绿灯并提交**
+**步骤 4：运行绿灯并提交**
 
 运行步骤 1 命令，再运行：dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateCoordinatorTests|FullyQualifiedName~ReleaseHistoryViewModelTests|FullyQualifiedName~UpdateServiceTests"
 
@@ -921,7 +955,7 @@ git commit -m "完善设置页版本历史与更新本地化"
 - 消费全部实现，不新增产品接口。
 - 产出测试、构建、OpenSpec、CUA、进程路径和发布文件完整性证据。
 
-- [ ] **步骤 1：运行定向与完整自动化验证**
+**步骤 1：运行定向与完整自动化验证**
 
 ~~~powershell
 dotnet test LoomX.Tests/LoomX.Tests.csproj -c Release --no-restore --filter "FullyQualifiedName~UpdateServiceTests|FullyQualifiedName~UpdateCoordinatorTests|FullyQualifiedName~ReleaseHistoryViewModelTests|FullyQualifiedName~ReleaseNotesContentViewModelTests|FullyQualifiedName~ReleaseNotesViewContractTests|FullyQualifiedName~UpdateExperienceContractTests|FullyQualifiedName~MainWindowChromeContractTests|FullyQualifiedName~SettingsViewContractTests|FullyQualifiedName~Localization"
@@ -933,7 +967,7 @@ git diff --check
 
 预期：所有测试 PASS；Build 0 error；OpenSpec 输出 change valid；git diff --check 无输出。出现任何失败先加载 systematic-debugging，写最小失败测试后修复，不以重跑掩盖问题。
 
-- [ ] **步骤 2：发布到唯一新目录**
+**步骤 2：发布到唯一新目录**
 
 ~~~powershell
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
@@ -946,13 +980,13 @@ if ($executables.Count -ne 1 -or $executables[0].Name -ne "LoomX.exe") { throw "
 
 预期：目录名符合 yyyyMMdd-HHmmss-enhance-update-experience，只包含一个 exe 入口 LoomX.exe，并保留 publish.log。不得删除或覆盖其他 outputs 子目录。
 
-- [ ] **步骤 3：用受控假 Release 启动验证模式**
+**步骤 3：用受控假 Release 启动验证模式**
 
 在 Debug 构建中增加仅由 LOOMX_UPDATE_PREVIEW 环境变量启用的测试接线，值固定支持 downloading、verifying、ready、error、history-empty；该接线只在 #if DEBUG 内创建 FakeUpdateService，Release 构建不包含预览分支。先用 Debug 预览逐态执行 CUA，再用 cua-driver launch_app 启动新发布目录的 LoomX.exe 做真实启动、设置页和进程路径冒烟。每次操作前后都调用 get_window_state，截图只包含 Loom-X 窗口。
 
 逐项验证：浅色、深色、关闭透明效果；标题栏默认紧凑、Hover 展开且不挤压窗口按钮；下载浮窗显示 Markdown、字节、速度、百分比并可稍后；校验态为不确定进度；Ready 仅显示稍后和重启并安装；Error 可重试；关闭后入口保留；设置页首次 10 条、最新/当前徽标、切换不请求、加载更多保留选择；空态和有/无缓存错误可读；普通 Toast 不与浮窗重叠。透明主题截图只作辅助，不单独判定配色。
 
-- [ ] **步骤 4：校验实际进程路径并写报告**
+**步骤 4：校验实际进程路径并写报告**
 
 ~~~powershell
 $expected = (Resolve-Path "$outputDir/LoomX.exe").Path
@@ -962,7 +996,7 @@ if (-not $process) { throw "未找到从发布目录启动的 LoomX 进程：$ex
 
 验证报告记录每条命令、结果、发布目录、进程路径、CUA 截图路径、主题结论、Context7 查询结果或降级原因，以及日志敏感信息检查结果。
 
-- [ ] **步骤 5：完成 Comet 任务边界并提交**
+**步骤 5：完成 Comet 任务边界并提交**
 
 勾选 OpenSpec 6.1 至 6.5，确认 tasks.md 的 22 项均为已完成；运行 git status --short，列出并保留无关 Session 产物。提交报告和任务状态：
 
@@ -979,3 +1013,23 @@ git commit -m "完成更新体验集成验证与发布"
 - **占位符扫描：** 未发现禁止占位词、延后实现表述或跨任务模糊引用；每个实现任务均给出文件、接口、红灯、绿灯、命令和中文提交消息。
 - **类型一致性：** IUpdateService、UpdateReleasePage、PreparedUpdate、UpdateDownloadProgress、UpdateStage、UpdateErrorKind、ReleaseNotesContentViewModel、ReleaseHistoryViewModel 的签名在生产接线、测试和视图任务中保持一致。
 - **流程边界：** Unity 不参与；Avalonia 资产不执行 Reimport；最终发布目录唯一且先验证不存在；CUA 只操作 Loom-X 窗口；正常退出仍由 desktop.Exit 完成。
+
+## 14. 归档前验收补充设计
+
+2026-09-21 的验收反馈扩大了更新体验的最终交付范围，以下内容覆盖此前“Ready 时重新打开 Release Notes 并直接安装”的交互：
+
+1. `updateDialogOverlay` 改为完整窗口覆盖层，遮罩固定 `#A6000000`，不进入 `WindowAppearanceCoordinator` 的透明度资源缩放。弹窗相对于完整窗口居中，不再为左侧导航栏保留 `228px` 偏移。
+2. 更新说明容器使用独立的 `ExperimentalAcrylicBorder` 材质；Avalonia 不支持 Acrylic 时使用高不透明度主题表面回退。磨砂材料只负责内容容器，外层遮罩始终固定纯黑 65%。
+3. `ReleaseNotesContentViewModel` 在完成安全清洗后，将三个约定的二级标题切分为独立 section。每个 section 持有自己的 `ObservableStringBuilder` 与默认 `IsExpanded = true`；旧正文没有约定标题时回退为单一兼容 section。
+4. 右上角关闭按钮替换为“前往发布页”，通过当前 `UpdateRelease.HtmlUrl` 打开 HTTPS 页面；关闭动作继续由 Footer 的“稍后”承担。
+5. Ready 状态下，标题栏入口和浮窗安装按钮统一调用应用内确认流程。确认流程由可复用 `AppModalHost` 提供，不创建独立 Window；正文明确提示应用重启、路由服务短暂中断和进行中请求可能失败。取消后保持 Ready，确认后才调用现有一次性安装命令。
+6. Inno Setup 桌面快捷方式从默认未勾选任务改为无条件创建，覆盖全新安装与升级。
+7. 使用真实 GitHub Release `v0.12.7` 的测试正文验证三段结构；正文只包含虚构的安全测试信息，不包含敏感信息。
+
+### 14.1 补充测试顺序
+
+1. 先补 Release Notes 分段、默认展开、旧正文回退测试，并确认旧实现失败。
+2. 补主窗口固定遮罩、完整窗口居中、发布页按钮和 Acrylic 容器契约测试。
+3. 补 Ready 入口不再打开 Release Notes、确认/取消安装风险模态的协调器测试。
+4. 补安装器桌面快捷方式无条件创建的文本契约测试。
+5. 完成实现后运行相关测试、完整 Release 构建、透明/非透明 CUA 验证，并重新发布到可读时间目录。

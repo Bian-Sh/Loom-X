@@ -58,7 +58,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var toolNames = useResponsesEndpoint
-            ? BuildResponsesToolNameMap(request)
+            ? BuildResponsesToolNameMap(request.Tools)
             : new Dictionary<string, string>(StringComparer.Ordinal);
         var wireToOriginalToolNames = toolNames.ToDictionary(
             item => item.Value,
@@ -669,7 +669,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 var calls = new JsonArray();
                 foreach (var rawCall in message.ToolCalls)
                 {
-                    var call = ToolArgumentSafety.EnsureSafe(rawCall);
+                    var call = ToolCallProjection.EnsureSafe(rawCall);
                     calls.Add(new JsonObject
                     {
                         ["id"] = call.Id,
@@ -718,17 +718,14 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
         return payload;
     }
 
-    private static IReadOnlyDictionary<string, string> BuildResponsesToolNameMap(ModelRequest request)
+    private static IReadOnlyDictionary<string, string> BuildResponsesToolNameMap(
+        IReadOnlyCollection<ToolDefinition> tools)
     {
         var result = new Dictionary<string, string>(StringComparer.Ordinal);
         var usedNames = new HashSet<string>(StringComparer.Ordinal);
-        var toolNames = request.Tools.Select(tool => tool.Name)
-            .Concat(request.Messages.SelectMany(message => message.ToolCalls).Select(call => call.Name))
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(name => name, StringComparer.Ordinal);
-        foreach (var toolName in toolNames)
+        foreach (var tool in tools)
         {
-            var normalized = new string(toolName.Select(character =>
+            var normalized = new string(tool.Name.Select(character =>
                 character is >= 'a' and <= 'z'
                     or >= 'A' and <= 'Z'
                     or >= '0' and <= '9'
@@ -745,7 +742,7 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                 candidate = normalized[..Math.Min(normalized.Length, 64 - suffixText.Length)] + suffixText;
             }
 
-            result[toolName] = candidate;
+            result[tool.Name] = candidate;
         }
 
         return result;

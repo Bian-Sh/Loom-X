@@ -1,44 +1,77 @@
 <ResourceDictionary xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <!-- 玻璃拟态配置：调整透明度时优先修改 Alpha 通道，保持色相与层级不变。 -->
-  <!-- 透明度基线：Glass 72%，GlassStrong 82%，Surface 78%，SurfaceSubtle 64%。 -->
-  <!-- 磨砂方案：窗口使用 AcrylicBlur，下面的 fallback 色保证不支持 Acrylic 的环境仍有冷灰蓝材质。 -->
-  <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#E6D5E4E9" />
-  <SolidColorBrush x:Key="GlassBrush" Color="#B8DCE7EC" />
-  <SolidColorBrush x:Key="GlassStrongBrush" Color="#D0F2F7F8" />
-  <SolidColorBrush x:Key="SurfaceBrush" Color="#C7F8FAFB" />
-  <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#A4EDF3F5" />
-  <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#80C9D9DE" />
-  <SolidColorBrush x:Key="NavigationHoverBrush" Color="#D6F4F8F8" />
-  <SolidColorBrush x:Key="DialogBackgroundBrush" Color="#E8F8FAFB" />
-  <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#E0F2F7F8" />
-  <SolidColorBrush x:Key="BorderBrush" Color="#8094A6AB" />
-  <SolidColorBrush x:Key="BorderStrongBrush" Color="#A0A5B9BD" />
-  <!-- 极淡描边：给组合输入区这类“只勾个轮廓、不抢内容”的容器用。 -->
-  <SolidColorBrush x:Key="BorderSoftBrush" Color="#4D94A6AB" />
-  <!-- 聚焦态极淡描边：色相取自品牌色，透明度压到与 BorderSoftBrush 同量级，只作“被选中”的暗示。 -->
-  <SolidColorBrush x:Key="AccentBorderSoftBrush" Color="#66287C83" />
-
-  <!-- 语义色：用于状态、选中态和日志级别，不参与大面积背景。 -->
-  <SolidColorBrush x:Key="TextPrimaryBrush" Color="#172126" />
-  <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5F6D73" />
-  <SolidColorBrush x:Key="TextTertiaryBrush" Color="#8A969B" />
-  <SolidColorBrush x:Key="AccentBrush" Color="#287C83" />
-  <SolidColorBrush x:Key="AccentSoftBrush" Color="#DCEEEF" />
-  <SolidColorBrush x:Key="SuccessBrush" Color="#2D8666" />
-  <SolidColorBrush x:Key="SuccessSoftBrush" Color="#E8F4EE" />
-  <SolidColorBrush x:Key="SuccessBorderBrush" Color="#B8DCC8" />
-  <SolidColorBrush x:Key="WarningBrush" Color="#9A6B2B" />
-  <SolidColorBrush x:Key="WarningSoftBrush" Color="#FFF1D9" />
-  <SolidColorBrush x:Key="WarningBorderBrush" Color="#E6C98F" />
-  <SolidColorBrush x:Key="DangerBrush" Color="#A94E59" />
-  <SolidColorBrush x:Key="DangerSoftBrush" Color="#FBE8EC" />
-  <SolidColorBrush x:Key="DangerBorderBrush" Color="#E2B5BE" />
-  <!-- 异常消息使用独立阅读表面；中性正文颜色暂供预览，后续只需调整 token。 -->
-  <SolidColorBrush x:Key="DangerMessageSurfaceBrush" Color="#D9F8E8EB" />
-  <SolidColorBrush x:Key="DangerMessageBorderBrush" Color="#80C9949E" />
-  <SolidColorBrush x:Key="DangerMessageTextBrush" Color="#303639" />
-  <!-- Windows 标题栏关闭按钮使用系统语义红，避免悬停态与普通危险操作混淆。 -->
-  <SolidColorBrush x:Key="WindowCloseHoverBrush" Color="#E81123" />
-  <SolidColorBrush x:Key="WindowClosePressedBrush" Color="#C50F1F" />
-
+  <!-- 主题 token 按 Avalonia ThemeVariant 解析；透明度协调器只调整当前变体画刷的 Alpha。 -->
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#E6D5E4E9" />
+      <SolidColorBrush x:Key="GlassBrush" Color="#B8DCE7EC" />
+      <SolidColorBrush x:Key="GlassStrongBrush" Color="#D0F2F7F8" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#C7F8FAFB" />
+      <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#A4EDF3F5" />
+      <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#80C9D9DE" />
+      <SolidColorBrush x:Key="NavigationHoverBrush" Color="#D6F4F8F8" />
+      <SolidColorBrush x:Key="DialogBackgroundBrush" Color="#E8F8FAFB" />
+      <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#E0F2F7F8" />
+      <SolidColorBrush x:Key="BorderBrush" Color="#8094A6AB" />
+      <SolidColorBrush x:Key="BorderStrongBrush" Color="#A0A5B9BD" />
+      <SolidColorBrush x:Key="BorderSoftBrush" Color="#4D94A6AB" />
+      <SolidColorBrush x:Key="AccentBorderSoftBrush" Color="#66287C83" />
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#172126" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5F6D73" />
+      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#8A969B" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#287C83" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="#DCEEEF" />
+      <SolidColorBrush x:Key="UpdateEntryActiveBrush" Color="#FF5FB8EA" />
+      <SolidColorBrush x:Key="SuccessBrush" Color="#2D8666" />
+      <SolidColorBrush x:Key="SuccessSoftBrush" Color="#E8F4EE" />
+      <SolidColorBrush x:Key="SuccessBorderBrush" Color="#B8DCC8" />
+      <SolidColorBrush x:Key="WarningBrush" Color="#9A6B2B" />
+      <SolidColorBrush x:Key="WarningSoftBrush" Color="#FFF1D9" />
+      <SolidColorBrush x:Key="WarningBorderBrush" Color="#E6C98F" />
+      <SolidColorBrush x:Key="DangerBrush" Color="#A94E59" />
+      <SolidColorBrush x:Key="DangerSoftBrush" Color="#FBE8EC" />
+      <SolidColorBrush x:Key="DangerBorderBrush" Color="#E2B5BE" />
+      <SolidColorBrush x:Key="DangerMessageSurfaceBrush" Color="#D9F8E8EB" />
+      <SolidColorBrush x:Key="DangerMessageBorderBrush" Color="#80C9949E" />
+      <SolidColorBrush x:Key="DangerMessageTextBrush" Color="#303639" />
+      <SolidColorBrush x:Key="WindowCloseHoverBrush" Color="#E81123" />
+      <SolidColorBrush x:Key="WindowClosePressedBrush" Color="#C50F1F" />
+      <ExperimentalAcrylicMaterial x:Key="ReleaseNotesAcrylicMaterial" BackgroundSource="Digger" TintColor="#FFF8FAFB" TintOpacity="0.56" MaterialOpacity="0.78" FallbackColor="#F2F8FAFB" />
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#E6172226" />
+      <SolidColorBrush x:Key="GlassBrush" Color="#B81C2B31" />
+      <SolidColorBrush x:Key="GlassStrongBrush" Color="#D0213138" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#C725363D" />
+      <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#A42B3D44" />
+      <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#8035484F" />
+      <SolidColorBrush x:Key="NavigationHoverBrush" Color="#D62B4047" />
+      <SolidColorBrush x:Key="DialogBackgroundBrush" Color="#E825363D" />
+      <SolidColorBrush x:Key="PopupBackgroundBrush" Color="#E02B3D44" />
+      <SolidColorBrush x:Key="BorderBrush" Color="#806C8189" />
+      <SolidColorBrush x:Key="BorderStrongBrush" Color="#A080969E" />
+      <SolidColorBrush x:Key="BorderSoftBrush" Color="#4D6C8189" />
+      <SolidColorBrush x:Key="AccentBorderSoftBrush" Color="#6653A7AD" />
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F1F6F7" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#B7C4C8" />
+      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#819096" />
+      <SolidColorBrush x:Key="AccentBrush" Color="#53A7AD" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="#3A25474C" />
+      <SolidColorBrush x:Key="UpdateEntryActiveBrush" Color="#FF2F6FA3" />
+      <SolidColorBrush x:Key="SuccessBrush" Color="#66C69A" />
+      <SolidColorBrush x:Key="SuccessSoftBrush" Color="#3A1F4538" />
+      <SolidColorBrush x:Key="SuccessBorderBrush" Color="#A04A806A" />
+      <SolidColorBrush x:Key="WarningBrush" Color="#E0AD63" />
+      <SolidColorBrush x:Key="WarningSoftBrush" Color="#3A4C3821" />
+      <SolidColorBrush x:Key="WarningBorderBrush" Color="#A08C6839" />
+      <SolidColorBrush x:Key="DangerBrush" Color="#EA8893" />
+      <SolidColorBrush x:Key="DangerSoftBrush" Color="#3A512D35" />
+      <SolidColorBrush x:Key="DangerBorderBrush" Color="#A08D5660" />
+      <SolidColorBrush x:Key="DangerMessageSurfaceBrush" Color="#D92A3438" />
+      <SolidColorBrush x:Key="DangerMessageBorderBrush" Color="#807A5058" />
+      <SolidColorBrush x:Key="DangerMessageTextBrush" Color="#F1DADD" />
+      <SolidColorBrush x:Key="WindowCloseHoverBrush" Color="#E81123" />
+      <SolidColorBrush x:Key="WindowClosePressedBrush" Color="#C50F1F" />
+      <ExperimentalAcrylicMaterial x:Key="ReleaseNotesAcrylicMaterial" BackgroundSource="Digger" TintColor="#FF25363D" TintOpacity="0.56" MaterialOpacity="0.78" FallbackColor="#F225363D" />
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

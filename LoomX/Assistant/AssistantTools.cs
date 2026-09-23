@@ -22,7 +22,7 @@ public static class AssistantTools
     {
         "id", "label", "type", "is_required", "options", "default_option_id", "default_option_ids",
         "min_selections", "max_selections", "default_number", "min_number", "max_number", "step",
-        "default_text", "is_multiline", "allow_custom_input", "custom_input_placeholder", "max_length",
+        "default_text", "is_multiline", "max_length",
     };
     private static readonly HashSet<string> OptionProperties = new(StringComparer.Ordinal)
     {
@@ -37,7 +37,7 @@ public static class AssistantTools
         registry.Register(new ToolDefinition
         {
             Name = "assistant.ask_user",
-            Description = "通用 Human-in-the-loop 结构化交互，可直接用于测试、偏好收集、必要输入、歧义澄清和行动确认；fields 中每个字段独立分页。若用户要求在 single_select 或 multi_select 的选项下方同一页输入其他内容，只创建一个选择字段并设置 allow_custom_input=true，可同时设置 custom_input_placeholder 和 max_length；不要创建独立 text 字段。无需加载 Skill，无需 Browser Bridge 或 Chrome；不得用于索取密钥或认证信息。",
+            Description = "通用 Human-in-the-loop 结构化交互，可直接用于测试、偏好收集、必要输入、歧义澄清和行动确认；无需加载 Skill，无需 Browser Bridge 或 Chrome；不得用于索取密钥或认证信息。",
             ParametersSchema = CreateAskUserSchema(),
             RiskLevel = ToolRiskLevel.Read,
             SafeArgumentsProjector = CreateSafeArgumentsProjection,
@@ -99,9 +99,6 @@ public static class AssistantTools
                     ["type"] = type,
                     ["required"] = required,
                     ["option_count"] = field?["options"] is JsonArray options ? options.Count : 0,
-                    ["custom_input_allowed"] = field?["allow_custom_input"] is JsonValue customInputValue
-                        && customInputValue.TryGetValue<bool>(out var allowCustomInput)
-                        && allowCustomInput,
                 });
             }
         }
@@ -164,8 +161,6 @@ public static class AssistantTools
             OptionalNullableValue<decimal>(field, "step"),
             OptionalString(field, "default_text"),
             OptionalValue(field, "is_multiline", false),
-            OptionalValue(field, "allow_custom_input", false),
-            OptionalString(field, "custom_input_placeholder"),
             OptionalNullableValue<int>(field, "max_length"));
     }
 
@@ -499,23 +494,19 @@ public static class AssistantTools
 
     private static string SerializeResult(UserDecisionRequest request, UserDecisionResult result)
     {
+        var fields = request.Fields.ToDictionary(field => field.Id, StringComparer.Ordinal);
         var values = new JsonObject();
         foreach (var pair in result.Values)
         {
-            values[pair.Key] = JsonSerializer.SerializeToNode(pair.Value, OutputJsonOptions);
-        }
-
-        var customInputs = new JsonObject();
-        foreach (var pair in result.CustomInputs)
-        {
-            customInputs[pair.Key] = pair.Value;
+            values[pair.Key] = fields[pair.Key].Type == UserDecisionFieldType.Text
+                ? new JsonObject { ["provided"] = pair.Value is not null }
+                : JsonSerializer.SerializeToNode(pair.Value, OutputJsonOptions);
         }
 
         return new JsonObject
         {
             ["cancelled"] = result.Cancelled,
             ["values"] = values,
-            ["custom_inputs"] = customInputs,
         }.ToJsonString(OutputJsonOptions);
     }
 
@@ -532,7 +523,6 @@ public static class AssistantTools
             "allow_cancel": { "type": "boolean", "default": true },
             "fields": {
               "type": "array",
-              "description": "字段列表；每个字段独立分页。若要在单选或多选的选项下方同一页显示自由输入框，应在同一个选择字段设置 allow_custom_input=true，不要新增 text 字段。",
               "minItems": 1,
               "items": {
                 "type": "object",
@@ -566,9 +556,7 @@ public static class AssistantTools
                   "step": { "type": "number", "exclusiveMinimum": 0 },
                   "default_text": { "type": "string" },
                   "is_multiline": { "type": "boolean", "default": false },
-                  "allow_custom_input": { "type": "boolean", "default": false, "description": "仅用于 single_select 或 multi_select；为 true 时在选项下方同一页显示自由输入框。适用于其他选项、都不符合或我有其他想法等回答；不要新增 text 字段。" },
-                  "custom_input_placeholder": { "type": "string", "maxLength": 200, "description": "选择题同页自由输入框的 Watermark；仅在 allow_custom_input=true 时使用。" },
-                  "max_length": { "type": "integer", "minimum": 1, "maximum": 4000, "description": "text 字段或已启用 allow_custom_input 的选择字段之自由输入最大字符数；用户说输入框80字时应设置为80。" }
+                  "max_length": { "type": "integer", "minimum": 1, "maximum": 4000 }
                 },
                 "allOf": [
                   {

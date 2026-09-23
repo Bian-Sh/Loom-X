@@ -81,9 +81,54 @@ public sealed record UpdateCheckResult(string CurrentVersion, UpdateRelease? Lat
     public bool IsAvailable => Latest is not null;
 }
 
-public sealed record UpdateDownloadProgress(long Transferred, long Total, int Percent, long BytesPerSecond);
+public enum UpdatePreparationPhase
+{
+    Downloading,
+    Verifying
+}
 
-public sealed record UpdateInstallResult(string InstallerPath, string Version);
+public sealed record UpdateDownloadProgress(
+    long Transferred,
+    long Total,
+    int Percent,
+    long BytesPerSecond,
+    UpdatePreparationPhase Phase = UpdatePreparationPhase.Downloading);
+
+public sealed record PreparedUpdate(
+    string Version,
+    string InstallerPath,
+    DateTimeOffset VerifiedAt,
+    string Sha256,
+    long InstallerSize);
+
+public sealed class InvalidPreparedUpdateException(string message) : InvalidOperationException(message);
+
+public sealed record UpdateReleasePage(
+    IReadOnlyList<UpdateRelease> Items,
+    int Page,
+    int PageSize,
+    bool HasMore);
+
+public interface IUpdateService
+{
+    Task<UpdateCheckResult> CheckAsync(
+        UpdateProxySettings settings,
+        CancellationToken cancellationToken = default);
+
+    Task<UpdateReleasePage> GetStableReleasesAsync(
+        UpdateProxySettings settings,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<PreparedUpdate> PrepareUpdateAsync(
+        UpdateRelease release,
+        UpdateProxySettings settings,
+        IProgress<UpdateDownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    void LaunchInstaller(PreparedUpdate preparedUpdate);
+}
 
 public interface IUpdateInstallerLauncher
 {
@@ -135,10 +180,11 @@ public static class UpdateHttpClientFactory
     }
 }
 
-public sealed class UpdateService
+public sealed class UpdateService : IUpdateService
 {
     private const string Repository = "Bian-Sh/Loom-X";
-    private const string ApiUrl = "https://api.github.com/repos/Bian-Sh/Loom-X/releases?per_page=30";
+    private const string ApiUrl = "https://api.github.com/repos/Bian-Sh/Loom-X/releases";
+    private const int GitHubPageSize = 100;
     private const int MaxRedirects = 8;
     private static readonly HashSet<string> AllowedHosts = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -176,63 +222,194 @@ public sealed class UpdateService
         var startedAt = Stopwatch.GetTimestamp();
         try
         {
-            using var client = clientFactory(proxySettings);
-            using var response = await SendGetAsync(client, ApiUrl, cancellationToken);
-            var releases = await DeserializeReleasesAsync(response, cancellationToken);
+            var page = await GetStableReleasesAsync(proxySettings, 1, GitHubPageSize, cancellationToken);
             var current = AppVersion.TryParse(currentVersion, out var currentParsed) ? currentParsed : default;
-            var latest = releases
-                .Where(item => !item.Draft && !item.Prerelease)
-                .Select(MapRelease)
-                .Where(item => item is not null)
-                .Select(item => item!)
+            var latest = page.Items
+                .Where(item => item.InstallerAsset is not null && item.ChecksumAsset is not null)
                 .Where(item => AppVersion.TryParse(item.Version, out var parsed) && parsed.CompareTo(current) > 0)
-                .OrderByDescending(item => new StableVersion(
-                    int.Parse(item.Version.Split('.')[0]),
-                    int.Parse(item.Version.Split('.')[1]),
-                    int.Parse(item.Version.Split('.')[2])))
+                .OrderByDescending(item =>
+                {
+                    AppVersion.TryParse(item.Version, out var parsed);
+                    return parsed;
+                })
                 .FirstOrDefault();
 
-            logger.LogInformation("更新检查完成 {CurrentVersion} {LatestVersion} {ElapsedMs}ms", currentVersion, latest?.Version ?? "无", (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            logger.LogInformation(
+                "更新检查完成 {CurrentVersion} {LatestVersion} {ItemCount} {ElapsedMs}ms",
+                currentVersion,
+                latest?.Version ?? "无",
+                page.Items.Count,
+                (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
             return new UpdateCheckResult(currentVersion, latest);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            logger.LogWarning(exception, "更新检查失败 {CurrentVersion} {ElapsedMs}ms", currentVersion, (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+            var diagnostic = SafeUpdateDiagnosticException.Create(exception, "check");
+            logger.LogWarning(
+                diagnostic,
+                "更新检查失败 {CurrentVersion} {ElapsedMs}ms {ExceptionType} {HResult} {HttpStatusCode} {Stage}",
+                currentVersion,
+                (long)Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds,
+                diagnostic.OriginalExceptionType,
+                diagnostic.OriginalHResult,
+                diagnostic.HttpStatusCode,
+                diagnostic.Stage);
             throw;
         }
     }
 
-    public async Task<UpdateInstallResult> DownloadAndInstallAsync(
+    public async Task<UpdateReleasePage> GetStableReleasesAsync(
+        UpdateProxySettings settings,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
+        if (pageSize is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(pageSize));
+
+        var skip = (page - 1) * pageSize;
+        var required = skip + pageSize + 1;
+        var stable = new List<UpdateRelease>(required);
+        var rawPage = 1;
+        var hasNextRawPage = true;
+        using var client = clientFactory(settings);
+
+        while (stable.Count < required && hasNextRawPage)
+        {
+            var url = $"{ApiUrl}?per_page={GitHubPageSize}&page={rawPage}";
+            using var response = await SendGetAsync(client, url, cancellationToken);
+            var releases = await DeserializeReleasesAsync(response, cancellationToken);
+            stable.AddRange(releases
+                .Where(item => !item.Draft && !item.Prerelease)
+                .Select(MapRelease)
+                .OfType<UpdateRelease>());
+            hasNextRawPage = HasNextPage(response);
+            rawPage++;
+        }
+
+        var items = stable.Skip(skip).Take(pageSize).ToArray();
+        var hasMore = stable.Count > skip + items.Length || hasNextRawPage;
+        logger.LogInformation(
+            "正式版本历史拉取完成 {Page} {PageSize} {ItemCount} {HasMore}",
+            page, pageSize, items.Length, hasMore);
+        return new UpdateReleasePage(items, page, pageSize, hasMore);
+    }
+
+    public async Task<PreparedUpdate> PrepareUpdateAsync(
         UpdateRelease release,
-        UpdateProxySettings proxySettings,
+        UpdateProxySettings settings,
         IProgress<UpdateDownloadProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         if (release.InstallerAsset is null || release.ChecksumAsset is null)
             throw new InvalidOperationException("该版本缺少兼容的 LoomX 安装器或校验文件。");
 
-        Directory.CreateDirectory(tempRoot);
         var versionDirectory = Path.Combine(tempRoot, release.Version);
         Directory.CreateDirectory(versionDirectory);
         var installerPath = Path.Combine(versionDirectory, Path.GetFileName(release.InstallerAsset.Name));
         var checksumPath = Path.Combine(versionDirectory, Path.GetFileName(release.ChecksumAsset.Name));
+        var installerPartial = installerPath + ".partial";
+        var checksumPartial = checksumPath + ".partial";
 
+        if (File.Exists(installerPath) && File.Exists(checksumPath))
+        {
+            try
+            {
+                progress?.Report(new UpdateDownloadProgress(
+                    new FileInfo(installerPath).Length,
+                    new FileInfo(installerPath).Length,
+                    100,
+                    0,
+                    UpdatePreparationPhase.Verifying));
+                var sha256 = await VerifyChecksumAsync(installerPath, checksumPath, cancellationToken);
+                var installerSize = new FileInfo(installerPath).Length;
+                logger.LogInformation("更新包缓存校验完成 {Version} {Bytes}", release.Version, installerSize);
+                return new PreparedUpdate(release.Version, installerPath, DateTimeOffset.UtcNow, sha256, installerSize);
+            }
+            catch (InvalidOperationException)
+            {
+                TryDelete(installerPath);
+                TryDelete(checksumPath);
+            }
+        }
+
+        TryDelete(installerPartial);
+        TryDelete(checksumPartial);
         try
         {
-            using var client = clientFactory(proxySettings);
-            await DownloadFileAsync(client, release.InstallerAsset.Url, installerPath, progress, cancellationToken);
-            await DownloadFileAsync(client, release.ChecksumAsset.Url, checksumPath, null, cancellationToken);
-            await VerifyChecksumAsync(installerPath, checksumPath, cancellationToken);
-            logger.LogInformation("更新包校验完成 {Version} {Bytes}", release.Version, new FileInfo(installerPath).Length);
-            installerLauncher.Launch(installerPath);
-            logger.LogInformation("更新安装器已启动 {Version}", release.Version);
-            return new UpdateInstallResult(installerPath, release.Version);
+            using var client = clientFactory(settings);
+            await DownloadFileAsync(client, release.InstallerAsset.Url, installerPartial, progress, cancellationToken);
+            await DownloadFileAsync(client, release.ChecksumAsset.Url, checksumPartial, null, cancellationToken);
+            progress?.Report(new UpdateDownloadProgress(
+                new FileInfo(installerPartial).Length,
+                new FileInfo(installerPartial).Length,
+                100,
+                0,
+                UpdatePreparationPhase.Verifying));
+            var sha256 = await VerifyChecksumAsync(installerPartial, checksumPartial, cancellationToken);
+            File.Move(installerPartial, installerPath, true);
+            File.Move(checksumPartial, checksumPath, true);
+            var installerSize = new FileInfo(installerPath).Length;
+            logger.LogInformation("更新包校验完成 {Version} {Bytes}", release.Version, installerSize);
+            return new PreparedUpdate(release.Version, installerPath, DateTimeOffset.UtcNow, sha256, installerSize);
         }
         catch
         {
             TryDelete(installerPath);
             TryDelete(checksumPath);
+            TryDelete(installerPartial);
+            TryDelete(checksumPartial);
             throw;
+        }
+    }
+
+    public void LaunchInstaller(PreparedUpdate preparedUpdate)
+    {
+        ArgumentNullException.ThrowIfNull(preparedUpdate);
+        try
+        {
+            if (string.IsNullOrWhiteSpace(preparedUpdate.Version)
+                || string.IsNullOrWhiteSpace(preparedUpdate.InstallerPath)
+                || preparedUpdate.InstallerSize < 0
+                || !TryParseSha256(preparedUpdate.Sha256, out var expectedSha256)
+                || !File.Exists(preparedUpdate.InstallerPath))
+                throw new InvalidPreparedUpdateException("已验证更新包不可用，请重新下载。");
+
+            using var stream = new FileStream(
+                preparedUpdate.InstallerPath,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read,
+                81920,
+                FileOptions.SequentialScan);
+            if (stream.Length != preparedUpdate.InstallerSize)
+                throw new InvalidPreparedUpdateException("已验证更新包已发生变化，请重新下载。");
+
+            var actualSha256 = SHA256.HashData(stream);
+            if (!CryptographicOperations.FixedTimeEquals(actualSha256, expectedSha256))
+                throw new InvalidPreparedUpdateException("已验证更新包已发生变化，请重新下载。");
+        }
+        catch (InvalidPreparedUpdateException)
+        {
+            InvalidatePreparedUpdate(preparedUpdate);
+            logger.LogWarning("更新安装器启动前身份复验失败 {Version}", preparedUpdate.Version);
+            throw;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            InvalidatePreparedUpdate(preparedUpdate);
+            logger.LogWarning("更新安装器启动前无法读取 {Version} {ExceptionType}", preparedUpdate.Version, exception.GetType().Name);
+            throw new InvalidPreparedUpdateException("已验证更新包不可用，请重新下载。");
+        }
+
+        installerLauncher.Launch(preparedUpdate.InstallerPath);
+        try
+        {
+            logger.LogInformation("更新安装器已启动 {Version}", preparedUpdate.Version);
+        }
+        catch
+        {
+            // 安装器已启动后，日志失败不得改变调用结果或诱发重复启动。
         }
     }
 
@@ -259,7 +436,7 @@ public sealed class UpdateService
         progress?.Report(new UpdateDownloadProgress(transferred, total, 100, (long)(transferred / Math.Max(Stopwatch.GetElapsedTime(startedAt).TotalSeconds, 0.001))));
     }
 
-    private static async Task VerifyChecksumAsync(string installerPath, string checksumPath, CancellationToken cancellationToken)
+    private static async Task<string> VerifyChecksumAsync(string installerPath, string checksumPath, CancellationToken cancellationToken)
     {
         var text = await File.ReadAllTextAsync(checksumPath, cancellationToken);
         var match = ChecksumRegex.Match(text);
@@ -268,6 +445,28 @@ public sealed class UpdateService
         var actual = Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
         if (!string.Equals(actual, match.Value, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("更新包 SHA-256 校验失败。");
+        return actual;
+    }
+
+    private static bool TryParseSha256(string value, out byte[] sha256)
+    {
+        sha256 = [];
+        if (string.IsNullOrWhiteSpace(value) || value.Length != 64) return false;
+        try
+        {
+            sha256 = Convert.FromHexString(value);
+            return sha256.Length == 32;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static void InvalidatePreparedUpdate(PreparedUpdate preparedUpdate)
+    {
+        TryDelete(preparedUpdate.InstallerPath);
+        TryDelete(preparedUpdate.InstallerPath + ".sha256");
     }
 
     private static async Task<HttpResponseMessage> SendGetAsync(HttpClient client, string rawUrl, CancellationToken cancellationToken)
@@ -307,6 +506,11 @@ public sealed class UpdateService
             || !AllowedHosts.Contains(uri.Host))
             throw new InvalidOperationException("更新下载地址不受信任。");
     }
+
+    private static bool HasNextPage(HttpResponseMessage response) =>
+        response.Headers.TryGetValues("Link", out var values)
+        && values.SelectMany(value => value.Split(','))
+            .Any(part => part.Contains("rel=\"next\"", StringComparison.OrdinalIgnoreCase));
 
     private static async Task<IReadOnlyList<GitHubRelease>> DeserializeReleasesAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {

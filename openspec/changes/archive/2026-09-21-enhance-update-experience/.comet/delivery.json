@@ -1,0 +1,9 @@
+{
+  "action": "push",
+  "targetBranch": "codex/merge-structured-config-assistant-decisions",
+  "remote": "origin",
+  "schemaVersion": 1,
+  "changeIdentity": "run:51e487bc-6d5a-46f1-82cd-2365360e975d",
+  "authorizationId": "3392fc6e-4707-4b8d-978c-759f9a3839d0",
+  "authorizedRemoteUrl": "https://github.com/Bian-Sh/Loom-X.git"
+}

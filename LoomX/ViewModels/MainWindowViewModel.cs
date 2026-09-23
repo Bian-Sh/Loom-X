@@ -28,12 +28,15 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     private readonly ConsoleViewModel consoleViewModel;
     private readonly SettingsViewModel settingsViewModel;
     private readonly OverviewViewModel overviewViewModel;
+    private readonly PluginsViewModel pluginsViewModel;
     private readonly ProvidersViewModel providersViewModel;
     private readonly GatewayViewModel gatewayViewModel;
     private readonly ActivityViewModel activityViewModel;
     private readonly AssistantViewModel assistantViewModel;
     private readonly UpdateCoordinator updateCoordinator;
+    private readonly ReleaseHistoryViewModel releaseHistoryViewModel;
     private readonly Action<bool, int, int, string>? applyAppearance;
+    private readonly Action<string>? applyTheme;
     private readonly IStringLocalizer<MainWindowViewModel> _loc;
     private object currentView;
     private string currentViewKey = "nav.overview";
@@ -41,6 +44,9 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     private double selectedNavigationOffset;
     private bool hasActiveNavigationItem;
     private bool disposed;
+#if DEBUG
+    private readonly bool updatePreviewEnabled;
+#endif
 
     public ObservableCollection<NavigationItemViewModel> NavigationItems { get; }
     public object CurrentView => currentView;
@@ -71,7 +77,10 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         Action<bool, int, int, string>? applyAppearance = null,
         AppDataStore? dataStore = null,
         IStringLocalizer<MainWindowViewModel>? localizer = null,
-        AssistantViewModel? assistantViewModel = null)
+        AssistantViewModel? assistantViewModel = null,
+        Action? requestApplicationExit = null,
+        Func<Task<bool>>? confirmUpdateInstall = null,
+        Action<string>? applyTheme = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
@@ -79,9 +88,14 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         var ownedConfigService = configService ?? new ConfigSnapshotService(this.loggerFactory.CreateLogger<ConfigSnapshotService>());
         this.dataStore = dataStore ?? new AppDataStore(ownedConfigService, gatewayService, this.loggerFactory.CreateLogger<AppDataStore>());
         this.applyAppearance = applyAppearance;
+        this.applyTheme = applyTheme;
         _loc = localizer ?? LocalizerFactory.Create<MainWindowViewModel>();
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService, logger: this.loggerFactory.CreateLogger<ConsoleViewModel>());
         overviewViewModel = new OverviewViewModel(gatewayService, this.dataStore, this.loggerFactory.CreateLogger<MainWindowViewModel>());
+        pluginsViewModel = new PluginsViewModel(
+            gatewayService,
+            this.toastService,
+            this.loggerFactory.CreateLogger<PluginsViewModel>());
         providersViewModel = new ProvidersViewModel(
             this.dataStore,
             this.toastService,
@@ -90,8 +104,24 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
         activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
         this.assistantViewModel = assistantViewModel ?? new AssistantViewModel(gatewayService, this.loggerFactory, this.toastService);
-        updateCoordinator = new UpdateCoordinator(this.dataStore, logger: this.loggerFactory.CreateLogger<UpdateCoordinator>());
-        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, localizer: LocalizerFactory.Create<SettingsViewModel>());
+        IUpdateService updateService = new UpdateService(
+            logger: this.loggerFactory.CreateLogger<UpdateService>(),
+            currentVersion: AppVersion.Current);
+#if DEBUG
+        updateService = DebugUpdatePreviewService.CreateFromEnvironment(updateService);
+        updatePreviewEnabled = updateService is DebugUpdatePreviewService;
+#endif
+        updateCoordinator = new UpdateCoordinator(
+            this.dataStore,
+            updateService,
+            this.loggerFactory.CreateLogger<UpdateCoordinator>(),
+            requestApplicationExit,
+            confirmUpdateInstall);
+        releaseHistoryViewModel = new ReleaseHistoryViewModel(
+            updateService,
+            this.dataStore.GetUpdateProxySettingsAsync,
+            this.loggerFactory.CreateLogger<ReleaseHistoryViewModel>());
+        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, releaseHistory: releaseHistoryViewModel, localizer: LocalizerFactory.Create<SettingsViewModel>(), applyTheme: this.applyTheme);
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
         NavigationItems = new([
             new("nav.overview", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
@@ -99,6 +129,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             new("nav.gateway", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
             new("nav.providers", "M 7,8 L 25,8 M 7,16 L 25,16 M 7,24 L 25,24 M 4,8 L 4,8 M 4,16 L 4,16 M 4,24 L 4,24", () => ShowProviders()),
             new("nav.activity", "M 7,28 L 7,5 M 8,6 C 13,4 18,8 25,6 L 25,18 C 18,20 13,16 8,18", () => ShowActivity()),
+            new("nav.plugins", "M 8,13 L 13,13 L 13,8 L 19,8 L 19,13 L 24,13 L 24,19 L 19,19 L 19,24 L 13,24 L 13,19 L 8,19 Z", () => ShowPlugins()),
             new("nav.console", "M 5,6 L 27,6 L 27,26 L 5,26 Z M 9,12 L 13,16 L 9,20 M 16,20 L 23,20", () => ShowConsole()),
             new("nav.settings", "M 16,4 L 18,7 L 22,8 L 25,6 L 28,9 L 26,12 L 27,16 L 30,18 L 28,22 L 24,21 L 21,24 L 21,28 L 16,29 L 14,25 L 10,24 L 7,26 L 4,22 L 6,19 L 5,15 L 2,13 L 4,8 L 8,9 L 11,6 L 11,3 Z M 16,12 A 4,4 0 1,0 16,20 A 4,4 0 1,0 16,12 Z", () => ShowSettings())
         ]);
@@ -152,6 +183,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     }
 
     private void ShowOverview() => ShowView("nav.overview", overviewViewModel);
+    private void ShowPlugins() => ShowView("nav.plugins", pluginsViewModel);
     private void ShowAssistant() => ShowView("nav.assistant", assistantViewModel);
     private void ShowProviders() => ShowView("nav.providers", providersViewModel);
     private void ShowGateway() => ShowView("nav.gateway", gatewayViewModel);
@@ -175,10 +207,14 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             if (dataStore.Settings is { } settings)
             {
                 LocaleService.SetCulture(settings.Language);
+                applyTheme?.Invoke(settings.Theme);
                 applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
             }
             ShowOverview();
             updateCoordinator.Start();
+#if DEBUG
+            if (updatePreviewEnabled) _ = updateCoordinator.CheckNowAsync();
+#endif
         }
         if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
     }
@@ -203,7 +239,10 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         void Apply()
         {
             if (dataStore.Settings is { } settings)
+            {
+                applyTheme?.Invoke(settings.Theme);
                 applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
+            }
         }
         if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
     }
@@ -243,11 +282,13 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         gatewayService.StateChanged -= OnGatewayStateChanged;
         LocaleService.CultureChanged -= OnCultureChanged;
         overviewViewModel.Dispose();
+        pluginsViewModel.Dispose();
         providersViewModel.Dispose();
         gatewayViewModel.Dispose();
         activityViewModel.Dispose();
         assistantViewModel.Dispose();
         settingsViewModel.Dispose();
+        releaseHistoryViewModel.Dispose();
         updateCoordinator.Dispose();
         consoleViewModel.Dispose();
         dataStore.Dispose();
@@ -1741,10 +1782,11 @@ public sealed class ProviderEditorViewModel : NotifyViewModel
     private bool suppressDirtyTracking;
     private bool suppressCliIdentityVersionChange;
     public string BusinessId { get => businessId; set => SetProperty(ref businessId, value); } public string DisplayName { get => displayName; set => SetProperty(ref displayName, value); } public string BaseUrl { get => baseUrl; set => SetProperty(ref baseUrl, value); } public string ModelListUrl { get => modelListUrl; set => SetProperty(ref modelListUrl, value); }
-    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); OnPropertyChanged(nameof(SelectedCompatibility)); UpdateCliIdentityRecommendations(); } }
-    public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); OnPropertyChanged(nameof(SelectedCompatibility)); } }
+    public string ApiMode { get => apiMode; set { if (!SetProperty(ref apiMode, value)) return; OnPropertyChanged(nameof(IsEndpointFormatVisible)); OnPropertyChanged(nameof(SelectedCompatibility)); OnPropertyChanged(nameof(CompatibilityTypeLine)); UpdateCliIdentityRecommendations(); } }
+    public string EndpointFormat { get => endpointFormat; set { var normalized = EndpointFormatOption.Normalize(value); if (!SetProperty(ref endpointFormat, normalized)) return; OnPropertyChanged(nameof(SelectedEndpointFormat)); OnPropertyChanged(nameof(SelectedCompatibility)); OnPropertyChanged(nameof(CompatibilityTypeLine)); } }
     public IReadOnlyList<ProviderCompatibilityOption> CompatibilityOptions { get; } = ProviderCompatibilityOption.All;
     public ProviderCompatibilityOption SelectedCompatibility { get => ProviderCompatibilityOption.FromFields(ApiMode, EndpointFormat); set => value?.ApplyTo(this); }
+    public string CompatibilityTypeLine => string.Format(CultureInfo.CurrentCulture, ResourceLookup.Resolve("providers.models.sort.toggle.currenttype"), ResourceLookup.Resolve(SelectedCompatibility.TitleKey));
     public IReadOnlyList<EndpointFormatOption> EndpointFormatOptions { get; } = EndpointFormatOption.All;
     public EndpointFormatOption SelectedEndpointFormat { get => EndpointFormatOption.FromValue(EndpointFormat); set { if (value is not null) EndpointFormat = value.Value; } }
     public bool IsEndpointFormatVisible => string.Equals(ApiMode, "openai", StringComparison.OrdinalIgnoreCase);

@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:vm="using:LoomX.ViewModels" xmlns:views="using:LoomX.Views" x:Class="LoomX.App">
   <Application.DataTemplates>
     <DataTemplate DataType="{x:Type vm:OverviewViewModel}"><views:OverviewView /></DataTemplate>
+    <DataTemplate DataType="{x:Type vm:PluginsViewModel}"><views:PluginsView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:ProvidersViewModel}"><views:ProvidersView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:ConsoleViewModel}"><views:ConsoleView /></DataTemplate>
     <DataTemplate DataType="{x:Type vm:ActivityViewModel}"><views:ActivityView /></DataTemplate>
@@ -114,6 +115,17 @@
     <Style Selector="Button.primary:disabled">
       <Setter Property="Opacity" Value="0.45" />
     </Style>
+    <!-- 图标按钮：无背景无边框，hover/pressed 才出底；网关与提供商等页面共用 -->
+    <Style Selector="Button.icon">
+      <Setter Property="Width" Value="34" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
     <Style Selector="TextBox, ComboBox, NumericUpDown">
       <Setter Property="MinHeight" Value="36" />
       <Setter Property="Padding" Value="10,7" />
@@ -168,6 +180,14 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
+    <Style Selector="ListBox.selection-rail-list"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
+    <Style Selector="ListBox.selection-rail-list ListBoxItem"><Setter Property="Background" Value="Transparent"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0,0,0,6"/></Style>
+    <Style Selector="Border.selection-rail-card"><Setter Property="Background" Value="{DynamicResource SurfaceSubtleBrush}"/><Setter Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}"/><Setter Property="BorderThickness" Value="0,0,0,1"/></Style>
+    <Style Selector="ListBox.selection-rail-list ListBoxItem:pointerover Border.selection-rail-card"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/></Style>
+    <Style Selector="ListBox.selection-rail-list ListBoxItem:selected:pointerover Border.selection-rail-card"><Setter Property="Background" Value="{DynamicResource SurfaceMutedBrush}"/></Style>
+    <Style Selector="ListBox.selection-rail-list ListBoxItem:selected"><Setter Property="Background" Value="Transparent"/><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="BorderThickness" Value="3,0,0,0"/></Style>
+    <Style Selector="ListBox.selection-rail-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
+    <Style Selector="ListBox.selection-rail-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter"><Setter Property="Background" Value="Transparent"/><Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/></Style>
     <Style Selector="ListBoxItem:pointerover">
       <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}" />
     </Style>

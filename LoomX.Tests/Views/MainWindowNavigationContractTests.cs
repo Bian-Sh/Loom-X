@@ -14,6 +14,7 @@ public sealed class MainWindowNavigationContractTests
         foreach (var field in new[]
         {
             "private readonly OverviewViewModel overviewViewModel;",
+            "private readonly PluginsViewModel pluginsViewModel;",
             "private readonly ProvidersViewModel providersViewModel;",
             "private readonly GatewayViewModel gatewayViewModel;",
             "private readonly ActivityViewModel activityViewModel;",
@@ -23,6 +24,7 @@ public sealed class MainWindowNavigationContractTests
             Assert.Contains(field, source, StringComparison.Ordinal);
 
         Assert.Contains("overviewViewModel = new OverviewViewModel", source, StringComparison.Ordinal);
+        Assert.Contains("pluginsViewModel = new PluginsViewModel", source, StringComparison.Ordinal);
         Assert.Contains("providersViewModel = new ProvidersViewModel", source, StringComparison.Ordinal);
         Assert.Contains("gatewayViewModel = new GatewayViewModel", source, StringComparison.Ordinal);
         Assert.Contains("activityViewModel = new ActivityViewModel", source, StringComparison.Ordinal);
@@ -30,6 +32,7 @@ public sealed class MainWindowNavigationContractTests
         Assert.Contains("settingsViewModel = new SettingsViewModel", source, StringComparison.Ordinal);
 
         Assert.Contains("ShowView(\"nav.overview\", overviewViewModel)", source, StringComparison.Ordinal);
+        Assert.Contains("ShowView(\"nav.plugins\", pluginsViewModel)", source, StringComparison.Ordinal);
         Assert.Contains("ShowView(\"nav.providers\", providersViewModel)", source, StringComparison.Ordinal);
         Assert.Contains("ShowView(\"nav.gateway\", gatewayViewModel)", source, StringComparison.Ordinal);
         Assert.Contains("ShowView(\"nav.activity\", activityViewModel)", source, StringComparison.Ordinal);
@@ -40,6 +43,20 @@ public sealed class MainWindowNavigationContractTests
         Assert.Contains("Dispatcher.UIThread.Post(() => _ = RefreshAsync())", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void NavigationPlacesPluginsBelowActivityAndAboveConsole()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
+        var source = File.ReadAllText(path);
+        var navigationStart = source.IndexOf("NavigationItems = new([", StringComparison.Ordinal);
+        var navigationEnd = source.IndexOf("]);", navigationStart, StringComparison.Ordinal);
+        Assert.True(navigationStart >= 0);
+        Assert.True(navigationEnd > navigationStart);
+
+        var navigation = source[navigationStart..navigationEnd];
+        Assert.True(navigation.IndexOf("new(\"nav.activity\"", StringComparison.Ordinal) < navigation.IndexOf("new(\"nav.plugins\"", StringComparison.Ordinal));
+        Assert.True(navigation.IndexOf("new(\"nav.plugins\"", StringComparison.Ordinal) < navigation.IndexOf("new(\"nav.console\"", StringComparison.Ordinal));
+    }
     [Fact]
     public void NavigationUsesPersistentActiveStateAndAnimatedSharedSelection()
     {

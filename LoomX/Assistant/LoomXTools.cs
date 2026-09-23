@@ -8,7 +8,7 @@ namespace LoomX.Assistant;
 
 /// <summary>
 /// LoomX 工具组（loomx.* + skill.*）：小助手配置、诊断与连接能力的统一入口。
-/// 所有输出经过 SecretBoundary，绝不包含 API Key 明文。
+/// 配置 DTO 只暴露凭据是否已配置；工具结果中的意外凭据由统一 Pipeline 处理。
 /// </summary>
 public static class LoomXTools
 {
@@ -26,7 +26,6 @@ public static class LoomXTools
         IDatabaseConfigurationProvider configurationProvider,
         AssistantTester tester,
         SkillStore skillStore,
-        Browser.BrowserSecretVault? secretVault = null,
         GatewayStateHub? gatewayStateHub = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
@@ -36,7 +35,7 @@ public static class LoomXTools
         ArgumentNullException.ThrowIfNull(skillStore);
 
         RegisterStatusTools(registry, configuration, configurationProvider, gatewayStateHub);
-        RegisterProviderTools(registry, configuration, secretVault);
+        RegisterProviderTools(registry, configuration);
         RegisterModelTools(registry, configuration);
         RegisterComboTools(registry, configuration);
         RegisterEndpointTools(registry, configuration);
@@ -143,12 +142,12 @@ public static class LoomXTools
 
     // ---------- loomx.*_provider ----------
 
-    private static void RegisterProviderTools(ToolRegistry registry, ConfigurationManagementService configuration, Browser.BrowserSecretVault? secretVault)
+    private static void RegisterProviderTools(ToolRegistry registry, ConfigurationManagementService configuration)
     {
         registry.Register(new ToolDefinition
         {
             Name = "loomx.list_providers",
-            Description = "列出全部 Provider（含模型摘要）。API Key 只返回 secret_ref，不返回明文。",
+            Description = "列出全部 Provider（含模型摘要）。API Key 只返回是否已配置，不返回明文。",
             ParametersSchema = EmptyObjectSchema.DeepClone(),
             RiskLevel = ToolRiskLevel.Read,
             Handler = async (_, cancellationToken) => Ok(new JsonObject
@@ -173,14 +172,13 @@ public static class LoomXTools
         registry.Register(new ToolDefinition
         {
             Name = "loomx.create_provider",
-            Description = "创建 Provider。api_key 只会加密存入本地（DPAPI），不会回显；可用 api_key_secret_ref 引用浏览器收割的 Key。",
+            Description = "创建 Provider。api_key 只会加密存入本地（DPAPI），不会回显。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{
                   "business_id":{"type":"string"},"display_name":{"type":"string"},
                   "base_url":{"type":"string","description":"HTTP/HTTPS 绝对地址"},
                   "api_mode":{"type":"string","enum":["openai","anthropic","ollama"]},
                   "enabled":{"type":"boolean"},"api_key":{"type":"string"},
-                  "api_key_secret_ref":{"type":"string","description":"secret://browser/... 形式的引用"},
                   "use_proxy":{"type":"boolean"},"model_list_url":{"type":"string"},
                   "endpoint_format":{"type":"string","enum":["responses","chat_completions"]},
                   "headers":{"type":"object","description":"自定义请求头"}
@@ -189,7 +187,7 @@ public static class LoomXTools
             RiskLevel = ToolRiskLevel.Write,
             Handler = async (args, cancellationToken) => await GuardAsync(async () =>
             {
-                var provider = await configuration.CreateProviderAsync(ReadProviderInput(args, secretVault), cancellationToken);
+                var provider = await configuration.CreateProviderAsync(ReadProviderInput(args), cancellationToken);
                 return Ok(ToSafeJson(provider, includeModels: false));
             }),
         });
@@ -197,14 +195,13 @@ public static class LoomXTools
         registry.Register(new ToolDefinition
         {
             Name = "loomx.update_provider",
-            Description = "更新 Provider（整体替换语义）。clear_api_key=true 时清除已保存的 Key；可用 api_key_secret_ref 引用浏览器收割的 Key。",
+            Description = "更新 Provider（整体替换语义）。clear_api_key=true 时清除已保存的 Key。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{
                   "id":{"type":"string","description":"Provider Guid"},
                   "business_id":{"type":"string"},"display_name":{"type":"string"},
                   "base_url":{"type":"string"},"api_mode":{"type":"string","enum":["openai","anthropic","ollama"]},
                   "enabled":{"type":"boolean"},"api_key":{"type":"string"},"clear_api_key":{"type":"boolean"},
-                  "api_key_secret_ref":{"type":"string","description":"secret://browser/... 形式的引用"},
                   "use_proxy":{"type":"boolean"},"model_list_url":{"type":"string"},
                   "endpoint_format":{"type":"string","enum":["responses","chat_completions"]},
                   "headers":{"type":"object"}
@@ -213,7 +210,7 @@ public static class LoomXTools
             RiskLevel = ToolRiskLevel.Write,
             Handler = async (args, cancellationToken) => await GuardAsync(async () =>
             {
-                var provider = await configuration.UpdateProviderAsync(RequireGuid(args, "id"), ReadProviderInput(args, secretVault), cancellationToken);
+                var provider = await configuration.UpdateProviderAsync(RequireGuid(args, "id"), ReadProviderInput(args), cancellationToken);
                 return Ok(ToSafeJson(provider, includeModels: false));
             }),
         });
@@ -629,7 +626,7 @@ public static class LoomXTools
         });
     }
 
-    // ---------- 安全序列化（SecretBoundary 出口） ----------
+    // ---------- 配置摘要序列化（不读取凭据值） ----------
 
     private static JsonObject ToSafeJson(ProviderResponse provider, bool includeModels)
     {
@@ -645,7 +642,7 @@ public static class LoomXTools
             ["endpoint_format"] = provider.EndpointFormat,
             ["model_list_url"] = provider.ModelListUrl,
             ["model_count"] = provider.ModelCount,
-            ["api_key"] = SecretBoundary.Describe(provider.HasApiKey, SecretBoundary.ProviderApiKeyRef(provider.BusinessId)),
+            ["api_key_configured"] = provider.HasApiKey,
         };
         if (includeModels)
         {
@@ -670,7 +667,7 @@ public static class LoomXTools
         ["top_p"] = model.TopP is double topP ? JsonValue.Create(topP) : null,
         ["enabled"] = model.Enabled,
         ["sort_order"] = model.SortOrder,
-        ["api_key"] = SecretBoundary.Describe(model.HasApiKey, SecretBoundary.ModelApiKeyRef(model.Id)),
+        ["api_key_configured"] = model.HasApiKey,
     };
 
     private static JsonObject ToSafeJson(GatewayComboResponse combo) => new()
@@ -708,7 +705,7 @@ public static class LoomXTools
         ["public_path"] = endpoint.PublicPath,
         ["enabled"] = endpoint.Enabled,
         ["reasoning_effort"] = endpoint.ReasoningEffort,
-        ["api_key"] = SecretBoundary.Describe(!string.IsNullOrWhiteSpace(endpoint.ApiKey), SecretBoundary.EndpointApiKeyRef(endpoint.Key)),
+        ["api_key_configured"] = !string.IsNullOrWhiteSpace(endpoint.ApiKey),
         ["combos"] = new JsonArray(endpoint.Combos.Select(combo => (JsonNode?)new JsonObject
         {
             ["combo_id"] = JsonValue.Create(combo.ComboId),
@@ -721,19 +718,11 @@ public static class LoomXTools
 
     // ---------- 参数读取与错误处理 ----------
 
-    private static ProviderInput ReadProviderInput(JsonNode? args, Browser.BrowserSecretVault? secretVault = null)
+    private static ProviderInput ReadProviderInput(JsonNode? args)
     {
-        // api_key 直传（用户场景）；api_key_secret_ref 由浏览器收割入库后引用（中转站场景），
-        // 两种途径的明文都只在服务端内部流转，绝不回显到模型上下文。
+        // Provider 响应 Pipeline 会在工具调用解析前恢复本地签发的凭据 token，
+        // 因而 Handler 只需接收统一的 api_key 参数。
         var apiKey = GetString(args, "api_key");
-        var secretRef = GetString(args, "api_key_secret_ref");
-        if (apiKey is null && secretRef is not null)
-        {
-            if (secretVault is null || !secretVault.TryResolve(secretRef, out apiKey!))
-            {
-                throw new ArgumentException($"secret_ref 无法解析（不存在或已失效）：{secretRef}");
-            }
-        }
 
         return new ProviderInput(
             RequireString(args, "business_id"),

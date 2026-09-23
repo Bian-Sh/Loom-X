@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>LoomX Router 插件运行时：目录发现、Manifest 验证、AssemblyLoadContext 加载、Extension 注册、Pipeline 编排与异常隔离。</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\LoomX.Plugin.Abstractions\LoomX.Plugin.Abstractions.csproj" />
+    <InternalsVisibleTo Include="LoomX.Tests" />
+    <InternalsVisibleTo Include="LoomX.PluginPlayground" />
+  </ItemGroup>
+</Project>

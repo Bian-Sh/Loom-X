@@ -56,11 +56,6 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <TextBox Text="{Binding CustomInput, Mode=TwoWay}"
-                 Watermark="{Binding CustomInputPlaceholder}"
-                 MaxLength="{Binding CustomInputMaxLength}"
-                 IsVisible="{Binding AllowsCustomInput}"
-                 KeyDown="SelectionCustomInput_OnKeyDown"/>
         <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap"/>
       </StackPanel>
     </DataTemplate>
@@ -81,11 +76,6 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <TextBox Text="{Binding CustomInput, Mode=TwoWay}"
-                 Watermark="{Binding CustomInputPlaceholder}"
-                 MaxLength="{Binding CustomInputMaxLength}"
-                 IsVisible="{Binding AllowsCustomInput}"
-                 KeyDown="SelectionCustomInput_OnKeyDown"/>
         <TextBlock Text="{Binding ErrorMessage}" IsVisible="{Binding HasError}" Foreground="{DynamicResource DangerBrush}" FontSize="12" TextWrapping="Wrap"/>
       </StackPanel>
     </DataTemplate>

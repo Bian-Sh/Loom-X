@@ -62,6 +62,12 @@ public sealed class WindowAppearanceCoordinator
         AppearanceChanged?.Invoke(this, new WindowAppearanceChangedEventArgs(Current));
     }
 
+    public void RefreshThemeResources()
+    {
+        baseBrushColors.Clear();
+        Apply(Current.Enabled, Current.Opacity, Current.BlurAmount, Current.Algorithm);
+    }
+
     public void ApplyTo(Window window)
     {
         ApplyWindow(window);

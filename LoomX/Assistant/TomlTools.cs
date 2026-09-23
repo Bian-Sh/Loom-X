@@ -50,7 +50,7 @@ public static class TomlTools
                     ["exists"] = result.Exists,
                     ["is_valid"] = result.IsValid,
                     ["top_level_keys"] = new JsonArray(result.TopLevelKeys
-                        .Select(key => SensitiveKeyPolicy.IsSensitivePath([key]) ? SensitiveKeyPlaceholder : key)
+                        .Select(key => AssistantContentPolicy.IsSensitivePath([key]) ? SensitiveKeyPlaceholder : key)
                         .Select(key => (JsonNode?)JsonValue.Create(key))
                         .ToArray()),
                 });
@@ -84,7 +84,7 @@ public static class TomlTools
                     return Fail("toml_get_failed", "无法读取 TOML 路径。");
                 }
 
-                var value = SensitiveKeyPolicy.Redact(result.Value, keyPath.Segments);
+                var value = AssistantContentPolicy.Redact(result.Value, keyPath.Segments);
                 return Ok(new JsonObject
                 {
                     ["found"] = true,
@@ -181,7 +181,7 @@ public static class TomlTools
             var fileName = Path.GetFileName(path);
             projection["file"] = new JsonObject
             {
-                ["name"] = SensitiveKeyPolicy.ContainsSensitiveContent(fileName) ? "[hidden]" : fileName,
+                ["name"] = AssistantContentPolicy.ContainsSensitiveContent(fileName) ? "[hidden]" : fileName,
                 ["path_sha256"] = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(path))),
             };
         }
@@ -559,7 +559,7 @@ public static class TomlTools
         foreach (var property in (IReadOnlyDictionary<string, TomlValue>)value.Value)
         {
             var childPath = path.Concat([property.Key]).ToArray();
-            if (!SensitiveKeyPolicy.IsSensitivePath(childPath))
+            if (!AssistantContentPolicy.IsSensitivePath(childPath))
             {
                 json[property.Key] = ToSafeJsonNode(property.Value, childPath);
             }

@@ -189,16 +189,13 @@ public sealed class AssistantTesterTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task TestEndpoint_ApiKeyOnlyExposesSecretRef()
+    public async Task TestEndpoint_ApiKeyOnlyExposesConfiguredState()
     {
         var result = await CreateTester().TestEndpointAsync("openai", CancellationToken.None);
 
-        var apiKey = result["api_key"]!.AsObject();
-        var configured = apiKey["configured"]!.GetValue<bool>();
-        Assert.Equal(configured, apiKey["secret_ref"] is not null);
-        if (configured)
-        {
-            Assert.StartsWith("secret://endpoint/openai/", apiKey["secret_ref"]!.GetValue<string>());
-        }
+        Assert.NotNull(result["api_key_configured"]);
+        _ = result["api_key_configured"]!.GetValue<bool>();
+        Assert.Null(result["api_key"]);
+        Assert.DoesNotContain("secret://", result.ToJsonString(), StringComparison.Ordinal);
     }
 }

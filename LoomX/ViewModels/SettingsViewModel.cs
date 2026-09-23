@@ -48,8 +48,10 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private readonly ToastService toastService;
     private readonly UpdateCoordinator updateCoordinator;
     private readonly bool ownsUpdateCoordinator;
+    private readonly bool ownsReleaseHistory;
     private readonly ILogger<SettingsViewModel> logger;
     private readonly Action<bool, int, int, string>? applyAppearance;
+    private readonly Action<string>? applyTheme;
     private readonly IStringLocalizer<SettingsViewModel> _loc;
     private SettingOption selectedLanguage = LanguageOptions[0];
     private SettingOption selectedTheme = ThemeOptions[0];
@@ -71,6 +73,8 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private string status;
     private bool hasProxyPassword;
     private bool suppressAutoSave;
+    private bool releaseHistoryLoadRequested;
+    private int selectedTabIndex;
     private readonly SemaphoreSlim saveLock = new(1, 1);
     private readonly object saveScheduleLock = new();
     private CancellationTokenSource? saveDebounceCancellation;
@@ -96,7 +100,16 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             SaveAfterEdit();
         }
     }
-    public SettingOption SelectedTheme { get => selectedTheme; set { if (SetProperty(ref selectedTheme, value)) SaveAfterEdit(); } }
+    public SettingOption SelectedTheme
+    {
+        get => selectedTheme;
+        set
+        {
+            if (!SetProperty(ref selectedTheme, value)) return;
+            if (!suppressAutoSave) ApplyThemePreview();
+            SaveAfterEdit();
+        }
+    }
     public SettingOption SelectedProxyMode
     {
         get => selectedProxyMode;
@@ -126,6 +139,17 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public bool IsBusy { get => isBusy; private set { if (SetProperty(ref isBusy, value)) { OnPropertyChanged(nameof(IsNotBusy)); } } }
     public bool IsNotBusy => !IsBusy;
     public string Status { get => status; private set => SetProperty(ref status, value); }
+    public int SelectedTabIndex
+    {
+        get => selectedTabIndex;
+        set
+        {
+            if (!SetProperty(ref selectedTabIndex, value) || value != 2 || releaseHistoryLoadRequested) return;
+            releaseHistoryLoadRequested = true;
+            _ = ReleaseHistory.EnsureLoadedAsync();
+        }
+    }
+    public ReleaseHistoryViewModel ReleaseHistory { get; }
     public string VersionLabel => AppVersion.Label;
     public string DataDirectory => AppDataPaths.RootDirectory;
     public bool IsCustomProxyVisible => SelectedProxyMode.Value == "custom";
@@ -143,14 +167,19 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public ICommand ClearLogsCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
 
-    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null, IStringLocalizer<SettingsViewModel>? localizer = null)
+    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null, ReleaseHistoryViewModel? releaseHistory = null, IStringLocalizer<SettingsViewModel>? localizer = null, Action<string>? applyTheme = null)
     {
         this.dataStore = dataStore;
         this.logger = logger ?? NullLogger<SettingsViewModel>.Instance;
         this.toastService = toastService ?? new ToastService();
         this.updateCoordinator = updateCoordinator ?? new UpdateCoordinator(dataStore);
         ownsUpdateCoordinator = updateCoordinator is null;
+        ReleaseHistory = releaseHistory ?? new ReleaseHistoryViewModel(
+            new UpdateService(logger: null, currentVersion: AppVersion.Current),
+            dataStore.GetUpdateProxySettingsAsync);
+        ownsReleaseHistory = releaseHistory is null;
         this.applyAppearance = applyAppearance;
+        this.applyTheme = applyTheme;
         _loc = localizer ?? LocalizerFactory.Create<SettingsViewModel>();
         Status = Loc("settings.status.loading");
         LoadCommand = new AsyncCommand(LoadAsync);
@@ -164,8 +193,8 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         _ = LoadAsync();
     }
 
-    public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null)
-        : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance, null) { }
+    public SettingsViewModel(ConfigSnapshotService configService, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, Action<string>? applyTheme = null)
+        : this(new AppDataStore(configService, new GatewayProcessService()), logger, toastService, applyAppearance, null, null, null, applyTheme) { }
 
     private string Loc(string key) => _loc[key]?.Value ?? key;
 
@@ -328,6 +357,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         try
         {
             var result = await updateCoordinator.CheckNowAsync(true);
+            await ReleaseHistory.RefreshAsync();
             Status = result?.Latest is null
                 ? string.Format(Loc("settings.update.check.status.latest"), VersionLabel)
                 : string.Format(Loc("settings.update.check.status.found"), result.Latest.Version);
@@ -389,6 +419,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private static SettingOption FindOption(IReadOnlyList<SettingOption> options, string? value, SettingOption fallback) => options.FirstOrDefault(option => string.Equals(option.Value, value, StringComparison.OrdinalIgnoreCase)) ?? fallback;
 
     private void ApplyAppearancePreview() => applyAppearance?.Invoke(TransparencyEnabled, TransparencyOpacity, BlurAmount, AcrylicTransparencyAlgorithm);
+    private void ApplyThemePreview() => applyTheme?.Invoke(SelectedTheme.Value);
 
     private void OnConfigurationChanged(object? sender, ConfigurationChangedEventArgs args)
     {
@@ -414,6 +445,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             saveDebounceCancellation = null;
         }
         _ = SaveAsync();
+        if (ownsReleaseHistory) ReleaseHistory.Dispose();
         if (ownsUpdateCoordinator) updateCoordinator.Dispose();
     }
 }
