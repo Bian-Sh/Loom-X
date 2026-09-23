@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -138,6 +138,7 @@ public partial class App : Application
             }
             var configService = new ConfigSnapshotService(loggerFactory.CreateLogger<ConfigSnapshotService>());
             gatewayService = new GatewayProcessService();
+            var windowsStartupService = new WindowsStartupService(loggerFactory.CreateLogger<WindowsStartupService>());
             var toastService = new ToastService();
             dataStore = new AppDataStore(configService, gatewayService, loggerFactory.CreateLogger<AppDataStore>());
             mainWindow = new MainWindow(
@@ -154,7 +155,8 @@ public partial class App : Application
                 LocalizerFactory.Create<MainWindowViewModel>(),
                 requestApplicationExit: () => desktop.Shutdown(),
                 confirmUpdateInstall: mainWindow.ConfirmUpdateInstallAsync,
-                applyTheme: mainWindow.ApplyTheme);
+                applyTheme: mainWindow.ApplyTheme,
+                windowsStartupService: windowsStartupService);
             desktop.MainWindow = mainWindow;
             if (activationPending)
                 mainWindow.ActivateFromSecondaryLaunch();

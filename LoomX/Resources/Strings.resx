@@ -172,6 +172,15 @@
   <!-- ============================================================ -->
   <!-- Settings - General                                           -->
   <!-- ============================================================ -->
+  <data name="settings.startup.windows.label">
+    <value>开机时启动 Loom-X</value>
+  </data>
+  <data name="settings.startup.windows.hint">
+    <value>登录 Windows 后自动启动 Loom-X，不需要管理员权限。</value>
+  </data>
+  <data name="settings.startup.windows.sync.failed">
+    <value>无法更新开机自启动：{0}</value>
+  </data>
   <data name="settings.language.label">
     <value>界面语言</value>
   </data>

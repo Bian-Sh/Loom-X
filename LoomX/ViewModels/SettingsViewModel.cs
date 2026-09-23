@@ -53,6 +53,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private readonly Action<bool, int, int, string>? applyAppearance;
     private readonly Action<string>? applyTheme;
     private readonly IStringLocalizer<SettingsViewModel> _loc;
+    private readonly IWindowsStartupService? windowsStartupService;
     private SettingOption selectedLanguage = LanguageOptions[0];
     private SettingOption selectedTheme = ThemeOptions[0];
     private SettingOption selectedProxyMode = ProxyModeOptions[0];
@@ -63,6 +64,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     private bool clearProxyPassword;
     private bool autoCheckUpdates = true;
     private bool useProxyForUpdates = true;
+    private bool startWithWindows;
     private bool diagnosticsEnabled;
     private bool logStackTrace;
     private bool transparencyEnabled = true;
@@ -129,6 +131,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public bool HasProxyPassword { get => hasProxyPassword; private set => SetProperty(ref hasProxyPassword, value); }
     public bool AutoCheckUpdates { get => autoCheckUpdates; set { if (SetProperty(ref autoCheckUpdates, value)) SaveAfterEdit(); } }
     public bool UseProxyForUpdates { get => useProxyForUpdates; set { if (SetProperty(ref useProxyForUpdates, value)) SaveAfterEdit(); } }
+    public bool StartWithWindows { get => startWithWindows; set { if (SetProperty(ref startWithWindows, value)) SaveAfterEdit(); } }
     public bool DiagnosticsEnabled { get => diagnosticsEnabled; set { if (SetProperty(ref diagnosticsEnabled, value)) SaveAfterEdit(); } }
     public bool LogStackTrace { get => logStackTrace; set { if (SetProperty(ref logStackTrace, value)) { LoggingBootstrap.SetIncludeStackTrace(value); SaveAfterEdit(); } } }
     public bool TransparencyEnabled { get => transparencyEnabled; set { if (SetProperty(ref transparencyEnabled, value)) { if (!suppressAutoSave) ApplyAppearancePreview(); SaveAfterEdit(); } } }
@@ -167,7 +170,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
     public ICommand ClearLogsCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
 
-    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null, ReleaseHistoryViewModel? releaseHistory = null, IStringLocalizer<SettingsViewModel>? localizer = null, Action<string>? applyTheme = null)
+    public SettingsViewModel(AppDataStore dataStore, ILogger<SettingsViewModel>? logger = null, ToastService? toastService = null, Action<bool, int, int, string>? applyAppearance = null, UpdateCoordinator? updateCoordinator = null, ReleaseHistoryViewModel? releaseHistory = null, IStringLocalizer<SettingsViewModel>? localizer = null, Action<string>? applyTheme = null, IWindowsStartupService? windowsStartupService = null)
     {
         this.dataStore = dataStore;
         this.logger = logger ?? NullLogger<SettingsViewModel>.Instance;
@@ -180,6 +183,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
         ownsReleaseHistory = releaseHistory is null;
         this.applyAppearance = applyAppearance;
         this.applyTheme = applyTheme;
+        this.windowsStartupService = windowsStartupService;
         _loc = localizer ?? LocalizerFactory.Create<SettingsViewModel>();
         Status = Loc("settings.status.loading");
         LoadCommand = new AsyncCommand(LoadAsync);
@@ -213,6 +217,7 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
             SelectedProxyMode = FindOption(ProxyModeOptions, settings.ProxyMode, ProxyModeOptions[0]);
             AutoCheckUpdates = settings.AutoCheckUpdates;
             UseProxyForUpdates = settings.UseProxyForUpdates;
+            StartWithWindows = settings.StartWithWindows;
             DiagnosticsEnabled = settings.DiagnosticsEnabled;
             LogStackTrace = settings.LogStackTrace;
             ProxyHost = settings.ProxyHost;
@@ -263,9 +268,21 @@ public sealed class SettingsViewModel : NotifyViewModel, IDisposable
                     TransparencyOpacity,
                     BlurAmount,
                     AcrylicTransparencyAlgorithm,
-                    UseProxyForUpdates);
+                    UseProxyForUpdates,
+                    StartWithWindows);
                 var response = await dataStore.UpdateSettingsAsync(input, cancellationToken);
                 HasProxyPassword = response.HasProxyPassword;
+                try
+                {
+                    windowsStartupService?.Apply(response.StartWithWindows);
+                }
+                catch (Exception exception)
+                {
+                    Status = string.Format(Loc("settings.startup.windows.sync.failed"), exception.Message);
+                    toastService.Show(Status, ToastLevel.Error);
+                    logger.LogError(exception, "Windows 开机自启动同步失败 {Enabled}", response.StartWithWindows);
+                    return;
+                }
                 Status = string.Format(Loc("settings.status.saved"), DateTime.Now.ToString("HH:mm:ss"));
                 logger.LogInformation("设置保存完成 {ProxyMode} {AutoCheckUpdates} {UseProxyForUpdates} {DiagnosticsEnabled}", response.ProxyMode, response.AutoCheckUpdates, response.UseProxyForUpdates, response.DiagnosticsEnabled);
             }

@@ -172,6 +172,36 @@ public sealed class AppDataStoreTests
     }
 
     [Fact]
+    public async Task GatewayRunningWriteUpdatesOnlyRuntimeIntentAndPublishesSettingsChange()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            await store.InitializeAsync();
+            var before = store.Settings!;
+            var events = new List<ConfigurationChangedEventArgs>();
+            store.ConfigurationChanged += (_, args) => events.Add(args);
+
+            var updated = await store.SetGatewayRunningAsync(true);
+
+            Assert.True(updated.GatewayRunning);
+            Assert.True(store.Settings!.GatewayRunning);
+            Assert.True(store.CurrentConfig.Settings.GatewayRunning);
+            Assert.Equal(before.Theme, updated.Theme);
+            Assert.Equal(before.StartWithWindows, updated.StartWithWindows);
+            var change = Assert.Single(events);
+            Assert.Equal(ConfigurationChangeKind.Settings, change.Kind);
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
     public async Task SettingsFieldWriteDoesNotReloadTheFullConfiguration()
     {
         var directory = CreateDirectory();

@@ -53,6 +53,7 @@ public enum ConfigurationChangeFields
     RouteModel = 1 << 25,
     RouteAvailability = 1 << 26,
     RouteOrder = 1 << 27,
+    SettingsStartup = 1 << 28,
 
     SettingsDiagnosticsEnabled = SettingsDiagnostics,
     SettingsTransparency = SettingsAppearance,

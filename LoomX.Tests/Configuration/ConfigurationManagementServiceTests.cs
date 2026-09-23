@@ -579,6 +579,8 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal(86, defaults.TransparencyOpacity);
             Assert.Equal(24, defaults.BlurAmount);
             Assert.Equal("acrylic", defaults.TransparencyAlgorithm);
+            Assert.False(defaults.StartWithWindows);
+            Assert.False(defaults.GatewayRunning);
 
             await using (var legacyContext = new ConfigurationDbContext(options))
             {
@@ -595,7 +597,8 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal(64, configurationProvider.Current.Settings.BlurAmount);
             Assert.Equal("acrylic", configurationProvider.Current.Settings.TransparencyAlgorithm);
 
-            var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 0, 48, "mica"));
+            await service.SetGatewayRunningAsync(true);
+            var updatedSettings = await service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 0, 48, "mica", true, true));
             Assert.Equal("dark", updatedSettings.Theme);
             Assert.True(updatedSettings.HasProxyPassword);
             Assert.True(configurationProvider.Current.Settings.DiagnosticsEnabled);
@@ -604,6 +607,8 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal(0, updatedSettings.TransparencyOpacity);
             Assert.Equal(48, updatedSettings.BlurAmount);
             Assert.Equal("acrylic", updatedSettings.TransparencyAlgorithm);
+            Assert.True(updatedSettings.StartWithWindows);
+            Assert.True(updatedSettings.GatewayRunning);
 
             var provider = await service.CreateProviderAsync(new ProviderInput("proxy", "代理 Provider", "https://example.com", "anthropic", true, null, false, null, true, "https://models.example.com/list"));
             Assert.True(provider.UseProxy);
@@ -620,6 +625,8 @@ public sealed class ConfigurationManagementServiceTests
             Assert.Equal(0, storedSettings.TransparencyOpacity);
             Assert.Equal(48, storedSettings.BlurAmount);
             Assert.Equal("acrylic", storedSettings.TransparencyAlgorithm);
+            Assert.True(storedSettings.StartWithWindows);
+            Assert.True(storedSettings.GatewayRunning);
 
             await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "custom", "http://127.0.0.1", 7890, "user", "password", false, true, "stable", true, 7, true, true, 0, 65, "acrylic")));
         }

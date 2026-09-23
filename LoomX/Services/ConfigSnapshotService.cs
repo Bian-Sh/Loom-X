@@ -114,6 +114,7 @@ public sealed class ConfigSnapshotService : IDisposable
     }
 
     public Task<AppSettingsResponse> UpdateSettingsAsync(AppSettingsInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateSettingsAsync(input, token), cancellationToken);
+    public Task<AppSettingsResponse> SetGatewayRunningAsync(bool gatewayRunning, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.SetGatewayRunningAsync(gatewayRunning, token), cancellationToken);
 
     public Task<ProviderResponse> CreateProviderAsync(ProviderInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.CreateProviderAsync(input, token), cancellationToken);
     public Task<ProviderResponse> UpdateProviderAsync(Guid id, ProviderInput input, CancellationToken cancellationToken = default) => ExecuteManagementAsync((service, token) => service.UpdateProviderAsync(id, input, token), cancellationToken);

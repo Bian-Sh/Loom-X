@@ -123,6 +123,30 @@ public sealed class ConfigurationDatabaseMigrationTests
     }
 
     [Fact]
+    public async Task AppSettingsSchema_ContainsStartupStateColumnsWithFalseDefaults()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-settings-schema-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={databasePath}").Options;
+            await using var context = new ConfigurationDbContext(options);
+            await ConfigurationDatabase.InitializeAsync(context);
+
+            var columns = await ReadColumnsAsync(context, "AppSettings");
+            Assert.Contains("StartWithWindows", columns);
+            Assert.Contains("GatewayRunning", columns);
+
+            var settings = await context.AppSettings.AsNoTracking().SingleAsync();
+            Assert.False(settings.StartWithWindows);
+            Assert.False(settings.GatewayRunning);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(databasePath);
+        }
+    }
+
+    [Fact]
     public async Task ExistingDatabase_MissingComboDeletedColumn_GetsDefaultValue()
     {
         var databasePath = Path.Combine(Path.GetTempPath(), $"loomx-combo-migration-{Guid.NewGuid():N}.db");

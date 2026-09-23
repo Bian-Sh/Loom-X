@@ -35,6 +35,8 @@ public sealed class ConfigurationDbContext(DbContextOptions<ConfigurationDbConte
             entity.Property(item => item.ProxyUsername).HasMaxLength(256);
             entity.Property(item => item.UpdateChannel).HasMaxLength(32).IsRequired();
             entity.Property(item => item.UseProxyForUpdates).HasDefaultValue(true);
+            entity.Property(item => item.StartWithWindows).HasDefaultValue(false);
+            entity.Property(item => item.GatewayRunning).HasDefaultValue(false);
         });
         modelBuilder.Entity<ProviderEntity>(entity =>
         {
@@ -129,6 +131,8 @@ public sealed class AppSettingsEntity
     public bool AutoCheckUpdates { get; set; } = true;
     public string UpdateChannel { get; set; } = "stable";
     public bool UseProxyForUpdates { get; set; } = true;
+    public bool StartWithWindows { get; set; }
+    public bool GatewayRunning { get; set; }
     public bool DiagnosticsEnabled { get; set; }
     public int LogRetentionDays { get; set; } = 30;
     public bool LogStackTrace { get; set; }
@@ -406,7 +410,8 @@ public static class ConfigurationDatabase
             if (!await HasColumnsAsync(connection, "AppSettings", cancellationToken,
                     "Id", "Language", "Theme", "ProxyMode", "ProxyHost", "ProxyPort", "ProxyUsername", "ProtectedProxyPassword",
                     "AutoCheckUpdates", "UpdateChannel", "DiagnosticsEnabled", "LogRetentionDays", "LogStackTrace",
-                    "TransparencyEnabled", "TransparencyOpacity", "BlurAmount", "TransparencyAlgorithm", "UseProxyForUpdates")
+                    "TransparencyEnabled", "TransparencyOpacity", "BlurAmount", "TransparencyAlgorithm", "UseProxyForUpdates",
+                    "StartWithWindows", "GatewayRunning")
                 || await HasColumnAsync(connection, "AppSettings", "OpenControlCenterOnStartup", cancellationToken))
                 return false;
 
@@ -467,6 +472,8 @@ public static class ConfigurationDatabase
                 AutoCheckUpdates INTEGER NOT NULL,
                 UpdateChannel TEXT NOT NULL,
                 UseProxyForUpdates INTEGER NOT NULL DEFAULT 1,
+                StartWithWindows INTEGER NOT NULL DEFAULT 0,
+                GatewayRunning INTEGER NOT NULL DEFAULT 0,
                 DiagnosticsEnabled INTEGER NOT NULL,
                 LogRetentionDays INTEGER NOT NULL,
                 LogStackTrace INTEGER NOT NULL DEFAULT 0,
@@ -516,6 +523,21 @@ public static class ConfigurationDatabase
         }
         catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
         {
+        }
+
+        foreach (var statement in new[]
+        {
+            "ALTER TABLE AppSettings ADD COLUMN StartWithWindows INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE AppSettings ADD COLUMN GatewayRunning INTEGER NOT NULL DEFAULT 0"
+        })
+        {
+            try
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(statement, cancellationToken);
+            }
+            catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+            {
+            }
         }
 
         try

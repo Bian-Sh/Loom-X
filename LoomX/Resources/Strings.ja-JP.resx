@@ -116,6 +116,15 @@
   <data name="settings.tab.about">
     <value>情報</value>
   </data>
+  <data name="settings.startup.windows.label">
+    <value>Windows の起動時に Loom-X を起動</value>
+  </data>
+  <data name="settings.startup.windows.hint">
+    <value>Windows にサインインした後、Loom-X を自動的に起動します。管理者権限は不要です。</value>
+  </data>
+  <data name="settings.startup.windows.sync.failed">
+    <value>Windows の起動設定を更新できません: {0}</value>
+  </data>
   <data name="settings.language.label">
     <value>インターフェース言語</value>
   </data>
