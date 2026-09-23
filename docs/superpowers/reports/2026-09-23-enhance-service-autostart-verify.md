@@ -23,7 +23,7 @@
 - 配置字段与数据库列：`LoomX/Configuration/ConfigurationDbContext.cs:38-39,414,475-476,530-531`。
 - 当前用户 Run 注册实现：`LoomX/Services/WindowsStartupService.cs:8-82`。
 - 设置页加载、保存、错误 Toast 与结构化日志：`LoomX/ViewModels/SettingsViewModel.cs:56,134,173-185,217-220,253-285`。
-- 设置 UI 和四套资源：`LoomX/Views/SettingsView.axaml:22` 与 `LoomX/Resources/Strings*.resx`。
+- 设置 UI 和四套资源：`LoomX/Views/SettingsView.axaml:20` 与 `LoomX/Resources/Strings*.resx`；开机自启动位于常规设置第一排，语言、主题与透明设置连续排列。
 - 场景覆盖：`WindowsStartupServiceTests`、`SettingsViewContractTests`、CUA 设置页截图。
 
 ### 2. 概览页操作持久化网关运行意图
@@ -47,7 +47,7 @@
 
 ## 自动化与构建证据
 
-- 相关测试：88 个通过，0 个失败。
+- 相关测试：88 个通过，0 个失败；本次布局调整后 `SettingsViewContractTests` 19 个测试重新执行并全部通过。
 - `UpdateExperienceContractTests.更新安装请求复用正常退出路径和共享服务`：通过。
 - Release 构建：0 个错误；仅保留仓库既有的 `NU1903`、`CS8618`、`CA2024` 警告。
 - 完整测试：共 1276 个，1274 个通过；剩余 2 个失败均来自相对基线未修改的既有契约：
@@ -57,16 +57,16 @@
 
 ## 发布包
 
-- 目录：`outputs/LoomX-service-autostart-2026-09-23-2003/`。
+- 目录：`outputs/LoomX-service-autostart-2026-09-23-2113/`。
 - 目标：Release、win-x64、self-contained、非单文件。
-- 共 446 个文件，唯一可执行文件为 `LoomX.exe`。
+- 发布生成 446 个应用文件，唯一可执行文件为 `LoomX.exe`；另保存 1 张 CUA 验收截图。
 - `plugins/`、en-US、ja-JP、zh-TW 本地化资源存在；zh-CN 使用主程序集中的中性资源。
 
 ## CUA 实机验收
 
 使用 `cua-driver` 后台操作本次发布包，截图仅包含 Loom-X 窗口。应用通过 `Start-Process -WindowStyle Hidden` 启动，并校验实际进程路径。
 
-1. 设置页显示“开机时启动 Loom-X”开关及说明，截图：`settings-start-with-windows.png`。
+1. 设置页将“开机时启动 Loom-X”置于常规设置第一排，语言、主题与透明设置连续排列，截图：`settings-startup-first-row.png`。
 2. 初始配置状态为 `StartWithWindows = 0`、`GatewayRunning = 0`。
 3. 概览页点击“启动网关”后显示“运行中”和“停止网关”，配置状态变为 `(0, 1)`。
 4. 直接关闭 APP 后进程退出、11434 端口释放，配置状态仍为 `(0, 1)`。

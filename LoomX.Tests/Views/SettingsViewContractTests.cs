@@ -378,6 +378,13 @@ public sealed class SettingsViewContractTests
         Assert.Contains("settings.startup.windows.label", source, StringComparison.Ordinal);
         Assert.Contains("settings.startup.windows.hint", source, StringComparison.Ordinal);
         Assert.Contains(@"IsChecked=""{Binding StartWithWindows, Mode=TwoWay}""", source, StringComparison.Ordinal);
+
+        var startupIndex = source.IndexOf("settings.startup.windows.label", StringComparison.Ordinal);
+        var languageIndex = source.IndexOf("settings.language.label", StringComparison.Ordinal);
+        var themeIndex = source.IndexOf("settings.theme.label", StringComparison.Ordinal);
+        var transparencyIndex = source.IndexOf("settings.transparency.label", StringComparison.Ordinal);
+        Assert.True(startupIndex < languageIndex, "开机自启动应位于常规设置第一排");
+        Assert.True(languageIndex < themeIndex && themeIndex < transparencyIndex, "语言、主题与透明设置应连续排列");
         Assert.Contains("public bool StartWithWindows", viewModel, StringComparison.Ordinal);
         Assert.Contains("StartWithWindows = settings.StartWithWindows;", viewModel, StringComparison.Ordinal);
         Assert.DoesNotContain("GatewayRunning", viewModel, StringComparison.Ordinal);
