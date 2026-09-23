@@ -125,11 +125,11 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
         NavigationItems = new([
             new("nav.overview", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
-            new("nav.plugins", "M 8,13 L 13,13 L 13,8 L 19,8 L 19,13 L 24,13 L 24,19 L 19,19 L 19,24 L 13,24 L 13,19 L 8,19 Z", () => ShowPlugins()),
             new("nav.assistant", "M 6,4 L 26,4 L 26,20 L 18,20 L 12,27 L 12,20 L 6,20 Z M 11,10 L 13,10 M 16,10 L 18,10 M 21,10 L 23,10", () => ShowAssistant()),
             new("nav.gateway", "M 16,4 L 16,9 M 16,9 L 8,16 M 16,9 L 24,16 M 8,16 L 8,25 M 24,16 L 24,25 M 4,25 L 12,25 M 20,25 L 28,25", () => ShowGateway()),
             new("nav.providers", "M 7,8 L 25,8 M 7,16 L 25,16 M 7,24 L 25,24 M 4,8 L 4,8 M 4,16 L 4,16 M 4,24 L 4,24", () => ShowProviders()),
             new("nav.activity", "M 7,28 L 7,5 M 8,6 C 13,4 18,8 25,6 L 25,18 C 18,20 13,16 8,18", () => ShowActivity()),
+            new("nav.plugins", "M 8,13 L 13,13 L 13,8 L 19,8 L 19,13 L 24,13 L 24,19 L 19,19 L 19,24 L 13,24 L 13,19 L 8,19 Z", () => ShowPlugins()),
             new("nav.console", "M 5,6 L 27,6 L 27,26 L 5,26 Z M 9,12 L 13,16 L 9,20 M 16,20 L 23,20", () => ShowConsole()),
             new("nav.settings", "M 16,4 L 18,7 L 22,8 L 25,6 L 28,9 L 26,12 L 27,16 L 30,18 L 28,22 L 24,21 L 21,24 L 21,28 L 16,29 L 14,25 L 10,24 L 7,26 L 4,22 L 6,19 L 5,15 L 2,13 L 4,8 L 8,9 L 11,6 L 11,3 Z M 16,12 A 4,4 0 1,0 16,20 A 4,4 0 1,0 16,12 Z", () => ShowSettings())
         ]);

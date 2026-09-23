@@ -44,6 +44,20 @@ public sealed class MainWindowNavigationContractTests
     }
 
     [Fact]
+    public void NavigationPlacesPluginsBelowActivityAndAboveConsole()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs");
+        var source = File.ReadAllText(path);
+        var navigationStart = source.IndexOf("NavigationItems = new([", StringComparison.Ordinal);
+        var navigationEnd = source.IndexOf("]);", navigationStart, StringComparison.Ordinal);
+        Assert.True(navigationStart >= 0);
+        Assert.True(navigationEnd > navigationStart);
+
+        var navigation = source[navigationStart..navigationEnd];
+        Assert.True(navigation.IndexOf("new(\"nav.activity\"", StringComparison.Ordinal) < navigation.IndexOf("new(\"nav.plugins\"", StringComparison.Ordinal));
+        Assert.True(navigation.IndexOf("new(\"nav.plugins\"", StringComparison.Ordinal) < navigation.IndexOf("new(\"nav.console\"", StringComparison.Ordinal));
+    }
+    [Fact]
     public void NavigationUsesPersistentActiveStateAndAnimatedSharedSelection()
     {
         var windowSource = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "MainWindow.axaml"));
