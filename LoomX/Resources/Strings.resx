@@ -494,6 +494,12 @@
   <data name="window.close">
     <value>关闭</value>
   </data>
+  <data name="sidebar.collapse">
+    <value>折叠侧边栏</value>
+  </data>
+  <data name="sidebar.expand">
+    <value>展开侧边栏</value>
+  </data>
 
   <!-- ============================================================ -->
   <!-- Sidebar                                                      -->

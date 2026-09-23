@@ -155,6 +155,8 @@
   <data name="window.minimize"><value>Minimize</value></data>
   <data name="window.maximize"><value>Maximize</value></data>
   <data name="window.close"><value>Close</value></data>
+  <data name="sidebar.collapse"><value>Collapse sidebar</value></data>
+  <data name="sidebar.expand"><value>Expand sidebar</value></data>
   <data name="sidebar.service"><value>Local service</value></data>
   <data name="sidebar.version"><value>Version</value></data>
   <data name="update.card.title"><value>Update available</value></data>

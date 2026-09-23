@@ -397,6 +397,12 @@
   <data name="window.close">
     <value>關閉</value>
   </data>
+  <data name="sidebar.collapse">
+    <value>摺疊側邊欄</value>
+  </data>
+  <data name="sidebar.expand">
+    <value>展開側邊欄</value>
+  </data>
   <data name="sidebar.service">
     <value>本地服務</value>
   </data>

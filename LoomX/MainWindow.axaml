@@ -65,6 +65,88 @@
       <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
       <Setter Property="BorderThickness" Value="0,0,1,0" />
+      <Setter Property="Width" Value="228" />
+      <Setter Property="Padding" Value="16,24" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Width" Duration="0:0:0.22" Easing="CubicEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <!-- 折叠状态：只保留图标，文字隐藏，按钮居中 -->
+    <Style Selector="Border.glass-sidebar.collapsed">
+      <Setter Property="Width" Value="72" />
+      <Setter Property="Padding" Value="12,24" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed TextBlock.sidebar-label">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed StackPanel.sidebar-label">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed StackPanel.sidebar-brand">
+      <Setter Property="Margin" Value="0,0,0,28" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed Button.nav-button">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.glass-sidebar.collapsed Panel.sidebar-status-dot">
+      <Setter Property="Grid.ColumnSpan" Value="2" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <!-- 分割线折叠把手：默认透明隐藏在分割线上，悬停时像液体一样浮现并弹性伸展 -->
+    <Style Selector="Border.sidebar-collapse-hotspot">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="160" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,-12,0" />
+    </Style>
+    <Style Selector="Button.sidebar-collapse-handle">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.sidebar-collapse-handle /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.sidebar-collapse-pill">
+      <Setter Property="Width" Value="5" />
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="{DynamicResource TextTertiaryBrush}" />
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="CubicEaseOut" />
+          <DoubleTransition Property="Width" Duration="0:0:0.32" Easing="ElasticEaseOut" />
+          <DoubleTransition Property="Height" Duration="0:0:0.32" Easing="ElasticEaseOut" />
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Border.sidebar-collapse-hotspot:pointerover Border.sidebar-collapse-pill">
+      <Setter Property="Opacity" Value="0.9" />
+    </Style>
+    <Style Selector="Button.sidebar-collapse-handle:pointerover Border.sidebar-collapse-pill">
+      <Setter Property="Opacity" Value="1" />
+      <Setter Property="Width" Value="7" />
+      <Setter Property="Height" Value="52" />
+      <Setter Property="Background" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="Button.sidebar-collapse-handle:pressed Border.sidebar-collapse-pill">
+      <Setter Property="Height" Value="40" />
     </Style>
     <Style Selector="Border.topbar">
       <Setter Property="Background" Value="{DynamicResource GlassStrongBrush}" />
@@ -198,12 +280,13 @@
     </Style>
   </Window.Styles>
   <Grid Background="{DynamicResource WindowBackgroundBrush}">
-    <Grid ColumnDefinitions="228,*">
-      <Border Grid.Column="0" Classes="glass-sidebar" Padding="16,24">
+    <Grid ColumnDefinitions="Auto,*">
+      <Grid Grid.Column="0" ZIndex="1">
+      <Border x:Name="sidebar" Classes="glass-sidebar" ClipToBounds="True">
         <Grid RowDefinitions="Auto,*,Auto">
-          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28" PointerPressed="WindowChrome_OnPointerPressed">
+          <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="11" Margin="8,0,8,28" Classes="sidebar-brand" PointerPressed="WindowChrome_OnPointerPressed">
             <Image Source="/Assets/icon-transparent.png" Width="30" Height="30" HorizontalAlignment="Left" VerticalAlignment="Center" />
-            <StackPanel Spacing="1" VerticalAlignment="Center">
+            <StackPanel Spacing="1" VerticalAlignment="Center" Classes="sidebar-label">
               <TextBlock Text="Loom-X" FontSize="16" FontWeight="SemiBold" />
             </StackPanel>
           </StackPanel>
@@ -217,10 +300,10 @@
               <ItemsControl ItemsSource="{Binding NavigationItems}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
-                    <Button Command="{Binding NavigateCommand}" Classes="nav-button" Classes.active="{Binding IsActive}">
+                    <Button Command="{Binding NavigateCommand}" Classes="nav-button" Classes.active="{Binding IsActive}" ToolTip.Tip="{Binding Title}">
                       <StackPanel Orientation="Horizontal" Spacing="11">
                         <Path Classes="nav-icon" Data="{Binding IconData}" Width="18" Height="18" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" Classes="sidebar-label" />
                       </StackPanel>
                     </Button>
                   </DataTemplate>
@@ -235,8 +318,8 @@
           </ScrollViewer>
           <Border x:Name="sidebarRuntimeStatus" Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="8,16,8,0">
             <Grid ColumnDefinitions="*,Auto" ToolTip.Tip="{Binding GatewayStatusText}" AutomationProperties.Name="{Binding GatewayStatusText}">
-              <TextBlock Text="{Binding VersionLabel}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" />
-              <Panel Grid.Column="1" Width="8" Height="8" VerticalAlignment="Center">
+              <TextBlock Text="{Binding VersionLabel}" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" VerticalAlignment="Center" Classes="sidebar-label" />
+              <Panel Grid.Column="1" Width="8" Height="8" VerticalAlignment="Center" Classes="sidebar-status-dot">
                 <Ellipse Width="8" Height="8" Fill="{DynamicResource SuccessBrush}" IsVisible="{Binding IsGatewayRunning}" />
                 <Ellipse Width="8" Height="8" Fill="{DynamicResource WarningBrush}" IsVisible="{Binding IsGatewayTransitioning}" />
                 <Ellipse Width="8" Height="8" Fill="{DynamicResource DangerBrush}" IsVisible="{Binding IsGatewayFailed}" />
@@ -246,6 +329,12 @@
           </Border>
         </Grid>
       </Border>
+      <Border x:Name="sidebarCollapseHotspot" Classes="sidebar-collapse-hotspot">
+        <Button x:Name="sidebarCollapseButton" Classes="sidebar-collapse-handle" Click="SidebarCollapseButton_OnClick">
+          <Border Classes="sidebar-collapse-pill" />
+        </Button>
+      </Border>
+      </Grid>
       <Grid Grid.Column="1" RowDefinitions="104,*">
         <Border Grid.Row="0" Classes="topbar">
           <StackPanel Margin="32,40,32,0" VerticalAlignment="Center" Spacing="5">

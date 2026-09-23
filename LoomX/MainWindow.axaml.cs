@@ -40,6 +40,9 @@ public partial class MainWindow : Window
     private double navigationSelectionAnimationTarget;
     private const double NavigationSelectionAnimationDurationMs = 200;
     private static readonly CubicEaseOut NavigationSelectionEasing = new();
+    // 窗口宽度低于该阈值时自动折叠侧栏；放宽时不会自动展开，需用户手动展开。
+    private const double SidebarAutoCollapseWidth = 1000;
+    private bool isSidebarCollapsed;
 
     public ToastService ToastService => toastService;
     public UpdateWindowPresentation UpdatePresentation => updatePresentation;
@@ -65,6 +68,8 @@ public partial class MainWindow : Window
             NavigationSelectionAnimationTimer_OnTick);
         updateReleasePreviewHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(160) };
         updateReleasePreviewHideTimer.Tick += (_, _) => CloseUpdateReleasePreview();
+        UpdateSidebarCollapseToolTip();
+        LocaleService.CultureChanged += (_, _) => UpdateSidebarCollapseToolTip();
         appearanceCoordinator = new WindowAppearanceCoordinator(this);
         TransparencyLevelHint = BuildTransparencyLevels("acrylic");
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
@@ -347,6 +352,37 @@ public partial class MainWindow : Window
     {
         updateReleasePreviewHideTimer.Stop();
         updateReleasePreviewPopup.IsOpen = false;
+    }
+
+    private void SidebarCollapseButton_OnClick(object? sender, RoutedEventArgs e) =>
+        SetSidebarCollapsed(!isSidebarCollapsed);
+
+    private void SetSidebarCollapsed(bool collapsed)
+    {
+        if (isSidebarCollapsed == collapsed) return;
+        isSidebarCollapsed = collapsed;
+        if (collapsed) sidebar.Classes.Add("collapsed");
+        else sidebar.Classes.Remove("collapsed");
+        UpdateSidebarCollapseToolTip();
+    }
+
+    private void UpdateSidebarCollapseToolTip()
+    {
+        var key = isSidebarCollapsed ? "sidebar.expand" : "sidebar.collapse";
+        ToolTip.SetTip(sidebarCollapseButton, ResourceLookup.Resolve(key));
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == ClientSizeProperty) AutoCollapseSidebar();
+    }
+
+    private void AutoCollapseSidebar()
+    {
+        var width = ClientSize.Width;
+        if (width <= 0 || width >= SidebarAutoCollapseWidth || isSidebarCollapsed) return;
+        SetSidebarCollapsed(true);
     }
 
     private void MinimizeButton_OnClick(object? sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;

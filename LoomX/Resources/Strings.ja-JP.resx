@@ -397,6 +397,12 @@
   <data name="window.close">
     <value>閉じる</value>
   </data>
+  <data name="sidebar.collapse">
+    <value>サイドバーを折りたたむ</value>
+  </data>
+  <data name="sidebar.expand">
+    <value>サイドバーを展開</value>
+  </data>
   <data name="sidebar.service">
     <value>ローカルサービス</value>
   </data>
