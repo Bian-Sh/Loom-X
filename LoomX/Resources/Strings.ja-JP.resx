@@ -1594,4 +1594,6 @@
   <data name="update.install.confirm.message"><value>インストールすると Loom-X が終了して再起動します。ルーティングサービスが一時停止し、処理中のリクエストが失敗する場合があります。重要な作業を保存してください。</value></data>
   <data name="update.install.confirm.accept"><value>インストールして再起動</value></data>
   <data name="update.install.confirm.cancel"><value>後で</value></data>
+  <data name="plugins.detail.open"><value>プラグインの詳細を開く</value></data>
+  <data name="plugins.detail.back"><value>プラグイン一覧に戻る</value></data>
 </root>

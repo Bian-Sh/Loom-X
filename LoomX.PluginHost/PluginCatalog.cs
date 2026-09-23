@@ -42,13 +42,17 @@ public static class PluginCatalog
             }
 
             var errors = new List<string>();
-            var manifest = ManifestParser.Parse(json, errors);
+            var uiDiagnostics = new List<string>();
+            var manifest = ManifestParser.Parse(json, errors, uiDiagnostics);
             if (manifest is null)
             {
                 foreach (var error in errors)
                     diagnostics.Add($"插件 {Path.GetFileName(directory)} 被拒绝：{error}");
                 continue;
             }
+
+            foreach (var diagnostic in uiDiagnostics)
+                diagnostics.Add($"插件 {manifest.Id} UI 被忽略：{diagnostic}");
 
             discovered.Add(new DiscoveredPlugin(manifest, directory));
         }

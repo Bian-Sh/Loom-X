@@ -1,0 +1,17 @@
+{
+  "change": "add-plugin-ui-contributions",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "task_hash_policy": "task-content-v1",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "a7eed4db152d4b8d466f30853666a2e8109eaa9bab19c24df950c844631efedb",
+  "files": [
+    { "path": "openspec/changes/add-plugin-ui-contributions/proposal.md", "sha256": "2a641945c1f92aaba90555ecb80e03c371852f5ecf9634a35fe92f84ddf073cf" },
+    { "path": "openspec/changes/add-plugin-ui-contributions/design.md", "sha256": "8a60ddf01d230d7b014283cf568d03463335cdb4bebc7aff6f41f2253da3590c" },
+    { "path": "openspec/changes/add-plugin-ui-contributions/tasks.md", "sha256": "decd5f868e2b44ecbe8ac0a332c47f87ff9ff7fafde63c23e99e1a552be7be63" },
+    { "path": "openspec/changes/add-plugin-ui-contributions/.openspec.yaml", "sha256": "e002504731ceb6e8fcf026b601ec3f0568d075aa00e43292bbd0642986212f03" },
+    { "path": "openspec/changes/add-plugin-ui-contributions/specs/credential-protection-observability/spec.md", "sha256": "69ddf7de03041b297ba009cd2cd48639926ca5cc3d260574a1b9874d7f0d54af" },
+    { "path": "openspec/changes/add-plugin-ui-contributions/specs/plugin-ui-contributions/spec.md", "sha256": "98dc47e470ac407135685f622ecf4e6adfafdc0e3946458c6f4db332c4b2fdb7" }
+  ]
+}

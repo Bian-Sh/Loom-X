@@ -1,9 +1,11 @@
+using Avalonia.Threading;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows.Input;
 using Microsoft.Extensions.Localization;
 using Microsoft.Extensions.Logging;
 using LoomX.Localization;
+using LoomX.Plugins;
 using LoomX.Plugins.Host;
 using LoomX.Services;
 
@@ -17,6 +19,8 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
     private readonly ToastService toastService;
     private readonly ILogger<PluginsViewModel> logger;
     private readonly IStringLocalizer<PluginsViewModel> localizer;
+    private readonly Action<Action> uiDispatcher;
+    private readonly PluginUiRefreshQueue uiRefreshQueue;
     private PluginRuntime? runtime;
     private bool isLoading;
     private string status = string.Empty;
@@ -25,10 +29,12 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
     private string statusKey = "plugins.status.waiting";
     private int? statusCount;
     private bool disposed;
+    private PluginItemViewModel? selectedPlugin;
 
     public ObservableCollection<PluginItemViewModel> Plugins { get; } = [];
     public ObservableCollection<string> Diagnostics { get; } = [];
     public ICommand RefreshCommand { get; }
+    public ICommand BackToPluginListCommand { get; }
     public bool IsLoading { get => isLoading; private set => SetProperty(ref isLoading, value); }
     public string Status { get => status; private set => SetProperty(ref status, value); }
     public int PluginCount => Plugins.Count;
@@ -38,6 +44,18 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
     public bool HasDiagnostics => Diagnostics.Count > 0;
     public bool HasLoadError { get => hasLoadError; private set => SetProperty(ref hasLoadError, value); }
     public bool IsEmpty => !IsLoading && !HasLoadError && !HasPlugins;
+    public PluginItemViewModel? SelectedPlugin
+    {
+        get => selectedPlugin;
+        private set
+        {
+            if (!SetProperty(ref selectedPlugin, value)) return;
+            OnPropertyChanged(nameof(IsPluginListVisible));
+            OnPropertyChanged(nameof(IsPluginDetailVisible));
+        }
+    }
+    public bool IsPluginListVisible => SelectedPlugin is null;
+    public bool IsPluginDetailVisible => SelectedPlugin is not null;
     public string PluginCountLabel => string.Format(CultureInfo.CurrentCulture, Loc("plugins.summary.loaded"), PluginCount);
     public string EnabledCountLabel => string.Format(CultureInfo.CurrentCulture, Loc("plugins.summary.enabled"), EnabledPluginCount);
     public string DiagnosticCountLabel => string.Format(CultureInfo.CurrentCulture, Loc("plugins.summary.diagnostics"), DiagnosticCount);
@@ -46,13 +64,18 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         GatewayProcessService gatewayService,
         ToastService? toastService = null,
         ILogger<PluginsViewModel>? logger = null,
-        IStringLocalizer<PluginsViewModel>? localizer = null)
+        IStringLocalizer<PluginsViewModel>? localizer = null,
+        Action<Action>? uiDispatcher = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<PluginsViewModel>.Instance;
         this.localizer = localizer ?? LocalizerFactory.Create<PluginsViewModel>();
+        this.uiDispatcher = uiDispatcher ?? DispatchToUiThread;
+        uiRefreshQueue = new PluginUiRefreshQueue(this.uiDispatcher, pluginId =>
+            RefreshPluginUi(pluginId, CultureInfo.CurrentUICulture.Name));
         RefreshCommand = new AsyncCommand(RefreshAsync, () => !IsLoading, this.logger);
+        BackToPluginListCommand = new DelegateCommand(ShowPluginList);
         LocaleService.CultureChanged += OnCultureChanged;
         SetStatus("plugins.status.waiting");
     }
@@ -69,7 +92,7 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         try
         {
             await gatewayService.EnsureHostedServicesAsync();
-            runtime = gatewayService.GetHostedService<PluginRuntime>();
+            AttachRuntime(gatewayService.GetHostedService<PluginRuntime>());
             if (runtime is null)
                 throw new InvalidOperationException(Loc("plugins.status.runtime_unavailable"));
 
@@ -96,17 +119,67 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         }
     }
 
+    private void AttachRuntime(PluginRuntime? pluginRuntime)
+    {
+        if (ReferenceEquals(runtime, pluginRuntime)) return;
+        if (runtime is not null)
+            runtime.PluginUiInvalidated -= OnPluginUiInvalidated;
+        runtime = pluginRuntime;
+        if (runtime is not null)
+            runtime.PluginUiInvalidated += OnPluginUiInvalidated;
+    }
+
+    private void OnPluginUiInvalidated(object? sender, PluginUiInvalidatedEventArgs args) =>
+        uiRefreshQueue.Enqueue(args.PluginId);
+
+    private void RefreshPluginUi(string pluginId, string cultureName)
+    {
+        if (runtime is null) return;
+        var plugin = Plugins.FirstOrDefault(item => item.Id == pluginId);
+        if (plugin is null) return;
+
+        plugin.ApplyUiContributions(
+            runtime.GetUiContributions(pluginId, PluginUiSlot.CardBody, cultureName),
+            runtime.GetUiContributions(pluginId, PluginUiSlot.DetailBody, cultureName));
+        if (ReferenceEquals(SelectedPlugin, plugin) && !plugin.CanOpenDetail)
+            ShowPluginList();
+    }
+
+    private static void DispatchToUiThread(Action action)
+    {
+        if (Dispatcher.UIThread.CheckAccess()) action();
+        else Dispatcher.UIThread.Post(action);
+    }
+
     private void Rebuild(PluginRuntime pluginRuntime)
     {
+        var selectedId = SelectedPlugin?.Id;
         Plugins.Clear();
         foreach (var info in pluginRuntime.PluginInfos.OrderBy(item => item.Id, StringComparer.Ordinal))
         {
             var isCredentialProtection = string.Equals(info.Id, CredentialProtectionPluginId, StringComparison.Ordinal);
+            var cardContributions = pluginRuntime.GetUiContributions(
+                info.Id,
+                PluginUiSlot.CardBody,
+                CultureInfo.CurrentUICulture.Name);
+            var detailContributions = pluginRuntime.GetUiContributions(
+                info.Id,
+                PluginUiSlot.DetailBody,
+                CultureInfo.CurrentUICulture.Name);
             Plugins.Add(new PluginItemViewModel(
                 info,
                 isCredentialProtection,
+                cardContributions,
+                detailContributions,
                 SetPluginEnabled,
+                OpenPluginDetail,
                 Loc));
+        }
+
+        if (selectedId is not null)
+        {
+            var replacement = Plugins.FirstOrDefault(item => item.Id == selectedId && item.CanOpenDetail);
+            SelectedPlugin = replacement;
         }
 
         Diagnostics.Clear();
@@ -115,6 +188,13 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         DiagnosticCount = Diagnostics.Count;
         RaiseSummaryChanged();
     }
+
+    internal void OpenPluginDetail(PluginItemViewModel item)
+    {
+        SelectedPlugin = item.CanOpenDetail ? item : null;
+    }
+
+    private void ShowPluginList() => SelectedPlugin = null;
 
     private void SetPluginEnabled(PluginItemViewModel item, bool enabled)
     {
@@ -161,12 +241,18 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
 
     private void OnCultureChanged(object? sender, CultureInfo culture)
     {
-        foreach (var plugin in Plugins)
-            plugin.RefreshLocalization(Loc);
-        SetStatus(statusKey, statusCount);
-        OnPropertyChanged(nameof(PluginCountLabel));
-        OnPropertyChanged(nameof(EnabledCountLabel));
-        OnPropertyChanged(nameof(DiagnosticCountLabel));
+        uiDispatcher(() =>
+        {
+            foreach (var plugin in Plugins)
+            {
+                plugin.RefreshLocalization(Loc);
+                RefreshPluginUi(plugin.Id, culture.Name);
+            }
+            SetStatus(statusKey, statusCount);
+            OnPropertyChanged(nameof(PluginCountLabel));
+            OnPropertyChanged(nameof(EnabledCountLabel));
+            OnPropertyChanged(nameof(DiagnosticCountLabel));
+        });
     }
 
     public void Dispose()
@@ -174,12 +260,16 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         if (disposed) return;
         disposed = true;
         LocaleService.CultureChanged -= OnCultureChanged;
+        if (runtime is not null)
+            runtime.PluginUiInvalidated -= OnPluginUiInvalidated;
+        uiRefreshQueue.Dispose();
     }
 }
 
 public sealed class PluginItemViewModel : NotifyViewModel
 {
     private readonly Action<PluginItemViewModel, bool> setEnabled;
+    private readonly Action<PluginItemViewModel> openDetail;
     private bool enabled;
     private Func<string, string> loc;
 
@@ -188,6 +278,12 @@ public sealed class PluginItemViewModel : NotifyViewModel
     public IReadOnlyList<string> Capabilities { get; }
     public int ExtensionCount { get; }
     public bool IsCredentialProtection { get; }
+    public IReadOnlyList<PluginUiContribution> CardContributions { get; private set; }
+    public IReadOnlyList<PluginUiContribution> DetailContributions { get; private set; }
+    public bool HasCardUi => CardContributions.Count > 0;
+    public bool HasDetailUi { get; }
+    public bool CanOpenDetail => HasDetailUi && DetailContributions.Count > 0;
+    public ICommand OpenDetailCommand { get; }
     public bool IsSystemPlugin => IsCredentialProtection;
     public bool CanToggle => !IsCredentialProtection;
     public string DisplayName => IsCredentialProtection ? Loc("plugins.credential.name") : Id;
@@ -207,7 +303,10 @@ public sealed class PluginItemViewModel : NotifyViewModel
     public PluginItemViewModel(
         LoadedPluginInfo info,
         bool isCredentialProtection,
+        IReadOnlyList<PluginUiContribution> cardContributions,
+        IReadOnlyList<PluginUiContribution> detailContributions,
         Action<PluginItemViewModel, bool> setEnabled,
+        Action<PluginItemViewModel> openDetail,
         Func<string, string> localize)
     {
         Id = info.Id;
@@ -216,7 +315,12 @@ public sealed class PluginItemViewModel : NotifyViewModel
         ExtensionCount = info.ExtensionCount;
         enabled = info.Enabled;
         IsCredentialProtection = isCredentialProtection;
+        CardContributions = cardContributions;
+        DetailContributions = detailContributions;
+        HasDetailUi = info.HasDetailUi;
         this.setEnabled = setEnabled;
+        this.openDetail = openDetail;
+        OpenDetailCommand = new DelegateCommand(() => this.openDetail(this));
         loc = localize;
     }
 
@@ -224,6 +328,18 @@ public sealed class PluginItemViewModel : NotifyViewModel
     {
         if (!SetProperty(ref enabled, value, nameof(Enabled))) return;
         OnPropertyChanged(nameof(StatusLabel));
+    }
+
+    internal void ApplyUiContributions(
+        IReadOnlyList<PluginUiContribution> cardContributions,
+        IReadOnlyList<PluginUiContribution> detailContributions)
+    {
+        CardContributions = cardContributions;
+        DetailContributions = detailContributions;
+        OnPropertyChanged(nameof(CardContributions));
+        OnPropertyChanged(nameof(DetailContributions));
+        OnPropertyChanged(nameof(HasCardUi));
+        OnPropertyChanged(nameof(CanOpenDetail));
     }
 
     internal void RefreshLocalization(Func<string, string> localize)
@@ -239,4 +355,46 @@ public sealed class PluginItemViewModel : NotifyViewModel
     }
 
     private string Loc(string key) => loc(key);
+}
+
+internal sealed class PluginUiRefreshQueue : IDisposable
+{
+    private readonly Action<Action> dispatch;
+    private readonly Action<string> refresh;
+    private readonly HashSet<string> pending = new(StringComparer.Ordinal);
+    private readonly object gate = new();
+    private bool disposed;
+
+    public PluginUiRefreshQueue(Action<Action> dispatch, Action<string> refresh)
+    {
+        this.dispatch = dispatch;
+        this.refresh = refresh;
+    }
+
+    public void Enqueue(string pluginId)
+    {
+        lock (gate)
+        {
+            if (disposed || !pending.Add(pluginId)) return;
+        }
+
+        dispatch(() =>
+        {
+            lock (gate)
+            {
+                pending.Remove(pluginId);
+                if (disposed) return;
+            }
+            refresh(pluginId);
+        });
+    }
+
+    public void Dispose()
+    {
+        lock (gate)
+        {
+            disposed = true;
+            pending.Clear();
+        }
+    }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Globalization;
 using LoomX.Plugins;
 
 namespace LoomX.CredentialProtection;
@@ -8,13 +9,22 @@ namespace LoomX.CredentialProtection;
 /// 第一方 Credential Protection Router 插件：在请求正文离开本地安全边界、
 /// 发送给外部 Provider 前完成凭据检测与脱敏。规则数据 Plugin-owned，脱敏失败 fail closed。
 /// </summary>
-public sealed class CredentialProtectionPlugin : ILoomXPlugin
+public sealed class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContributionProvider
 {
     public const string PluginId = "loomx.credential-protection";
 
+    private readonly CredentialProtectionObservability observability = new();
     private SensitiveRuleStore? ruleStore;
 
     public string Id => PluginId;
+
+    public CredentialProtectionObservability Observability => observability;
+
+    public event EventHandler? UiInvalidated
+    {
+        add => observability.Changed += value;
+        remove => observability.Changed -= value;
+    }
 
     /// <summary>规则存储（宿主 Initialize 后可用；测试也可直接注入）。</summary>
     public SensitiveRuleStore RuleStore =>
@@ -26,14 +36,81 @@ public sealed class CredentialProtectionPlugin : ILoomXPlugin
         ruleStore = new SensitiveRuleStore(context.DataDirectory);
     }
 
+    public IReadOnlyList<PluginUiContribution> GetUiContributions(PluginUiContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        var snapshot = observability.Snapshot();
+        var text = CredentialProtectionUiText.Resolve(context.CultureName);
+        CultureInfo culture;
+        try { culture = CultureInfo.GetCultureInfo(context.CultureName); }
+        catch (CultureNotFoundException) { culture = CultureInfo.InvariantCulture; }
+
+        return
+        [
+            new PluginUiContribution(
+                PluginUiContribution.CurrentSchemaVersion,
+                "observability",
+                PluginUiSlot.CardBody,
+                new PluginUiGridNode(
+                    3,
+                    [
+                        new PluginUiGridItem(BuildMetricCard(
+                            text.SanitizedRequests,
+                            $"{snapshot.SanitizedRequests.ToString("N0", culture)}/{snapshot.TotalRequests.ToString("N0", culture)}",
+                            string.Format(culture, text.SanitizedTerms, snapshot.SanitizedTerms),
+                            PluginUiTone.Success,
+                            "M 16,3 L 27,8 L 27,16 C 27,23 22,28 16,30 C 10,28 5,23 5,16 L 5,8 Z M 11,16 L 15,20 L 22,12")),
+                        new PluginUiGridItem(BuildMetricCard(
+                            text.RestoredResponses,
+                            snapshot.RestoredResponses.ToString("N0", culture),
+                            text.RestoredHint,
+                            PluginUiTone.Accent,
+                            "M 16,3 L 27,8 L 27,16 C 27,23 22,28 16,30 C 10,28 5,23 5,16 L 5,8 Z M 11,16 L 15,20 L 22,12")),
+                        new PluginUiGridItem(BuildMetricCard(
+                            text.Errors,
+                            snapshot.Errors.ToString("N0", culture),
+                            text.ErrorsHint,
+                            PluginUiTone.Warning,
+                            "M 16,4 A 12,12 0 1 1 16,28 A 12,12 0 1 1 16,4 M 16,10 L 16,18 M 16,23 L 16,23")),
+                    ],
+                    ColumnSpacing: 12)),
+        ];
+    }
+
+    private static PluginUiSurfaceNode BuildMetricCard(
+        string title,
+        string value,
+        string caption,
+        PluginUiTone tone,
+        string iconData) =>
+        new(
+            new PluginUiStackNode(
+                [
+                    new PluginUiGridNode(
+                        2,
+                        [
+                            new PluginUiGridItem(new PluginUiTextNode(title, PluginUiTextRole.Title)),
+                            new PluginUiGridItem(
+                                new PluginUiIconNode(iconData, tone, Size: 18, HorizontalAlignment: PluginUiAlignment.End),
+                                HorizontalAlignment: PluginUiAlignment.End),
+                        ]),
+                    new PluginUiTextNode(value, PluginUiTextRole.Metric, tone),
+                    new PluginUiDividerNode(),
+                    new PluginUiTextNode(caption, PluginUiTextRole.Caption, Wrap: true),
+                ],
+                Spacing: 8),
+            Tone: PluginUiTone.Default,
+            Padding: 14,
+            CornerRadius: 10);
+
     public IEnumerable<IPipelineExtension> CreateExtensions()
     {
         // 宿主保证 Initialize 先于 CreateExtensions 调用；防御性兜底避免空引用。
         var store = ruleStore ?? new SensitiveRuleStore(
             Path.Combine(Path.GetTempPath(), PluginId));
         var engine = new CredentialEngine(store);
-        yield return new CredentialRequestExtension(engine);
-        yield return new CredentialResponseExtension(engine);
+        yield return new CredentialRequestExtension(engine, observability);
+        yield return new CredentialResponseExtension(engine, observability);
     }
 }
 
@@ -68,8 +145,11 @@ public abstract class CredentialExtensionBase(CredentialEngine engine) : IPipeli
 }
 
 /// <summary>Router 请求扩展点：请求正文发送给外部 Provider 前脱敏。</summary>
-public sealed class CredentialRequestExtension(CredentialEngine engine) : IRequestExtension
+public sealed class CredentialRequestExtension(
+    CredentialEngine engine,
+    CredentialProtectionObservability? observability = null) : IRequestExtension
 {
+    private readonly CredentialProtectionObservability observability = observability ?? new();
     public string ExtensionId => "credential.request";
 
     public ExtensionKind Kind => ExtensionKind.Request;
@@ -84,7 +164,7 @@ public sealed class CredentialRequestExtension(CredentialEngine engine) : IReque
     {
         try
         {
-            var sanitized = engine.Sanitize(payload, out var sanitizedChanged);
+            var sanitized = engine.Sanitize(payload, out var sanitizedChanged, out var replacementCount);
             var transformed = sanitized;
             var instructionChanged = false;
             if (CredentialEngine.ContainsPlaceholderCandidate(sanitized))
@@ -97,6 +177,7 @@ public sealed class CredentialRequestExtension(CredentialEngine engine) : IReque
                             : null,
                     out instructionChanged);
             }
+            observability.RecordRequest(replacementCount);
             var changed = sanitizedChanged || instructionChanged;
             return ValueTask.FromResult(changed
                 ? PipelineResult.Modify(transformed, "敏感数据已脱敏并应用凭据引用完整性指令。")
@@ -104,6 +185,8 @@ public sealed class CredentialRequestExtension(CredentialEngine engine) : IReque
         }
         catch (Exception)
         {
+            observability.RecordRequest(0);
+            observability.RecordError();
             return ValueTask.FromResult(PipelineResult.Block("凭据保护处理失败，已阻止原始数据。"));
         }
     }
@@ -228,8 +311,11 @@ internal static class CredentialIntegrityInstructionInjector
 }
 
 /// <summary>Router 响应扩展点：只恢复本地签发的有效占位符，未知 token 保持原样。</summary>
-public sealed class CredentialResponseExtension(CredentialEngine engine) : IResponseExtension
+public sealed class CredentialResponseExtension(
+    CredentialEngine engine,
+    CredentialProtectionObservability? observability = null) : IResponseExtension
 {
+    private readonly CredentialProtectionObservability observability = observability ?? new();
     public string ExtensionId => "credential.response";
 
     public ExtensionKind Kind => ExtensionKind.Response;
@@ -244,13 +330,70 @@ public sealed class CredentialResponseExtension(CredentialEngine engine) : IResp
         try
         {
             var restored = engine.RestoreTransportPayload(payload, out var changed);
+            if (changed) observability.RecordRestoredResponse();
             return ValueTask.FromResult(changed
                 ? PipelineResult.Modify(restored, "本地占位符已恢复。")
                 : PipelineResult.Pass(payload));
         }
         catch (Exception)
         {
+            observability.RecordError();
             return ValueTask.FromResult(PipelineResult.Block("凭据恢复处理失败，已阻止未处理响应。"));
         }
+    }
+}
+
+internal sealed record CredentialProtectionUiText(
+    string SanitizedRequests,
+    string SanitizedTerms,
+    string RestoredResponses,
+    string RestoredHint,
+    string Errors,
+    string ErrorsHint)
+{
+    public static CredentialProtectionUiText Resolve(string cultureName)
+    {
+        var normalized = cultureName.Trim().ToLowerInvariant();
+        if (normalized.StartsWith("zh-tw", StringComparison.Ordinal)
+            || normalized.StartsWith("zh-hk", StringComparison.Ordinal))
+        {
+            return new(
+                "已脫敏請求",
+                "累計脫敏詞項 {0:N0}",
+                "已還原回覆",
+                "模型回覆已成功還原",
+                "異常與警告",
+                "請求或回覆處理異常");
+        }
+
+        if (normalized.StartsWith("ja", StringComparison.Ordinal))
+        {
+            return new(
+                "マスク済みリクエスト",
+                "累計マスク項目 {0:N0}",
+                "復元済みレスポンス",
+                "モデル応答を正常に復元",
+                "異常と警告",
+                "リクエストまたは応答の処理異常");
+        }
+
+        if (normalized.StartsWith("zh", StringComparison.Ordinal))
+        {
+            return new(
+                "已脱敏请求",
+                "累计脱敏词项 {0:N0}",
+                "已还原回复",
+                "模型回复已成功还原",
+                "异常与告警",
+                "请求或响应处理异常");
+        }
+
+        return new(
+            "Sanitized requests",
+            "Sanitized terms {0:N0}",
+            "Restored responses",
+            "Model responses restored successfully",
+            "Errors and warnings",
+            "Request or response processing errors");
     }
 }

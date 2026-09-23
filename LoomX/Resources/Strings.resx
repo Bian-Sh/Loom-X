@@ -1769,4 +1769,6 @@
   <data name="update.install.confirm.message"><value>安装将关闭并重启 Loom-X。期间路由服务会短暂中断，正在进行的请求可能失败。请先保存重要工作。</value></data>
   <data name="update.install.confirm.accept"><value>安装并重启</value></data>
   <data name="update.install.confirm.cancel"><value>暂不安装</value></data>
+  <data name="plugins.detail.open"><value>打开插件详情</value></data>
+  <data name="plugins.detail.back"><value>返回插件列表</value></data>
 </root>

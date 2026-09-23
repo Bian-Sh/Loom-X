@@ -28,7 +28,15 @@ public sealed record LoadedPluginInfo(
     string Version,
     IReadOnlyList<string> Capabilities,
     int ExtensionCount,
-    bool Enabled);
+    bool Enabled,
+    bool HasCardUi = false,
+    bool HasDetailUi = false);
+
+/// <summary>插件 UI 快照失效通知，只携带安全的插件标识。</summary>
+public sealed class PluginUiInvalidatedEventArgs(string pluginId) : EventArgs
+{
+    public string PluginId { get; } = pluginId;
+}
 
 /// <summary>
 /// 插件运行时：发现 → Manifest 验证 → ALC 加载 → Extension 注册 → Pipeline 编排。
@@ -42,11 +50,15 @@ public sealed class PluginRuntime
         public required ILoomXPlugin Instance { get; init; }
         public required PluginLoadContext LoadContext { get; init; }
         public required List<PipelineEntry> Entries { get; init; }
+        public IPluginUiContributionProvider? UiProvider { get; init; }
+        public EventHandler? UiInvalidatedHandler { get; init; }
         public bool Enabled { get; set; } = true;
     }
 
     private readonly List<LoadedPlugin> plugins = [];
     private readonly List<string> diagnostics = [];
+    private readonly HashSet<string> uiDiagnosticKeys = new(StringComparer.Ordinal);
+    private readonly object diagnosticsGate = new();
     private readonly PipelineRegistry registry = new();
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<PluginRuntime> logger;
@@ -57,7 +69,16 @@ public sealed class PluginRuntime
         logger = loggerFactory.CreateLogger<PluginRuntime>();
     }
 
-    public IReadOnlyList<string> Diagnostics => diagnostics;
+    public IReadOnlyList<string> Diagnostics
+    {
+        get
+        {
+            lock (diagnosticsGate)
+                return diagnostics.ToArray();
+        }
+    }
+
+    public event EventHandler<PluginUiInvalidatedEventArgs>? PluginUiInvalidated;
 
     public IReadOnlyDictionary<string, Pipeline> Pipelines => registry.Pipelines;
 
@@ -67,12 +88,76 @@ public sealed class PluginRuntime
             plugin.Manifest.Version,
             plugin.Manifest.Capabilities,
             plugin.Entries.Count,
-            plugin.Enabled))
+            plugin.Enabled,
+            plugin.UiProvider is not null && HasUiSlot(plugin.Manifest, PluginUiSlot.CardBody),
+            plugin.UiProvider is not null && HasUiSlot(plugin.Manifest, PluginUiSlot.DetailBody)))
         .ToArray();
 
     /// <summary>按 id 取 Pipeline；不存在（无 Entry 注册）时返回 null，调用方保持原行为。</summary>
     public IPipeline? GetPipeline(string pipelineId) =>
         registry.Pipelines.TryGetValue(pipelineId, out var pipeline) ? pipeline : null;
+
+    /// <summary>读取插件在指定 Slot 的已验证声明式 UI 快照。</summary>
+    public IReadOnlyList<PluginUiContribution> GetUiContributions(
+        string pluginId,
+        PluginUiSlot slot,
+        string cultureName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cultureName);
+        var plugin = plugins.FirstOrDefault(item => item.Manifest.Id == pluginId);
+        if (plugin?.UiProvider is null || plugin.Manifest.Ui is null) return [];
+
+        IReadOnlyList<PluginUiContribution> provided;
+        try
+        {
+            provided = plugin.UiProvider.GetUiContributions(new PluginUiContext(cultureName)) ?? [];
+        }
+        catch (Exception exception)
+        {
+            AddUiDiagnostic(pluginId, "provider", "PROVIDER_FAILURE");
+            logger.LogWarning(
+                exception,
+                "插件 UI 快照获取失败 {PluginId} {ExceptionType}",
+                pluginId,
+                exception.GetType().Name);
+            return [];
+        }
+
+        var declarations = plugin.Manifest.Ui.Contributions
+            .ToDictionary(item => item.Id, StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<PluginUiContribution>();
+        foreach (var contribution in provided)
+        {
+            if (contribution is null)
+            {
+                AddUiDiagnostic(pluginId, "unknown", "NULL_CONTRIBUTION");
+                continue;
+            }
+            if (!seen.Add(contribution.Id))
+            {
+                AddUiDiagnostic(pluginId, contribution.Id, "DUPLICATE_RUNTIME_ID");
+                continue;
+            }
+            if (!declarations.TryGetValue(contribution.Id, out var declared)
+                || declared.Slot != contribution.Slot)
+            {
+                AddUiDiagnostic(pluginId, contribution.Id, "UNDECLARED_CONTRIBUTION");
+                continue;
+            }
+
+            var validation = PluginUiValidator.Validate(contribution);
+            if (!validation.IsValid)
+            {
+                AddUiDiagnostic(pluginId, contribution.Id, validation.ReasonCode);
+                continue;
+            }
+            if (contribution.Slot == slot)
+                result.Add(contribution);
+        }
+        return result;
+    }
 
     public static PluginRuntime Start(PluginRuntimeOptions options, ILoggerFactory loggerFactory)
     {
@@ -170,12 +255,25 @@ public sealed class PluginRuntime
         var extensions = instance.CreateExtensions().ToArray();
         var manifestExtensions = manifest.Extensions.ToDictionary(item => item.Id, StringComparer.Ordinal);
         var entries = new List<PipelineEntry>();
+        var uiProvider = instance as IPluginUiContributionProvider;
+        EventHandler? uiInvalidatedHandler = null;
+        if (manifest.Ui is { Contributions.Count: > 0 } && uiProvider is null)
+            AddUiDiagnostic(manifest.Id, "provider", "PROVIDER_MISSING");
+        if (uiProvider is not null)
+        {
+            uiInvalidatedHandler = (_, _) =>
+                PluginUiInvalidated?.Invoke(this, new PluginUiInvalidatedEventArgs(manifest.Id));
+            uiProvider.UiInvalidated += uiInvalidatedHandler;
+        }
+
         var plugin = new LoadedPlugin
         {
             Manifest = manifest,
             Instance = instance,
             LoadContext = loadContext,
             Entries = entries,
+            UiProvider = uiProvider,
+            UiInvalidatedHandler = uiInvalidatedHandler,
         };
 
         foreach (var extension in extensions)
@@ -204,6 +302,19 @@ public sealed class PluginRuntime
         }
 
         plugins.Add(plugin);
+    }
+
+    private static bool HasUiSlot(PluginManifest manifest, PluginUiSlot slot) =>
+        manifest.Ui?.Contributions.Any(item => item.Slot == slot) == true;
+
+    private void AddUiDiagnostic(string pluginId, string contributionId, string reasonCode)
+    {
+        var key = $"{pluginId}|{contributionId}|{reasonCode}";
+        lock (diagnosticsGate)
+        {
+            if (!uiDiagnosticKeys.Add(key)) return;
+            diagnostics.Add($"插件 {pluginId} UI Contribution {contributionId} 已忽略：{reasonCode}");
+        }
     }
 
     private void ApplyOrdering(PluginRuntimeOptions options)

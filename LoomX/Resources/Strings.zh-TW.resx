@@ -1615,4 +1615,6 @@
   <data name="update.install.confirm.message"><value>安裝將關閉並重新啟動 Loom-X。期間路由服務會短暫中斷，正在進行的請求可能失敗。請先儲存重要工作。</value></data>
   <data name="update.install.confirm.accept"><value>安裝並重新啟動</value></data>
   <data name="update.install.confirm.cancel"><value>暫不安裝</value></data>
+  <data name="plugins.detail.open"><value>開啟外掛程式詳細資料</value></data>
+  <data name="plugins.detail.back"><value>返回外掛程式清單</value></data>
 </root>
