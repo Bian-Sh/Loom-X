@@ -63,7 +63,7 @@ public sealed class MainWindowNavigationContractTests
         var windowSource = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "MainWindow.axaml"));
         var viewModelSource = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "ViewModels", "MainWindowViewModel.cs"));
 
-        Assert.Contains("<Button Command=\"{Binding NavigateCommand}\" Classes=\"nav-button\" Classes.active=\"{Binding IsActive}\">", windowSource, StringComparison.Ordinal);
+        Assert.Contains("<Button Command=\"{Binding NavigateCommand}\" Classes=\"nav-button\" Classes.active=\"{Binding IsActive}\"", windowSource, StringComparison.Ordinal);
         Assert.DoesNotContain("<ToggleButton Command=\"{Binding NavigateCommand}\"", windowSource, StringComparison.Ordinal);
         Assert.Contains("Classes=\"navigation-selection-indicator\"", windowSource, StringComparison.Ordinal);
         Assert.Contains("Classes=\"navigation-selection-outline\"", windowSource, StringComparison.Ordinal);

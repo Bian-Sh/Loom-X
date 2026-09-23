@@ -82,7 +82,7 @@ public sealed class GatewayViewContractTests
         Assert.DoesNotContain("ListBoxItem:selected", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ListBoxItem:pointerover", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.endpoint-card\"><Setter Property=\"Background\" Value=\"{DynamicResource SurfaceSubtleBrush}\"/>", source, StringComparison.Ordinal);
-        Assert.Contains("<Border Classes=\"endpoint-card\" Padding=\"14,12\" Background=\"{DynamicResource SurfaceSubtleBrush}\"", source, StringComparison.Ordinal);
+        Assert.Contains("<Border Classes=\"endpoint-card\" Padding=\"14,8\" Background=\"{DynamicResource SurfaceSubtleBrush}\"", source, StringComparison.Ordinal);
         Assert.Contains("BorderBrush=\"{DynamicResource BorderStrongBrush}\" BorderThickness=\"0,0,0,1\"", source, StringComparison.Ordinal);
         Assert.Contains("ColumnDefinitions=\"3*,2*\"", source, StringComparison.Ordinal);
     }
