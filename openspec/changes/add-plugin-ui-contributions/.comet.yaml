@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: build
+phase: archive
 context_compression: off
 build_mode: autonomous
 build_pause: null
@@ -8,18 +8,18 @@ subagent_dispatch: null
 tdd_mode: tdd
 review_mode: standard
 isolation: current
-verify_mode: null
+verify_mode: full
 auto_transition: true
 base_ref: 4e7fba1567d1f6833703b0ecd17d621088aee2a7
 design_doc: openspec/changes/add-plugin-ui-contributions/design.md
 plan: docs/superpowers/plans/2026-09-23-add-plugin-ui-contributions.md
-verify_result: pending
+verify_result: pass
 verify_failures: 0
-verification_report: null
+verification_report: docs/superpowers/reports/2026-09-23-add-plugin-ui-contributions-verify.md
 branch_status: pending
 created_at: 2026-09-23
-verified_at: null
-archive_confirmation: null
+verified_at: 2026-09-23
+archive_confirmation: pending
 archived: false
 bound_branch: codex/plugin-ui-contributions
 direct_override: null
@@ -28,4 +28,4 @@ handoff_hash: a7eed4db152d4b8d466f30853666a2e8109eaa9bab19c24df950c844631efedb
 classic_profile: full
 classic_migration: 1
 run_id: dc7ce5ac-361a-48c1-9f74-58b58da8b717
-check_epoch: 2
+check_epoch: 4
