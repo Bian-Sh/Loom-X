@@ -36,6 +36,26 @@ public sealed class OverviewGraphContractTests
     }
 
     [Fact]
+    public void OverviewGatewayActionsPersistUserIntentBeforeChangingRuntimeState()
+    {
+        var source = ReadDesktopFile("ViewModels", "MainWindowViewModel.cs");
+        var overview = source[source.IndexOf("public sealed class OverviewViewModel", StringComparison.Ordinal)..];
+
+        Assert.Contains("await dataStore.SetGatewayRunningAsync(true);", overview, StringComparison.Ordinal);
+        Assert.Contains("await dataStore.SetGatewayRunningAsync(false);", overview, StringComparison.Ordinal);
+        Assert.True(
+            overview.IndexOf("await dataStore.SetGatewayRunningAsync(true);", StringComparison.Ordinal)
+            < overview.IndexOf("await gatewayService.StartAsync", StringComparison.Ordinal));
+        Assert.True(
+            overview.IndexOf("await dataStore.SetGatewayRunningAsync(false);", StringComparison.Ordinal)
+            < overview.IndexOf("await gatewayService.StopAsync", StringComparison.Ordinal));
+
+        var stateChangedStart = overview.IndexOf("private void OnGatewayStateChanged", StringComparison.Ordinal);
+        var telemetryStart = overview.IndexOf("private void OnTelemetryPublished", stateChangedStart, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetGatewayRunningAsync", overview[stateChangedStart..telemetryStart], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OverviewUsesNativeRuntimeGraphControl()
     {
         var source = ReadDesktopFile("Views", "OverviewView.axaml");

@@ -1,0 +1,8 @@
+{
+  "openspec_proposal": "openspec/changes/enhance-service-autostart/proposal.md",
+  "openspec_design": "openspec/changes/enhance-service-autostart/design.md",
+  "openspec_tasks": "openspec/changes/enhance-service-autostart/tasks.md",
+  "openspec_delta_spec": "openspec/changes/enhance-service-autostart/specs/desktop-startup-lifecycle/spec.md",
+  "handoff_context": "openspec/changes/enhance-service-autostart/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/enhance-service-autostart/.comet/handoff/design-context.md"
+}

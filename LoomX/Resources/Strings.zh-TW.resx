@@ -116,6 +116,15 @@
   <data name="settings.tab.about">
     <value>關於</value>
   </data>
+  <data name="settings.startup.windows.label">
+    <value>開機時啟動 Loom-X</value>
+  </data>
+  <data name="settings.startup.windows.hint">
+    <value>登入 Windows 後自動啟動 Loom-X，不需要系統管理員權限。</value>
+  </data>
+  <data name="settings.startup.windows.sync.failed">
+    <value>無法更新開機自動啟動：{0}</value>
+  </data>
   <data name="settings.language.label">
     <value>界面語言</value>
   </data>

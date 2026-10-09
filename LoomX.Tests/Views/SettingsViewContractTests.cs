@@ -364,6 +364,37 @@ public sealed class SettingsViewContractTests
         Assert.Contains("<value>現在のバージョン：</value>", jaJp, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void 常规设置提供Windows开机自启动并保存到统一设置模型()
+    {
+        var source = ReadDesktopFile("Views", "SettingsView.axaml");
+        var viewModel = ReadDesktopFile("ViewModels", "SettingsViewModel.cs");
+        var configurationService = ReadDesktopFile("Configuration", "ConfigurationManagementService.cs");
+        var zhCn = ReadDesktopFile("Resources", "Strings.resx");
+        var zhTw = ReadDesktopFile("Resources", "Strings.zh-TW.resx");
+        var enUs = ReadDesktopFile("Resources", "Strings.en-US.resx");
+        var jaJp = ReadDesktopFile("Resources", "Strings.ja-JP.resx");
+
+        Assert.Contains("settings.startup.windows.label", source, StringComparison.Ordinal);
+        Assert.Contains("settings.startup.windows.hint", source, StringComparison.Ordinal);
+        Assert.Contains(@"IsChecked=""{Binding StartWithWindows, Mode=TwoWay}""", source, StringComparison.Ordinal);
+
+        var startupIndex = source.IndexOf("settings.startup.windows.label", StringComparison.Ordinal);
+        var languageIndex = source.IndexOf("settings.language.label", StringComparison.Ordinal);
+        var themeIndex = source.IndexOf("settings.theme.label", StringComparison.Ordinal);
+        var transparencyIndex = source.IndexOf("settings.transparency.label", StringComparison.Ordinal);
+        Assert.True(startupIndex < languageIndex, "开机自启动应位于常规设置第一排");
+        Assert.True(languageIndex < themeIndex && themeIndex < transparencyIndex, "语言、主题与透明设置应连续排列");
+        Assert.Contains("public bool StartWithWindows", viewModel, StringComparison.Ordinal);
+        Assert.Contains("StartWithWindows = settings.StartWithWindows;", viewModel, StringComparison.Ordinal);
+        Assert.DoesNotContain("GatewayRunning", viewModel, StringComparison.Ordinal);
+        Assert.DoesNotContain("GatewayRunning", configurationService.Split("public sealed record AppSettingsResponse", StringSplitOptions.None)[0], StringComparison.Ordinal);
+        Assert.Contains("开机时启动 Loom-X", zhCn, StringComparison.Ordinal);
+        Assert.Contains("開機時啟動 Loom-X", zhTw, StringComparison.Ordinal);
+        Assert.Contains("Start Loom-X when Windows starts", enUs, StringComparison.Ordinal);
+        Assert.Contains("Windows の起動時に Loom-X を起動", jaJp, StringComparison.Ordinal);
+    }
+
     private static void EnsureAvaloniaSetup()
     {
         AvaloniaTestBootstrap.Ensure();

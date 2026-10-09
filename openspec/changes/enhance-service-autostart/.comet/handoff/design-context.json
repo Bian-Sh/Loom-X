@@ -1,0 +1,16 @@
+{
+  "change": "enhance-service-autostart",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "task_hash_policy": "task-content-v1",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "e5de34f88f18ccdf36302a91a3750f6370988a832a1bc13faaab289a2ddf5d61",
+  "files": [
+    { "path": "openspec/changes/enhance-service-autostart/proposal.md", "sha256": "1e6ec6a5edec63162c36ac46aa59723e7e4649565949859a3712d9f0fb718022" },
+    { "path": "openspec/changes/enhance-service-autostart/design.md", "sha256": "cb0a0128998e6a2935e43231c4f3693a9719b280ed1a7d08503fbf14213d10e4" },
+    { "path": "openspec/changes/enhance-service-autostart/tasks.md", "sha256": "28e38a37ecb7358a45792dc0c4cedd162a405caac859f8410ac879f8c934c801" },
+    { "path": "openspec/changes/enhance-service-autostart/.openspec.yaml", "sha256": "d04b6ad7c1b1e5eb9e8ec8cfdae94bc49d29216b59b73cea7a3cc1de9d508463" },
+    { "path": "openspec/changes/enhance-service-autostart/specs/desktop-startup-lifecycle/spec.md", "sha256": "7d8d8543d0db9baa990bf9fbe4076c07003d350509813da77e9e38831b6d386b" }
+  ]
+}

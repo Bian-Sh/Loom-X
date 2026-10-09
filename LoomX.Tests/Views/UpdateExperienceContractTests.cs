@@ -35,7 +35,7 @@ public sealed class UpdateExperienceContractTests
 
         Assert.Contains("requestApplicationExit: () => desktop.Shutdown()", app, StringComparison.Ordinal);
         Assert.Contains("confirmUpdateInstall: mainWindow.ConfirmUpdateInstallAsync", app, StringComparison.Ordinal);
-        Assert.Contains("AssistantViewModel? assistantViewModel = null,\n        Action? requestApplicationExit = null,\n        Func<Task<bool>>? confirmUpdateInstall = null,\n        Action<string>? applyTheme = null)", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("AssistantViewModel? assistantViewModel = null,\n        Action? requestApplicationExit = null,\n        Func<Task<bool>>? confirmUpdateInstall = null,\n        Action<string>? applyTheme = null,\n        IWindowsStartupService? windowsStartupService = null)", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("private readonly ReleaseHistoryViewModel releaseHistoryViewModel;", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("IUpdateService updateService = new UpdateService(", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("new UpdateCoordinator(\n            this.dataStore,\n            updateService,", mainViewModel, StringComparison.Ordinal);

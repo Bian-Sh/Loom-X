@@ -63,6 +63,15 @@
   <data name="settings.tab.updates"><value>Updates</value></data>
   <data name="settings.tab.data"><value>Data and privacy</value></data>
   <data name="settings.tab.about"><value>About</value></data>
+  <data name="settings.startup.windows.label">
+    <value>Start Loom-X when Windows starts</value>
+  </data>
+  <data name="settings.startup.windows.hint">
+    <value>Launch Loom-X automatically after you sign in to Windows. Administrator access is not required.</value>
+  </data>
+  <data name="settings.startup.windows.sync.failed">
+    <value>Unable to update Windows startup: {0}</value>
+  </data>
   <data name="settings.language.label"><value>Language</value></data>
   <data name="settings.language.hint"><value>Change the interface language.</value></data>
   <data name="settings.theme.label"><value>Theme</value></data>

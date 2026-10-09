@@ -52,4 +52,44 @@ public sealed class AppStartupAndProviderRefreshContractTests
         Assert.DoesNotContain("ExternalChangeDetected", File.ReadAllText(snapshotPath), StringComparison.Ordinal);
         Assert.DoesNotContain("ExternalChangeDetected", File.ReadAllText(storePath), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void 应用启动接入Windows自启动与网关意图恢复()
+    {
+        var appSource = ReadDesktopFile("App.axaml.cs");
+        var mainViewModelSource = ReadDesktopFile("ViewModels", "MainWindowViewModel.cs");
+        var initializeMethod = Slice(mainViewModelSource, "private async Task InitializeDataStoreAsync()", "private void OnConfigurationChanged");
+
+        Assert.Contains("var windowsStartupService = new WindowsStartupService(", appSource, StringComparison.Ordinal);
+        Assert.Contains("windowsStartupService: windowsStartupService", appSource, StringComparison.Ordinal);
+        Assert.Contains("IWindowsStartupService? windowsStartupService = null", mainViewModelSource, StringComparison.Ordinal);
+        Assert.Contains("windowsStartupService: this.windowsStartupService", mainViewModelSource, StringComparison.Ordinal);
+        Assert.Contains("new ApplicationStartupCoordinator(", mainViewModelSource, StringComparison.Ordinal);
+        Assert.Contains("await dataStore.InitializeAsync();", initializeMethod, StringComparison.Ordinal);
+        Assert.Contains("dataStore.CurrentConfig.Server.Urls.FirstOrDefault()", initializeMethod, StringComparison.Ordinal);
+        Assert.Contains("http://127.0.0.1:11434", initializeMethod, StringComparison.Ordinal);
+        Assert.Contains("await startupCoordinator.RestoreAsync(", initializeMethod, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetGatewayRunningAsync", initializeMethod, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 应用退出仅停止网关且不清零运行意图()
+    {
+        var appSource = ReadDesktopFile("App.axaml.cs");
+        var exitHandler = Slice(appSource, "desktop.Exit +=", "base.OnFrameworkInitializationCompleted();");
+
+        Assert.Contains("await gatewayService.StopAsync();", exitHandler, StringComparison.Ordinal);
+        Assert.DoesNotContain("SetGatewayRunningAsync", exitHandler, StringComparison.Ordinal);
+    }
+
+    private static string Slice(string source, string startMarker, string endMarker)
+    {
+        var start = source.IndexOf(startMarker, StringComparison.Ordinal);
+        var end = source.IndexOf(endMarker, start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start);
+        return source[start..end];
+    }
+
+    private static string ReadDesktopFile(params string[] segments) =>
+        File.ReadAllText(Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]));
 }

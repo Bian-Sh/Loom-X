@@ -127,6 +127,18 @@ public sealed class AppDataStore : IDisposable
         return result;
     }
 
+    public async Task<AppSettingsResponse> SetGatewayRunningAsync(bool gatewayRunning, CancellationToken cancellationToken = default)
+    {
+        var previous = Settings;
+        var result = await configService.SetGatewayRunningAsync(gatewayRunning, cancellationToken);
+        var fields = GetSettingsFields(previous, result);
+        await ApplyLocalChangeAsync(
+            new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Settings, EntityKey: "settings", Fields: fields),
+            () => ApplySettingsSnapshot(result),
+            cancellationToken);
+        return result;
+    }
+
     public async Task<ProviderResponse> CreateProviderAsync(ProviderInput input, CancellationToken cancellationToken = default)
     {
         var result = await configService.CreateProviderAsync(input, cancellationToken);
@@ -460,6 +472,8 @@ public sealed class AppDataStore : IDisposable
             AutoCheckUpdates = result.AutoCheckUpdates,
             UpdateChannel = result.UpdateChannel,
             UseProxyForUpdates = result.UseProxyForUpdates,
+            StartWithWindows = result.StartWithWindows,
+            GatewayRunning = result.GatewayRunning,
             DiagnosticsEnabled = result.DiagnosticsEnabled,
             LogRetentionDays = result.LogRetentionDays,
             LogStackTrace = result.LogStackTrace,
@@ -654,7 +668,7 @@ public sealed class AppDataStore : IDisposable
 
     private static ConfigurationChangeFields GetSettingsFields(AppSettingsResponse? before, AppSettingsResponse after)
     {
-        if (before is null) return ConfigurationChangeFields.SettingsLanguage | ConfigurationChangeFields.SettingsTheme | ConfigurationChangeFields.SettingsProxy | ConfigurationChangeFields.SettingsUpdates | ConfigurationChangeFields.SettingsDiagnostics | ConfigurationChangeFields.SettingsLogging | ConfigurationChangeFields.SettingsAppearance;
+        if (before is null) return ConfigurationChangeFields.SettingsLanguage | ConfigurationChangeFields.SettingsTheme | ConfigurationChangeFields.SettingsProxy | ConfigurationChangeFields.SettingsUpdates | ConfigurationChangeFields.SettingsDiagnostics | ConfigurationChangeFields.SettingsLogging | ConfigurationChangeFields.SettingsAppearance | ConfigurationChangeFields.SettingsStartup;
         var fields = ConfigurationChangeFields.None;
         if (!string.Equals(before.Language, after.Language, StringComparison.OrdinalIgnoreCase)) fields |= ConfigurationChangeFields.SettingsLanguage;
         if (!string.Equals(before.Theme, after.Theme, StringComparison.OrdinalIgnoreCase)) fields |= ConfigurationChangeFields.SettingsTheme;
@@ -663,6 +677,7 @@ public sealed class AppDataStore : IDisposable
         if (before.DiagnosticsEnabled != after.DiagnosticsEnabled) fields |= ConfigurationChangeFields.SettingsDiagnostics;
         if (before.LogRetentionDays != after.LogRetentionDays || before.LogStackTrace != after.LogStackTrace) fields |= ConfigurationChangeFields.SettingsLogging;
         if (before.TransparencyEnabled != after.TransparencyEnabled || before.TransparencyOpacity != after.TransparencyOpacity || before.BlurAmount != after.BlurAmount || !string.Equals(before.TransparencyAlgorithm, after.TransparencyAlgorithm, StringComparison.OrdinalIgnoreCase)) fields |= ConfigurationChangeFields.SettingsAppearance;
+        if (before.StartWithWindows != after.StartWithWindows || before.GatewayRunning != after.GatewayRunning) fields |= ConfigurationChangeFields.SettingsStartup;
         return fields;
     }
 

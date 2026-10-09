@@ -37,6 +37,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     private readonly ReleaseHistoryViewModel releaseHistoryViewModel;
     private readonly Action<bool, int, int, string>? applyAppearance;
     private readonly Action<string>? applyTheme;
+    private readonly IWindowsStartupService? windowsStartupService;
     private readonly IStringLocalizer<MainWindowViewModel> _loc;
     private object currentView;
     private string currentViewKey = "nav.overview";
@@ -80,7 +81,8 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         AssistantViewModel? assistantViewModel = null,
         Action? requestApplicationExit = null,
         Func<Task<bool>>? confirmUpdateInstall = null,
-        Action<string>? applyTheme = null)
+        Action<string>? applyTheme = null,
+        IWindowsStartupService? windowsStartupService = null)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
@@ -89,6 +91,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         this.dataStore = dataStore ?? new AppDataStore(ownedConfigService, gatewayService, this.loggerFactory.CreateLogger<AppDataStore>());
         this.applyAppearance = applyAppearance;
         this.applyTheme = applyTheme;
+        this.windowsStartupService = windowsStartupService;
         _loc = localizer ?? LocalizerFactory.Create<MainWindowViewModel>();
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService, logger: this.loggerFactory.CreateLogger<ConsoleViewModel>());
         overviewViewModel = new OverviewViewModel(gatewayService, this.dataStore, this.loggerFactory.CreateLogger<MainWindowViewModel>());
@@ -121,7 +124,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             updateService,
             this.dataStore.GetUpdateProxySettingsAsync,
             this.loggerFactory.CreateLogger<ReleaseHistoryViewModel>());
-        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, releaseHistory: releaseHistoryViewModel, localizer: LocalizerFactory.Create<SettingsViewModel>(), applyTheme: this.applyTheme);
+        settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, releaseHistory: releaseHistoryViewModel, localizer: LocalizerFactory.Create<SettingsViewModel>(), applyTheme: this.applyTheme, windowsStartupService: this.windowsStartupService);
         currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
         NavigationItems = new([
             new("nav.overview", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
@@ -221,7 +224,25 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
 
     private async Task InitializeDataStoreAsync()
     {
-        try { await dataStore.InitializeAsync(); }
+        try
+        {
+            await dataStore.InitializeAsync();
+            if (windowsStartupService is null || dataStore.Settings is not { } settings) return;
+
+            var gatewayEndpoint = dataStore.CurrentConfig.Server.Urls.FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(gatewayEndpoint)) gatewayEndpoint = "http://127.0.0.1:11434";
+            var startupCoordinator = new ApplicationStartupCoordinator(
+                windowsStartupService,
+                gatewayService.StartAsync,
+                loggerFactory.CreateLogger<ApplicationStartupCoordinator>());
+            var startupRegistrationError = await startupCoordinator.RestoreAsync(settings, gatewayEndpoint);
+            if (!string.IsNullOrWhiteSpace(startupRegistrationError))
+            {
+                toastService.Show(
+                    string.Format(CultureInfo.CurrentCulture, Loc("settings.startup.windows.sync.failed"), startupRegistrationError),
+                    ToastLevel.Error);
+            }
+        }
         catch (Exception exception)
         {
             var title = Loc("app.loading.failed");
@@ -451,12 +472,14 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private async Task StartAsync()
     {
         var endpoint = LoadEndpoint();
+        await dataStore.SetGatewayRunningAsync(true);
         await gatewayService.StartAsync(endpoint);
         await RefreshAsync();
     }
 
     private async Task StopAsync()
     {
+        await dataStore.SetGatewayRunningAsync(false);
         await gatewayService.StopAsync();
         await RefreshAsync();
     }
@@ -470,11 +493,13 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         {
             if (gatewayService.State == GatewayState.Running)
             {
+                await dataStore.SetGatewayRunningAsync(false);
                 await gatewayService.StopAsync();
                 logger?.LogInformation("概览网关切换完成，操作 {Action}", "停止");
             }
             else
             {
+                await dataStore.SetGatewayRunningAsync(true);
                 await gatewayService.StartAsync(LoadEndpoint());
                 logger?.LogInformation("概览网关切换完成，操作 {Action}", "启动");
             }
