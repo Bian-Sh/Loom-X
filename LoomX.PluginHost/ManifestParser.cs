@@ -116,7 +116,10 @@ public static class ManifestParser
                     diagnostics?.Add($"UI Contribution {contribution.Id} 的 slot 非法：{contribution.Slot ?? "(空)"}，已忽略。");
                     continue;
                 }
-                contributions.Add(new PluginManifestUiContribution(contribution.Id, slot));
+                contributions.Add(new PluginManifestUiContribution(
+                    contribution.Id,
+                    slot,
+                    contribution.Interactive));
             }
             ui = new PluginManifestUi(contributions);
         }
@@ -196,5 +199,6 @@ public static class ManifestParser
     {
         public string? Id { get; set; }
         public string? Slot { get; set; }
+        public bool Interactive { get; set; }
     }
 }

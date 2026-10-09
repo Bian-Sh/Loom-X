@@ -27,7 +27,10 @@ public sealed class PluginUiContractTests
             PluginUiSlot.CardBody,
             new PluginUiGridNode(3, [new PluginUiGridItem(metric)]));
 
-        Assert.Equal(1, contribution.SchemaVersion);
+        Assert.Equal(PluginUiContribution.CurrentSchemaVersion, contribution.SchemaVersion);
+        // v1 仍受支持：只含展示型节点的旧快照不得被宿主拒绝
+        Assert.True(PluginUiContribution.CurrentSchemaVersion >= PluginUiContribution.MinimumSchemaVersion);
+        Assert.True(PluginUiContribution.CurrentSchemaVersion >= PluginUiContribution.InteractiveSchemaVersion);
         Assert.Equal(PluginUiSlot.CardBody, contribution.Slot);
         Assert.IsType<PluginUiGridNode>(contribution.Root);
         Assert.DoesNotContain(

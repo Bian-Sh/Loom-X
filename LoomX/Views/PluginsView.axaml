@@ -117,7 +117,11 @@
                     <TextBlock Grid.Column="1" Text="{Binding CapabilitySummary}" Classes="tertiary" FontSize="11" TextWrapping="Wrap"/>
                   </Grid>
 
-                  <controls:PluginUiPresenter Grid.Row="3" Contributions="{Binding CardContributions}" IsVisible="{Binding HasCardUi}"/>
+                  <controls:PluginUiPresenter Grid.Row="3"
+                                              Contributions="{Binding CardContributions}"
+                                              IsVisible="{Binding HasCardUi}"
+                                              IsInteractive="{Binding IsCardInteractive}"
+                                              CommandSink="{Binding UiCommandSink}"/>
 
                   <Border Grid.Row="4" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="9">
@@ -179,7 +183,10 @@
             </Grid>
 
             <TextBlock Grid.Row="1" Text="{Binding SelectedPlugin.Description}" Classes="muted" TextWrapping="Wrap"/>
-            <controls:PluginUiPresenter Grid.Row="2" Contributions="{Binding SelectedPlugin.DetailContributions}"/>
+            <controls:PluginUiPresenter Grid.Row="2"
+                                        Contributions="{Binding SelectedPlugin.DetailContributions}"
+                                        IsInteractive="{Binding SelectedPlugin.IsDetailInteractive}"
+                                        CommandSink="{Binding SelectedPlugin.UiCommandSink}"/>
           </Grid>
         </Border>
       </StackPanel>

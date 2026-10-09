@@ -9,29 +9,40 @@ internal readonly record struct PluginUiValidationResult(bool IsValid, string Re
 /// <summary>验证插件声明式 UI 的结构边界；失败原因只返回安全代码，不回显节点内容。</summary>
 internal static class PluginUiValidator
 {
-    private const int MaxDepth = 12;
-    private const int MaxNodes = 128;
+    private const int MaxDepth = 14;
+    private const int MaxNodes = 512;
     private const int MaxTextLength = 4096;
     private const int MaxGeometryLength = 2048;
     private const int MaxColumns = 12;
     private const double MaxSpacing = 64;
     private const double MaxSize = 512;
+    private const int MaxIdentifierLength = 128;
+    private const int MaxLabelLength = 256;
+    private const int MaxArguments = 32;
+    private const int MaxOptions = 64;
+    private const int MaxOptionLength = 256;
 
     public static PluginUiValidationResult Validate(PluginUiContribution contribution)
     {
         ArgumentNullException.ThrowIfNull(contribution);
-        if (contribution.SchemaVersion != PluginUiContribution.CurrentSchemaVersion)
+        if (contribution.SchemaVersion is < PluginUiContribution.MinimumSchemaVersion
+            or > PluginUiContribution.CurrentSchemaVersion)
             return PluginUiValidationResult.Invalid("UNSUPPORTED_SCHEMA");
         if (string.IsNullOrWhiteSpace(contribution.Id) || contribution.Id.Length > 128)
             return PluginUiValidationResult.Invalid("INVALID_ID");
         if (contribution.Root is null)
             return PluginUiValidationResult.Invalid("MISSING_ROOT");
 
+        var interactive = contribution.SchemaVersion >= PluginUiContribution.InteractiveSchemaVersion;
         var nodeCount = 0;
-        return ValidateNode(contribution.Root, depth: 1, ref nodeCount);
+        return ValidateNode(contribution.Root, depth: 1, ref nodeCount, interactive);
     }
 
-    private static PluginUiValidationResult ValidateNode(PluginUiNode node, int depth, ref int nodeCount)
+    private static PluginUiValidationResult ValidateNode(
+        PluginUiNode node,
+        int depth,
+        ref int nodeCount,
+        bool interactive)
     {
         if (depth > MaxDepth) return PluginUiValidationResult.Invalid("TREE_TOO_DEEP");
         nodeCount++;
@@ -47,7 +58,7 @@ internal static class PluginUiValidator
                 foreach (var child in stack.Children)
                 {
                     if (child is null) return PluginUiValidationResult.Invalid("NULL_CHILD");
-                    var result = ValidateNode(child, depth + 1, ref nodeCount);
+                    var result = ValidateNode(child, depth + 1, ref nodeCount, interactive);
                     if (!result.IsValid) return result;
                 }
                 return PluginUiValidationResult.Valid;
@@ -66,7 +77,7 @@ internal static class PluginUiValidator
                         return PluginUiValidationResult.Invalid("NULL_CHILD");
                     if (item.ColumnSpan < 1 || item.ColumnSpan > grid.Columns)
                         return PluginUiValidationResult.Invalid("INVALID_COLUMN_SPAN");
-                    var result = ValidateNode(item.Content, depth + 1, ref nodeCount);
+                    var result = ValidateNode(item.Content, depth + 1, ref nodeCount, interactive);
                     if (!result.IsValid) return result;
                 }
                 return PluginUiValidationResult.Valid;
@@ -77,7 +88,7 @@ internal static class PluginUiValidator
                     return PluginUiValidationResult.Invalid("INVALID_SURFACE_SIZE");
                 return surface.Content is null
                     ? PluginUiValidationResult.Invalid("NULL_CHILD")
-                    : ValidateNode(surface.Content, depth + 1, ref nodeCount);
+                    : ValidateNode(surface.Content, depth + 1, ref nodeCount, interactive);
 
             case PluginUiTextNode text:
                 return text.Text is null || text.Text.Length > MaxTextLength
@@ -94,6 +105,53 @@ internal static class PluginUiValidator
             case PluginUiDividerNode:
                 return PluginUiValidationResult.Valid;
 
+            case PluginUiButtonNode button:
+                if (!interactive) return RejectInteractive();
+                if (!IsValidIdentifier(button.CommandId))
+                    return PluginUiValidationResult.Invalid("INVALID_COMMAND_ID");
+                return !IsValidLabel(button.Label)
+                    ? PluginUiValidationResult.Invalid("INVALID_LABEL")
+                    : ValidateArguments(button.Arguments);
+
+            case PluginUiTextFieldNode field:
+                if (!interactive) return RejectInteractive();
+                if (!IsValidIdentifier(field.FieldId))
+                    return PluginUiValidationResult.Invalid("INVALID_FIELD_ID");
+                if (!IsValidLabel(field.Label))
+                    return PluginUiValidationResult.Invalid("INVALID_LABEL");
+                if (field.Value is null || field.Value.Length > MaxTextLength)
+                    return PluginUiValidationResult.Invalid("TEXT_TOO_LONG");
+                return field.Watermark is { Length: > MaxLabelLength }
+                    ? PluginUiValidationResult.Invalid("INVALID_LABEL")
+                    : PluginUiValidationResult.Valid;
+
+            case PluginUiToggleFieldNode toggle:
+                if (!interactive) return RejectInteractive();
+                if (!IsValidIdentifier(toggle.FieldId))
+                    return PluginUiValidationResult.Invalid("INVALID_FIELD_ID");
+                if (!IsValidLabel(toggle.Label))
+                    return PluginUiValidationResult.Invalid("INVALID_LABEL");
+                if (toggle.Caption is { Length: > MaxTextLength })
+                    return PluginUiValidationResult.Invalid("TEXT_TOO_LONG");
+                return ValidateInstantCommand(toggle.CommandId, toggle.Arguments, interactive);
+
+            case PluginUiChoiceFieldNode choice:
+                if (!interactive) return RejectInteractive();
+                if (!IsValidIdentifier(choice.FieldId))
+                    return PluginUiValidationResult.Invalid("INVALID_FIELD_ID");
+                if (!IsValidLabel(choice.Label))
+                    return PluginUiValidationResult.Invalid("INVALID_LABEL");
+                if (choice.Options is null || choice.Options.Count > MaxOptions)
+                    return PluginUiValidationResult.Invalid("INVALID_CHOICE_OPTIONS");
+                if (choice.SelectedValue is { Length: > MaxTextLength })
+                    return PluginUiValidationResult.Invalid("TEXT_TOO_LONG");
+                foreach (var option in choice.Options)
+                {
+                    if (string.IsNullOrWhiteSpace(option) || option.Length > MaxOptionLength)
+                        return PluginUiValidationResult.Invalid("INVALID_CHOICE_OPTIONS");
+                }
+                return ValidateInstantCommand(choice.CommandId, choice.Arguments, interactive);
+
             default:
                 return PluginUiValidationResult.Invalid("UNKNOWN_NODE_TYPE");
         }
@@ -101,4 +159,42 @@ internal static class PluginUiValidator
 
     private static bool IsFiniteInRange(double value, double minimum, double maximum) =>
         double.IsFinite(value) && value >= minimum && value <= maximum;
+
+    private static PluginUiValidationResult RejectInteractive() =>
+        PluginUiValidationResult.Invalid("INTERACTIVE_NODE_REQUIRES_V2");
+
+    private static bool IsValidIdentifier(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && value.Length <= MaxIdentifierLength;
+
+    private static bool IsValidLabel(string? value) =>
+        value is not null && value.Length <= MaxLabelLength;
+
+    /// <summary>字段节点上的即时命令（值变化即回传）校验；未声明命令时直接通过。</summary>
+    private static PluginUiValidationResult ValidateInstantCommand(
+        string? commandId,
+        IReadOnlyDictionary<string, string>? arguments,
+        bool interactive)
+    {
+        if (commandId is null) return PluginUiValidationResult.Valid;
+        if (!interactive) return RejectInteractive();
+        return !IsValidIdentifier(commandId)
+            ? PluginUiValidationResult.Invalid("INVALID_COMMAND_ID")
+            : ValidateArguments(arguments);
+    }
+
+    private static PluginUiValidationResult ValidateArguments(
+        IReadOnlyDictionary<string, string>? arguments)
+    {
+        if (arguments is null) return PluginUiValidationResult.Valid;
+        if (arguments.Count > MaxArguments)
+            return PluginUiValidationResult.Invalid("TOO_MANY_ARGUMENTS");
+        foreach (var (key, value) in arguments)
+        {
+            if (!IsValidIdentifier(key))
+                return PluginUiValidationResult.Invalid("INVALID_ARGUMENT_KEY");
+            if (value is null || value.Length > MaxTextLength)
+                return PluginUiValidationResult.Invalid("TEXT_TOO_LONG");
+        }
+        return PluginUiValidationResult.Valid;
+    }
 }

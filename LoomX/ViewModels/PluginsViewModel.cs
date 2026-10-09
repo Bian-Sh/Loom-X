@@ -166,14 +166,17 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
                 info.Id,
                 PluginUiSlot.DetailBody,
                 CultureInfo.CurrentUICulture.Name);
-            Plugins.Add(new PluginItemViewModel(
+            var item = new PluginItemViewModel(
                 info,
                 isCredentialProtection,
                 cardContributions,
                 detailContributions,
                 SetPluginEnabled,
                 OpenPluginDetail,
-                Loc));
+                Loc,
+                info.InteractiveUiContributions ?? []);
+            item.AttachCommandSink(command => ExecutePluginUiCommandAsync(item, command));
+            Plugins.Add(item);
         }
 
         if (selectedId is not null)
@@ -195,6 +198,62 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
     }
 
     private void ShowPluginList() => SelectedPlugin = null;
+
+    /// <summary>把插件声明式 UI 上的命令转发给 Runtime，并把插件返回的安全摘要 Toast 给用户。</summary>
+    internal async Task<PluginUiCommandResult?> ExecutePluginUiCommandAsync(
+        PluginItemViewModel plugin,
+        PluginUiCommand command)
+    {
+        if (runtime is null) return null;
+        try
+        {
+            var result = await runtime.ExecuteUiCommandAsync(plugin.Id, command).ConfigureAwait(true);
+            ReportCommandResult(plugin, command, result);
+            return result;
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(
+                exception,
+                "插件 UI 命令转发失败 {PluginId} {CommandId}",
+                plugin.Id,
+                command.CommandId);
+            return null;
+        }
+    }
+
+    private void ReportCommandResult(
+        PluginItemViewModel plugin,
+        PluginUiCommand command,
+        PluginUiCommandResult? result)
+    {
+        if (result is null)
+        {
+            logger.LogWarning(
+                "插件 UI 命令未被处理 {PluginId} {CommandId}",
+                plugin.Id,
+                command.CommandId);
+            return;
+        }
+
+        logger.LogInformation(
+            "插件 UI 命令已回传 {PluginId} {ContributionId} {CommandId} {Handled}",
+            plugin.Id,
+            command.ContributionId,
+            command.CommandId,
+            result.Handled);
+
+        if (string.IsNullOrWhiteSpace(result.Message)) return;
+        uiDispatcher(() => toastService.Show(result.Message!, MapToastLevel(result.Tone)));
+    }
+
+    private static ToastLevel MapToastLevel(PluginUiTone tone) => tone switch
+    {
+        PluginUiTone.Success => ToastLevel.Success,
+        PluginUiTone.Danger => ToastLevel.Error,
+        PluginUiTone.Warning => ToastLevel.Warning,
+        _ => ToastLevel.Info,
+    };
 
     private void SetPluginEnabled(PluginItemViewModel item, bool enabled)
     {
@@ -283,6 +342,10 @@ public sealed class PluginItemViewModel : NotifyViewModel
     public bool HasCardUi => CardContributions.Count > 0;
     public bool HasDetailUi { get; }
     public bool CanOpenDetail => HasDetailUi && DetailContributions.Count > 0;
+    public IReadOnlyList<string> InteractiveContributions { get; }
+    public bool IsCardInteractive => IsInteractive(CardContributions);
+    public bool IsDetailInteractive => IsInteractive(DetailContributions);
+    public Func<PluginUiCommand, Task<PluginUiCommandResult?>>? UiCommandSink { get; private set; }
     public ICommand OpenDetailCommand { get; }
     public bool IsSystemPlugin => IsCredentialProtection;
     public bool CanToggle => !IsCredentialProtection;
@@ -307,7 +370,8 @@ public sealed class PluginItemViewModel : NotifyViewModel
         IReadOnlyList<PluginUiContribution> detailContributions,
         Action<PluginItemViewModel, bool> setEnabled,
         Action<PluginItemViewModel> openDetail,
-        Func<string, string> localize)
+        Func<string, string> localize,
+        IReadOnlyList<string>? interactiveContributions = null)
     {
         Id = info.Id;
         Version = info.Version;
@@ -318,6 +382,7 @@ public sealed class PluginItemViewModel : NotifyViewModel
         CardContributions = cardContributions;
         DetailContributions = detailContributions;
         HasDetailUi = info.HasDetailUi;
+        InteractiveContributions = interactiveContributions ?? [];
         this.setEnabled = setEnabled;
         this.openDetail = openDetail;
         OpenDetailCommand = new DelegateCommand(() => this.openDetail(this));
@@ -330,6 +395,9 @@ public sealed class PluginItemViewModel : NotifyViewModel
         OnPropertyChanged(nameof(StatusLabel));
     }
 
+    internal void AttachCommandSink(Func<PluginUiCommand, Task<PluginUiCommandResult?>> sink) =>
+        UiCommandSink = sink;
+
     internal void ApplyUiContributions(
         IReadOnlyList<PluginUiContribution> cardContributions,
         IReadOnlyList<PluginUiContribution> detailContributions)
@@ -340,7 +408,13 @@ public sealed class PluginItemViewModel : NotifyViewModel
         OnPropertyChanged(nameof(DetailContributions));
         OnPropertyChanged(nameof(HasCardUi));
         OnPropertyChanged(nameof(CanOpenDetail));
+        OnPropertyChanged(nameof(IsCardInteractive));
+        OnPropertyChanged(nameof(IsDetailInteractive));
     }
+
+    private bool IsInteractive(IReadOnlyList<PluginUiContribution> contributions) =>
+        InteractiveContributions.Count > 0
+        && contributions.Any(item => InteractiveContributions.Contains(item.Id, StringComparer.Ordinal));
 
     internal void RefreshLocalization(Func<string, string> localize)
     {

@@ -39,13 +39,20 @@ public sealed class PluginRuntimeTests : IDisposable
         {
             "LoomX.CredentialProtection.dll",
             "LoomX.CredentialProtection.deps.json",
-            "plugin.manifest.json",
         })
         {
             var source = Path.Combine(AppContext.BaseDirectory, fileName);
             if (File.Exists(source))
                 File.Copy(source, Path.Combine(directory, fileName), overwrite: true);
         }
+
+        // 清单从插件源目录取：多个插件的 Manifest 同名，测试输出目录里的副本不一定是这一个。
+        var manifestSource = Path.Combine(
+            AppContext.BaseDirectory, "..", "..", "..", "..",
+            "plugins", "LoomX.CredentialProtection", ManifestParser.ManifestFileName);
+        if (!File.Exists(manifestSource))
+            manifestSource = Path.Combine(AppContext.BaseDirectory, ManifestParser.ManifestFileName);
+        File.Copy(manifestSource, Path.Combine(directory, ManifestParser.ManifestFileName), overwrite: true);
 
         return directory;
     }

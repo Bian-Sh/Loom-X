@@ -28,8 +28,12 @@ public sealed record PluginManifestExtension(
 /// 插件清单。必备字段：id、version、extensions、capabilities；
 /// assembly 与 pluginType 指示宿主加载入口。
 /// </summary>
-/// <summary>Manifest 中声明的 UI Contribution；内容由插件运行时 Provider 提供。</summary>
-public sealed record PluginManifestUiContribution(string Id, PluginUiSlot Slot);
+/// <summary>
+/// Manifest 中声明的 UI Contribution；内容由插件运行时 Provider 提供。
+/// Interactive 表示该 Contribution 会包含交互节点并接收命令回传，
+/// 宿主只为声明为交互的 Contribution 挂载命令通道。
+/// </summary>
+public sealed record PluginManifestUiContribution(string Id, PluginUiSlot Slot, bool Interactive = false);
 
 /// <summary>插件可选的 UI 声明集合。</summary>
 public sealed record PluginManifestUi(IReadOnlyList<PluginManifestUiContribution> Contributions);

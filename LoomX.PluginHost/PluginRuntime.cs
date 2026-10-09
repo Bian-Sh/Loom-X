@@ -30,7 +30,8 @@ public sealed record LoadedPluginInfo(
     int ExtensionCount,
     bool Enabled,
     bool HasCardUi = false,
-    bool HasDetailUi = false);
+    bool HasDetailUi = false,
+    IReadOnlyList<string>? InteractiveUiContributions = null);
 
 /// <summary>插件 UI 快照失效通知，只携带安全的插件标识。</summary>
 public sealed class PluginUiInvalidatedEventArgs(string pluginId) : EventArgs
@@ -51,6 +52,7 @@ public sealed class PluginRuntime
         public required PluginLoadContext LoadContext { get; init; }
         public required List<PipelineEntry> Entries { get; init; }
         public IPluginUiContributionProvider? UiProvider { get; init; }
+        public IPluginUiCommandHandler? CommandHandler { get; init; }
         public EventHandler? UiInvalidatedHandler { get; init; }
         public bool Enabled { get; set; } = true;
     }
@@ -90,7 +92,11 @@ public sealed class PluginRuntime
             plugin.Entries.Count,
             plugin.Enabled,
             plugin.UiProvider is not null && HasUiSlot(plugin.Manifest, PluginUiSlot.CardBody),
-            plugin.UiProvider is not null && HasUiSlot(plugin.Manifest, PluginUiSlot.DetailBody)))
+            plugin.UiProvider is not null && HasUiSlot(plugin.Manifest, PluginUiSlot.DetailBody),
+            plugin.Manifest.Ui?.Contributions
+                .Where(item => item.Interactive)
+                .Select(item => item.Id)
+                .ToArray() ?? []))
         .ToArray();
 
     /// <summary>按 id 取 Pipeline；不存在（无 Entry 注册）时返回 null，调用方保持原行为。</summary>
@@ -157,6 +163,85 @@ public sealed class PluginRuntime
                 result.Add(contribution);
         }
         return result;
+    }
+
+    /// <summary>
+    /// 把插件声明式 UI 上的一次交互回传给插件。命令只接受 Manifest 声明为交互的 Contribution；
+    /// 任何非法输入或插件异常都只记录安全诊断并返回未处理，不影响插件 Pipeline。
+    /// </summary>
+    public async Task<PluginUiCommandResult> ExecuteUiCommandAsync(
+        string pluginId,
+        PluginUiCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        ArgumentNullException.ThrowIfNull(command);
+
+        if (string.IsNullOrWhiteSpace(command.CommandId) || command.CommandId.Length > 128)
+        {
+            logger.LogWarning("插件 UI 命令被拒绝：命令标识非法 {PluginId}", pluginId);
+            return PluginUiCommandResult.Unhandled;
+        }
+        if (command.Arguments is { Count: > 32 })
+        {
+            logger.LogWarning("插件 UI 命令被拒绝：参数过多 {PluginId} {CommandId}", pluginId, command.CommandId);
+            return PluginUiCommandResult.Unhandled;
+        }
+        foreach (var value in command.Arguments.Values)
+        {
+            if (value is null || value.Length > 4096)
+            {
+                logger.LogWarning("插件 UI 命令被拒绝：参数超长 {PluginId} {CommandId}", pluginId, command.CommandId);
+                return PluginUiCommandResult.Unhandled;
+            }
+        }
+
+        var plugin = plugins.FirstOrDefault(item => item.Manifest.Id == pluginId);
+        if (plugin is null)
+        {
+            logger.LogWarning("插件 UI 命令被拒绝：未找到插件 {PluginId}", pluginId);
+            return PluginUiCommandResult.Unhandled;
+        }
+        if (plugin.CommandHandler is null)
+        {
+            logger.LogWarning("插件 UI 命令被拒绝：插件未实现命令处理器 {PluginId}", pluginId);
+            return PluginUiCommandResult.Unhandled;
+        }
+        if (plugin.Manifest.Ui?.Contributions.FirstOrDefault(
+                item => string.Equals(item.Id, command.ContributionId, StringComparison.Ordinal))
+            is not { Interactive: true })
+        {
+            logger.LogWarning(
+                "插件 UI 命令被拒绝：Contribution 未声明为交互 {PluginId} {ContributionId}",
+                pluginId,
+                command.ContributionId);
+            return PluginUiCommandResult.Unhandled;
+        }
+
+        try
+        {
+            var result = await plugin.CommandHandler
+                .ExecuteUiCommandAsync(command, cancellationToken)
+                .ConfigureAwait(false);
+            logger.LogInformation(
+                "插件 UI 命令执行完成 {PluginId} {ContributionId} {CommandId} {Handled}",
+                pluginId,
+                command.ContributionId,
+                command.CommandId,
+                result?.Handled ?? false);
+            return result ?? PluginUiCommandResult.Unhandled;
+        }
+        catch (Exception exception)
+        {
+            AddUiDiagnostic(pluginId, command.ContributionId, "COMMAND_FAILURE");
+            logger.LogWarning(
+                exception,
+                "插件 UI 命令执行失败 {PluginId} {CommandId} {ExceptionType}",
+                pluginId,
+                command.CommandId,
+                exception.GetType().Name);
+            return PluginUiCommandResult.Unhandled;
+        }
     }
 
     public static PluginRuntime Start(PluginRuntimeOptions options, ILoggerFactory loggerFactory)
@@ -273,6 +358,7 @@ public sealed class PluginRuntime
             LoadContext = loadContext,
             Entries = entries,
             UiProvider = uiProvider,
+            CommandHandler = instance as IPluginUiCommandHandler,
             UiInvalidatedHandler = uiInvalidatedHandler,
         };
 
