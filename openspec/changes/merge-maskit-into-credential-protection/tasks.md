@@ -35,10 +35,18 @@
 - [x] `CredentialProtectionDisableTests`（7 项）覆盖停用语义边界
 - [x] `CredentialProtectionSettingsTests`（12 项）覆盖设置页 CRUD 与文案声明
 - [x] 更新 3 处过时断言（manifest 贡献数、发布契约、启停契约）
-- [x] 全量测试通过（1346 项）
 - [x] 实机验证：插件页只剩凭据保护、开关可交互、设置页四区块渲染正常
+
+## 5. 嵌套引用安全缺陷
+
+- [x] 定位根因：随机后缀约 2.28% 概率被内置 `IBAN` 形态规则命中
+- [x] `SanitizeText` 改为单遍区间扫描，形态规则按先窄后宽竞争区间
+- [x] 已签发引用保护区：历史placeholder 逐字符透传，不二次 token 化
+- [x] 敏感字段值为纯引用时不再包一层
+- [x] `CredentialProtectionIdempotencyTests`（5 项）固化契约
+- [x] 全量测试 1351 项连续三轮 0 失败
 
 ## 遗留
 
 - [ ] 内置形态规则之间未逐一验证跨形态误命中（当前只发现并修复了 LANDLINE）
-- [ ] `Restore_NormalizesAsciiCaseAndInternalWhitespace_WithoutChangingWrapper` 在高并发全量下偶发失败，单跑稳定通过，疑似既存的并发敏感测试
+- [ ] `AvaloniaTestBootstrap.Ensure` 只在首个测试线程绑定 Dispatcher，同 collection 跨测试类可能落在不同线程。测试数量增长到一定程度会暴露 `Call from invalid thread`（本轮曾因新增测试耗时过长触发 6 项）。建议后续让每个 Avalonia 测试显式在 `Dispatcher.UIThread` 上执行。
