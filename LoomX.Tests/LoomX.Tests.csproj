@@ -32,8 +32,7 @@
     <ProjectReference Include="..\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj" />
     <!-- 两个插件的 Manifest 同名（plugin.manifest.json），会在测试输出目录互相覆盖；
          Runtime 端到端测试统一从 plugins/<插件>/ 源目录读取清单，不依赖输出目录里的副本。 -->
-    <ProjectReference Include="..\plugins\LoomX.Maskit\LoomX.Maskit.csproj" />
-  </ItemGroup>
+      </ItemGroup>
   <ItemGroup>
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

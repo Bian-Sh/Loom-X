@@ -21,3 +21,25 @@ public interface ILoomXPlugin
     /// <summary>创建本插件的全部 Extension 实例；一个插件可注册多个 Extension。</summary>
     IEnumerable<IPipelineExtension> CreateExtensions();
 }
+
+/// <summary>
+/// 可选契约：插件自行接管"停用"的语义。
+/// <para>
+/// 默认情况下宿主停用插件会把它的全部 Entry 一并关闭。实现本契约后，宿主改为
+/// 只回调 <see cref="OnPluginEnabledChanged"/> 而不关闭 Entry，由插件自己决定停用期间
+/// 各 Extension 的行为。
+/// </para>
+/// <para>
+/// 适用场景：停用不应等同于能力消失。例如凭据保护停用后停止识别与 token 化新明文，
+/// 但仍须为历史会话中已存在的 placeholder 注入完整性指令并完成恢复，
+/// 否则旧会话的凭据引用会永久失效。
+/// </para>
+/// </summary>
+public interface IPluginEnableStateAware
+{
+    /// <summary>
+    /// 插件启停状态变化。实现方应保证该调用不抛异常；
+    /// 宿主在调用后仍以本接口返回的插件自身状态展示启停结果。
+    /// </summary>
+    void OnPluginEnabledChanged(bool enabled);
+}

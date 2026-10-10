@@ -384,7 +384,8 @@ public sealed class CredentialProtectionTests : IDisposable
 
         Assert.Empty(engine.Detect(payload)); // 新增前不命中
 
-        Assert.True(store.AddRule(SensitiveRuleKind.Name, "vault_path", out _));
+        Assert.True(store.AddRule(SensitiveRuleKind.Name, "vault_path", out _, out var addError));
+        Assert.Null(addError);
 
         var hits = engine.Detect(payload);
         Assert.Contains(hits, hit => hit.Kind == "name");
@@ -413,7 +414,8 @@ public sealed class CredentialProtectionTests : IDisposable
     {
         Directory.CreateDirectory(dataDirectory);
         var store = new SensitiveRuleStore(dataDirectory);
-        Assert.True(store.AddRule(SensitiveRuleKind.Name, "vault_path", out _));
+        Assert.True(store.AddRule(SensitiveRuleKind.Name, "vault_path", out _, out var addError));
+        Assert.Null(addError);
 
         // 规则文件只写插件自有数据目录
         Assert.True(File.Exists(Path.Combine(dataDirectory, "rules.json")));

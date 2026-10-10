@@ -144,7 +144,7 @@
   <data name="plugins.category.extension"><value>扩展插件</value></data>
   <data name="plugins.credential.name"><value>凭据保护</value></data>
   <data name="plugins.credential.description"><value>在 Router 请求链路中识别并掩码敏感凭据，向模型注入 placeholder 完整性约束，并在响应链路恢复原值。</value></data>
-  <data name="plugins.credential.lifecycle"><value>当前版本暂不允许从界面停用：历史会话中的 token 仍依赖兼容解析能力。后续将把“主动保护”和“兼容恢复”拆分，并为卸载提供保留 Vault 的强警告流程。</value></data>
+  <data name="plugins.credential.lifecycle"><value>可以停用：停用只停止检测与替换新送出的明文。历史会话中已签发的凭据引用仍会识别、仍注入完整性指令并在响应中还原，判定依据是上下文中是否存在本插件注入的提示词。停用后新请求可能携带未经处理的凭据明文。</value></data>
   <data name="plugins.generic.description"><value>为 Loom-X Router Pipeline 提供可组合的请求或响应扩展。</value></data>
   <data name="plugins.generic.lifecycle"><value>停用只影响当前运行时执行，不会删除插件文件或插件自有数据；重启后的持久化开关将在后续版本接入。</value></data>
   <data name="plugins.extension_count"><value>{0} 个扩展点</value></data>

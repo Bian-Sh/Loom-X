@@ -258,7 +258,11 @@ public sealed class PluginRuntime
         return runtime;
     }
 
-    /// <summary>启用/禁用插件：其全部 Entry 同步启停，重新启用后按配置顺序恢复执行。</summary>
+    /// <summary>
+    /// 启用/禁用插件。默认把其全部 Entry 同步启停；实现
+    /// <see cref="IPluginEnableStateAware"/> 的插件改为只回调其自身状态，
+    /// 由插件决定停用期间各 Extension 的行为（Entry 保持启用可继续运行）。
+    /// </summary>
     public bool SetPluginEnabled(string pluginId, bool enabled)
     {
         var plugin = plugins.FirstOrDefault(item => item.Manifest.Id == pluginId);
@@ -267,7 +271,25 @@ public sealed class PluginRuntime
             logger.LogWarning("插件启停被忽略：未找到插件 {PluginId}", pluginId);
             return false;
         }
+
         plugin.Enabled = enabled;
+        if (plugin.Instance is IPluginEnableStateAware stateAware)
+        {
+            // 语义停用：插件自行处理，不关闭 Entry，避免历史引用失去恢复能力。
+            try
+            {
+                stateAware.OnPluginEnabledChanged(enabled);
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception, "插件启停回调失败 {PluginId} {Enabled}", pluginId, enabled);
+            }
+
+            logger.LogInformation("插件{State} {PluginId}（语义停用，由插件自行处理）",
+                enabled ? "已启用" : "已停用", pluginId);
+            return true;
+        }
+
         foreach (var entry in plugin.Entries)
             entry.Enabled = enabled;
         logger.LogInformation("插件{State} {PluginId}", enabled ? "已启用" : "已禁用", pluginId);

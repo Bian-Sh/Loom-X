@@ -43,15 +43,18 @@ public sealed class CredentialProtectionUiTests
     }
 
     [Fact]
-    public void ManifestDeclaresOnlyCardBodyContribution()
+    public void ManifestDeclaresCardBodyAndInteractiveDetailBody()
     {
         var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "plugins", "LoomX.CredentialProtection");
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "plugin.manifest.json")));
         var contributions = document.RootElement.GetProperty("ui").GetProperty("contributions");
 
-        var contribution = Assert.Single(contributions.EnumerateArray());
-        Assert.Equal("observability", contribution.GetProperty("id").GetString());
-        Assert.Equal("card-body", contribution.GetProperty("slot").GetString());
+        var card = Assert.Single(contributions.EnumerateArray(), item => item.GetProperty("slot").GetString() == "card-body");
+        Assert.Equal("observability", card.GetProperty("id").GetString());
+
+        var detail = Assert.Single(contributions.EnumerateArray(), item => item.GetProperty("slot").GetString() == "detail-body");
+        Assert.Equal("settings", detail.GetProperty("id").GetString());
+        Assert.True(detail.GetProperty("interactive").GetBoolean());
     }
 
     private static string FlattenText(PluginUiNode node) => node switch

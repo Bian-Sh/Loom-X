@@ -38,53 +38,59 @@ public sealed class CredentialTokenStore
 
         lock (gate)
         {
-            using var connection = OpenConnection();
-            using var transaction = connection.BeginTransaction();
-            using (var find = connection.CreateCommand())
-            {
-                find.Transaction = transaction;
-                find.CommandText = "SELECT Token FROM CredentialTokens WHERE OriginalHash = $hash LIMIT 1;";
-                find.Parameters.AddWithValue("$hash", originalHash);
-                if (find.ExecuteScalar() is string existing)
-                {
-                    transaction.Commit();
-                    return existing;
-                }
-            }
+            var existing = FindByHash(originalHash);
+            if (existing is not null) return existing;
 
+            // 主键冲突后不能复用已失败的事务：事务已进入错误状态，
+            // 继续在同一事务里重试会为同一原值签出第二个 token，
+            // 导致同一段明文被替换两次、产出嵌套 placeholder。
+            // 因此每次尝试都开启独立事务，冲突时回滚并在新事务中查回既有 token。
             while (true)
             {
                 var token = createToken();
-                try
+                var conflict = false;
+
+                using (var connection = OpenConnection())
+                using (var transaction = connection.BeginTransaction())
                 {
-                    using var insert = connection.CreateCommand();
-                    insert.Transaction = transaction;
-                    insert.CommandText = """
-                        INSERT INTO CredentialTokens(Token, OriginalHash, ProtectedOriginal, CreatedAtUtc)
-                        VALUES($token, $hash, $protected, $created);
-                        """;
-                    insert.Parameters.AddWithValue("$token", token);
-                    insert.Parameters.AddWithValue("$hash", originalHash);
-                    insert.Parameters.AddWithValue("$protected", Protect(original));
-                    insert.Parameters.AddWithValue("$created", DateTimeOffset.UtcNow.ToString("O"));
-                    insert.ExecuteNonQuery();
-                    transaction.Commit();
-                    return token;
-                }
-                catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
-                {
-                    using var find = connection.CreateCommand();
-                    find.Transaction = transaction;
-                    find.CommandText = "SELECT Token FROM CredentialTokens WHERE OriginalHash = $hash LIMIT 1;";
-                    find.Parameters.AddWithValue("$hash", originalHash);
-                    if (find.ExecuteScalar() is string existing)
+                    try
                     {
+                        using var insert = connection.CreateCommand();
+                        insert.Transaction = transaction;
+                        insert.CommandText = """
+                            INSERT INTO CredentialTokens(Token, OriginalHash, ProtectedOriginal, CreatedAtUtc)
+                            VALUES($token, $hash, $protected, $created);
+                            """;
+                        insert.Parameters.AddWithValue("$token", token);
+                        insert.Parameters.AddWithValue("$hash", originalHash);
+                        insert.Parameters.AddWithValue("$protected", Protect(original));
+                        insert.Parameters.AddWithValue("$created", DateTimeOffset.UtcNow.ToString("O"));
+                        insert.ExecuteNonQuery();
                         transaction.Commit();
-                        return existing;
+                        return token;
+                    }
+                    catch (SqliteException exception) when (exception.SqliteErrorCode == 19)
+                    {
+                        conflict = true;
+                        transaction.Rollback();
                     }
                 }
+
+                if (!conflict) return token;
+
+                existing = FindByHash(originalHash);
+                if (existing is not null) return existing;
             }
         }
+    }
+
+    private string? FindByHash(string originalHash)
+    {
+        using var connection = OpenConnection();
+        using var find = connection.CreateCommand();
+        find.CommandText = "SELECT Token FROM CredentialTokens WHERE OriginalHash = $hash LIMIT 1;";
+        find.Parameters.AddWithValue("$hash", originalHash);
+        return find.ExecuteScalar() as string;
     }
 
     public IReadOnlyDictionary<string, string> ResolveTokens(IEnumerable<string> tokens)

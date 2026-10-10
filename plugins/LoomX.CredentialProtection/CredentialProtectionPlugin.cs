@@ -9,7 +9,7 @@ namespace LoomX.CredentialProtection;
 /// 第一方 Credential Protection Router 插件：在请求正文离开本地安全边界、
 /// 发送给外部 Provider 前完成凭据检测与脱敏。规则数据 Plugin-owned，脱敏失败 fail closed。
 /// </summary>
-public sealed class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContributionProvider
+public sealed class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContributionProvider, IPluginUiCommandHandler, IPluginEnableStateAware
 {
     public const string PluginId = "loomx.credential-protection";
 
@@ -19,6 +19,9 @@ public sealed class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContribu
     public string Id => PluginId;
 
     public CredentialProtectionObservability Observability => observability;
+
+    /// <summary>停用后仍保持可用的历史引用解析能力，不随停用关闭。</summary>
+    public bool ActiveProtectionEnabled { get; private set; } = true;
 
     public event EventHandler? UiInvalidated
     {
@@ -34,22 +37,45 @@ public sealed class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContribu
     {
         ArgumentNullException.ThrowIfNull(context);
         ruleStore = new SensitiveRuleStore(context.DataDirectory);
+        // 规则变更让宿主重新拉取声明式 UI 快照。
+        ruleStore.Changed += (_, _) => observability.RaiseChanged();
     }
+
+    /// <summary>
+    /// 语义停用：停止识别与 token 化新明文，但保留 placeholder 恢复与完整性指令注入，
+    /// 否则历史会话中已签发的凭据引用会永久失效。
+    /// </summary>
+    public void OnPluginEnabledChanged(bool enabled)
+    {
+        ActiveProtectionEnabled = enabled;
+        if (Engine is not null) Engine.ActiveProtectionEnabled = enabled;
+        observability.RecordProtectionToggled(enabled);
+        observability.RaiseChanged();
+    }
+
+    private CredentialEngine? engine;
+
+    /// <summary>当前处于编辑态的规则 id；非编辑态为 null。</summary>
+    private string? editingRuleId;
+
+    /// <summary>脱敏引擎（CreateExtensions 后可用）。</summary>
+    public CredentialEngine? Engine => engine;
 
     public IReadOnlyList<PluginUiContribution> GetUiContributions(PluginUiContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         var snapshot = observability.Snapshot();
         var text = CredentialProtectionUiText.Resolve(context.CultureName);
+        var settingsText = CredentialSettingsText.Resolve(context.CultureName);
         CultureInfo culture;
         try { culture = CultureInfo.GetCultureInfo(context.CultureName); }
         catch (CultureNotFoundException) { culture = CultureInfo.InvariantCulture; }
 
-        return
-        [
-            new PluginUiContribution(
+        var contributions = new List<PluginUiContribution>
+        {
+            new(
                 PluginUiContribution.CurrentSchemaVersion,
-                "observability",
+                CredentialSettingsUi.OverviewContributionId,
                 PluginUiSlot.CardBody,
                 new PluginUiGridNode(
                     3,
@@ -74,7 +100,22 @@ public sealed class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContribu
                             "M 16,4 A 12,12 0 1 1 16,28 A 12,12 0 1 1 16,4 M 16,10 L 16,18 M 16,23 L 16,23")),
                     ],
                     ColumnSpacing: 12)),
-        ];
+        };
+
+        if (ruleStore is not null)
+        {
+            contributions.Add(new PluginUiContribution(
+                PluginUiContribution.CurrentSchemaVersion,
+                CredentialSettingsUi.SettingsContributionId,
+                PluginUiSlot.DetailBody,
+                CredentialSettingsUi.BuildSettings(
+                    ruleStore,
+                    context.CultureName,
+                    editingRuleId,
+                    ActiveProtectionEnabled)));
+        }
+
+        return contributions;
     }
 
     private static PluginUiSurfaceNode BuildMetricCard(
@@ -108,9 +149,42 @@ public sealed class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContribu
         // 宿主保证 Initialize 先于 CreateExtensions 调用；防御性兜底避免空引用。
         var store = ruleStore ?? new SensitiveRuleStore(
             Path.Combine(Path.GetTempPath(), PluginId));
-        var engine = new CredentialEngine(store);
-        yield return new CredentialRequestExtension(engine, observability);
-        yield return new CredentialResponseExtension(engine, observability);
+        var created = new CredentialEngine(store) { ActiveProtectionEnabled = ActiveProtectionEnabled };
+        engine = created;
+        yield return new CredentialRequestExtension(created, observability);
+        yield return new CredentialResponseExtension(created, observability);
+    }
+
+    public async ValueTask<PluginUiCommandResult> ExecuteUiCommandAsync(
+        PluginUiCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        var store = ruleStore;
+        if (store is null)
+            return PluginUiCommandResult.Failure("PLUGIN_NOT_INITIALIZED");
+
+        // 编辑态是纯 UI 关注点：只切换状态并刷新快照，不改动规则数据。
+        if (command.CommandId == CredentialSettingsUi.BeginEdit)
+        {
+            editingRuleId = command.GetArgument("rule_id");
+            observability.RaiseChanged();
+            return PluginUiCommandResult.Success();
+        }
+
+        if (command.CommandId == CredentialSettingsUi.CancelEdit)
+        {
+            editingRuleId = null;
+            observability.RaiseChanged();
+            return PluginUiCommandResult.Success();
+        }
+
+        var result = await CredentialSettingsCommands
+            .Execute(store, command, CultureInfo.CurrentUICulture.Name)
+            .ConfigureAwait(false);
+
+        if (result.Handled) editingRuleId = null;
+        return result;
     }
 }
 

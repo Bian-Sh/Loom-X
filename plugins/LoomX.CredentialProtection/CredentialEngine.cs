@@ -30,9 +30,29 @@ public class CredentialEngine
 
     private readonly SensitiveRuleStore store;
     private readonly CredentialTokenStore tokenStore;
-    private int compiledVersion = -1;
-    private HashSet<string> sensitiveNames = new(StringComparer.Ordinal);
-    private List<(string RuleId, Regex Pattern)> patterns = [];
+
+    /// <summary>
+    /// 已编译规则的不可变快照。
+    /// MUST 整体替换而非就地修改：多线程脱敏时若在遍历过程中被另一个线程改写，
+    /// 会导致同一段明文被重复替换，产出嵌套 placeholder（安全缺陷）。
+    /// </summary>
+    private sealed record CompiledRules(
+        int Version,
+        HashSet<string> SensitiveNames,
+        List<(string RuleId, Regex Pattern)> Patterns,
+        List<(string RuleId, Regex Pattern)> BuiltinPatterns,
+        List<string> Prefixes)
+    {
+        public static CompiledRules Initial { get; } = new(
+            -1,
+            new HashSet<string>(StringComparer.Ordinal),
+            [],
+            [],
+            []);
+    }
+
+    private CompiledRules compiled = CompiledRules.Initial;
+    private readonly object compilationGate = new();
 
     public CredentialEngine(SensitiveRuleStore store, CredentialTokenStore? tokenStore = null)
     {
@@ -41,21 +61,27 @@ public class CredentialEngine
         this.tokenStore = tokenStore ?? new CredentialTokenStore(store.DataDirectory);
     }
 
+    /// <summary>
+    /// 主动保护开关。停用只停止新明文的检测与 token 化，
+    /// 历史会话中已签发的 placeholder 仍必须注入完整性指令并完成恢复。
+    /// </summary>
+    public bool ActiveProtectionEnabled { get; set; } = true;
+
     /// <summary>检测payload中的敏感内容，返回安全摘要（不含原始值）。</summary>
     public virtual IReadOnlyList<DetectionHit> Detect(string? payload)
     {
         if (string.IsNullOrWhiteSpace(payload)) return [];
-        EnsureCompiled();
+        var rules = EnsureCompiled();
 
         var hits = new List<DetectionHit>();
         var root = TryParseJson(payload, out var consumed);
         if (root is not null && consumed)
         {
-            DetectNode(root, hits);
+            DetectNode(root, rules, hits);
         }
         else
         {
-            DetectText(payload, hits);
+            DetectText(payload, rules, hits);
         }
 
         return hits;
@@ -74,20 +100,26 @@ public class CredentialEngine
         changed = false;
         replacementCount = 0;
         if (string.IsNullOrWhiteSpace(payload)) return payload ?? string.Empty;
-        EnsureCompiled();
+
+        // 停用只停止主动保护：不做新明文检测与 token 化。
+        // 恢复路径（Restore*）与完整性指令注入不受此开关影响。
+        if (!ActiveProtectionEnabled) return payload;
+
+        var rules = EnsureCompiled();
 
         var root = TryParseJson(payload, out var consumed);
         if (root is not null && consumed)
         {
             var sanitized = SanitizeNode(
                 root,
+                rules,
                 isSensitivePath: false,
                 ref changed,
                 ref replacementCount);
             return changed ? sanitized.ToJsonString() : payload;
         }
 
-        return SanitizeText(payload, ref changed, ref replacementCount);
+        return SanitizeText(payload, rules, ref changed, ref replacementCount);
     }
 
     /// <summary>
@@ -249,14 +281,25 @@ public class CredentialEngine
         return changed;
     }
 
-    private void EnsureCompiled()
+    /// <summary>
+    /// 返回当前规则版本对应的已编译快照。版本命中时直接复用，否则加锁重建。
+    /// 重建结果以不可变快照整体发布，读侧无需加锁且不会读到中间态。
+    /// </summary>
+    private CompiledRules EnsureCompiled()
     {
-        if (compiledVersion == store.Version) return;
-        lock (this)
+        var version = store.Version;
+        var snapshot = compiled;
+        if (snapshot.Version == version) return snapshot;
+
+        lock (compilationGate)
         {
-            if (compiledVersion == store.Version) return;
+            if (compiled.Version == version) return compiled;
+
             var names = new HashSet<string>(StringComparer.Ordinal);
-            var compiled = new List<(string, Regex)>();
+            var patterns = new List<(string, Regex)>();
+            var builtin = new List<(string, Regex)>();
+            var prefixes = new List<string>();
+
             foreach (var rule in store.Rules)
             {
                 if (!rule.Enabled) continue;
@@ -266,63 +309,93 @@ public class CredentialEngine
                 }
                 else
                 {
-                    try
-                    {
-                        compiled.Add((rule.Id, new Regex(
-                            rule.Value,
-                            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
-                            TimeSpan.FromSeconds(2))));
-                    }
-                    catch (ArgumentException)
-                    {
-                        // 非法正则规则跳过（用户自定义规则可能写错），不影响其余规则。
-                    }
+                    var compiledPattern = TryCompile(rule.Id, rule.Value);
+                    if (compiledPattern is not null) patterns.Add((rule.Id, compiledPattern));
                 }
             }
 
-            sensitiveNames = names;
-            patterns = compiled;
-            compiledVersion = store.Version;
+            // 内置形态规则：可开关，默认顺序即脱敏顺序（先窄后宽）。
+            foreach (var rule in store.EnabledBuiltinRules())
+            {
+                var compiledPattern = TryCompile($"builtin.{rule.Key}", rule.Pattern);
+                if (compiledPattern is not null) builtin.Add(($"builtin.{rule.Key}", compiledPattern));
+            }
+
+            // 自定义密钥前缀：命中此前缀的字面片段一律替换。
+            prefixes.AddRange(store.SecretPrefixes);
+
+            // 一次性发布不可变快照。
+            var rebuilt = new CompiledRules(version, names, patterns, builtin, prefixes);
+            compiled = rebuilt;
+            return rebuilt;
         }
     }
 
-    private void DetectNode(JsonNode node, List<DetectionHit> hits)
+    private static Regex? TryCompile(string ruleId, string pattern)
+    {
+        try
+        {
+            return new Regex(
+                pattern,
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant,
+                TimeSpan.FromSeconds(2));
+        }
+        catch (ArgumentException)
+        {
+            // 非法正则规则跳过（用户自定义规则可能写错），不影响其余规则。
+            return null;
+        }
+    }
+
+    private void DetectNode(JsonNode node, CompiledRules rules, List<DetectionHit> hits)
     {
         switch (node)
         {
             case JsonObject jsonObject:
                 foreach (var property in jsonObject)
                 {
-                    if (IsSensitiveSegment(property.Key))
+                    if (IsSensitiveSegment(property.Key, rules))
                     {
                         hits.Add(new DetectionHit($"name.{NormalizeSegment(property.Key)}", "name"));
                         if (property.Value is not null)
-                            DetectNode(property.Value, hits);
+                            DetectNode(property.Value, rules, hits);
                     }
                     else if (property.Value is not null)
                     {
-                        DetectNode(property.Value, hits);
+                        DetectNode(property.Value, rules, hits);
                     }
                 }
                 break;
             case JsonArray jsonArray:
                 foreach (var item in jsonArray)
                     if (item is not null)
-                        DetectNode(item, hits);
+                        DetectNode(item, rules, hits);
                 break;
             case JsonValue value:
                 if (value.TryGetValue<string>(out var text))
-                    DetectText(text, hits);
+                    DetectText(text, rules, hits);
                 break;
         }
     }
 
-    private void DetectText(string text, List<DetectionHit> hits)
+    private static void DetectText(string text, CompiledRules rules, List<DetectionHit> hits)
     {
-        foreach (var (ruleId, pattern) in patterns)
+        foreach (var (ruleId, pattern) in rules.Patterns)
         {
             if (pattern.IsMatch(text))
                 hits.Add(new DetectionHit(ruleId, "pattern"));
+        }
+
+        foreach (var (ruleId, pattern) in rules.BuiltinPatterns)
+        {
+            if (pattern.IsMatch(text))
+                hits.Add(new DetectionHit(ruleId, "builtin"));
+        }
+
+        foreach (var prefix in rules.Prefixes)
+        {
+            if (text.Contains(prefix, StringComparison.Ordinal))
+                hits.Add(new DetectionHit("prefix.custom", "prefix"));
         }
 
         if (ContainsSensitiveWords(text))
@@ -331,6 +404,7 @@ public class CredentialEngine
 
     private JsonNode SanitizeNode(
         JsonNode node,
+        CompiledRules rules,
         bool isSensitivePath,
         ref bool changed,
         ref int replacementCount)
@@ -352,7 +426,8 @@ public class CredentialEngine
                     // 覆盖自定义 Header 容器——其子值无论名称全部脱敏）。
                     result[property.Key] = SanitizeNode(
                         property.Value,
-                        isSensitivePath || IsSensitiveSegment(property.Key),
+                        rules,
+                        isSensitivePath || IsSensitiveSegment(property.Key, rules),
                         ref changed,
                         ref replacementCount);
                 }
@@ -365,23 +440,29 @@ public class CredentialEngine
                 foreach (var item in jsonArray)
                     result.Add(item is null
                         ? null
-                        : SanitizeNode(item, isSensitivePath, ref changed, ref replacementCount));
+                        : SanitizeNode(item, rules, isSensitivePath, ref changed, ref replacementCount));
                 return result;
             }
             case JsonValue value:
             {
                 if (isSensitivePath)
                 {
-                    changed = true;
-                    replacementCount++;
                     var original = value.TryGetValue<string>(out var sensitiveText)
                         ? sensitiveText
                         : value.ToJsonString();
+
+                    // 敏感字段的值若本身就是历史凭据引用，逐字符透传。
+                    // 再包一层会让这个 token 的原值变成 placeholder 本身，
+                    // 历史会话中的凭据引用从此永远无法还原。
+                    if (IsPlaceholderOnly(original)) return value.DeepClone();
+
+                    changed = true;
+                    replacementCount++;
                     return JsonValue.Create(GetOrCreatePlaceholder(original));
                 }
 
                 if (!value.TryGetValue<string>(out var text)) return value.DeepClone();
-                var sanitized = SanitizeText(text, ref changed, ref replacementCount);
+                var sanitized = SanitizeText(text, rules, ref changed, ref replacementCount);
                 return JsonValue.Create(sanitized);
             }
             default:
@@ -389,26 +470,133 @@ public class CredentialEngine
         }
     }
 
-    private string SanitizeText(string text, ref bool changed, ref int replacementCount)
+    /// <summary>
+    /// 单遍扫描式脱敏：先在原文本上求出全部命中区间，再一次性生成替换结果。
+    /// 绝不采用"逐条规则顺序 Replace"——那样后一条规则会在前一条刚生成的
+    /// placeholder 上再次命中，而随机后缀有约2% 概率被 IBAN/AKIA 形态规则识别，
+    /// 产出 {{LOOMX_CREDENTIAL_{{LOOMX_CREDENTIAL_...}}}} 这类嵌套引用，
+    /// 其外层 token 的原值是placeholder 本身，历史会话将永远无法还原。
+    /// </summary>
+    private string SanitizeText(string text, CompiledRules rules, ref bool changed, ref int replacementCount)
     {
-        var current = text;
-        foreach (var (_, pattern) in patterns)
+        // 已存在的合法凭据引用受保护：不参与命中计算，原样透传。
+        // 旧会话、模型回传、多次重试都会让入参里带着上一轮签发的 placeholder。
+        var protectedSpans = PlaceholderPattern.Matches(text)
+            .Select(match => (match.Index, match.Length))
+            .ToArray();
+
+        var hits = new List<(int Start, int Length)>();
+        var covered = new bool[text.Length];
+
+        // 自定义密钥前缀优先：前缀命中意味着后续整段都是密钥材料。
+        foreach (var prefix in rules.Prefixes)
         {
-            var patternReplacementCount = 0;
-            var next = pattern.Replace(current, match =>
+            foreach (var (start, length) in FindPrefixSegments(text, prefix))
             {
-                patternReplacementCount++;
-                return GetOrCreatePlaceholder(match.Value);
-            });
-            if (patternReplacementCount > 0)
-            {
-                changed = true;
-                replacementCount += patternReplacementCount;
+                if (TryClaim(covered, hits, start, length, protectedSpans)) continue;
             }
-            current = next;
         }
 
-        return current;
+        // 形态规则按"先窄后宽"顺序竞争同一段区间：先占者胜，
+        // 与历史行为一致（窄类别不再被宽类别切碎）。
+        foreach (var (_, pattern) in rules.Patterns.Concat(rules.BuiltinPatterns))
+        {
+            foreach (Match match in pattern.Matches(text))
+            {
+                if (TryClaim(covered, hits, match.Index, match.Length, protectedSpans)) continue;
+            }
+        }
+
+        if (hits.Count == 0) return text;
+
+        var builder = new StringBuilder(text.Length);
+        var position = 0;
+        foreach (var (start, length) in hits)
+        {
+            builder.Append(text, position, start - position);
+            builder.Append(GetOrCreatePlaceholder(text.Substring(start, length)));
+            position = start + length;
+        }
+
+        builder.Append(text, position, text.Length - position);
+        changed = true;
+        replacementCount += hits.Count;
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// 尝试认领一段区间。返回 false 表示该区间与已认领区间重叠或落在受保护
+    /// 的placeholder 上，应放弃本次命中。
+    /// </summary>
+    private static bool TryClaim(
+        bool[] covered,
+        List<(int Start, int Length)> hits,
+        int start,
+        int length,
+        (int Index, int Length)[] protectedSpans)
+    {
+        if (start < 0 || length <= 0) return false;
+        var end = start + length;
+        if (end > covered.Length) return false;
+
+        for (var index = start; index < end; index++)
+            if (covered[index]) return false;
+
+        foreach (var (protectedIndex, protectedLength) in protectedSpans)
+        {
+            if (protectedIndex >= end) break;
+            if (protectedIndex + protectedLength > start) return false;
+        }
+
+        for (var index = start; index < end; index++)
+            covered[index] = true;
+
+        hits.Add((start, length));
+        return true;
+    }
+
+    /// <summary>
+    /// 找出命中自定义前缀的连续 token 片段（不含分隔空白）的区间。
+    /// </summary>
+    private static List<(int Start, int Length)> FindPrefixSegments(string text, string prefix)
+    {
+        var segments = new List<(int, int)>();
+        var position = 0;
+
+        while (position < text.Length)
+        {
+            var index = text.IndexOf(prefix, position, StringComparison.Ordinal);
+            if (index < 0) break;
+
+            var segmentEnd = text.Length;
+            for (var cursor = index + prefix.Length; cursor < text.Length; cursor++)
+            {
+                if (char.IsWhiteSpace(text[cursor]) || text[cursor] is ',' or ';' or '"' or '\'')
+                {
+                    segmentEnd = cursor;
+                    break;
+                }
+            }
+
+            segments.Add((index, segmentEnd - index));
+            position = segmentEnd;
+        }
+
+        return segments;
+    }
+
+    /// <summary>整段文本是否恰好是一个合法凭据引用（可带首尾空白）。</summary>
+    private static bool IsPlaceholderOnly(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        var trimmed = text.Trim();
+        if (trimmed.Length == 0) return false;
+        foreach (Match match in PlaceholderPattern.Matches(trimmed))
+        {
+            if (match.Index == 0 && match.Length == trimmed.Length) return true;
+        }
+
+        return false;
     }
 
     private string GetOrCreatePlaceholder(string original) =>
@@ -427,12 +615,12 @@ public class CredentialEngine
         return new string(suffix);
     }
 
-    private bool IsSensitiveSegment(string segment)
+    private bool IsSensitiveSegment(string segment, CompiledRules rules)
     {
         if (string.IsNullOrWhiteSpace(segment)) return false;
         var normalized = NormalizeSegment(segment);
-        if (sensitiveNames.Contains(normalized)) return true;
-        return sensitiveNames.Any(name => normalized.EndsWith($"_{name}", StringComparison.Ordinal));
+        if (rules.SensitiveNames.Contains(normalized)) return true;
+        return rules.SensitiveNames.Any(name => normalized.EndsWith($"_{name}", StringComparison.Ordinal));
     }
 
     private static string NormalizeSegment(string segment) =>

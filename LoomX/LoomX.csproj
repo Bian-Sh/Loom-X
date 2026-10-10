@@ -59,41 +59,27 @@
                       ReferenceOutputAssembly="false"
                       OutputItemType="FirstPartyPlugin"
                       PrivateAssets="all" />
-    <ProjectReference Include="..\plugins\LoomX.Maskit\LoomX.Maskit.csproj"
-                      ReferenceOutputAssembly="false"
-                      OutputItemType="FirstPartyPluginMaskit"
-                      PrivateAssets="all" />
   </ItemGroup>
   <Target Name="CopyFirstPartyPlugins" AfterTargets="Build">
     <PropertyGroup>
       <_PluginOutputDir>@(FirstPartyPlugin->'%(RootDir)%(Directory)')</_PluginOutputDir>
-      <_MaskitPluginOutputDir>@(FirstPartyPluginMaskit->'%(RootDir)%(Directory)')</_MaskitPluginOutputDir>
     </PropertyGroup>
     <ItemGroup>
       <_PluginPayload Include="$(_PluginOutputDir)**\*" />
-      <_MaskitPluginPayload Include="$(_MaskitPluginOutputDir)**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(_PluginPayload)"
           DestinationFiles="@(_PluginPayload->'$(OutputPath)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(_MaskitPluginPayload)"
-          DestinationFiles="@(_MaskitPluginPayload->'$(OutputPath)plugins\loomx.maskit\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
   <Target Name="CopyFirstPartyPluginsToPublish" AfterTargets="Publish">
     <PropertyGroup>
       <_PluginPublishOutputDir>@(FirstPartyPlugin->'%(RootDir)%(Directory)')</_PluginPublishOutputDir>
-      <_MaskitPluginPublishOutputDir>@(FirstPartyPluginMaskit->'%(RootDir)%(Directory)')</_MaskitPluginPublishOutputDir>
     </PropertyGroup>
     <ItemGroup>
       <_PluginPublishPayload Include="$(_PluginPublishOutputDir)**\*" />
-      <_MaskitPluginPublishPayload Include="$(_MaskitPluginPublishOutputDir)**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(_PluginPublishPayload)"
           DestinationFiles="@(_PluginPublishPayload->'$(PublishDir)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(_MaskitPluginPublishPayload)"
-          DestinationFiles="@(_MaskitPluginPublishPayload->'$(PublishDir)plugins\loomx.maskit\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

@@ -26,7 +26,9 @@ public sealed class PluginPublishContractTests
         Assert.Contains("CopyToOutputDirectory=\"PreserveNewest\"", project, StringComparison.Ordinal);
         Assert.Contains("\"id\": \"observability\"", manifest, StringComparison.Ordinal);
         Assert.Contains("\"slot\": \"card-body\"", manifest, StringComparison.Ordinal);
-        Assert.DoesNotContain("detail-body", manifest, StringComparison.Ordinal);
+        // 设置页以交互式 detail-body 贡献，未声明 interactive 的贡献不接收命令。
+        Assert.Contains("\"slot\": \"detail-body\"", manifest, StringComparison.Ordinal);
+        Assert.Contains("\"interactive\": true", manifest, StringComparison.Ordinal);
     }
 
     private static string GetRepositoryFile(params string[] segments)

@@ -348,7 +348,9 @@ public sealed class PluginItemViewModel : NotifyViewModel
     public Func<PluginUiCommand, Task<PluginUiCommandResult?>>? UiCommandSink { get; private set; }
     public ICommand OpenDetailCommand { get; }
     public bool IsSystemPlugin => IsCredentialProtection;
-    public bool CanToggle => !IsCredentialProtection;
+
+    // 凭据保护支持停用：停用只关闭主动保护，历史引用的解析与恢复继续运行。
+    public bool CanToggle => true;
     public string DisplayName => IsCredentialProtection ? Loc("plugins.credential.name") : Id;
     public string Category => IsCredentialProtection ? Loc("plugins.category.system") : Loc("plugins.category.extension");
     public string Description => IsCredentialProtection ? Loc("plugins.credential.description") : Loc("plugins.generic.description");

@@ -16,6 +16,7 @@ public sealed class CredentialProtectionObservability
     private long sanitizedTerms;
     private long restoredResponses;
     private long errors;
+    private long protectionEnabled = 1;
 
     public event EventHandler? Changed;
 
@@ -49,4 +50,14 @@ public sealed class CredentialProtectionObservability
         Interlocked.Increment(ref errors);
         Changed?.Invoke(this, EventArgs.Empty);
     }
+
+    /// <summary>记录主动保护启停切换（只记录状态，不含任何业务内容）。</summary>
+    public void RecordProtectionToggled(bool enabled)
+    {
+        Interlocked.Exchange(ref protectionEnabled, enabled ? 1 : 0);
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>触发一次快照失效通知（规则变更时使用）。</summary>
+    public void RaiseChanged() => Changed?.Invoke(this, EventArgs.Empty);
 }

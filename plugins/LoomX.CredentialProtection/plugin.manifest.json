@@ -1,12 +1,13 @@
 {
   "id": "loomx.credential-protection",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "assembly": "LoomX.CredentialProtection.dll",
   "plugin_type": "LoomX.CredentialProtection.CredentialProtectionPlugin",
   "capabilities": ["credential.detect", "credential.mask", "credential.integrity-instruction", "credential.restore"],
   "ui": {
     "contributions": [
-      { "id": "observability", "slot": "card-body" }
+      { "id": "observability", "slot": "card-body" },
+      { "id": "settings", "slot": "detail-body", "interactive": true }
     ]
   },
   "extensions": [
