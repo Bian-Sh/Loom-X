@@ -366,6 +366,7 @@ FodyWeavers.xsd
 
 # OllamaHub 发布产物
 /outputs/
+/dist/
 /graphify-out
 /OllamaHub.Desktop/graphify-out
 /LoomX/graphify-out
