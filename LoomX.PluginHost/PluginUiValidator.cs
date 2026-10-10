@@ -21,6 +21,8 @@ internal static class PluginUiValidator
     private const int MaxArguments = 32;
     private const int MaxOptions = 64;
     private const int MaxOptionLength = 256;
+    private const int MaxColumnWeights = 12;
+    private const double MaxColumnWeight = 1000d;
 
     public static PluginUiValidationResult Validate(PluginUiContribution contribution)
     {
@@ -69,6 +71,8 @@ internal static class PluginUiValidator
                 if (!IsFiniteInRange(grid.ColumnSpacing, 0, MaxSpacing)
                     || !IsFiniteInRange(grid.RowSpacing, 0, MaxSpacing))
                     return PluginUiValidationResult.Invalid("INVALID_SPACING");
+                if (!ValidateColumnWeights(grid))
+                    return PluginUiValidationResult.Invalid("INVALID_COLUMN_WEIGHTS");
                 if (grid.Children is null)
                     return PluginUiValidationResult.Invalid("MISSING_CHILDREN");
                 foreach (var item in grid.Children)
@@ -109,9 +113,10 @@ internal static class PluginUiValidator
                 if (!interactive) return RejectInteractive();
                 if (!IsValidIdentifier(button.CommandId))
                     return PluginUiValidationResult.Invalid("INVALID_COMMAND_ID");
-                return !IsValidLabel(button.Label)
-                    ? PluginUiValidationResult.Invalid("INVALID_LABEL")
-                    : ValidateArguments(button.Arguments);
+                if (!IsValidLabel(button.Label))
+                    return PluginUiValidationResult.Invalid("INVALID_LABEL");
+                var readsFields = ValidateReadsFields(button.ReadsFields);
+                return readsFields ?? ValidateArguments(button.Arguments);
 
             case PluginUiTextFieldNode field:
                 if (!interactive) return RejectInteractive();
@@ -159,6 +164,29 @@ internal static class PluginUiValidator
 
     private static bool IsFiniteInRange(double value, double minimum, double maximum) =>
         double.IsFinite(value) && value >= minimum && value <= maximum;
+
+    /// <summary>列权重缺省即等宽；给出时必须逐项为有限数且不超过列数上限（0/负值表示按内容自适应）。</summary>
+    private static bool ValidateColumnWeights(PluginUiGridNode grid)
+    {
+        if (grid.ColumnWeights is not { } weights) return true;
+        if (weights.Count > MaxColumnWeights || weights.Count > grid.Columns) return false;
+        foreach (var weight in weights)
+            if (!double.IsFinite(weight) || Math.Abs(weight) > MaxColumnWeight)
+                return false;
+        return true;
+    }
+
+    /// <summary>按钮显式声明要读取的表单字段：数量有上限，且每项都必须是合法标识符。</summary>
+    private static PluginUiValidationResult? ValidateReadsFields(IReadOnlyList<string>? readsFields)
+    {
+        if (readsFields is not { } fields) return null;
+        if (fields.Count > MaxArguments)
+            return PluginUiValidationResult.Invalid("TOO_MANY_READ_FIELDS");
+        foreach (var field in fields)
+            if (!IsValidIdentifier(field))
+                return PluginUiValidationResult.Invalid("INVALID_READ_FIELD");
+        return null;
+    }
 
     private static PluginUiValidationResult RejectInteractive() =>
         PluginUiValidationResult.Invalid("INTERACTIVE_NODE_REQUIRES_V2");

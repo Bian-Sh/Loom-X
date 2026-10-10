@@ -70,11 +70,17 @@ public sealed record PluginUiStackNode(
     PluginUiOrientation Orientation = PluginUiOrientation.Vertical,
     double Spacing = 0) : PluginUiNode;
 
+/// <summary>
+/// 声明式网格。<see cref="ColumnWeights"/> 给出各列的宽度策略，缺省或 null 表示所有列等宽：
+/// 正值表示该列占用的相对权重（Star），0 或负值表示该列按内容自适应（Auto）。
+/// 这样插件既能表达「等宽卡片网格」，也能表达「开关贴左 + 文字占满剩余空间」这类非等分布局。
+/// </summary>
 public sealed record PluginUiGridNode(
     int Columns,
     IReadOnlyList<PluginUiGridItem> Children,
     double ColumnSpacing = 0,
-    double RowSpacing = 0) : PluginUiNode;
+    double RowSpacing = 0,
+    IReadOnlyList<double>? ColumnWeights = null) : PluginUiNode;
 
 public sealed record PluginUiGridItem(
     PluginUiNode Content,
@@ -106,7 +112,8 @@ public sealed record PluginUiDividerNode(
     PluginUiTone Tone = PluginUiTone.Default) : PluginUiNode;
 
 /// <summary>
-/// 声明式按钮。点击时宿主把 <see cref="Arguments"/> 与当前表单字段值打包成命令回传插件；
+/// 声明式按钮。点击时宿主把 <see cref="Arguments"/>、<see cref="ReadsFields"/>
+/// 指定的表单字段值与节点自身字段值打包成命令回传插件；
 /// 按钮不携带业务数据，只携带插件自证的标识与参数。
 /// </summary>
 public sealed record PluginUiButtonNode(
@@ -114,9 +121,13 @@ public sealed record PluginUiButtonNode(
     string CommandId,
     IReadOnlyDictionary<string, string>? Arguments = null,
     PluginUiTone Tone = PluginUiTone.Default,
-    bool IsPrimary = false) : PluginUiNode;
+    bool IsPrimary = false,
+    IReadOnlyList<string>? ReadsFields = null) : PluginUiNode;
 
-/// <summary>声明式单行文本字段；用户输入的当前值由宿主在命令回传时以 FieldId 为键提交。</summary>
+/// <summary>
+/// 声明式单行文本字段；用户输入的当前值由宿主在命令回传时以 FieldId 为键提交。
+/// TextFieldNode 自身不携带命令：它的值只随引用它的按钮 <see cref="PluginUiButtonNode.ReadsFields"/> 提交。
+/// </summary>
 public sealed record PluginUiTextFieldNode(
     string FieldId,
     string Label,
@@ -127,6 +138,7 @@ public sealed record PluginUiTextFieldNode(
 /// <summary>
 /// 声明式开关字段；当前勾选状态由宿主在命令回传时以 FieldId 为键提交。
 /// CommandId 非空时，宿主在勾选状态变化后立即回传一次命令（无需额外提交按钮）。
+/// Label 为空串时宿主只渲染开关本身，不渲染任何标签文字。
 /// </summary>
 public sealed record PluginUiToggleFieldNode(
     string FieldId,

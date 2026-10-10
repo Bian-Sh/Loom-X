@@ -66,6 +66,18 @@ internal static class CredentialSettingsCommands
                     enabled ? text.BuiltinEnabled : text.BuiltinDisabled));
             }
 
+            case CredentialSettingsUi.EnableAllBuiltins:
+            {
+                store.SetAllBuiltinEnabled(true);
+                return ValueTask.FromResult(PluginUiCommandResult.Success(text.AllBuiltinsEnabled));
+            }
+
+            case CredentialSettingsUi.DisableAllBuiltins:
+            {
+                store.SetAllBuiltinEnabled(false);
+                return ValueTask.FromResult(PluginUiCommandResult.Success(text.AllBuiltinsDisabled));
+            }
+
             case CredentialSettingsUi.AddPrefix:
             {
                 var prefix = command.GetArgument(CredentialSettingsUi.NewPrefixField);

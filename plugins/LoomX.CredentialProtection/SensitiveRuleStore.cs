@@ -245,6 +245,26 @@ public sealed class SensitiveRuleStore
         return true;
     }
 
+    /// <summary>批量开关全部内置形态规则；状态已全部一致时返回 false（无需落盘）。</summary>
+    public bool SetAllBuiltinEnabled(bool enabled)
+    {
+        lock (gate)
+        {
+            var changed = false;
+            foreach (var rule in CredentialBuiltinRules.Defaults)
+            {
+                if (builtinEnabled[rule.Key] == enabled) continue;
+                builtinEnabled[rule.Key] = enabled;
+                changed = true;
+            }
+            if (!changed) return false;
+            Save();
+        }
+
+        RaiseChanged();
+        return true;
+    }
+
     public bool AddPrefix(string prefix, out string? error)
     {
         error = null;

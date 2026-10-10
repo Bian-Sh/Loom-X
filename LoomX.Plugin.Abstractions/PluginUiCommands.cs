@@ -2,8 +2,9 @@ namespace LoomX.Plugins;
 
 /// <summary>
 /// 宿主把插件声明式 UI 上的一次交互回传给插件的命令。
-/// Arguments 由「命令自带参数」与「当前表单字段值」合并而成，字段值以 FieldId 为键；
-/// 两者键冲突时命令自带参数优先，插件不得依赖冲突行为。
+/// Arguments 由「命令自带参数」与「节点自身字段值 + 按钮显式声明的 ReadsFields 字段值」合并而成，
+/// 字段值以 FieldId 为键；两者键冲突时命令自带参数优先，插件不得依赖冲突行为。
+/// 宿主 MUST NOT 把整页表单的全量字段并入命令：字段数量随页面规模增长会让参数无界增长并被宿主拒绝。
 /// </summary>
 public sealed record PluginUiCommand(
     string ContributionId,

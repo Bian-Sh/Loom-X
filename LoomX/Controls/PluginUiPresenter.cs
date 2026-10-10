@@ -132,7 +132,15 @@ public sealed class PluginUiPresenter : ContentControl
         };
         grid.Classes.Add("plugin-ui-grid");
         for (var column = 0; column < node.Columns; column++)
-            grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        {
+            // 显式权重缺省时全部列等宽（Star = 1）；权重 <= 0 表示该列按内容自适应。
+            var weight = node.ColumnWeights is { } weights && column < weights.Count
+                ? weights[column]
+                : 1d;
+            grid.ColumnDefinitions.Add(weight > 0
+                ? new ColumnDefinition(new GridLength(weight, GridUnitType.Star))
+                : new ColumnDefinition(GridLength.Auto));
+        }
 
         var rowCount = Math.Max(1, (int)Math.Ceiling(node.Children.Count / (double)node.Columns));
         for (var row = 0; row < rowCount; row++)
@@ -225,7 +233,10 @@ public sealed class PluginUiPresenter : ContentControl
 
         button.Click += async (_, _) =>
             await DispatchCommandAsync(
-                new PluginUiCommand(contributionId, node.CommandId, MergeArguments(node.Arguments)));
+                new PluginUiCommand(
+                    contributionId,
+                    node.CommandId,
+                    CollectArguments(node.Arguments, node.ReadsFields, selfFieldId: null)));
         return button;
     }
 
@@ -253,16 +264,21 @@ public sealed class PluginUiPresenter : ContentControl
         bool interactive)
     {
         form.SetToggle(node.FieldId, node.IsChecked);
+        // OnContent/OffContent 置空：Fluent 主题默认在开关两侧渲染 On/Off 字样，
+        // 声明式协议里这些文案由插件的 Label/Caption 表达，主题不再重复注入。
         var toggle = new ToggleSwitch
         {
             IsChecked = node.IsChecked,
             IsEnabled = interactive,
+            OnContent = string.Empty,
+            OffContent = string.Empty,
         };
         toggle.Classes.Add("plugin-ui-field");
         toggle.IsCheckedChanged += async (_, _) =>
         {
             form.SetToggle(node.FieldId, toggle.IsChecked == true);
-            await DispatchFieldCommandAsync(node.CommandId, node.Arguments, contributionId, interactive);
+            await DispatchFieldCommandAsync(
+                node.CommandId, node.Arguments, contributionId, interactive, node.FieldId);
         };
 
         var content = string.IsNullOrEmpty(node.Caption)
@@ -298,7 +314,8 @@ public sealed class PluginUiPresenter : ContentControl
         combo.SelectionChanged += async (_, _) =>
         {
             form.SetChoice(node.FieldId, combo.SelectedItem as string ?? string.Empty);
-            await DispatchFieldCommandAsync(node.CommandId, node.Arguments, contributionId, interactive);
+            await DispatchFieldCommandAsync(
+                node.CommandId, node.Arguments, contributionId, interactive, node.FieldId);
         };
 
         return string.IsNullOrEmpty(node.Label)
@@ -324,20 +341,43 @@ public sealed class PluginUiPresenter : ContentControl
         string? commandId,
         IReadOnlyDictionary<string, string>? arguments,
         string contributionId,
-        bool interactive)
+        bool interactive,
+        string selfFieldId)
     {
         if (!interactive || string.IsNullOrEmpty(commandId)) return;
         await DispatchCommandAsync(
-            new PluginUiCommand(contributionId, commandId!, MergeArguments(arguments)));
+            new PluginUiCommand(
+                contributionId,
+                commandId!,
+                CollectArguments(arguments, readsFields: null, selfFieldId)));
     }
 
-    private Dictionary<string, string> MergeArguments(IReadOnlyDictionary<string, string>? arguments)
+    /// <summary>
+    /// 按需收集命令参数：只取「命令自带参数 + 触发节点自身字段 + 按钮显式声明的 ReadsFields」。
+    /// 绝不并入整页表单的全量字段——页面规模（几十个开关）会让参数无界增长并被宿主 Runtime 拒绝，
+    /// 表现为「新增/删除规则」这类命令静默失效。
+    /// </summary>
+    private Dictionary<string, string> CollectArguments(
+        IReadOnlyDictionary<string, string>? arguments,
+        IReadOnlyList<string>? readsFields,
+        string? selfFieldId)
     {
-        var merged = form.Snapshot();
-        if (arguments is null) return merged;
+        var collected = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        if (selfFieldId is not null && form.TryGetValue(selfFieldId, out var selfValue))
+            collected[selfFieldId] = selfValue;
+
+        if (readsFields is not null)
+        {
+            foreach (var fieldId in readsFields)
+                if (form.TryGetValue(fieldId, out var value))
+                    collected[fieldId] = value;
+        }
+
+        if (arguments is null) return collected;
         foreach (var (key, value) in arguments)
-            merged[key] = value ?? string.Empty;
-        return merged;
+            collected[key] = value ?? string.Empty;
+        return collected;
     }
 
     private async Task DispatchCommandAsync(PluginUiCommand command)
@@ -385,36 +425,19 @@ public sealed class PluginUiPresenter : ContentControl
         _ => VerticalAlignment.Stretch,
     };
 
-    /// <summary>本次快照内交互字段的当前值表；命令回传时以 FieldId 为键提交。</summary>
+    /// <summary>本次快照内交互字段的当前值表；命令回传时按 FieldId 精确取用。</summary>
     private sealed class PluginUiFormState
     {
-        private readonly Dictionary<string, string> textValues = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, bool> toggleValues = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, string> choiceValues = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> values = new(StringComparer.Ordinal);
 
-        public void Reset()
-        {
-            textValues.Clear();
-            toggleValues.Clear();
-            choiceValues.Clear();
-        }
+        public void Reset() => values.Clear();
 
-        public void SetText(string fieldId, string value) => textValues[fieldId] = value;
+        public void SetText(string fieldId, string value) => values[fieldId] = value;
 
-        public void SetToggle(string fieldId, bool value) => toggleValues[fieldId] = value;
+        public void SetToggle(string fieldId, bool value) => values[fieldId] = value ? "true" : "false";
 
-        public void SetChoice(string fieldId, string value) => choiceValues[fieldId] = value;
+        public void SetChoice(string fieldId, string value) => values[fieldId] = value;
 
-        public Dictionary<string, string> Snapshot()
-        {
-            var snapshot = new Dictionary<string, string>(StringComparer.Ordinal);
-            foreach (var (fieldId, value) in toggleValues)
-                snapshot[fieldId] = value ? "true" : "false";
-            foreach (var (fieldId, value) in choiceValues)
-                snapshot[fieldId] = value;
-            foreach (var (fieldId, value) in textValues)
-                snapshot[fieldId] = value;
-            return snapshot;
-        }
+        public bool TryGetValue(string fieldId, out string value) => values.TryGetValue(fieldId, out value!);
     }
 }
