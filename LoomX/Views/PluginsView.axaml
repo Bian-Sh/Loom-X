@@ -157,39 +157,39 @@
     </ScrollViewer>
     </Grid>
 
-    <ScrollViewer IsVisible="{Binding IsPluginDetailVisible}" VerticalScrollBarVisibility="Auto">
-      <StackPanel Spacing="14" Margin="0,0,8,0">
-        <Button Command="{Binding BackToPluginListCommand}" HorizontalAlignment="Left" Padding="10,6">
-          <StackPanel Orientation="Horizontal" Spacing="7">
-            <PathIcon Data="M 21,7 L 12,16 L 21,25" Width="14" Height="14"/>
-            <TextBlock Text="{l:Locale plugins.detail.back}" VerticalAlignment="Center"/>
+    <!-- 插件详情：标题区固定不随滚动消失，仅下方内容滚动。
+         返回入口收敛到标题区左侧的 "<"，悬停提示"返回插件列表"，不再另起按钮。 -->
+    <Border IsVisible="{Binding IsPluginDetailVisible}" Classes="surface-card" Padding="18">
+      <Grid RowDefinitions="Auto,*">
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+          <Button Width="42" Height="42" MinWidth="0" MinHeight="0" Padding="0"
+                  VerticalAlignment="Center"
+                  Background="{DynamicResource SurfaceSubtleBrush}"
+                  BorderBrush="{DynamicResource BorderBrush}"
+                  BorderThickness="1" CornerRadius="10"
+                  Command="{Binding BackToPluginListCommand}"
+                  ToolTip.Tip="{l:Locale plugins.detail.back}">
+            <PathIcon Data="M 21,7 L 12,16 L 21,25" Width="18" Height="18"/>
+          </Button>
+          <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+            <TextBlock Text="{Binding SelectedPlugin.DisplayName}" FontSize="18" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding SelectedPlugin.Id}" Classes="tertiary" FontSize="11" FontFamily="Consolas"/>
           </StackPanel>
-        </Button>
+          <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+            <TextBlock Text="{Binding SelectedPlugin.StatusLabel}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+            <TextBlock Text="{Binding SelectedPlugin.Version, StringFormat='v{0}'}" Classes="tertiary" HorizontalAlignment="Right" FontSize="10"/>
+          </StackPanel>
+        </Grid>
 
-        <Border Classes="surface-card" Padding="18">
-          <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="14">
-            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-              <Border Width="42" Height="42" Background="{DynamicResource AccentSoftBrush}" CornerRadius="10">
-                <PathIcon Data="M 8,13 L 13,13 L 13,8 L 19,8 L 19,13 L 24,13 L 24,19 L 19,19 L 19,24 L 13,24 L 13,19 L 8,19 Z" Foreground="{DynamicResource AccentBrush}" Width="21" Height="21" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              </Border>
-              <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
-                <TextBlock Text="{Binding SelectedPlugin.DisplayName}" FontSize="18" FontWeight="SemiBold"/>
-                <TextBlock Text="{Binding SelectedPlugin.Id}" Classes="tertiary" FontSize="11" FontFamily="Consolas"/>
-              </StackPanel>
-              <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                <TextBlock Text="{Binding SelectedPlugin.StatusLabel}" HorizontalAlignment="Right" FontWeight="SemiBold"/>
-                <TextBlock Text="{Binding SelectedPlugin.Version, StringFormat='v{0}'}" Classes="tertiary" HorizontalAlignment="Right" FontSize="10"/>
-              </StackPanel>
-            </Grid>
-
-            <TextBlock Grid.Row="1" Text="{Binding SelectedPlugin.Description}" Classes="muted" TextWrapping="Wrap"/>
-            <controls:PluginUiPresenter Grid.Row="2"
-                                        Contributions="{Binding SelectedPlugin.DetailContributions}"
+        <ScrollViewer Grid.Row="1" Margin="0,14,8,0" VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="14">
+            <TextBlock Text="{Binding SelectedPlugin.Description}" Classes="muted" TextWrapping="Wrap"/>
+            <controls:PluginUiPresenter Contributions="{Binding SelectedPlugin.DetailContributions}"
                                         IsInteractive="{Binding SelectedPlugin.IsDetailInteractive}"
                                         CommandSink="{Binding SelectedPlugin.UiCommandSink}"/>
-          </Grid>
-        </Border>
-      </StackPanel>
-    </ScrollViewer>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+    </Border>
   </Grid>
 </UserControl>
