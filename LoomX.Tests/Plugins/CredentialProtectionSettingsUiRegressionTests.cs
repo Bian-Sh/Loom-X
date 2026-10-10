@@ -7,7 +7,7 @@ namespace LoomX.Tests.Plugins;
 /// <summary>
 /// 凭据保护设置页交互的回归防线：
 /// 命令参数必须按需收集（否则页面字段一多就全量超限、增删规则静默失效）、
-/// 自定义规则区不得混入内置基线（否则整屏都是打码后的 ******）。
+/// 自定义规则区不得混入内置基线（否则整屏都是与用户配置无关的内置规则）。
 /// </summary>
 public sealed class CredentialProtectionSettingsUiRegressionTests : IDisposable
 {
@@ -159,20 +159,36 @@ public sealed class CredentialProtectionSettingsUiRegressionTests : IDisposable
     }
 
     [Fact]
-    public void BaselineSection_UsesReadableLabelsInsteadOfRawRegexOrMasks()
+    public void BaselineSection_UsesReadableLabelsInsteadOfRawRegex()
     {
         var text = FlattenText(Settings(CreatePlugin()));
 
         // 基线区块有自己的标题，不再复用「自定义规则」。
         Assert.Contains("内置识别底座", text, StringComparison.Ordinal);
 
-        // 由规则 id 派生的可读标签：既不是原始正则，也不是打码星号。
+        // 由规则 id 派生的可读标签，而不是铺开原始正则。
         Assert.Contains("Openai Sk", text, StringComparison.Ordinal);
         Assert.Contains("Github Token", text, StringComparison.Ordinal);
         Assert.Contains("Http Headers", text, StringComparison.Ordinal);
+    }
 
-        // 整页不得出现纯星号占位。
-        Assert.DoesNotContain("********", text, StringComparison.Ordinal);
+    [Fact]
+    public void CustomRuleRows_ShowRuleValueVerbatim()
+    {
+        var plugin = CreatePlugin();
+        plugin.RuleStore.AddRule(SensitiveRuleKind.Name, "vault_path", out _, out _);
+        plugin.RuleStore.AddRule(
+            SensitiveRuleKind.Pattern, @"(?<![a-z0-9])x-vault-[0-9]{8}(?![a-z0-9])", out _, out _);
+
+        var section = FindSection(Settings(plugin), "自定义规则 · ");
+        var text = FlattenText(section);
+
+        // 用户要能一眼确认自己写的是哪条规则，因此名称与正则都原样展示。
+        Assert.Contains("vault_path", text, StringComparison.Ordinal);
+        Assert.Contains(@"(?<![a-z0-9])x-vault-[0-9]{8}(?![a-z0-9])", text, StringComparison.Ordinal);
+
+        // 展示层不再产生掩码占位：连续星号即打码残留。
+        Assert.DoesNotMatch(@"\*{2,}", text);
     }
 
     [Fact]

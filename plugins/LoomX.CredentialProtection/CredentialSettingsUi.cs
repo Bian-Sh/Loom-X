@@ -133,7 +133,7 @@ public static class CredentialSettingsUi
     /// <summary>
     /// 自定义规则区：只列用户自己新增的规则。
     /// 内置基线规则（name.* / pattern.*）属于引擎的识别底座而非用户资产，
-    /// 混进列表只会得到一屏打码后的 ******，因此归入内置规则区统一开关。
+    /// 混进列表只会得到一屏与用户配置无关的内置规则，因此归入内置规则区统一开关。
     /// </summary>
     private static PluginUiNode BuildRuleSection(
         SensitiveRuleStore store,
@@ -174,7 +174,7 @@ public static class CredentialSettingsUi
 
     /// <summary>
     /// 自定义规则条目：开关前置且不显示任何标签文字，
-    /// 右侧依次是打码后的规则值、形态标签与编辑/删除操作。
+    /// 右侧依次是原样的规则值、形态标签与编辑/删除操作。
     /// </summary>
     private static PluginUiNode BuildRuleRow(
         CredentialSettingsText text,
@@ -219,7 +219,7 @@ public static class CredentialSettingsUi
                     HorizontalAlignment: PluginUiAlignment.Start,
                     VerticalAlignment: PluginUiAlignment.Center),
                 new PluginUiGridItem(new PluginUiTextNode(
-                    MaskValue(rule.Value, rule.Kind), PluginUiTextRole.Body, Wrap: true)),
+                    rule.Value, PluginUiTextRole.Body, Wrap: true)),
                 new PluginUiGridItem(new PluginUiTextNode(tag, PluginUiTextRole.Caption, Wrap: true)),
                 new PluginUiGridItem(
                     new PluginUiButtonNode(
@@ -364,7 +364,7 @@ public static class CredentialSettingsUi
     /// 基线规则卡片：形状同形态规则卡片。
     /// 基线规则来自插件自身的只读基线表、不是用户凭据，因此展示的是由规则 id 派生的可读标签
     /// （如 <c>pattern.openai-sk</c> → OpenAI API Key）；直接铺开原值正则会占满整张卡片，
-    /// 而一律打码又只剩无意义的< ********>。
+    /// 而一律打码又只剩认不出内容的星号。
     /// </summary>
     private static PluginUiNode BuildBaselineCard(CredentialSettingsText text, SensitiveRule rule)
     {
@@ -495,20 +495,5 @@ public static class CredentialSettingsUi
             new PluginUiStackNode(rows, Spacing: 10),
             Padding: 14,
             CornerRadius: 10);
-    }
-
-    /// <summary>
-    /// 列表展示时给规则值打码：正则规则恒打码（用户可能写入真实密钥作为模式），
-    /// 名称规则仅做部分遮蔽以便辨认。编辑态走明文以便修改。
-    /// 内置基线规则不在自定义列表中出现，因此不需要走这条路径。
-    /// </summary>
-    public static string MaskValue(string value, SensitiveRuleKind kind)
-    {
-        if (string.IsNullOrEmpty(value)) return string.Empty;
-        if (kind == SensitiveRuleKind.Pattern || value.Length <= 2)
-            return new string('*', Math.Min(8, Math.Max(2, value.Length)));
-        if (value.Length <= 6) return value[0] + new string('*', value.Length - 2) + value[^1];
-        var keep = Math.Min(3, value.Length / 4);
-        return value[..keep] + new string('*', Math.Min(12, value.Length - keep * 2)) + value[^keep..];
     }
 }

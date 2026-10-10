@@ -202,15 +202,21 @@ public sealed class CredentialProtectionSettingsTests : IDisposable
     }
 
     [Fact]
-    public void RuleValue_IsMaskedInList_ButNotLeakedInText()
+    public void RuleValue_IsShownVerbatimInList()
     {
         var plugin = CreatePlugin();
         plugin.RuleStore.AddRule(SensitiveRuleKind.Name, "vault_path", out _, out _);
+        plugin.RuleStore.AddRule(
+            SensitiveRuleKind.Pattern, @"(?<![a-z0-9])x-vault-[0-9]{8}(?![a-z0-9])", out _, out _);
 
         var text = FlattenText(GetSettingsNode(plugin));
 
-        // 列表展示打码，规则值不以明文出现在快照里。
-        Assert.DoesNotContain("vault_path", text, StringComparison.Ordinal);
+        // 规则值原样展示：用户要能一眼确认自己写的是哪条规则，
+        // 否则打码后的星号既无法辨认、也无法与规则文件对上。
+        Assert.Contains("vault_path", text, StringComparison.Ordinal);
+        Assert.Contains(@"(?<![a-z0-9])x-vault-[0-9]{8}(?![a-z0-9])", text, StringComparison.Ordinal);
+        // 展示层不再产生掩码占位。
+        Assert.DoesNotMatch(@"\*{2,}", text);
     }
 
     private static PluginUiNode GetSettingsNode(CredentialProtectionPlugin plugin) =>
