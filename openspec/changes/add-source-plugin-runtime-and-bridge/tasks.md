@@ -10,12 +10,12 @@
 
 ## 2. 宿主 SQLite Bridge
 
-- [ ] 2.1 新建宿主侧 `LoomX.Plugin.Storage.Sqlite` 项目并把 `Microsoft.Data.Sqlite`/`SQLitePCLRaw` 依赖集中于该项目，构建测试验证 Plugin Abstractions 和普通插件项目不传递这些依赖。 <!-- comet-task:b28eb15e-361c-45ea-80bc-8745f78f06e7 -->
-- [ ] 2.2 实现与 plugin id 绑定的数据库路径解析和目录创建，覆盖相对嵌套路径、绝对路径、UNC、设备路径、盘符相对路径、`..`、空路径及大小写边界测试。 <!-- comet-task:172a5347-d48a-44a6-a8c4-acd4cb6407cd -->
-- [ ] 2.3 增加 Windows reparse point/符号链接逃逸检查并在测试临时目录验证现有父目录链接、创建前后竞态校验和跨插件路径均返回 `InvalidPath`。 <!-- comet-task:40bda651-a7a0-4193-9a6b-707d23986624 -->
-- [ ] 2.4 实现 SQLite 打开、单语句参数化 Execute、QuerySingle、Query 和 Null/Integer/Real/Text/Blob 映射，使用 CRUD、DDL、索引、Blob、空结果、重复列名和资源上限测试验证行为。 <!-- comet-task:e2aca947-f284-42f6-b367-7a145da607fb -->
-- [ ] 2.5 实现显式事务、提交、回滚、释放回滚、完成后拒绝复用和取消传播，使用原子写入、失败回滚、并发 busy/locked 与取消测试验证生命周期。 <!-- comet-task:3423f7ba-5076-4d87-87e3-3e2214f81f73 -->
-- [ ] 2.6 实现 `PluginSqlException` 错误映射，逐项测试 ConstraintViolation、Busy、Locked、Corrupt、ReadOnly、PermissionDenied、InvalidPath、InvalidSql、Cancelled、ResourceLimit 和 Unknown，确认消息不含参数值或数据库绝对路径。 <!-- comet-task:fb8c5646-1a63-41fd-ad62-55d3f2bba90a -->
+- [x] 2.1 新建宿主侧 `LoomX.Plugin.Storage.Sqlite` 项目并把 `Microsoft.Data.Sqlite`/`SQLitePCLRaw` 依赖集中于该项目，构建测试验证 Plugin Abstractions 和普通插件项目不传递这些依赖。 <!-- comet-task:b28eb15e-361c-45ea-80bc-8745f78f06e7 -->
+- [x] 2.2 实现与 plugin id 绑定的数据库路径解析和目录创建，覆盖相对嵌套路径、绝对路径、UNC、设备路径、盘符相对路径、`..`、空路径及大小写边界测试。 <!-- comet-task:172a5347-d48a-44a6-a8c4-acd4cb6407cd -->
+- [x] 2.3 增加 Windows reparse point/符号链接逃逸检查并在测试临时目录验证现有父目录链接、创建前后竞态校验和跨插件路径均返回 `InvalidPath`。 <!-- comet-task:40bda651-a7a0-4193-9a6b-707d23986624 -->
+- [x] 2.4 实现 SQLite 打开、单语句参数化 Execute、QuerySingle、Query 和 Null/Integer/Real/Text/Blob 映射，使用 CRUD、DDL、索引、Blob、空结果、重复列名和资源上限测试验证行为。 <!-- comet-task:e2aca947-f284-42f6-b367-7a145da607fb -->
+- [x] 2.5 实现显式事务、提交、回滚、释放回滚、完成后拒绝复用和取消传播，使用原子写入、失败回滚、并发 busy/locked 与取消测试验证生命周期。 <!-- comet-task:3423f7ba-5076-4d87-87e3-3e2214f81f73 -->
+- [x] 2.6 实现 `PluginSqlException` 错误映射，逐项测试 ConstraintViolation、Busy、Locked、Corrupt、ReadOnly、PermissionDenied、InvalidPath、InvalidSql、Cancelled、ResourceLimit 和 Unknown，确认消息不含参数值或数据库绝对路径。 <!-- comet-task:fb8c5646-1a63-41fd-ad62-55d3f2bba90a -->
 - [ ] 2.7 关闭 SQLite 扩展加载并增加 authorizer/语句限制，测试 ATTACH、外部路径型 VACUUM 和提供程序替换被拒绝，而普通 PRAGMA、DDL、DML 与查询保持可用。 <!-- comet-task:cd65eb11-68d9-4122-bfac-a7ffb98f1341 -->
 - [ ] 2.8 把数据库句柄和事务登记到插件 Bridge 生命周期，在插件卸载时关闭资源并回滚未完成事务；通过文件可重新打开、句柄不可复用和其他插件不受影响的测试验证。 <!-- comet-task:fe042dc6-143e-4987-a09c-5227006fe633 -->
 

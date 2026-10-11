@@ -29,6 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\LoomX\LoomX.csproj" />
     <ProjectReference Include="..\LoomX.PluginHost\LoomX.PluginHost.csproj" />
+    <ProjectReference Include="..\LoomX.Plugin.Storage.Sqlite\LoomX.Plugin.Storage.Sqlite.csproj" />
     <!-- 插件只作静态引用（测试需要直接 new 插件类型），负载一律走下面的镜像：
          plugin.manifest.json 与 i18n/<culture>.json 都同名，靠「每个插件各占一个目录」解决冲突。 -->
     <ProjectReference Include="..\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj" />
