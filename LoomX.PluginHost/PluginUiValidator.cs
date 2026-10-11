@@ -115,6 +115,8 @@ internal static class PluginUiValidator
                     return PluginUiValidationResult.Invalid("INVALID_COMMAND_ID");
                 if (!IsValidLabel(button.Label))
                     return PluginUiValidationResult.Invalid("INVALID_LABEL");
+                if (button.ToolTip is { } toolTip && !IsValidLabel(toolTip))
+                    return PluginUiValidationResult.Invalid("INVALID_LABEL");
                 var readsFields = ValidateReadsFields(button.ReadsFields);
                 return readsFields ?? ValidateArguments(button.Arguments);
 

@@ -143,6 +143,38 @@ public sealed class CredentialProtectionSettingsUiRegressionTests : IDisposable
     }
 
     [Fact]
+    public void SettingsSections_PlaceProtectionFirst_AndKeepAddSectionNextToCustomRules()
+    {
+        var root = Assert.IsType<PluginUiStackNode>(Settings(CreatePlugin()));
+        var sectionTitles = root.Children
+            .Cast<PluginUiSurfaceNode>()
+            .Select(FlattenText)
+            .Select(text => text.Split('\n')[0])
+            .ToArray();
+
+        Assert.Equal("主动保护状态", sectionTitles[0]);
+        Assert.Equal("新增自定义规则", sectionTitles[1]);
+        Assert.Equal("自定义规则", sectionTitles[2]);
+    }
+
+    [Fact]
+    public void CustomRuleRows_CenterRuleValue_AndDoNotRenderKindTag()
+    {
+        var plugin = CreatePlugin();
+        plugin.RuleStore.AddRule(SensitiveRuleKind.Name, "vault_path", out _, out _);
+
+        var customSection = FindSection(Settings(plugin), "自定义规则 · ");
+        var stack = Assert.IsType<PluginUiStackNode>(customSection.Content);
+        var row = Assert.IsType<PluginUiGridNode>(stack.Children[1]);
+        var value = Assert.IsType<PluginUiTextNode>(row.Children[1].Content);
+
+        Assert.Equal(4, row.Columns);
+        Assert.Equal(PluginUiAlignment.Center, row.Children[1].VerticalAlignment);
+        Assert.Equal("vault_path", value.Text);
+        Assert.DoesNotContain("名称", FlattenText(row), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BuiltinSection_GroupsRulesWithCounts_AndOffersBulkToggles()
     {
         var plugin = CreatePlugin();
@@ -208,7 +240,7 @@ public sealed class CredentialProtectionSettingsUiRegressionTests : IDisposable
     }
 
     [Fact]
-    public void BuiltinCards_LeadWithUnlabelledToggle_AndUseWeightedColumns()
+    public void BuiltinCards_StackTitleAndHintBesideUnlabelledToggle()
     {
         var builtinSection = FindSection(Settings(CreatePlugin()), "内置形态规则");
         var card = Collect(builtinSection, node => node is PluginUiSurfaceNode)
@@ -218,12 +250,71 @@ public sealed class CredentialProtectionSettingsUiRegressionTests : IDisposable
 
         var grid = (PluginUiGridNode)card.Content;
         var toggle = Assert.IsType<PluginUiToggleFieldNode>(grid.Children[0].Content);
+        var content = Assert.IsType<PluginUiStackNode>(grid.Children[1].Content);
 
         Assert.Equal(string.Empty, toggle.Label);
-        Assert.NotNull(grid.ColumnWeights);
-        // 第 0 列按内容自适应（开关不被拉伸），后两列按权重瓜分剩余宽度。
-        Assert.Equal(0d, grid.ColumnWeights![0]);
-        Assert.All(grid.ColumnWeights.Skip(1), weight => Assert.True(weight > 0));
+        Assert.Equal(2, grid.Columns);
+        Assert.Equal([0d, 1d], grid.ColumnWeights);
+        Assert.Equal(PluginUiOrientation.Vertical, content.Orientation);
+        Assert.Equal(PluginUiTextRole.Body, Assert.IsType<PluginUiTextNode>(content.Children[0]).Role);
+        Assert.Equal(PluginUiTextRole.Caption, Assert.IsType<PluginUiTextNode>(content.Children[1]).Role);
+    }
+
+    [Fact]
+    public void BaselineCards_UseTheSameTitleAndHintLayoutAsBuiltinCards()
+    {
+        var builtinSection = FindSection(Settings(CreatePlugin()), "内置形态规则");
+        var card = Collect(builtinSection, node => node is PluginUiSurfaceNode)
+            .OfType<PluginUiSurfaceNode>()
+            .First(surface => surface.Content is PluginUiGridNode
+                && Collect(surface, n => n is PluginUiToggleFieldNode toggle
+                    && toggle.FieldId.StartsWith("enabled_name.", StringComparison.Ordinal)).Any());
+
+        var grid = Assert.IsType<PluginUiGridNode>(card.Content);
+        var content = Assert.IsType<PluginUiStackNode>(grid.Children[1].Content);
+
+        Assert.Equal(2, grid.Columns);
+        Assert.Equal([0d, 1d], grid.ColumnWeights);
+        Assert.Equal(PluginUiTextRole.Body, Assert.IsType<PluginUiTextNode>(content.Children[0]).Role);
+        Assert.Equal(PluginUiTextRole.Caption, Assert.IsType<PluginUiTextNode>(content.Children[1]).Role);
+    }
+
+    [Fact]
+    public void PrefixSection_PlacesAddFormBeforeContentSizedCenteredChips()
+    {
+        var plugin = CreatePlugin();
+        Assert.True(plugin.RuleStore.AddPrefix("sk-live-", out _));
+
+        var section = FindSection(Settings(plugin), "自定义密钥前缀");
+        var stack = Assert.IsType<PluginUiStackNode>(section.Content);
+        var addFormIndex = stack.Children
+            .Select((node, index) => (node, index))
+            .Single(item => item.node is PluginUiGridNode grid
+                && Collect(grid, child => child is PluginUiTextFieldNode field
+                    && field.FieldId == CredentialSettingsUi.NewPrefixField).Any())
+            .index;
+        var chipsIndex = stack.Children
+            .Select((node, index) => (node, index))
+            .Single(item => item.node is PluginUiGridNode grid
+                && Collect(grid, child => child is PluginUiButtonNode button
+                    && button.CommandId == CredentialSettingsUi.DeletePrefix).Any())
+            .index;
+        var addForm = Assert.IsType<PluginUiGridNode>(stack.Children[addFormIndex]);
+        var chips = Assert.IsType<PluginUiGridNode>(stack.Children[chipsIndex]);
+        var chip = Assert.IsType<PluginUiSurfaceNode>(chips.Children[0].Content);
+        var chipContent = Assert.IsType<PluginUiGridNode>(chip.Content);
+        var prefix = Assert.IsType<PluginUiTextNode>(chipContent.Children[0].Content);
+        var delete = Assert.IsType<PluginUiButtonNode>(chipContent.Children[1].Content);
+
+        Assert.True(addFormIndex < chipsIndex);
+        Assert.Equal(PluginUiAlignment.End, addForm.Children[1].VerticalAlignment);
+        Assert.Equal([0d, 0d, 0d], chips.ColumnWeights);
+        Assert.All(chips.Children, item => Assert.Equal(PluginUiAlignment.Start, item.HorizontalAlignment));
+        Assert.Equal(PluginUiAlignment.Center, chipContent.Children[0].VerticalAlignment);
+        Assert.Equal("sk-live-", prefix.Text);
+        Assert.Equal("×", delete.Label);
+        Assert.Equal("删除", delete.ToolTip);
+        Assert.True(delete.IsIconOnly);
     }
 
     /// <summary>

@@ -145,7 +145,9 @@ public sealed record PluginUiButtonNode(
     IReadOnlyDictionary<string, string>? Arguments = null,
     PluginUiTone Tone = PluginUiTone.Default,
     bool IsPrimary = false,
-    IReadOnlyList<string>? ReadsFields = null) : PluginUiNode;
+    IReadOnlyList<string>? ReadsFields = null,
+    string? ToolTip = null,
+    bool IsIconOnly = false) : PluginUiNode;
 
 /// <summary>
 /// 声明式单行文本字段；用户输入的当前值由宿主在命令回传时以 FieldId 为键提交。

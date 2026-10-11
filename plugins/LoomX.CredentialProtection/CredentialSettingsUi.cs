@@ -30,8 +30,8 @@ public static class CredentialSettingsUi
     /// <summary>列表一次渲染的规则上限，避免节点数突破宿主校验限制；超出时给出总数提示。</summary>
     private const int MaxVisibleRules = 24;
 
-    /// <summary>内置形态规则卡片每行的列宽策略：开关按内容自适应，名称与说明按 1 : 2.4 分配。</summary>
-    private static readonly double[] BuiltinCardColumns = [0, 1, 2.4];
+    /// <summary>内置规则卡片：开关按内容自适应，右侧文字占满剩余空间。</summary>
+    private static readonly double[] BuiltinCardColumns = [0, 1];
 
     public static string EnabledField(string ruleId) => $"enabled_{ruleId}";
     public static string EditValueField(string ruleId) => $"edit_value_{ruleId}";
@@ -56,8 +56,8 @@ public static class CredentialSettingsUi
     {
         return new PluginUiStackNode(
             [
-                BuildAddSection(text),
                 BuildProtectionNoticeSection(text, activeProtectionEnabled),
+                BuildAddSection(text),
                 BuildRuleSection(store, text, editingRuleId),
                 BuildBuiltinSection(store, text),
                 BuildPrefixSection(store, text),
@@ -204,9 +204,8 @@ public static class CredentialSettingsUi
             Spacing: 8);
         }
 
-        var tag = rule.Kind == SensitiveRuleKind.Pattern ? text.TagPattern : text.TagName;
         return new PluginUiGridNode(
-            5,
+            4,
             [
                 // 开关在最前，Label 传空串：宿主只渲染开关本体，不加「启用」文字。
                 new PluginUiGridItem(
@@ -218,9 +217,9 @@ public static class CredentialSettingsUi
                         Arguments: new Dictionary<string, string>(StringComparer.Ordinal) { ["rule_id"] = rule.Id }),
                     HorizontalAlignment: PluginUiAlignment.Start,
                     VerticalAlignment: PluginUiAlignment.Center),
-                new PluginUiGridItem(new PluginUiTextNode(
-                    rule.Value, PluginUiTextRole.Body, Wrap: true)),
-                new PluginUiGridItem(new PluginUiTextNode(tag, PluginUiTextRole.Caption, Wrap: true)),
+                new PluginUiGridItem(
+                    new PluginUiTextNode(rule.Value, PluginUiTextRole.Body, Wrap: true),
+                    VerticalAlignment: PluginUiAlignment.Center),
                 new PluginUiGridItem(
                     new PluginUiButtonNode(
                         text.ButtonEdit,
@@ -238,7 +237,7 @@ public static class CredentialSettingsUi
                     VerticalAlignment: PluginUiAlignment.Center),
             ],
             ColumnSpacing: 8,
-            ColumnWeights: [0, 1, 0, 0, 0]);
+            ColumnWeights: [0, 1, 0, 0]);
     }
 
     /// <summary>
@@ -328,14 +327,14 @@ public static class CredentialSettingsUi
         CredentialBuiltinRule rule) =>
         enabled.TryGetValue(rule.Key, out var on) ? on : rule.EnabledByDefault;
 
-    /// <summary>内置形态规则卡片：开关在前，右侧是名称与一行说明。</summary>
+    /// <summary>内置形态规则卡片：开关在前，右侧标题与说明上下排列。</summary>
     private static PluginUiNode BuildBuiltinCard(
         CredentialSettingsText text,
         CredentialBuiltinRule rule,
         bool isEnabled) =>
         new PluginUiSurfaceNode(
             new PluginUiGridNode(
-                3,
+                2,
                 [
                     new PluginUiGridItem(
                         new PluginUiToggleFieldNode(
@@ -347,10 +346,12 @@ public static class CredentialSettingsUi
                         HorizontalAlignment: PluginUiAlignment.Start,
                         VerticalAlignment: PluginUiAlignment.Center),
                     new PluginUiGridItem(
-                        new PluginUiTextNode(text.BuiltinName(rule.Key), PluginUiTextRole.Body, Wrap: true),
-                        VerticalAlignment: PluginUiAlignment.Center),
-                    new PluginUiGridItem(
-                        new PluginUiTextNode(text.BuiltinHint(rule.Key), PluginUiTextRole.Caption, Wrap: true),
+                        new PluginUiStackNode(
+                            [
+                                new PluginUiTextNode(text.BuiltinName(rule.Key), PluginUiTextRole.Body, Wrap: true),
+                                new PluginUiTextNode(text.BuiltinHint(rule.Key), PluginUiTextRole.Caption, Wrap: true),
+                            ],
+                            Spacing: 3),
                         VerticalAlignment: PluginUiAlignment.Center),
                 ],
                 ColumnSpacing: 8,
@@ -371,7 +372,7 @@ public static class CredentialSettingsUi
         var isName = rule.Kind == SensitiveRuleKind.Name;
         return new PluginUiSurfaceNode(
             new PluginUiGridNode(
-                3,
+                2,
                 [
                     new PluginUiGridItem(
                         new PluginUiToggleFieldNode(
@@ -383,13 +384,15 @@ public static class CredentialSettingsUi
                         HorizontalAlignment: PluginUiAlignment.Start,
                         VerticalAlignment: PluginUiAlignment.Center),
                     new PluginUiGridItem(
-                        new PluginUiTextNode(
-                            isName ? text.BaselineNameLabel : text.BaselinePatternLabel,
-                            PluginUiTextRole.Caption,
-                            Wrap: true),
-                        VerticalAlignment: PluginUiAlignment.Center),
-                    new PluginUiGridItem(
-                        new PluginUiTextNode(BaselineLabel(rule), PluginUiTextRole.Body, Wrap: true),
+                        new PluginUiStackNode(
+                            [
+                                new PluginUiTextNode(BaselineLabel(rule), PluginUiTextRole.Body, Wrap: true),
+                                new PluginUiTextNode(
+                                    isName ? text.BaselineNameLabel : text.BaselinePatternLabel,
+                                    PluginUiTextRole.Caption,
+                                    Wrap: true),
+                            ],
+                            Spacing: 3),
                         VerticalAlignment: PluginUiAlignment.Center),
                 ],
                 ColumnSpacing: 8,
@@ -426,26 +429,32 @@ public static class CredentialSettingsUi
     }
 
     /// <summary>
-    /// 密钥前缀区：已配置前缀以标签（chip）形式平铺，末尾是新增输入框，
-    /// 与 maskit 的前缀标签 + 内联新增一致。
+    /// 密钥前缀区：新增表单在前，已配置前缀以按内容宽度的标签（chip）平铺。
     /// </summary>
     private static PluginUiNode BuildPrefixSection(SensitiveRuleStore store, CredentialSettingsText text)
     {
         var prefixes = store.SecretPrefixes;
         var chips = prefixes
             .Select(prefix => new PluginUiSurfaceNode(
-                new PluginUiStackNode(
+                new PluginUiGridNode(
+                    2,
                     [
-                        new PluginUiTextNode(prefix, PluginUiTextRole.Body),
-                        new PluginUiButtonNode(
-                            text.ButtonDelete,
-                            DeletePrefix,
-                            new Dictionary<string, string>(StringComparer.Ordinal) { ["prefix"] = prefix },
-                            PluginUiTone.Danger),
+                        new PluginUiGridItem(
+                            new PluginUiTextNode(prefix, PluginUiTextRole.Body),
+                            VerticalAlignment: PluginUiAlignment.Center),
+                        new PluginUiGridItem(
+                            new PluginUiButtonNode(
+                                "×",
+                                DeletePrefix,
+                                new Dictionary<string, string>(StringComparer.Ordinal) { ["prefix"] = prefix },
+                                PluginUiTone.Danger,
+                                ToolTip: text.ButtonDelete,
+                                IsIconOnly: true),
+                            VerticalAlignment: PluginUiAlignment.Center),
                     ],
-                    PluginUiOrientation.Horizontal,
-                    Spacing: 6),
-                Padding: 8,
+                    ColumnSpacing: 6,
+                    ColumnWeights: [0, 0]),
+                Padding: 6,
                 CornerRadius: 8))
             .Cast<PluginUiNode>()
             .ToArray();
@@ -454,6 +463,24 @@ public static class CredentialSettingsUi
         {
             new PluginUiTextNode(text.PrefixSectionTitle, PluginUiTextRole.Title),
             new PluginUiTextNode(text.PrefixSectionHint, PluginUiTextRole.Caption, Wrap: true),
+            new PluginUiGridNode(
+                2,
+                [
+                    new PluginUiGridItem(new PluginUiTextFieldNode(
+                        NewPrefixField, text.FieldPrefix, Watermark: "sk-")),
+                    new PluginUiGridItem(
+                        new PluginUiButtonNode(
+                            text.ButtonAddPrefix,
+                            AddPrefix,
+                            Tone: PluginUiTone.Accent,
+                            IsPrimary: true,
+                            ReadsFields: [NewPrefixField]),
+                        HorizontalAlignment: PluginUiAlignment.Start,
+                        VerticalAlignment: PluginUiAlignment.End),
+                ],
+                ColumnSpacing: 10,
+                // 输入框占满剩余宽度，新增按钮按内容自适应，并与输入框本体底部对齐。
+                ColumnWeights: [1, 0]),
         };
 
         if (chips.Length == 0)
@@ -466,30 +493,12 @@ public static class CredentialSettingsUi
                 3,
                 [.. chips.Select(chip => new PluginUiGridItem(
                     chip,
-                    HorizontalAlignment: PluginUiAlignment.Stretch,
+                    HorizontalAlignment: PluginUiAlignment.Start,
                     VerticalAlignment: PluginUiAlignment.Center))],
                 ColumnSpacing: 8,
-                RowSpacing: 8));
+                RowSpacing: 8,
+                ColumnWeights: [0, 0, 0]));
         }
-
-        rows.Add(new PluginUiGridNode(
-            2,
-            [
-                new PluginUiGridItem(new PluginUiTextFieldNode(
-                    NewPrefixField, text.FieldPrefix, Watermark: "sk-")),
-                new PluginUiGridItem(
-                    new PluginUiButtonNode(
-                        text.ButtonAddPrefix,
-                        AddPrefix,
-                        Tone: PluginUiTone.Accent,
-                        IsPrimary: true,
-                        ReadsFields: [NewPrefixField]),
-                    HorizontalAlignment: PluginUiAlignment.Start,
-                    VerticalAlignment: PluginUiAlignment.Center),
-            ],
-            ColumnSpacing: 10,
-            // 输入框占满剩余宽度，新增按钮按内容自适应。
-            ColumnWeights: [1, 0]));
 
         return new PluginUiSurfaceNode(
             new PluginUiStackNode(rows, Spacing: 10),

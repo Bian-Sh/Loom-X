@@ -228,6 +228,12 @@ public sealed class PluginUiPresenter : ContentControl
         button.Classes.Add("plugin-ui-button");
         button.Classes.Add(ToneClass(node.Tone));
         if (node.IsPrimary) button.Classes.Add("is-primary");
+        if (node.IsIconOnly) button.Classes.Add("is-icon-only");
+        if (!string.IsNullOrEmpty(node.ToolTip))
+        {
+            Avalonia.Controls.ToolTip.SetTip(button, node.ToolTip);
+            Avalonia.Automation.AutomationProperties.SetName(button, node.ToolTip);
+        }
 
         if (!interactive) return button;
 

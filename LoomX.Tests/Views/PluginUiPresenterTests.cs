@@ -106,5 +106,32 @@ public sealed class PluginUiPresenterTests
         Assert.Null(presenter.Content);
     }
 
+    [Fact]
+    public void Presenter_RendersIconOnlyButtonWithTooltipAndCircularStyle()
+    {
+        AvaloniaTestBootstrap.Ensure();
+        var contribution = new PluginUiContribution(
+            PluginUiContribution.CurrentSchemaVersion,
+            "actions",
+            PluginUiSlot.DetailBody,
+            new PluginUiButtonNode(
+                "×",
+                "delete",
+                Tone: PluginUiTone.Danger,
+                ToolTip: "删除",
+                IsIconOnly: true));
+
+        var presenter = new PluginUiPresenter
+        {
+            Contributions = [contribution],
+            IsInteractive = true,
+        };
+
+        var button = Assert.IsType<Button>(presenter.Content);
+        Assert.Equal("×", button.Content);
+        Assert.Equal("删除", ToolTip.GetTip(button));
+        Assert.Contains("is-icon-only", button.Classes);
+    }
+
     private sealed record UnknownNode : PluginUiNode;
 }
