@@ -9,7 +9,9 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\LoomX.PluginHost\LoomX.PluginHost.csproj" />
-    <!-- 插件只作为负载拷贝到 plugins 目录供运行时动态发现，不做静态引用（验证 ALC 加载路径）。 -->
+    <!-- 插件只作为负载拷贝到 plugins 目录供运行时动态发现，不做静态引用（验证 ALC 加载路径）。
+         插件负载不在应用根目录出现：plugin.manifest.json 与 i18n/<culture>.json 只存在于
+         plugins/<id>/ 下，同名文件平铺会互相覆盖。 -->
     <ProjectReference Include="..\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj"
                       ReferenceOutputAssembly="false"
                       OutputItemType="FirstPartyPlugin"

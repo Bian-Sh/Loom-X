@@ -51,9 +51,6 @@
   <data name="plugins.toast.disabled"><value>Disabled “{0}”</value></data>
   <data name="plugins.category.system"><value>System plugin</value></data>
   <data name="plugins.category.extension"><value>Extension</value></data>
-  <data name="plugins.credential.name"><value>Credential Protection</value></data>
-  <data name="plugins.credential.description"><value>Detects and masks credentials in Router requests, injects placeholder integrity instructions, and restores original values in responses.</value></data>
-  <data name="plugins.credential.lifecycle"><value>Can be disabled: disabling only stops detecting and replacing newly sent plaintext. Credential references already issued in past sessions are still recognised, still receive the integrity instruction, and are still restored in responses; the trigger is whether the plugin-injected instruction is present in the context. After disabling, new requests may carry unprocessed credential plaintext.</value></data>
   <data name="plugins.generic.description"><value>Provides composable request or response extensions for the Loom-X Router Pipeline.</value></data>
   <data name="plugins.generic.lifecycle"><value>Disabling affects only the current runtime. Plugin files and owned data remain intact; persistent startup switches will be added later.</value></data>
   <data name="plugins.extension_count"><value>{0} extension points</value></data>

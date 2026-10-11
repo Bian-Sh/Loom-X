@@ -9,7 +9,7 @@ namespace LoomX.CredentialProtection;
 /// 第一方 Credential Protection Router 插件：在请求正文离开本地安全边界、
 /// 发送给外部 Provider 前完成凭据检测与脱敏。规则数据 Plugin-owned，脱敏失败 fail closed。
 /// </summary>
-public sealed class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContributionProvider, IPluginUiCommandHandler, IPluginEnableStateAware
+public sealed partial class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContributionProvider, IPluginUiCommandHandler, IPluginEnableStateAware
 {
     public const string PluginId = "loomx.credential-protection";
 
@@ -417,57 +417,19 @@ public sealed class CredentialResponseExtension(
     }
 }
 
-internal sealed record CredentialProtectionUiText(
-    string SanitizedRequests,
-    string SanitizedTerms,
-    string RestoredResponses,
-    string RestoredHint,
-    string Errors,
-    string ErrorsHint)
+/// <summary>凭据保护卡片概览的多语言文案，来自插件自有资源。</summary>
+internal sealed record CredentialProtectionUiText(PluginTextCatalog Catalog)
 {
-    public static CredentialProtectionUiText Resolve(string cultureName)
-    {
-        var normalized = cultureName.Trim().ToLowerInvariant();
-        if (normalized.StartsWith("zh-tw", StringComparison.Ordinal)
-            || normalized.StartsWith("zh-hk", StringComparison.Ordinal))
-        {
-            return new(
-                "已脫敏請求",
-                "累計脫敏詞項 {0:N0}",
-                "已還原回覆",
-                "模型回覆已成功還原",
-                "異常與警告",
-                "請求或回覆處理異常");
-        }
+    public static CredentialProtectionUiText Resolve(string cultureName) =>
+        new(PluginTextCatalog.For(
+            typeof(CredentialProtectionUiText),
+            CredentialProtectionPlugin.PluginId,
+            cultureName));
 
-        if (normalized.StartsWith("ja", StringComparison.Ordinal))
-        {
-            return new(
-                "マスク済みリクエスト",
-                "累計マスク項目 {0:N0}",
-                "復元済みレスポンス",
-                "モデル応答を正常に復元",
-                "異常と警告",
-                "リクエストまたは応答の処理異常");
-        }
-
-        if (normalized.StartsWith("zh", StringComparison.Ordinal))
-        {
-            return new(
-                "已脱敏请求",
-                "累计脱敏词项 {0:N0}",
-                "已还原回复",
-                "模型回复已成功还原",
-                "异常与告警",
-                "请求或响应处理异常");
-        }
-
-        return new(
-            "Sanitized requests",
-            "Sanitized terms {0:N0}",
-            "Restored responses",
-            "Model responses restored successfully",
-            "Errors and warnings",
-            "Request or response processing errors");
-    }
+    public string SanitizedRequests => Catalog.Get("sanitizedRequests");
+    public string SanitizedTerms => Catalog.Get("sanitizedTerms");
+    public string RestoredResponses => Catalog.Get("restoredResponses");
+    public string RestoredHint => Catalog.Get("restoredHint");
+    public string Errors => Catalog.Get("errors");
+    public string ErrorsHint => Catalog.Get("errorsHint");
 }

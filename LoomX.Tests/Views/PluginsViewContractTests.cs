@@ -22,18 +22,20 @@ public sealed class PluginsViewContractTests
     }
 
     [Fact]
-    public void CredentialProtectionCardExplainsDisableSemanticsAndCanBeToggled()
+    public void EveryPluginCanBeToggledAndCarriesItsOwnLifecycleText()
     {
         var viewModel = File.ReadAllText(Path.Combine(Root, "LoomX", "ViewModels", "PluginsViewModel.cs"));
         var view = File.ReadAllText(Path.Combine(Root, "LoomX", "Views", "PluginsView.axaml"));
-        var resources = File.ReadAllText(Path.Combine(Root, "LoomX", "Resources", "Strings.resx"));
+        var pluginI18n = File.ReadAllText(Path.Combine(
+            Root, "plugins", "LoomX.CredentialProtection", "i18n", "zh-CN.json"));
 
-        Assert.Contains("CredentialProtectionPluginId = \"loomx.credential-protection\"", viewModel, StringComparison.Ordinal);
-        // 凭据保护允许停用：停用只关闭主动保护，历史引用的解析与恢复继续运行。
+        // 所有插件都可停用；停用语义由插件自己的 lifecycle 文案说明，宿主不再硬编码任何插件 id。
         Assert.Contains("public bool CanToggle => true", viewModel, StringComparison.Ordinal);
         Assert.Contains("IsEnabled=\"{Binding CanToggle}\"", view, StringComparison.Ordinal);
-        Assert.Contains("历史会话中已签发的凭据引用仍会识别", resources, StringComparison.Ordinal);
-        Assert.DoesNotContain("暂不允许从界面停用", resources, StringComparison.Ordinal);
+        Assert.DoesNotContain("CredentialProtectionPluginId", viewModel, StringComparison.Ordinal);
+        Assert.DoesNotContain("loomx.credential-protection", viewModel, StringComparison.Ordinal);
+        // 「停用后历史引用仍会还原」这条关键语义现在住在插件资源里。
+        Assert.Contains("历史会话中已签发的凭据引用仍会识别", pluginI18n, StringComparison.Ordinal);
     }
 
 

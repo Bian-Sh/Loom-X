@@ -1,0 +1,118 @@
+using System.Globalization;
+using LoomX.Plugins;
+
+namespace LoomX.ToolResultCompression;
+
+/// <summary>
+/// 设置页文案。全部来自插件自有本地化资源（<c>i18n/*.json</c>），
+/// 只描述数量、比例与配置语义，不含任何工具结果内容。
+/// </summary>
+internal sealed record CompressionSettingsText(
+    PluginTextCatalog Localization,
+    string SavingsTitle,
+    string SavingsHint,
+    string ColumnOriginal,
+    string ColumnCompressed,
+    string RowChars,
+    string RowTokens,
+    string RowSaved,
+    string RowSavedValue,
+    string CharsUnit,
+    string KiloCharsUnit,
+    string MegaCharsUnit,
+    string TokenUnit,
+    string SummaryFormat,
+    string EmptyStateHint,
+    string StrategyTitle,
+    string StrategyHint,
+    string EnableLabel,
+    string EnableCaption,
+    string LevelLabel,
+    string LevelConservative,
+    string LevelStandard,
+    string LevelAggressive,
+    string LevelCustom,
+    string KeepRecentLabel,
+    string KeepRecentWatermark,
+    string MinSavingLabel,
+    string MinSavingWatermark,
+    string JsonFoldLabel,
+    string DedupeLabel,
+    string CommandFiltersLabel,
+    string ButtonApply,
+    string ButtonRestoreDefaults,
+    string RecentTitle,
+    string RecentEmpty,
+    string RecentEntryFormat,
+    string ButtonResetStats,
+    string ButtonResetStatsCaption,
+    string MsgEnabled,
+    string MsgDisabled,
+    string MsgLevelApplied,
+    string MsgKeepRecentApplied,
+    string MsgMinSavingApplied,
+    string MsgInvalidNumber,
+    string MsgStatsReset,
+    string MsgDefaultsRestored,
+    string MsgStrategyUpdated,
+    string MsgNotInitialized)
+{
+    public CultureInfo Culture => Localization.Culture;
+
+    public static CompressionSettingsText Resolve(string cultureName)
+    {
+        var text = PluginTextCatalog.For(
+            typeof(CompressionSettingsText),
+            ToolResultCompressionPlugin.PluginId,
+            cultureName);
+        return new(
+            text,
+            text.Get("settings.savings_title"),
+            text.Get("settings.savings_hint"),
+            text.Get("settings.column_original"),
+            text.Get("settings.column_compressed"),
+            text.Get("settings.row_chars"),
+            text.Get("settings.row_tokens"),
+            text.Get("settings.row_saved"),
+            text.Get("settings.row_saved_value"),
+            text.Get("settings.chars_unit"),
+            text.Get("settings.kilo_chars_unit"),
+            text.Get("settings.mega_chars_unit"),
+            text.Get("settings.token_unit"),
+            text.Get("settings.summary"),
+            text.Get("settings.empty_state"),
+            text.Get("settings.strategy_title"),
+            text.Get("settings.strategy_hint"),
+            text.Get("settings.enable_label"),
+            text.Get("settings.enable_caption"),
+            text.Get("settings.level_label"),
+            text.Get("settings.level_conservative"),
+            text.Get("settings.level_standard"),
+            text.Get("settings.level_aggressive"),
+            text.Get("settings.level_custom"),
+            text.Get("settings.keep_recent_label"),
+            text.Get("settings.keep_recent_watermark"),
+            text.Get("settings.min_saving_label"),
+            text.Get("settings.min_saving_watermark"),
+            text.Get("settings.json_fold_label"),
+            text.Get("settings.dedupe_label"),
+            text.Get("settings.command_filters_label"),
+            text.Get("settings.button_apply"),
+            text.Get("settings.button_restore_defaults"),
+            text.Get("settings.recent_title"),
+            text.Get("settings.recent_empty"),
+            text.Get("settings.recent_entry"),
+            text.Get("settings.button_reset_stats"),
+            text.Get("settings.reset_stats_caption"),
+            text.Get("settings.msg_enabled"),
+            text.Get("settings.msg_disabled"),
+            text.Get("settings.msg_level_applied"),
+            text.Get("settings.msg_keep_recent_applied"),
+            text.Get("settings.msg_min_saving_applied"),
+            text.Get("settings.msg_invalid_number"),
+            text.Get("settings.msg_stats_reset"),
+            text.Get("settings.msg_defaults_restored"),
+            text.Get("settings.msg_strategy_updated"),
+            text.Get("settings.msg_not_initialized"));
+    }
+}

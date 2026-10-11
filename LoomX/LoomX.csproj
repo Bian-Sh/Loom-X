@@ -54,32 +54,50 @@
     <Content Include="BrowserExtension\**\*.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
-    <!-- 第一方插件只作为负载拷贝到输出 plugins 目录供运行时动态发现，不做静态引用（验证 ALC 加载路径）。 -->
+    <!-- 第一方插件只作为负载拷贝到输出 plugins 目录供运行时动态发现，不做静态引用（验证 ALC 加载路径）。
+         每个插件用独立的 OutputItemType：共用一个会让两个插件的负载落到同一目录互相覆盖。
+         这里不需要、也没有加 ExcludeAssets="content"：插件负载已不再以 MSBuild Content 声明
+         （插件工程用自定义目标拷进自己的输出目录），MSBuild 不会把它传给本工程；
+         负载本来也不该出现在应用根目录，统一由下面的拷贝目标放进 plugins/<id>/。 -->
     <ProjectReference Include="..\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj"
                       ReferenceOutputAssembly="false"
-                      OutputItemType="FirstPartyPlugin"
+                      OutputItemType="FirstPartyCredentialPlugin"
+                      PrivateAssets="all" />
+    <ProjectReference Include="..\plugins\LoomX.ToolResultCompression\LoomX.ToolResultCompression.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="FirstPartyCompressionPlugin"
                       PrivateAssets="all" />
   </ItemGroup>
   <Target Name="CopyFirstPartyPlugins" AfterTargets="Build">
     <PropertyGroup>
-      <_PluginOutputDir>@(FirstPartyPlugin->'%(RootDir)%(Directory)')</_PluginOutputDir>
+      <_CredentialPluginOutputDir>@(FirstPartyCredentialPlugin->'%(RootDir)%(Directory)')</_CredentialPluginOutputDir>
+      <_CompressionPluginOutputDir>@(FirstPartyCompressionPlugin->'%(RootDir)%(Directory)')</_CompressionPluginOutputDir>
     </PropertyGroup>
     <ItemGroup>
-      <_PluginPayload Include="$(_PluginOutputDir)**\*" />
+      <_CredentialPluginPayload Include="$(_CredentialPluginOutputDir)**\*" />
+      <_CompressionPluginPayload Include="$(_CompressionPluginOutputDir)**\*" />
     </ItemGroup>
-    <Copy SourceFiles="@(_PluginPayload)"
-          DestinationFiles="@(_PluginPayload->'$(OutputPath)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
+    <Copy SourceFiles="@(_CredentialPluginPayload)"
+          DestinationFiles="@(_CredentialPluginPayload->'$(OutputPath)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_CompressionPluginPayload)"
+          DestinationFiles="@(_CompressionPluginPayload->'$(OutputPath)plugins\loomx.tool-result-compression\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
   <Target Name="CopyFirstPartyPluginsToPublish" AfterTargets="Publish">
     <PropertyGroup>
-      <_PluginPublishOutputDir>@(FirstPartyPlugin->'%(RootDir)%(Directory)')</_PluginPublishOutputDir>
+      <_CredentialPluginPublishOutputDir>@(FirstPartyCredentialPlugin->'%(RootDir)%(Directory)')</_CredentialPluginPublishOutputDir>
+      <_CompressionPluginPublishOutputDir>@(FirstPartyCompressionPlugin->'%(RootDir)%(Directory)')</_CompressionPluginPublishOutputDir>
     </PropertyGroup>
     <ItemGroup>
-      <_PluginPublishPayload Include="$(_PluginPublishOutputDir)**\*" />
+      <_CredentialPluginPublishPayload Include="$(_CredentialPluginPublishOutputDir)**\*" />
+      <_CompressionPluginPublishPayload Include="$(_CompressionPluginPublishOutputDir)**\*" />
     </ItemGroup>
-    <Copy SourceFiles="@(_PluginPublishPayload)"
-          DestinationFiles="@(_PluginPublishPayload->'$(PublishDir)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
+    <Copy SourceFiles="@(_CredentialPluginPublishPayload)"
+          DestinationFiles="@(_CredentialPluginPublishPayload->'$(PublishDir)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_CompressionPluginPublishPayload)"
+          DestinationFiles="@(_CompressionPluginPublishPayload->'$(PublishDir)plugins\loomx.tool-result-compression\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

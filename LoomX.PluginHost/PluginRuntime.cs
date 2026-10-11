@@ -103,6 +103,36 @@ public sealed class PluginRuntime
     public IPipeline? GetPipeline(string pipelineId) =>
         registry.Pipelines.TryGetValue(pipelineId, out var pipeline) ? pipeline : null;
 
+    /// <summary>
+    /// 向插件索取当前文化下的展示信息。展示信息是 UI 贡献契约的默认方法，
+    /// 与 <see cref="GetUiContributions"/> 共用同一个 Provider 与同一份失效信号，
+    /// 因此这里不再有独立的 Provider 分支。插件未实现或返回空时返回 null，
+    /// 由调用方回落插件 id 或宿主自身的通用文案。
+    /// </summary>
+    public PluginDisplayInfo? GetPluginDisplayInfo(string pluginId, string cultureName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(pluginId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cultureName);
+        var plugin = plugins.FirstOrDefault(item => item.Manifest.Id == pluginId);
+        if (plugin?.UiProvider is null) return null;
+
+        try
+        {
+            var info = plugin.UiProvider.GetDisplayInfo(new PluginUiContext(cultureName));
+            return info is null || info.IsEmpty ? null : info;
+        }
+        catch (Exception exception)
+        {
+            AddUiDiagnostic(pluginId, "display-info", "PROVIDER_FAILURE");
+            logger.LogWarning(
+                exception,
+                "插件展示信息获取失败 {PluginId} {ExceptionType}",
+                pluginId,
+                exception.GetType().Name);
+            return null;
+        }
+    }
+
     /// <summary>读取插件在指定 Slot 的已验证声明式 UI 快照。</summary>
     public IReadOnlyList<PluginUiContribution> GetUiContributions(
         string pluginId,

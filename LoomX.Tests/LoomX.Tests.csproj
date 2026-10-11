@@ -29,10 +29,28 @@
   <ItemGroup>
     <ProjectReference Include="..\LoomX\LoomX.csproj" />
     <ProjectReference Include="..\LoomX.PluginHost\LoomX.PluginHost.csproj" />
+    <!-- 插件只作静态引用（测试需要直接 new 插件类型），负载一律走下面的镜像：
+         plugin.manifest.json 与 i18n/<culture>.json 都同名，靠「每个插件各占一个目录」解决冲突。 -->
     <ProjectReference Include="..\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj" />
-    <!-- 两个插件的 Manifest 同名（plugin.manifest.json），会在测试输出目录互相覆盖；
-         Runtime 端到端测试统一从 plugins/<插件>/ 源目录读取清单，不依赖输出目录里的副本。 -->
-      </ItemGroup>
+    <ProjectReference Include="..\plugins\LoomX.ToolResultCompression\LoomX.ToolResultCompression.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- 插件负载在测试输出里复刻正式运行时的布局：plugins/<id>/plugin.manifest.json 与
+         plugins/<id>/i18n/<culture>.json。文件名与相对路径和运行时完全一致，不改名、不分层、
+         不依赖任何覆盖顺序；PluginTextCatalog 的「程序集目录 → plugins/<id>」查找顺序直接适用。 -->
+    <None Include="..\plugins\LoomX.CredentialProtection\plugin.manifest.json"
+          Link="plugins\loomx.credential-protection\plugin.manifest.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\plugins\LoomX.CredentialProtection\i18n\*.json"
+          Link="plugins\loomx.credential-protection\i18n\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\plugins\LoomX.ToolResultCompression\plugin.manifest.json"
+          Link="plugins\loomx.tool-result-compression\plugin.manifest.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\plugins\LoomX.ToolResultCompression\i18n\*.json"
+          Link="plugins\loomx.tool-result-compression\i18n\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
   <ItemGroup>
     <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

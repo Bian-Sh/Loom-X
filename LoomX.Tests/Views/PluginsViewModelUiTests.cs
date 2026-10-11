@@ -20,7 +20,6 @@ public sealed class PluginsViewModelUiTests
             new PluginUiTextNode("detail"));
         var item = new PluginItemViewModel(
             new LoadedPluginInfo("test.plugin", "1.0.0", [], 0, true, HasDetailUi: true),
-            isCredentialProtection: false,
             cardContributions: [],
             detailContributions: [detail],
             setEnabled: static (_, _) => { },
@@ -41,7 +40,6 @@ public sealed class PluginsViewModelUiTests
 
         var invalidItem = new PluginItemViewModel(
             new LoadedPluginInfo("test.invalid", "1.0.0", [], 0, true, HasDetailUi: true),
-            isCredentialProtection: false,
             cardContributions: [],
             detailContributions: [],
             setEnabled: static (_, _) => { },

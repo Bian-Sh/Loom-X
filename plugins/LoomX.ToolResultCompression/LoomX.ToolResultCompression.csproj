@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>LoomX 第一方 Tool Result Compression 插件：在请求正文发出前压缩历史工具调用结果。</Description>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\LoomX.Plugin.Abstractions\LoomX.Plugin.Abstractions.csproj" />
+    <!-- 插件负载：plugin.manifest.json 与 i18n/<culture>.json。
+         只由下面的自定义目标拷进本插件自己的输出目录，宿主与测试工程再把整个目录拷进 plugins/<id>/。
+         刻意不使用 Content + CopyToOutputDirectory：MSBuild 会把 Content 传给所有引用方，
+         多个插件的同名负载平铺到同一个输出根目录后只剩最后一份，且那份内容是错的
+         （ProjectReference 上的 ExcludeAssets="content" 拦不住这条路径）。
+         文件名与相对路径因此在所有工程里都固定为 plugins/<id>/ 下的同名同位置。 -->
+    <PluginPayload Include="plugin.manifest.json" />
+    <PluginPayload Include="i18n\**\*.json" />
+    <!-- 默认文化额外嵌入程序集作为兜底：只拷了一个 DLL 也不会显示原始键名。
+         查找与回落规则见 PluginTextCatalog。 -->
+    <EmbeddedResource Include="i18n\en-US.json" LogicalName="LoomX.ToolResultCompression.i18n.en-US.json" />
+  </ItemGroup>
+  <Target Name="CopyPluginPayloadToOutput" AfterTargets="Build">
+    <Copy SourceFiles="@(PluginPayload)"
+          DestinationFiles="@(PluginPayload->'$(OutputPath)%(RelativeDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

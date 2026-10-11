@@ -94,9 +94,6 @@
   <data name="plugins.toast.disabled"><value>「{0}」を無効にしました</value></data>
   <data name="plugins.category.system"><value>システムプラグイン</value></data>
   <data name="plugins.category.extension"><value>拡張プラグイン</value></data>
-  <data name="plugins.credential.name"><value>認証情報保護</value></data>
-  <data name="plugins.credential.description"><value>Router リクエスト内の機密認証情報を検出してマスクし、placeholder 整合性指示を注入し、レスポンスで元の値を復元します。</value></data>
-  <data name="plugins.credential.lifecycle"><value>無効化できます。無効化は新しく送信する平文の検出と置換のみを停止します。過去のセッションで発行済みの資格情報参照は引き続き識別され、完全性指示の注入と応答での復元が行われます。判定基準は、このプラグインが注入した指示がコンテキストに存在するかです。無効化後、新しいリクエストには未処理の資格情報平文が含まれる可能性があります。</value></data>
   <data name="plugins.generic.description"><value>Loom-X Router Pipeline に合成可能なリクエストまたはレスポンス拡張を提供します。</value></data>
   <data name="plugins.generic.lifecycle"><value>無効化は現在のランタイムだけに影響し、プラグインファイルと所有データは削除しません。永続的な起動設定は今後追加します。</value></data>
   <data name="plugins.extension_count"><value>{0} 個の拡張ポイント</value></data>

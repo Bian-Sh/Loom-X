@@ -42,6 +42,29 @@ public enum PluginUiAlignment
     End,
 }
 
+/// <summary>插件向宿主提供的展示信息（名称、简介、分类、启停说明）。</summary>
+/// <para>
+/// 与声明式 Contribution 同源：都由插件按 <see cref="PluginUiContext.CultureName"/> 自行解析，
+/// 宿主只渲染不翻译。因此它是 <see cref="IPluginUiContributionProvider"/> 的一个默认方法，
+/// 而不是独立契约——插件实现 UI 贡献时顺带就带上了展示信息。
+/// </para>
+/// </summary>
+public sealed record PluginDisplayInfo(
+    string DisplayName,
+    string Description,
+    string Category,
+    string LifecycleNote)
+{
+    /// <summary>字段缺失时宿主回落插件 id，不得用空串覆盖。</summary>
+    public bool IsEmpty =>
+        string.IsNullOrWhiteSpace(DisplayName)
+        && string.IsNullOrWhiteSpace(Description)
+        && string.IsNullOrWhiteSpace(Category)
+        && string.IsNullOrWhiteSpace(LifecycleNote);
+
+    public string? OrNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+}
+
 /// <summary>宿主请求插件 UI 快照时提供的安全上下文。</summary>
 public sealed record PluginUiContext(string CultureName);
 
@@ -169,4 +192,14 @@ public interface IPluginUiContributionProvider
     event EventHandler? UiInvalidated;
 
     IReadOnlyList<PluginUiContribution> GetUiContributions(PluginUiContext context);
+
+    /// <summary>
+    /// 提供插件在列表卡片与详情页头部展示的名称、简介、分类与启停说明。
+    /// <para>
+    /// 默认返回 null，宿主回落到插件 id 与通用文案，因此纯后台插件无需实现。
+    /// 插件 MUST 用 <see cref="PluginTextCatalog"/> 之类的插件自有资源解析这些文案，
+    /// 不得要求宿主资源里存在本插件的专属键。
+    /// </para>
+    /// </summary>
+    PluginDisplayInfo? GetDisplayInfo(PluginUiContext context) => null;
 }

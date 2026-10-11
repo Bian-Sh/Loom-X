@@ -45,7 +45,8 @@ public sealed class CredentialProtectionUiTests
     [Fact]
     public void ManifestDeclaresCardBodyAndInteractiveDetailBody()
     {
-        var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "plugins", "LoomX.CredentialProtection");
+        var root = Path.Combine(
+            RepositoryRoot(), "plugins", "LoomX.CredentialProtection");
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "plugin.manifest.json")));
         var contributions = document.RootElement.GetProperty("ui").GetProperty("contributions");
 
@@ -65,4 +66,15 @@ public sealed class CredentialProtectionUiTests
         PluginUiSurfaceNode surface => FlattenText(surface.Content),
         _ => string.Empty,
     };
+
+    /// <summary>向上找解决方案根目录，避免依赖固定的 bin 层数。</summary>
+    private static string RepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "LoomX.slnx")))
+            directory = directory.Parent;
+
+        Assert.NotNull(directory);
+        return directory!.FullName;
+    }
 }

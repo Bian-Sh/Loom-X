@@ -38,6 +38,29 @@
 
 - 新增事件驱动、函数驱动或异常驱动的业务流程时，同步补齐能够判断开始、完成、降级和失败的日志；测试必须覆盖敏感信息不会进入日志。
 
+## 插件负载布局与命名
+
+插件包的**文件名与相对路径在所有工程里必须完全一致**，这是不可静默分叉的约定：
+
+```
+plugins/<插件 id>/plugin.manifest.json
+plugins/<插件 id>/i18n/<culture>.json      # <culture> 为 zh-CN / zh-TW / ja-JP / en-US
+```
+
+- **同名冲突只能靠「每个插件各占一个目录」解决**。禁止为了绕开冲突而改名、把文案塞进 `i18n/<程序集名>/` 之类的分层目录、或依赖平铺副本的覆盖顺序。平铺到同一目录的同名文件最多只剩最后一份，且那份内容必然是错的——这类错误不报错，只会让某个插件静默失效。
+- **插件负载不得声明为 MSBuild `Content`**。`Content + CopyToOutputDirectory` 会经 ProjectReference 传给所有引用方，导致宿主/测试工程的输出根目录出现平铺副本。插件工程统一用自己的目标 `CopyPluginPayloadToOutput` 把负载拷进**自己**的输出目录，再由宿主或测试工程整体拷进 `plugins/<id>/`。
+- `ProjectReference` 上的 `ExcludeAssets="content"` **拦不住**上面这条传播路径，不要把它当成防线，也不要为它的"效果"写注释。
+- **测试工程必须复刻运行时布局**：`LoomX.Tests.csproj` 把每个插件的 manifest 与 i18n 镜像到 `$(OutputPath)plugins/<id>/`，文件名与相对路径和正式负载一致。运行时代码、测试代码读到的路径形状因此完全相同。`PluginTextCatalog` 的查找顺序是「程序集所在目录 → 宿主 `plugins/<id>` → 嵌入的 en-US」，不做按程序集名分层的特判。
+- 运行时只会读 `plugins/<id>/plugin.manifest.json`（见 `PluginCatalog.Discover`），根目录下的任何同名文件都无人读取，属于必须消除的死文件。
+- 新增第一方插件时的完整清单：新建 `plugins/<Name>/` 目录 → 写 `plugin.manifest.json`（`id` 与目录名一致）→ 建 `i18n/` 四语言 JSON 并把 `en-US.json` 同时设为 `EmbeddedResource` → csproj 里声明 `PluginPayload` 与 `CopyPluginPayloadToOutput` 目标 → 在 `LoomX/LoomX.csproj` 与 `LoomX.Tests/LoomX.Tests.csproj` 各挂一份（宿主只拷负载、测试工程静态引用 + 镜像负载），Playground 需要时另挂 → 补 `PluginPayloadLayoutTests` 覆盖。
+- 布局由 `LoomX.Tests/Plugins/PluginPayloadLayoutTests.cs` 与 `PluginPublishContractTests.cs` 守住：输出里必须存在 `plugins/<id>/plugin.manifest.json` 与四语言文案，且根目录不得出现平铺的 `plugin.manifest.json` 或 `i18n/`。
+
+## 插件本地化归属
+
+- 插件文案一律放插件自己的 `i18n/<culture>.json`，**不得写进宿主 `LoomX/Resources/Strings*.resx`**。宿主资源里出现任何插件专属键都是回归，`ToolResultCompressionLocalizationTests.HostResources_DoNotCarryAnyPluginSpecificText` 会拦。
+- 插件用 `PluginTextCatalog.For(owner, pluginId, cultureName)` 解析文案，第二个参数必须是本插件的 `PluginId` 常量——它决定程序集不在插件包目录内时（例如测试工程）回落到哪个 `plugins/<id>/`。
+- 查找顺序与回落规则见 `PluginTextCatalog` 的类注释；新增查找分支前先确认它不是为绕开某个输出目录的覆盖问题。
+
 ## Credential Protection 开发约束
 
 详细权威设计与验收场景见 `openspec/changes/add-router-credential-protection/`。修改 Router Plugin Runtime、Provider Request/Response Pipeline、Credential Protection、插件启停/卸载或凭据 Vault 时，必须同步阅读并遵守该 change；以下规则属于不可静默改变的开发约束：

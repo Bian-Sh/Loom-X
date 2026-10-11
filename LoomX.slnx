@@ -4,6 +4,7 @@
   <Project Path="LoomX.Plugin.Abstractions/LoomX.Plugin.Abstractions.csproj" />
   <Project Path="LoomX.PluginHost/LoomX.PluginHost.csproj" />
   <Project Path="plugins/LoomX.CredentialProtection/LoomX.CredentialProtection.csproj" />
+  <Project Path="plugins/LoomX.ToolResultCompression/LoomX.ToolResultCompression.csproj" />
     <Project Path="LoomX.PluginPlayground/LoomX.PluginPlayground.csproj" />
   <Project Path="LoomX/LoomX.csproj" />
 </Solution>

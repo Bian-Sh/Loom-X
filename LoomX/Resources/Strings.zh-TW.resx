@@ -94,9 +94,6 @@
   <data name="plugins.toast.disabled"><value>已停用「{0}」</value></data>
   <data name="plugins.category.system"><value>系統插件</value></data>
   <data name="plugins.category.extension"><value>擴展插件</value></data>
-  <data name="plugins.credential.name"><value>憑據保護</value></data>
-  <data name="plugins.credential.description"><value>在 Router 請求鏈路中識別並遮罩敏感憑據，向模型注入 placeholder 完整性約束，並在響應鏈路恢復原值。</value></data>
-  <data name="plugins.credential.lifecycle"><value>可以停用：停用只停止偵測與替換新送出的平文。歷史會話中已簽發的憑據引用仍會識別、仍注入完整性指令並在響應中還原，判定依據是上下文中是否存在本插件注入的提示詞。停用後新請求可能攜帶未經處理的憑據明文。</value></data>
   <data name="plugins.generic.description"><value>為 Loom-X Router Pipeline 提供可組合的請求或響應擴展。</value></data>
   <data name="plugins.generic.lifecycle"><value>停用只影響當前運行時執行，不會刪除插件檔案或插件自有資料；重啟後的持久化開關將在後續版本接入。</value></data>
   <data name="plugins.extension_count"><value>{0} 個擴展點</value></data>

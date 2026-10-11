@@ -13,8 +13,6 @@ namespace LoomX.ViewModels;
 
 public sealed class PluginsViewModel : NotifyViewModel, IDisposable
 {
-    private const string CredentialProtectionPluginId = "loomx.credential-protection";
-
     private readonly GatewayProcessService gatewayService;
     private readonly ToastService toastService;
     private readonly ILogger<PluginsViewModel> logger;
@@ -157,7 +155,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         Plugins.Clear();
         foreach (var info in pluginRuntime.PluginInfos.OrderBy(item => item.Id, StringComparer.Ordinal))
         {
-            var isCredentialProtection = string.Equals(info.Id, CredentialProtectionPluginId, StringComparison.Ordinal);
             var cardContributions = pluginRuntime.GetUiContributions(
                 info.Id,
                 PluginUiSlot.CardBody,
@@ -168,13 +165,13 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
                 CultureInfo.CurrentUICulture.Name);
             var item = new PluginItemViewModel(
                 info,
-                isCredentialProtection,
                 cardContributions,
                 detailContributions,
                 SetPluginEnabled,
                 OpenPluginDetail,
                 Loc,
-                info.InteractiveUiContributions ?? []);
+                info.InteractiveUiContributions ?? [],
+                pluginRuntime.GetPluginDisplayInfo(info.Id, CultureInfo.CurrentUICulture.Name));
             item.AttachCommandSink(command => ExecutePluginUiCommandAsync(item, command));
             Plugins.Add(item);
         }
@@ -304,7 +301,9 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         {
             foreach (var plugin in Plugins)
             {
-                plugin.RefreshLocalization(Loc);
+                plugin.RefreshLocalization(
+                    Loc,
+                    runtime?.GetPluginDisplayInfo(plugin.Id, culture.Name));
                 RefreshPluginUi(plugin.Id, culture.Name);
             }
             SetStatus(statusKey, statusCount);
@@ -331,12 +330,12 @@ public sealed class PluginItemViewModel : NotifyViewModel
     private readonly Action<PluginItemViewModel> openDetail;
     private bool enabled;
     private Func<string, string> loc;
+    private PluginDisplayInfo? displayInfo;
 
     public string Id { get; }
     public string Version { get; }
     public IReadOnlyList<string> Capabilities { get; }
     public int ExtensionCount { get; }
-    public bool IsCredentialProtection { get; }
     public IReadOnlyList<PluginUiContribution> CardContributions { get; private set; }
     public IReadOnlyList<PluginUiContribution> DetailContributions { get; private set; }
     public bool HasCardUi => CardContributions.Count > 0;
@@ -347,14 +346,29 @@ public sealed class PluginItemViewModel : NotifyViewModel
     public bool IsDetailInteractive => IsInteractive(DetailContributions);
     public Func<PluginUiCommand, Task<PluginUiCommandResult?>>? UiCommandSink { get; private set; }
     public ICommand OpenDetailCommand { get; }
-    public bool IsSystemPlugin => IsCredentialProtection;
 
-    // 凭据保护支持停用：停用只关闭主动保护，历史引用的解析与恢复继续运行。
+    // 停用只影响当前运行时执行；每个插件都可停用，具体语义由插件自己的 lifecycle 文案说明。
     public bool CanToggle => true;
-    public string DisplayName => IsCredentialProtection ? Loc("plugins.credential.name") : Id;
-    public string Category => IsCredentialProtection ? Loc("plugins.category.system") : Loc("plugins.category.extension");
-    public string Description => IsCredentialProtection ? Loc("plugins.credential.description") : Loc("plugins.generic.description");
-    public string LifecycleNote => IsCredentialProtection ? Loc("plugins.credential.lifecycle") : Loc("plugins.generic.lifecycle");
+
+    /// <summary>插件自带文案；为 null 时回落宿主通用文案或插件 id。</summary>
+    public PluginDisplayInfo? DisplayInfo => displayInfo;
+
+    // 文案优先级：插件自有资源 → 宿主通用文案 → 插件 id。宿主不持有任何插件专属文案。
+    public string DisplayName =>
+        displayInfo?.OrNull(displayInfo.DisplayName)
+        ?? Id;
+
+    public string Category =>
+        displayInfo?.OrNull(displayInfo.Category)
+        ?? Loc("plugins.category.extension");
+
+    public string Description =>
+        displayInfo?.OrNull(displayInfo.Description)
+        ?? Loc("plugins.generic.description");
+
+    public string LifecycleNote =>
+        displayInfo?.OrNull(displayInfo.LifecycleNote)
+        ?? Loc("plugins.generic.lifecycle");
     public string StatusLabel => Loc(Enabled ? "plugins.status.enabled" : "plugins.status.disabled");
     public string ExtensionCountLabel => string.Format(CultureInfo.CurrentCulture, Loc("plugins.extension_count"), ExtensionCount);
     public string CapabilitySummary => Capabilities.Count == 0 ? Loc("plugins.capabilities.none") : string.Join("  ·  ", Capabilities);
@@ -367,20 +381,20 @@ public sealed class PluginItemViewModel : NotifyViewModel
 
     public PluginItemViewModel(
         LoadedPluginInfo info,
-        bool isCredentialProtection,
         IReadOnlyList<PluginUiContribution> cardContributions,
         IReadOnlyList<PluginUiContribution> detailContributions,
         Action<PluginItemViewModel, bool> setEnabled,
         Action<PluginItemViewModel> openDetail,
         Func<string, string> localize,
-        IReadOnlyList<string>? interactiveContributions = null)
+        IReadOnlyList<string>? interactiveContributions = null,
+        PluginDisplayInfo? displayInfo = null)
     {
         Id = info.Id;
         Version = info.Version;
         Capabilities = info.Capabilities;
         ExtensionCount = info.ExtensionCount;
+        this.displayInfo = displayInfo;
         enabled = info.Enabled;
-        IsCredentialProtection = isCredentialProtection;
         CardContributions = cardContributions;
         DetailContributions = detailContributions;
         HasDetailUi = info.HasDetailUi;
@@ -418,9 +432,10 @@ public sealed class PluginItemViewModel : NotifyViewModel
         InteractiveContributions.Count > 0
         && contributions.Any(item => InteractiveContributions.Contains(item.Id, StringComparer.Ordinal));
 
-    internal void RefreshLocalization(Func<string, string> localize)
+    internal void RefreshLocalization(Func<string, string> localize, PluginDisplayInfo? pluginDisplayInfo = null)
     {
         loc = localize;
+        if (pluginDisplayInfo is not null) displayInfo = pluginDisplayInfo;
         OnPropertyChanged(nameof(DisplayName));
         OnPropertyChanged(nameof(Category));
         OnPropertyChanged(nameof(Description));
