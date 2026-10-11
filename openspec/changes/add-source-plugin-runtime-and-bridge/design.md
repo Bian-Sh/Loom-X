@@ -1,3 +1,9 @@
+---
+comet_change: add-source-plugin-runtime-and-bridge
+role: technical-design
+canonical_spec: openspec
+---
+
 # Design
 
 ## Context
@@ -75,7 +81,7 @@
 
 - `LoomX.Plugin.Abstractions.dll`：插件 SDK；包含 Manifest 模型、Plugin API、Bridge 接口、值 DTO、稳定错误与诊断。插件开发和编译只引用此契约，不引用 SQLite 实现。
 - `LoomX.PluginHost.dll`：发现、验证、能力协商、源码编译、缓存、加载、重新加载与 Bridge 生命周期编排。
-- `LoomX.Plugin.Storage.Sqlite.dll`：宿主侧 `storage.sqlite/v1` 实现；它是唯一直接引用 `Microsoft.Data.Sqlite` 与 `SQLitePCLRaw` 的插件基础设施程序集。
+- `LoomX.Plugin.Storage.Sqlite.dll`：宿主侧 `storage.sqlite/v1` 实现；它统一承载插件 Bridge 的 SQLite 提供程序依赖；宿主既有配置数据库依赖不在本次去重范围内。
 - `LoomX`：组合根；把统一 `ILogger` 管线和现有 `ToastService` 适配到 Logging/Notifications Bridge。
 
 SQLite 实现单独 DLL 的目的不是让插件引用它，而是把提供程序与原生依赖固定在宿主发布边界，使插件目录保持纯净，也便于用测试实现替换。插件调试依赖 Abstractions 和宿主提供的测试 Bridge，不需要复制生产 SQLite DLL。
@@ -84,7 +90,7 @@ Logging 和 Notifications 适配器暂不拆独立项目：它们体量小且依
 
 ### 3. 初始化上下文增加 Bridge，同时保持已有插件二进制入口
 
-`PluginInitializationContext` 增加只读 `Bridge` 属性，并保留现有 `PluginId`、`DataDirectory` 属性与兼容构造方式。宿主为每个插件创建与不可变 plugin id 绑定的 Bridge；所有能力授权、数据库根目录、日志作用域和通知来源均来自该绑定身份，而不是插件调用参数。
+`PluginInitializationContext` 增加 `Bridge` 属性，并保留现有 `PluginInitializationContext(string, string)` 二参数构造与 `PluginId`、`DataDirectory` 属性，避免改变旧 DLL 调用的构造签名。宿主为每个插件创建与不可变 plugin id 绑定的 Bridge；所有能力授权、数据库根目录、日志作用域和通知来源均来自该绑定身份，而不是插件调用参数。
 
 新插件文档优先使用 Bridge。`DataDirectory` 本 change 不删除，因为现有插件仍用它保存 JSON 配置和统计文件；删除会把 SQLite 边界调整扩大成全插件文件系统迁移。它不提供安全沙箱保证，后续若要治理任意文件访问，应新增 `storage.files/v1` 并配合进程隔离，而不是在本 change 中伪装成已隔离。
 
@@ -137,7 +143,7 @@ public interface IPluginSqliteDatabase : IAsyncDisposable
 }
 ```
 
-`IPluginSqliteTransaction` 提供同形的 Execute/Query 与 Commit/Rollback；事务对象完成或释放后不可复用，v1 不支持嵌套事务。`PluginSqlCommand` 包含一条 SQL 语句和命名参数；多语句批处理拆成多次调用，事务保证原子性。
+`IPluginSqliteTransaction` 提供同形的 Execute/Query 与 Commit/Rollback；事务对象完成或释放后不可复用，v1 不支持嵌套事务。事务与数据库共享串行操作门，活动事务期间非事务命令不能混入该事务；裸 BEGIN/COMMIT/ROLLBACK/SAVEPOINT 由语句策略拒绝，事务控制只能通过句柄完成。`PluginSqlCommand` 包含一条 SQL 语句和命名参数；多语句批处理拆成多次调用，事务保证原子性。
 
 `PluginSqlValue` 的种类固定为 Null、Integer、Real、Text、Blob。`PluginSqlRow` 保留列顺序，同时允许按列名读取；重复列名必须通过索引区分。`QuerySingleAsync` 返回第一行或 null，`QueryAsync` 返回受宿主限制的缓冲结果集，不暴露 Reader 或 Stream。
 
@@ -151,7 +157,7 @@ public interface IPluginSqliteDatabase : IAsyncDisposable
 %LOCALAPPDATA%\LoomX\plugins\<plugin-id>\<relativePath>
 ```
 
-解析顺序：拒绝空值、根路径、UNC、设备路径与盘符相对路径；规范化分隔符；计算绝对路径；验证目标位于插件根目录；逐段检查已存在父目录的 reparse point/符号链接；创建缺失父目录；创建后再次验证最终路径。所有文件系统操作使用宿主绑定的 plugin id，插件不能提交其他 id。
+解析顺序：拒绝空值、根路径、UNC、设备路径与盘符相对路径；规范化分隔符；计算绝对路径；验证目标位于插件根目录；逐段检查插件数据根、已存在父目录及数据库文件本身的 reparse point/符号链接；创建缺失父目录；创建后再次验证最终路径。所有文件系统操作使用宿主绑定的 plugin id，插件不能提交其他 id。
 
 仅约束打开入口还不够，因为 SQLite 的 `ATTACH`、`VACUUM INTO`、扩展加载等语句可能再次触达文件系统。宿主实现必须关闭扩展加载，并通过 SQLite authorizer 与受限语句策略拒绝可打开外部文件或改变提供程序边界的操作；v1 不支持 ATTACH。普通 DDL、DML、查询、索引、事务和数据库内 PRAGMA 保持可用，Credential Protection 所需的 WAL、synchronous 与 busy_timeout 由独立命令设置。
 
@@ -177,13 +183,13 @@ public interface IPluginSqliteDatabase : IAsyncDisposable
 
 1. 解析 Manifest 并校验 runtime、sources、host capabilities 与路径。
 2. 按 sources 声明顺序读取 UTF-8 源码，诊断使用 Manifest 相对路径。
-3. 生成缓存键：规范化完整 Manifest、每个源码相对路径及字节、Plugin API 版本、编译器版本、语言版本和全部生效编译选项。
+3. 生成缓存键：规范化完整 Manifest、每个源码相对路径及字节、Plugin API 版本、编译器版本、语言版本、全部生效编译选项、实际引用程序集摘要，以及进入产物的本地化负载内容。
 4. 检查 `%LOCALAPPDATA%\LoomX\plugin-cache\source\<plugin-id>\<hash>\` 的完整性元数据。
 5. 未命中时，以固定语言版本、nullable、deterministic 和 portable PDB 选项编译到同根临时候选目录。
 6. 编译成功后写入元数据并以原子目录切换发布；失败时删除本次候选，不触碰已发布缓存。
-7. 通过现有 Plugin API、入口类型和 Manifest 一致性验证后，在新的 collectible ALC 中加载。
+7. 缓存内部镜像 `plugins/<id>/plugin.manifest.json` 与 `i18n/<culture>.json`，程序集位于对应插件目录，并嵌入默认 en-US；保持 PluginTextCatalog 原查找顺序，不添加特判。生成程序集身份包含内容摘要，防止 reload 后文案缓存串代际。`i18n` 更新参与缓存失效。通过现有 Plugin API、入口类型和 Manifest 一致性验证后，在新的 collectible ALC 中加载。
 
-引用集合来自宿主目标框架的受信任平台程序集、`LoomX.Plugin.Abstractions` 及明确允许的共享契约；不解析插件目录任意 DLL，不发起 NuGet 恢复。缓存元数据记录输入摘要和产物摘要，避免只凭目录名信任残缺或篡改产物。
+引用集合来自发布包随附的固定 net10.0 编译引用集合、`LoomX.Plugin.Abstractions` 及明确允许的共享契约。构建时收集并发布，运行时校验清单与摘要，不搜索本机 SDK，不把宿主已加载程序集或 TPA 全集当作插件白名单，不解析插件目录任意 DLL，不发起 NuGet 恢复。引用集缺失或摘要不符时返回安全诊断，不在线补齐。缓存元数据记录输入摘要和产物摘要，避免只凭目录名信任残缺或篡改产物。
 
 首次编译失败时插件不加载；更新或 reload 失败时保留当前实例。成功 reload 先构造并验证新实例，再原子替换 Runtime 注册，最后释放旧实例；旧 ALC 无法及时回收只记诊断，不回滚已经成功的切换。
 
@@ -191,7 +197,7 @@ public interface IPluginSqliteDatabase : IAsyncDisposable
 
 新增公共 `PluginDiagnostic` 值模型，包含 PluginId、Stage、Severity、Code、Message、RelativePath、Line、Column。Stage 至少覆盖 Manifest、SourceRead、Compile、Cache、Capability、Load、Initialize、Bridge、Test、Reload。
 
-所有外部诊断必须使用相对路径和安全消息。详细异常只通过宿主 `ILogger<T>` 记录安全摘要，不把源码正文、SQL 参数、Vault 数据、Prompt 或请求/响应正文放入诊断。
+所有外部诊断必须使用相对路径和安全消息。编译诊断保留稳定 ID、相对路径与行列，消息由受控模板生成，不直接回显可能含源码字面量的 Roslyn 原始消息或任意异常消息。详细异常只通过宿主 `ILogger<T>` 记录安全摘要，不把源码正文、SQL 参数、Vault 数据、Prompt 或请求/响应正文放入诊断。
 
 ### 12. Credential Protection 只替换数据库访问层
 
@@ -200,7 +206,7 @@ Credential Protection 仍是预编译第一方插件，本 change 不把它转�
 - Manifest 增加 `storage.sqlite/v1`，需要用户反馈时增加 `logging/v1`、`notifications/v1`。
 - 初始化时保存 Bridge；`SensitiveRuleStore` 等现有 JSON 数据保持原路径和行为。
 - `CredentialTokenStore` 改为通过 `OpenSqliteAsync("credential-tokens.db")` 初始化同一张 `CredentialTokens` 表。
-- 原有同步锁改为异步互斥，唯一约束冲突捕获 `ConstraintViolation`；失败事务释放后在新操作中按 OriginalHash 精确查回既有 token。
+- 保留同步 CredentialEngine/JSON/SSE 业务链，以插件内部单一适配点消费异步 Bridge，不为数据库依赖去重重写全链路 async。第一版宿主实现不捕获 UI SynchronizationContext；统一验证同步适配的取消、异常、资源释放与无死锁行为。唯一约束冲突捕获 `ConstraintViolation`；失败事务释放后在新操作中按 OriginalHash 精确查回既有 token。
 - DPAPI 前缀、哈希算法、字段内容、表名、列名、索引和 fail closed 分支不变。
 - 从插件 csproj 移除 `Microsoft.Data.Sqlite`；发布测试断言插件目录不存在 `Microsoft.Data.Sqlite.dll`、`SQLitePCLRaw.*` 和 `e_sqlite3`，同时宿主发布目录具备唯一实现。
 
@@ -217,9 +223,30 @@ Credential Protection 仍是预编译第一方插件，本 change 不把它转�
 - `loomx.plugin.reload`
 - `loomx.plugin.diagnostics`
 
-这些工具共享同一应用服务，不重新实现 Manifest 或编译规则。集成 AI 在进程内调用；未来 CLI 适配器可以映射为 `loomx plugin <verb>`，但本 change 不要求为同一逻辑维护第二套实现。
+这些工具共享同一应用服务并注册到既有 ToolRegistry，不重新实现 Manifest 或编译规则。create 不覆盖既有插件目录；compile 写缓存、test 执行可信代码和 reload 改变 Runtime 的风险等级如实标记，沿用工具授权与可信代码披露。集成 AI 在进程内调用；未来 CLI 适配器可以映射为 `loomx plugin <verb>`，但本 change 不要求为同一逻辑维护第二套实现。
 
-Skill 随 Plugin API 版本发布，包含 Manifest Schema、目录模板、Pipeline、声明式 UI、Bridge、权限、示例和安全规则。AI 只需读取 Skill 和插件目录：validate/compile/test 返回 `PluginDiagnostic`，reload 使用 Runtime 的原子替换路径。测试使用隔离临时数据根和测试 Bridge，默认不连接真实 Provider、不读取生产 Vault、不修改宿主配置。
+Skill 随 Plugin API 版本发布，包含 Manifest Schema、目录模板、Pipeline、声明式 UI、Bridge、权限、示例和安全规则。AI 只需读取 Skill 和插件目录：validate/compile/test 返回 `PluginDiagnostic`，reload 使用 Runtime 的原子替换路径。测试使用隔离临时数据根、测试 Bridge 与假 Provider，默认不连接真实 Provider、不读取生产 Vault、不修改宿主配置。该隔离是受控测试流程的数据隔离，可信任意 C# 仍能直接访问进程资源，不得称为 OS 沙箱。validate/diagnostics 不执行插件代码；compile 只编译；test/reload 会执行可信代码。
+
+### 14. reload 按请求代际切换，不立即释放在途实例
+
+当前 ProviderExecutionPipeline 在启动时固定持有 request/response Pipeline，Runtime 的 Pipeline Entry 又存于可变 List。仅换 Runtime 注册会让旧引用继续工作，执行中直接改 List 会产生并发风险。采用候选实例、不可变注册快照与请求级代际租约：
+
+- 候选编译、入口、初始化、Extension/UI 校验全部成功后才发布；同插件 reload 串行，与启停操作协调。
+- ProviderExecutionPipeline 每次完整 Provider 调用取得成对 request/response 快照，不永久绑定启动时的旧 Pipeline；保留原构造用法供测试与兼容。
+- 租约贯穿请求、响应和流式正文释放。新请求使用新代际，旧请求/SSE 继续旧快照，直到结束。
+- 旧租约排空后解除 UI 订阅、回滚未完成事务、释放实例和 Bridge，并申请 ALC 卸载；未排空时不强制关闭数据库。
+- 候选失败只释放本次候选资源。普通禁用不释放 Credential Protection 历史解析所需的 Bridge。
+- 原子性只覆盖 Runtime 注册和句柄归属，不保证任意插件初始化副作用回滚。初始化持久化操作由可信插件自行保证幂等/事务性；失败 reload 不得恢复 Vault 快照覆盖新增 token。
+
+选择请求级租约而不是暂停全局请求或直接替换 List，是为了同时保持新请求可用与 SSE 连续性；代价是长流会延长旧代际存活。
+
+### 15. SQLite 策略与同步适配的验证边界
+
+一命令一语句通过实际 prepare 语义确认，不按分号切割或正则关键字承担安全边界。authorizer 在 prepare 层拒绝文件逃逸，并用受限策略处理可能改变文件落点的 PRAGMA。活动事务由宿主管理，命令取消后连接状态必须可判定，否则关闭。
+
+保持同步凭据业务链可最小化解析回归风险，但本地 SQLite 操作仍可能占用调用线程；Async 契约用于稳定调用和未来传输，不承诺底层已经是非阻塞 I/O。源码插件可直接 await Bridge；未来 Worker 的阻塞成本另行评估，不把本轮描述为已完成进程外隔离。
+
+测试必须覆盖旧二参数构造、固定引用集、i18n 缓存失效、真实旧格式 Vault、跨事务混入拒绝、并发 reload 和完整 SSE 生命周期。敏感哨兵需覆盖 SQL 参数、源码字面量、异常、日志与 Toast。无 SDK 验证采用发布包与不调用外部 SDK 的子进程，仅改 PATH 不足以证明无 SDK 依赖。
 
 ## Risks / Trade-offs
 

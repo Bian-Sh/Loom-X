@@ -3,9 +3,9 @@
 - Change: add-source-plugin-runtime-and-bridge
 - 日期：2026-10-12
 - 阶段：Design
-- 状态：候选方案待用户确认；本文件不是正式技术设计。
+- 状态：用户已于 2026-10-12 要求继续直到开发完成，设计方案已确认；正式技术设计以 design.md 为准。
 - 正式规格：OpenSpec delta spec。
-- 本轮授权：用户确认 Open 产物，并要求继续下一阶段；该授权不等于确认下面的设计补充或开始实现。
+- 本轮授权：用户确认 Open 产物，并要求继续下一阶段；后续继续指令确认设计补充与持续开发目标；Build 执行配置仍须按 Runtime 缺失字段补齐。
 
 ## 已确认事实与范围
 
@@ -31,7 +31,7 @@
 - plugins/LoomX.CredentialProtection/LoomX.CredentialProtection.csproj：直接引用 Microsoft.Data.Sqlite 10.0.0 并复制运行时依赖，是插件包 SQLite 负载的实际来源。
 - 已通过现有 codegraph 查询定位 PluginRuntime 与 CredentialTokenStore，并以当前工作区代码核验索引结果。
 
-## 候选技术方案（全部待确认）
+## 已确认技术方案
 
 ### 1. 契约与宿主能力
 
@@ -110,7 +110,7 @@
 7. 开发闭环：模板、validate/compile/test/reload/diagnostics、可信代码提示、临时 Provider、工具风险分级和敏感异常净化。
 8. 实现阶段再构建、运行必要回归、按可读时间命名发布到 outputs，并以仅截取 APP 的 CUA 验收；本次无实现修改，不重复打包或启动 APP。
 
-## Spec Patch 候选（待用户确认后回写）
+## 已确认的 Spec Patch
 
 - source-plugin-runtime：追加引用/本地化负载变化使缓存失效；缓存加载遵守既有 i18n 布局；发布包缺少引用集时返回安全诊断。
 - source-plugin-runtime：追加 reload 时旧在途请求/SSE 使用旧快照直到完成，新请求使用新代际，候选失败不替换。
@@ -127,4 +127,4 @@
 
 ## 下一步
 
-请用户确认上述候选设计。确认前不登记 design_doc、不执行 complete-design 或 Design guard，不创建实现计划、不开始代码开发。
+正式设计与 Spec Patch 已保存；执行 Design 守卫后进入 Build，按缺失的执行方式和 TDD 配置补齐授权，再制定计划和开发。

@@ -180,3 +180,17 @@ Credential Protection 迁移到 SQLite Bridge 后 MUST 继续使用既有 `crede
 #### Scenario: Vault 访问失败时安全失败
 - **WHEN** 数据库损坏、无法解密或 Bridge 返回不可恢复错误
 - **THEN** Credential Protection 保持既有 fail closed 行为，不放行可能含明文凭据的数据
+### Requirement: 事务归属与实例生命周期明确
+数据库句柄 SHALL 区分非事务命令与活动事务命令，不得将非事务调用隐式加入其他调用的活动事务。句柄在其所属实例实际退休并释放后 MUST 拒绝复用；普通禁用 MUST NOT 提前销毁 Credential Protection 的历史解析资源。
+
+#### Scenario: 非事务命令遇到活动事务
+- **WHEN** 同一数据库句柄上存在未结束事务且其他调用提交非事务命令
+- **THEN** Bridge 不让该命令混入活动事务，按受控串行或稳定错误处理
+
+#### Scenario: 已退休句柄被复用
+- **WHEN** 插件旧实例已排空在途调用并释放而代码继续使用其数据库或事务句柄
+- **THEN** Bridge 拒绝调用且不访问或重建数据库
+
+#### Scenario: 暂停主动保护后解析历史引用
+- **WHEN** 用户普通禁用 Credential Protection 而历史 placeholder 仍需解析
+- **THEN** 历史解析所需的 Bridge 保持可用，且不与实际实例退休混淆

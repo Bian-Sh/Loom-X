@@ -3,7 +3,7 @@
 - Change: add-source-plugin-runtime-and-bridge
 - Phase: design
 - Mode: compact
-- Context hash: 88f4b849dc800dda2dcb5015d9e7674bf6d7f54c9172013368c01eb2f5799c55
+- Context hash: 478ee4a73cd5672ef81830a3b55f895c32bd20fb95cb90a818ef4730194be8a8
 
 Generated-by: comet-handoff.sh
 Task hash policy: task-content-v1. Read tasks.md for live completion; excerpts are design-time context.
@@ -59,12 +59,18 @@ LoomX 当前插件以预编译程序集为交付单位，插件开发者既要�
 ## openspec/changes/add-source-plugin-runtime-and-bridge/design.md
 
 - Source: openspec/changes/add-source-plugin-runtime-and-bridge/design.md
-- Lines: 1-246
-- SHA256: 4da4ea58b160cfeedd970f2e71d70eae486335bb2f0ba54d19216208eb3eb106
+- Lines: 1-273
+- SHA256: 6e8c86a3eb72dc94d71a0924410098e738e7d427be96c33ae780be07c77f03c5
 
 [TRUNCATED]
 
 ```md
+---
+comet_change: add-source-plugin-runtime-and-bridge
+role: technical-design
+canonical_spec: openspec
+---
+
 # Design
 
 ## Context
@@ -140,12 +146,6 @@ LoomX 当前插件以预编译程序集为交付单位，插件开发者既要�
 
 程序集职责如下：
 
-- `LoomX.Plugin.Abstractions.dll`：插件 SDK；包含 Manifest 模型、Plugin API、Bridge 接口、值 DTO、稳定错误与诊断。插件开发和编译只引用此契约，不引用 SQLite 实现。
-- `LoomX.PluginHost.dll`：发现、验证、能力协商、源码编译、缓存、加载、重新加载与 Bridge 生命周期编排。
-- `LoomX.Plugin.Storage.Sqlite.dll`：宿主侧 `storage.sqlite/v1` 实现；它是唯一直接引用 `Microsoft.Data.Sqlite` 与 `SQLitePCLRaw` 的插件基础设施程序集。
-- `LoomX`：组合根；把统一 `ILogger` 管线和现有 `ToastService` 适配到 Logging/Notifications Bridge。
-
-
 ```
 
 Full source: openspec/changes/add-source-plugin-runtime-and-bridge/design.md
@@ -153,8 +153,8 @@ Full source: openspec/changes/add-source-plugin-runtime-and-bridge/design.md
 ## openspec/changes/add-source-plugin-runtime-and-bridge/tasks.md
 
 - Source: openspec/changes/add-source-plugin-runtime-and-bridge/tasks.md
-- Lines: 1-69
-- SHA256: 3b98480920cbf9417abc2fc3ea40d7517012370935ef987f1dd1765d6236c1ed
+- Lines: 1-72
+- SHA256: adffc4796a221cb057dbe9da99465c977a17bb8a087dc32c52dca6d359bf2f29
 
 ```md
 # Tasks
@@ -196,10 +196,13 @@ Full source: openspec/changes/add-source-plugin-runtime-and-bridge/design.md
 - [ ] 4.8 实现“先验证新实例、再原子替换”的 reload，测试成功切换、首次失败拒绝、更新失败保留当前实例和旧 ALC 回收失败仅产生安全诊断。
 - [ ] 4.9 在安装/启用源码插件入口增加可信代码边界披露及本地化文案，UI 测试验证不会把 ALC 或 Bridge 表述为安全沙箱。
 
+- [ ] 4.10 随发布包提供固定编译引用集，并将引用和本地化负载纳入缓存输入，验证无 SDK 编译、引用缺失诊断、四语言缓存布局及文案更新生效。
+- [ ] 4.11 为 Provider 调用绑定 request/response 代际租约，覆盖新请求切换、旧请求/SSE 完成前资源不释放、启停竞争及组合根旧引用回归。
+
 ## 5. Credential Protection 迁移
 
 - [ ] 5.1 为 Credential Protection Manifest 声明所需 Bridge 能力，并把 `CredentialTokenStore` 改为通过 `storage.sqlite/v1` 打开 `credential-tokens.db`；使用新建 Vault 测试验证表名、列名、索引和初始化 SQL 不变。
-- [ ] 5.2 将 token 创建、精确查询和批量恢复改为异步 Bridge 调用与插件内异步互斥，测试同一明文稳定复用 token、跨请求恢复、重复 token 去重和取消行为。
+- [ ] 5.2 将 token 创建、精确查询和批量恢复接入异步 Bridge，并保留同步解析链与单一同步适配点；测试同一明文稳定复用 token、跨请求恢复、重复 token 去重、取消、释放以及 UI SynchronizationContext 下无死锁。
 - [ ] 5.3 保留“唯一约束冲突后释放失败事务并重新精确查询”的算法，使用并发冲突测试验证不会签出第二个 token 或产生嵌套 placeholder。
 - [ ] 5.4 使用由旧实现创建的真实 `credential-tokens.db` 作为兼容夹具，验证升级后无需迁移即可恢复历史 placeholder，DPAPI 前缀、密文和 OriginalHash 保持原样且不创建第二个 Vault。
 - [ ] 5.5 覆盖 Bridge Busy/Locked/Corrupt、DPAPI 解密失败与未知 token 场景，验证 Credential Protection 保持原有确定性解析和 fail closed，不把明文发送给 Provider。
@@ -244,8 +247,8 @@ created: 2026-10-12
 ## openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-development-skill/spec.md
 
 - Source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-development-skill/spec.md
-- Lines: 1-99
-- SHA256: 0ce1cb21e6d770b56f2bd00dbec7d6b1a07d107d721ebcf406acac21600d7dba
+- Lines: 1-109
+- SHA256: b8377c76c2475d7c74638120bd4158f9f478a95319023fa9f081830bbe28b48f
 
 [TRUNCATED]
 
@@ -338,8 +341,8 @@ Full source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-
 ## openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-host-bridge/spec.md
 
 - Source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-host-bridge/spec.md
-- Lines: 1-182
-- SHA256: 54dddc327a1e3de9fc4dc43b62aca9e5cc79457df23743a3c4e809f0248ce4a0
+- Lines: 1-196
+- SHA256: 4bf68ae56351cd3a057cb3c3df146203ff6be3249b34eb6b7e0e56d3054acde3
 
 [TRUNCATED]
 
@@ -432,8 +435,8 @@ Full source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-
 ## openspec/changes/add-source-plugin-runtime-and-bridge/specs/source-plugin-runtime/spec.md
 
 - Source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/source-plugin-runtime/spec.md
-- Lines: 1-111
-- SHA256: 1bf93b711440f1987d8b5e04d2d0334840f8f2d3c6f841836eaba8252e32d97b
+- Lines: 1-140
+- SHA256: 165efc33000034a7fd660244bdfef50b30a9afd6968cd1b195c2f0bd7aaa3930
 
 [TRUNCATED]
 

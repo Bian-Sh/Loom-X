@@ -109,3 +109,32 @@ Runtime SHALL 以 Manifest、源码相对路径及内容、Plugin API 版本、�
 #### Scenario: 安装或启用源码插件
 - **WHEN** 用户首次安装或启用一个源码插件
 - **THEN** 产品向用户展示可信代码边界说明，不宣称该插件已被沙箱隔离
+### Requirement: 编译引用与本地化负载参与缓存完整性
+源码插件发布与缓存 SHALL 包含宿主固定提供的编译引用集合及实际进入产物的本地化负载身份。缺少必要引用时 MUST 返回安全诊断，不得搜索本机 SDK 或在线恢复。缓存负载 MUST 遵守既有插件目录布局与文案查找协议。
+
+#### Scenario: 引用或文案更新使缓存失效
+- **WHEN** 实际编译引用摘要或插件 i18n 内容发生变化
+- **THEN** Runtime 不复用旧缓存，并使新实例使用更新后的引用与文案
+
+#### Scenario: 发布包缺少编译引用
+- **WHEN** 随附引用集合缺失或完整性校验失败
+- **THEN** Runtime 返回安全的缓存或编译诊断，不搜索外部 SDK 或发起依赖恢复
+
+#### Scenario: 从缓存加载插件本地化
+- **WHEN** 源码程序集从内容寻址缓存加载
+- **THEN** 缓存仍提供 plugins/<id>/plugin.manifest.json 与 i18n/<culture>.json 的一致负载布局，且无需增加 PluginTextCatalog 查找特判
+
+### Requirement: 重新加载保持在途请求代际连续性
+Runtime SHALL 在候选实例验证成功后切换不可变注册快照。完整 Provider 调用的 request/response 及流式处理 MUST 使用同一已取得代际，旧代际的 Bridge 资源 MUST 在在途调用结束后才释放。
+
+#### Scenario: 新请求使用新代际
+- **WHEN** 候选插件已成功切换且新的 Provider 调用开始
+- **THEN** 新调用使用新代际的成对 request/response Pipeline，不继续使用组合根启动时固定持有的旧引用
+
+#### Scenario: 旧 SSE 调用仍在途
+- **WHEN** reload 成功而旧调用的 SSE 正文尚未结束或释放
+- **THEN** 旧调用继续使用原代际，所需 Bridge 不被提前释放
+
+#### Scenario: 候选初始化失败
+- **WHEN** 新候选编译成功但初始化或注册验证失败
+- **THEN** Runtime 不切换当前实例，只释放本次候选资源并返回安全诊断
