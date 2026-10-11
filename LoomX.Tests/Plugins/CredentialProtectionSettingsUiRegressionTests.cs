@@ -312,9 +312,13 @@ public sealed class CredentialProtectionSettingsUiRegressionTests : IDisposable
         Assert.All(chips.Children, item => Assert.Equal(PluginUiAlignment.Start, item.HorizontalAlignment));
         Assert.Equal(PluginUiAlignment.Center, chipContent.Children[0].VerticalAlignment);
         Assert.Equal("sk-live-", prefix.Text);
-        Assert.Equal("×", delete.Label);
+        Assert.Equal("删除", delete.Label);
         Assert.Equal("删除", delete.ToolTip);
         Assert.True(delete.IsIconOnly);
+        Assert.Equal(
+            "M1.9,2.5 L2.5,1.9 L6,5.4 L9.5,1.9 L10.1,2.5 L6.6,6 " +
+            "L10.1,9.5 L9.5,10.1 L6,6.6 L2.5,10.1 L1.9,9.5 L5.4,6 Z",
+            delete.IconData);
     }
 
     /// <summary>

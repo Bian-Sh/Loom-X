@@ -98,7 +98,7 @@ public sealed class PluginUiPresenter : ContentControl
                 _ => null,
             };
         }
-        catch (Exception) when (node is PluginUiIconNode)
+        catch (Exception) when (node is PluginUiIconNode or PluginUiButtonNode { IconData: not null })
         {
             // Runtime 已做结构与长度校验；Geometry 语法仍由宿主解析并安全丢弃。
             return null;
@@ -221,7 +221,16 @@ public sealed class PluginUiPresenter : ContentControl
     {
         var button = new Button
         {
-            Content = node.Label,
+            Content = string.IsNullOrWhiteSpace(node.IconData)
+                ? node.Label
+                : new PathIcon
+                {
+                    Data = Geometry.Parse(node.IconData),
+                    Width = 10,
+                    Height = 10,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
             IsEnabled = interactive,
             HorizontalAlignment = HorizontalAlignment.Left,
         };

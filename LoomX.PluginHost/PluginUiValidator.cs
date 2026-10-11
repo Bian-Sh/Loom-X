@@ -117,6 +117,9 @@ internal static class PluginUiValidator
                     return PluginUiValidationResult.Invalid("INVALID_LABEL");
                 if (button.ToolTip is { } toolTip && !IsValidLabel(toolTip))
                     return PluginUiValidationResult.Invalid("INVALID_LABEL");
+                if (button.IconData is { } iconData
+                    && (string.IsNullOrWhiteSpace(iconData) || iconData.Length > MaxGeometryLength))
+                    return PluginUiValidationResult.Invalid("INVALID_ICON_DATA");
                 var readsFields = ValidateReadsFields(button.ReadsFields);
                 return readsFields ?? ValidateArguments(button.Arguments);
 

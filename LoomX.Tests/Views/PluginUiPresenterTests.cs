@@ -100,6 +100,15 @@ public sealed class PluginUiPresenterTests
                     "bad-icon",
                     PluginUiSlot.CardBody,
                     new PluginUiIconNode("not valid geometry")),
+                new(
+                    PluginUiContribution.CurrentSchemaVersion,
+                    "bad-button-icon",
+                    PluginUiSlot.DetailBody,
+                    new PluginUiButtonNode(
+                        "删除",
+                        "delete",
+                        IsIconOnly: true,
+                        IconData: "not valid geometry")),
             ],
         };
 
@@ -115,11 +124,12 @@ public sealed class PluginUiPresenterTests
             "actions",
             PluginUiSlot.DetailBody,
             new PluginUiButtonNode(
-                "×",
+                "删除",
                 "delete",
                 Tone: PluginUiTone.Danger,
                 ToolTip: "删除",
-                IsIconOnly: true));
+                IsIconOnly: true,
+                IconData: "M1,1 L9,9 L8,10 L0,2 Z"));
 
         var presenter = new PluginUiPresenter
         {
@@ -128,7 +138,11 @@ public sealed class PluginUiPresenterTests
         };
 
         var button = Assert.IsType<Button>(presenter.Content);
-        Assert.Equal("×", button.Content);
+        var icon = Assert.IsType<PathIcon>(button.Content);
+        Assert.Equal(10, icon.Width);
+        Assert.Equal(10, icon.Height);
+        Assert.Equal(HorizontalAlignment.Center, icon.HorizontalAlignment);
+        Assert.Equal(VerticalAlignment.Center, icon.VerticalAlignment);
         Assert.Equal("删除", ToolTip.GetTip(button));
         Assert.Contains("is-icon-only", button.Classes);
     }

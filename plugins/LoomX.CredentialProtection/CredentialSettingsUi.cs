@@ -33,6 +33,11 @@ public static class CredentialSettingsUi
     /// <summary>内置规则卡片：开关按内容自适应，右侧文字占满剩余空间。</summary>
     private static readonly double[] BuiltinCardColumns = [0, 1];
 
+    /// <summary>以中心点完全对称的删除图标，避免字体字符受基线影响产生视觉偏移。</summary>
+    private const string DeleteIconData =
+        "M1.9,2.5 L2.5,1.9 L6,5.4 L9.5,1.9 L10.1,2.5 L6.6,6 " +
+        "L10.1,9.5 L9.5,10.1 L6,6.6 L2.5,10.1 L1.9,9.5 L5.4,6 Z";
+
     public static string EnabledField(string ruleId) => $"enabled_{ruleId}";
     public static string EditValueField(string ruleId) => $"edit_value_{ruleId}";
 
@@ -444,12 +449,13 @@ public static class CredentialSettingsUi
                             VerticalAlignment: PluginUiAlignment.Center),
                         new PluginUiGridItem(
                             new PluginUiButtonNode(
-                                "×",
+                                text.ButtonDelete,
                                 DeletePrefix,
                                 new Dictionary<string, string>(StringComparer.Ordinal) { ["prefix"] = prefix },
                                 PluginUiTone.Danger,
                                 ToolTip: text.ButtonDelete,
-                                IsIconOnly: true),
+                                IsIconOnly: true,
+                                IconData: DeleteIconData),
                             VerticalAlignment: PluginUiAlignment.Center),
                     ],
                     ColumnSpacing: 6,

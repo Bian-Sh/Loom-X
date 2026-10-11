@@ -1,4 +1,5 @@
 using System.IO;
+using System.Xml.Linq;
 using Xunit;
 
 namespace LoomX.Tests.Views;
@@ -19,6 +20,30 @@ public sealed class PluginsViewContractTests
         Assert.Contains("DataType=\"{x:Type vm:PluginsViewModel}\"><views:PluginsView", app, StringComparison.Ordinal);
         Assert.Contains("name=\"nav.plugins\"", resources, StringComparison.Ordinal);
         Assert.Contains("name=\"nav.plugins.description\"", resources, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PluginIconOnlyButtonStaysCloseToTextHeight()
+    {
+        var app = XDocument.Load(Path.Combine(Root, "LoomX", "App.axaml"));
+        var style = app
+            .Descendants()
+            .Single(element =>
+                element.Name.LocalName == "Style"
+                && (string?)element.Attribute("Selector") == "Button.plugin-ui-button.is-icon-only");
+        var setters = style
+            .Elements()
+            .Where(element => element.Name.LocalName == "Setter")
+            .ToDictionary(
+                element => (string)element.Attribute("Property")!,
+                element => (string)element.Attribute("Value")!,
+                StringComparer.Ordinal);
+
+        Assert.Equal("24", setters["Width"]);
+        Assert.Equal("24", setters["Height"]);
+        Assert.Equal("24", setters["MinWidth"]);
+        Assert.Equal("24", setters["MinHeight"]);
+        Assert.Equal("12", setters["CornerRadius"]);
     }
 
     [Fact]
