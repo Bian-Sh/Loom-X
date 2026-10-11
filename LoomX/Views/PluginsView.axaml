@@ -32,6 +32,9 @@
     <Style Selector="TextBlock.tertiary">
       <Setter Property="Foreground" Value="{DynamicResource TextTertiaryBrush}"/>
     </Style>
+    <Style Selector="Button.plugin-detail-back:pointerover">
+      <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+    </Style>
   </UserControl.Styles>
 
   <Grid>
@@ -147,25 +150,19 @@
     </Grid>
 
     <!-- 插件详情：标题区固定不随滚动消失，仅下方内容滚动。
-         返回入口收敛到标题区左侧的 "<"，悬停提示"返回插件列表"，不再另起按钮。 -->
+         返回入口使用无底色的 "←"，悬停显示浅色背景并提示"返回插件列表"。 -->
     <Border IsVisible="{Binding IsPluginDetailVisible}" Classes="surface-card" Padding="18">
       <Grid RowDefinitions="Auto,*">
-        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="12">
-          <Button Width="42" Height="42" MinWidth="0" MinHeight="0" Padding="0"
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*" ColumnSpacing="6">
+          <Button Classes="icon plugin-detail-back" Width="32" Height="32" MinWidth="0" MinHeight="0"
                   VerticalAlignment="Center"
-                  Background="{DynamicResource SurfaceSubtleBrush}"
-                  BorderBrush="{DynamicResource BorderBrush}"
-                  BorderThickness="1" CornerRadius="10"
                   Command="{Binding BackToPluginListCommand}"
                   ToolTip.Tip="{l:Locale plugins.detail.back}">
-            <PathIcon Data="M 21,7 L 12,16 L 21,25" Width="18" Height="18"/>
+            <TextBlock Text="←" FontSize="18"/>
           </Button>
-          <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
-              <TextBlock Text="{Binding SelectedPlugin.DisplayName}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Bottom"/>
-              <TextBlock Text="{Binding SelectedPlugin.Version, StringFormat='v{0}'}" Classes="tertiary" FontSize="12" VerticalAlignment="Bottom"/>
-            </StackPanel>
-            <TextBlock Text="{Binding SelectedPlugin.Id}" Classes="tertiary" FontSize="11" FontFamily="Consolas"/>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+            <TextBlock Text="{Binding SelectedPlugin.DisplayName}" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Bottom"/>
+            <TextBlock Text="{Binding SelectedPlugin.Version, StringFormat='v{0}'}" Classes="tertiary" FontSize="12" VerticalAlignment="Bottom"/>
           </StackPanel>
         </Grid>
 

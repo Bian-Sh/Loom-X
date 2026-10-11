@@ -66,18 +66,13 @@ public sealed class PluginsViewContractTests
     }
 
     /// <summary>
-    /// 详情页交互：返回入口收敛为标题区左侧的 "&lt;"（悬停提示"返回插件列表"），
-    /// 不再另起返回按钮；标题区在滚动区之外，长内容滚动时始终可见。
+    /// 详情页交互：返回入口收敛到标题区，标题区在滚动区之外，长内容滚动时始终可见。
     /// </summary>
     [Fact]
-    public void PluginDetailHeaderStaysFixedAndOwnsTheBackEntry()
+    public void PluginDetailHeaderStaysFixedAndOwnsSingleBackCommand()
     {
         var view = File.ReadAllText(Path.Combine(Root, "LoomX", "Views", "PluginsView.axaml"));
         var detailSection = view[view.IndexOf("IsPluginDetailVisible", StringComparison.Ordinal)..];
-
-        // 返回入口在标题区按钮上，且带悬停提示。
-        Assert.Contains("ToolTip.Tip=\"{l:Locale plugins.detail.back}\"", detailSection, StringComparison.Ordinal);
-        Assert.Contains("PathIcon Data=\"M 21,7 L 12,16 L 21,25\"", detailSection, StringComparison.Ordinal);
 
         // 标题区必须在 ScrollViewer 之前、且在其之外，滚动只作用于内容区。
         var headerIndex = detailSection.IndexOf("SelectedPlugin.DisplayName", StringComparison.Ordinal);
@@ -85,8 +80,7 @@ public sealed class PluginsViewContractTests
         Assert.True(headerIndex > 0, "详情标题区未找到。");
         Assert.True(scrollIndex > headerIndex, "标题区必须排在 ScrollViewer 之前，否则会随滚动消失。");
 
-        // 旧的设计：独立返回按钮（文字标签形式）+ 插件图标占位，均已移除。
-        Assert.DoesNotContain("<TextBlock Text=\"{l:Locale plugins.detail.back}\"", detailSection, StringComparison.Ordinal);
+        // 插件图标占位已移除。
         Assert.DoesNotContain("M 8,13 L 13,13 L 13,8 L 19,8 L 19,13 L 24,13 L 24,19 L 19,19 L 19,24 L 13,24 L 13,19 L 8,19 Z",
             detailSection, StringComparison.Ordinal);
 

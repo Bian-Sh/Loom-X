@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Media;
 using Avalonia.VisualTree;
 using LoomX.Localization;
 using LoomX.Plugins;
@@ -60,7 +61,7 @@ public sealed class PluginsViewModelUiTests
     }
 
     [Fact]
-    public void PluginDetailHeader_UsesInlineVersionWithoutStatusText()
+    public void PluginDetailHeader_UsesUnifiedBackTitleWithoutPluginId()
     {
         using var gatewayService = new GatewayProcessService();
         using var viewModel = new PluginsViewModel(gatewayService);
@@ -69,11 +70,34 @@ public sealed class PluginsViewModelUiTests
         item.OpenDetailCommand.Execute(null);
 
         var view = Render(viewModel);
-        var texts = view.GetVisualDescendants().OfType<TextBlock>().ToArray();
+        var texts = view.GetVisualDescendants().OfType<TextBlock>()
+            .Where(text => text.IsEffectivelyVisible)
+            .ToArray();
         var name = Assert.Single(texts, text => text.Text == item.DisplayName);
         var version = Assert.Single(texts, text => text.Text == $"v{item.Version}");
+        var back = Assert.Single(
+            view.GetVisualDescendants().OfType<Button>(),
+            button => Equals(ToolTip.GetTip(button), ResourceLookup.Resolve("plugins.detail.back")));
+        var arrow = Assert.IsType<TextBlock>(back.Content);
 
         Assert.DoesNotContain(texts, text => text.Text == item.StatusLabel);
+        Assert.DoesNotContain(texts, text => text.Text == item.Id);
+        Assert.Equal("←", arrow.Text);
+        Assert.Equal(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(back.Background).Color);
+        Assert.Equal(new Thickness(0), back.BorderThickness);
+        var pseudoClassesProperty = typeof(StyledElement).GetProperty(
+            "PseudoClasses",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(pseudoClassesProperty);
+        var pseudoClasses = Assert.IsAssignableFrom<IPseudoClasses>(pseudoClassesProperty.GetValue(back));
+        pseudoClasses.Add(":pointerover");
+        Assert.NotEqual(Colors.Transparent, Assert.IsAssignableFrom<ISolidColorBrush>(back.Background).Color);
+        pseudoClasses.Remove(":pointerover");
+        var backRight = back.TranslatePoint(new Point(back.Bounds.Width, 0), view)!.Value.X;
+        var nameLeft = name.TranslatePoint(default, view)!.Value.X;
+        Assert.Equal(32, back.Bounds.Width);
+        Assert.Equal(32, back.Bounds.Height);
+        Assert.InRange(nameLeft - backRight, 0, 8);
         Assert.InRange(version.Bounds.Left - name.Bounds.Right, 0, 12);
         Assert.Equal(name.Bounds.Bottom, version.Bounds.Bottom, 2);
         Assert.InRange(version.FontSize, 11, name.FontSize);
