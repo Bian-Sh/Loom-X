@@ -59,6 +59,22 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
+    public void ModelRowsExposeHoverCopyButtonForModelId()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var codeBehind = ReadDesktopFile("Views", "ProvidersView.axaml.cs");
+        var modelsTab = ReadTab(source, "providers.tab.models");
+
+        Assert.Contains("Selector=\"Button.model-copy\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Border.model-cell:pointerover Button.model-copy\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"model-copy\" Content=\"⧉\" Tag=\"{Binding ModelId}\"", modelsTab, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.Tip=\"{l:Locale providers.models.copy.tooltip}\"", modelsTab, StringComparison.Ordinal);
+        Assert.Contains("Click=\"CopyModelId_OnClick\"", modelsTab, StringComparison.Ordinal);
+        Assert.Contains("await clipboard.SetTextAsync(modelId);", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("viewModel.NotifyModelCopied();", codeBehind, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ModelDragUsesGatewayPlaceholderAndPreviewFlow()
     {
         var viewSource = ReadDesktopFile("Views", "ProvidersView.axaml.cs");

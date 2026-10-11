@@ -1086,6 +1086,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null, IStringLocalizer<ProvidersViewModel>? localizer = null)
         : this(new AppDataStore(configService, new GatewayProcessService()), toastService, logger, localizer) { }
 
+    public void NotifyModelCopied() => toastService.Show(Loc("providers.models.copy.success"), ToastLevel.Success);
+
     private string Loc(string key) => _loc[key]?.Value ?? key;
     private string LocFormat(string key, params object[] args) => string.Format(CultureInfo.CurrentCulture, Loc(key), args);
     private void SetStatus(string key, params object[] args)

@@ -1000,6 +1000,12 @@
   <data name="providers.models.delete.tooltip">
     <value>刪除模型</value>
   </data>
+  <data name="providers.models.copy.tooltip">
+    <value>複製模型名稱</value>
+  </data>
+  <data name="providers.models.copy.success">
+    <value>模型名稱已複製</value>
+  </data>
   <data name="providers.dragging">
     <value>拖動中</value>
   </data>

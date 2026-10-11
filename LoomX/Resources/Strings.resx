@@ -1144,6 +1144,12 @@
   <data name="providers.models.delete.tooltip">
     <value>删除模型</value>
   </data>
+  <data name="providers.models.copy.tooltip">
+    <value>复制模型名称</value>
+  </data>
+  <data name="providers.models.copy.success">
+    <value>模型名称已复制</value>
+  </data>
   <data name="providers.dragging">
     <value>拖动中</value>
   </data>

@@ -384,6 +384,8 @@
   <data name="providers.models.vision.tooltip"><value>Supports image input</value></data>
   <data name="providers.models.ctx.suffix"><value>ctx ·</value></data>
   <data name="providers.models.delete.tooltip"><value>Delete model</value></data>
+  <data name="providers.models.copy.tooltip"><value>Copy model name</value></data>
+  <data name="providers.models.copy.success"><value>Model name copied</value></data>
   <data name="providers.dragging"><value>Dragging</value></data>
   <data name="providers.models.empty"><value>No matching models</value></data>
   <data name="providers.empty.title"><value>No Providers</value></data>

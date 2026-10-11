@@ -1000,6 +1000,12 @@
   <data name="providers.models.delete.tooltip">
     <value>モデルを削除</value>
   </data>
+  <data name="providers.models.copy.tooltip">
+    <value>モデル名をコピー</value>
+  </data>
+  <data name="providers.models.copy.success">
+    <value>モデル名をコピーしました</value>
+  </data>
   <data name="providers.dragging">
     <value>ドラッグ中</value>
   </data>

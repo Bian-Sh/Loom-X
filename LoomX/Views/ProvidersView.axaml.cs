@@ -286,6 +286,16 @@ public partial class ProvidersView : UserControl
             await clipboard.SetTextAsync(TestResponseTextBox.SelectedText);
     }
 
+    private async void CopyModelId_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string modelId }) return;
+        var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+        if (clipboard is null) return;
+        await clipboard.SetTextAsync(modelId);
+        if (DataContext is ProvidersViewModel viewModel)
+            viewModel.NotifyModelCopied();
+    }
+
     private void DeleteTestResponseMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is ProvidersViewModel viewModel)
