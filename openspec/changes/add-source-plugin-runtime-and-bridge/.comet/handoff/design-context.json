@@ -5,11 +5,11 @@
   "canonical_spec": "openspec",
   "task_hash_policy": "task-content-v1",
   "generated_by": "comet-handoff.sh",
-  "context_hash": "478ee4a73cd5672ef81830a3b55f895c32bd20fb95cb90a818ef4730194be8a8",
+  "context_hash": "412767ccbb3a627d6bb5c040d0a2212b5a8299293bab68d6a632cf838676e689",
   "files": [
     { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/proposal.md", "sha256": "fdb2d991879337af9330d0a0d204b54379f4e04e1e113ed983e2aa373f658223" },
     { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/design.md", "sha256": "6e8c86a3eb72dc94d71a0924410098e738e7d427be96c33ae780be07c77f03c5" },
-    { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/tasks.md", "sha256": "adffc4796a221cb057dbe9da99465c977a17bb8a087dc32c52dca6d359bf2f29" },
+    { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/tasks.md", "sha256": "85195c241b77e3edefb7ab21edfb02a8adfea928b6ae64a276c1670079917127" },
     { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/.openspec.yaml", "sha256": "1dfdca412094f24473d8b842866201ec26f200b29b17064b03f1e4982c35a7b9" },
     { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-development-skill/spec.md", "sha256": "b8377c76c2475d7c74638120bd4158f9f478a95319023fa9f081830bbe28b48f" },
     { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-host-bridge/spec.md", "sha256": "4bf68ae56351cd3a057cb3c3df146203ff6be3249b34eb6b7e0e56d3054acde3" },

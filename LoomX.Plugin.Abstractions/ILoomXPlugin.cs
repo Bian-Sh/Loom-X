@@ -4,7 +4,11 @@ namespace LoomX.Plugins;
 /// 插件初始化上下文。DataDirectory 是插件自有数据目录（规则等 Plugin-owned 数据落在这里），
 /// 插件不得写宿主核心配置。
 /// </summary>
-public sealed record PluginInitializationContext(string PluginId, string DataDirectory);
+public sealed record PluginInitializationContext(string PluginId, string DataDirectory)
+{
+    /// <summary>未由宿主装配的旧上下文不默认授予任何能力。</summary>
+    public IPluginBridge Bridge { get; init; } = PluginBridgeDefaults.Unavailable;
+}
 
 /// <summary>
 /// 插件入口。宿主在独立 AssemblyLoadContext 中实例化本接口实现；
