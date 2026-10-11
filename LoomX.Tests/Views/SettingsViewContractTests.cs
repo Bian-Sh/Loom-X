@@ -43,8 +43,8 @@ public sealed class SettingsViewContractTests
         Assert.Contains("if (!suppressAutoSave) ApplyThemePreview();", settingsViewModelSource, StringComparison.Ordinal);
         Assert.Contains("<ResourceDictionary x:Key=\"Light\">", tokenSource, StringComparison.Ordinal);
         Assert.Contains("<ResourceDictionary x:Key=\"Dark\">", tokenSource, StringComparison.Ordinal);
-        Assert.Contains("Color=\"#E6172226\"", tokenSource, StringComparison.Ordinal);
-        Assert.Contains("Color=\"#F1F6F7\"", tokenSource, StringComparison.Ordinal);
+        Assert.Contains("Color=\"#E60D121A\"", tokenSource, StringComparison.Ordinal);
+        Assert.Contains("Color=\"#F1F5FB\"", tokenSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -210,6 +210,42 @@ public sealed class SettingsViewContractTests
 
         Assert.Equal(12, lightBrush.Color.A);
         Assert.NotEqual(lightBrush.Color.R, darkBrush.Color.R);
+    }
+
+    [Fact]
+    public void PhotonBlue核心令牌按主题切换()
+    {
+        EnsureAvaloniaSetup();
+        var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
+            new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
+
+        Assert.Equal(Color.Parse("#2563EB"), GetThemeBrush(dictionary, "AccentBrush", ThemeVariant.Light).Color);
+        Assert.Equal(Color.Parse("#60A5FA"), GetThemeBrush(dictionary, "AccentBrush", ThemeVariant.Dark).Color);
+        Assert.Equal(Color.Parse("#662563EB"), GetThemeBrush(dictionary, "AccentBorderSoftBrush", ThemeVariant.Light).Color);
+        Assert.Equal(Color.Parse("#6660A5FA"), GetThemeBrush(dictionary, "AccentBorderSoftBrush", ThemeVariant.Dark).Color);
+        Assert.Equal(Color.Parse("#EAF1FF"), GetThemeBrush(dictionary, "AccentSoftBrush", ThemeVariant.Light).Color);
+        Assert.Equal(Color.Parse("#3A1E3A5F"), GetThemeBrush(dictionary, "AccentSoftBrush", ThemeVariant.Dark).Color);
+        Assert.Equal(Color.Parse("#38BDF8"), GetThemeBrush(dictionary, "UpdateEntryActiveBrush", ThemeVariant.Light).Color);
+        Assert.Equal(Color.Parse("#38BDF8"), GetThemeBrush(dictionary, "UpdateEntryActiveBrush", ThemeVariant.Dark).Color);
+    }
+
+    [Fact]
+    public void PhotonBlue主题使用冷中性文字与表面画刷()
+    {
+        EnsureAvaloniaSetup();
+        var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
+            new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
+
+        Assert.Equal(Color.Parse("#18202C"), GetThemeBrush(dictionary, "TextPrimaryBrush", ThemeVariant.Light).Color);
+        Assert.Equal(Color.Parse("#5E6B7A"), GetThemeBrush(dictionary, "TextSecondaryBrush", ThemeVariant.Light).Color);
+        Assert.Equal(Color.Parse("#8995A5"), GetThemeBrush(dictionary, "TextTertiaryBrush", ThemeVariant.Light).Color);
+        Assert.Equal(Color.Parse("#F1F5FB"), GetThemeBrush(dictionary, "TextPrimaryBrush", ThemeVariant.Dark).Color);
+        Assert.Equal(Color.Parse("#9AA8BC"), GetThemeBrush(dictionary, "TextSecondaryBrush", ThemeVariant.Dark).Color);
+        Assert.Equal(Color.Parse("#6F7F92"), GetThemeBrush(dictionary, "TextTertiaryBrush", ThemeVariant.Dark).Color);
+        Assert.Equal(Color.Parse("#E6EDF2F7"), GetThemeBrush(dictionary, "WindowBackgroundBrush", ThemeVariant.Light).Color);
+        Assert.Equal(Color.Parse("#C7FFFFFF"), GetThemeBrush(dictionary, "SurfaceBrush", ThemeVariant.Light).Color);
+        Assert.Equal(Color.Parse("#E60D121A"), GetThemeBrush(dictionary, "WindowBackgroundBrush", ThemeVariant.Dark).Color);
+        Assert.Equal(Color.Parse("#C718202D"), GetThemeBrush(dictionary, "SurfaceBrush", ThemeVariant.Dark).Color);
     }
 
     [Fact]
@@ -398,6 +434,12 @@ public sealed class SettingsViewContractTests
     private static void EnsureAvaloniaSetup()
     {
         AvaloniaTestBootstrap.Ensure();
+    }
+
+    private static SolidColorBrush GetThemeBrush(ResourceDictionary dictionary, string key, ThemeVariant theme)
+    {
+        Assert.True(dictionary.TryGetResource(key, theme, out var resource));
+        return Assert.IsType<SolidColorBrush>(resource);
     }
 
     private static string ReadDesktopFile(params string[] segments)

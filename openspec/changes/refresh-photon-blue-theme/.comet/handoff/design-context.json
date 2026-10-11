@@ -1,0 +1,16 @@
+{
+  "change": "refresh-photon-blue-theme",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "task_hash_policy": "task-content-v1",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "b450e94c6488773d3947a5bc32c8d2c6830e2d75a12531948561139bcd6c9cba",
+  "files": [
+    { "path": "openspec/changes/refresh-photon-blue-theme/proposal.md", "sha256": "3cf60e97c18576eda5be0b03f7e097b01bbdc4bed3ffda4bfa725ea415255360" },
+    { "path": "openspec/changes/refresh-photon-blue-theme/design.md", "sha256": "74e22d17f242c0150cc27cd5a21bf937f58e7abbc44df4acebd6d281e767dbdb" },
+    { "path": "openspec/changes/refresh-photon-blue-theme/tasks.md", "sha256": "b14bd2e497731c9530ded020c3268c3cb87824c8ac404d780a505eea8b3745b1" },
+    { "path": "openspec/changes/refresh-photon-blue-theme/.openspec.yaml", "sha256": "3ae9e70fc0101b2a700cedadfa7b02caa5799fdfd1db033999469c527448c6b2" },
+    { "path": "openspec/changes/refresh-photon-blue-theme/specs/desktop-visual-theme/spec.md", "sha256": "188f395488aa882cba1e6d8252f5e7cd96aa1ceec3bcc74198137aabc6f5a416" }
+  ]
+}

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Xml.Linq;
 using Xunit;
 
 namespace LoomX.Tests.Views;
@@ -91,6 +92,29 @@ public sealed class MainWindowNavigationContractTests
         Assert.DoesNotContain("左侧导航选中框切换请求", codeBehindSource, StringComparison.Ordinal);
         Assert.DoesNotContain("左侧导航选中框动画开始", codeBehindSource, StringComparison.Ordinal);
         Assert.DoesNotContain("左侧导航选中框动画完成", codeBehindSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void 侧栏图标只在当前导航项使用主题强调色()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", "MainWindow.axaml");
+        var document = XDocument.Load(path);
+
+        var defaultStyle = Assert.Single(document.Descendants(), element =>
+            element.Name.LocalName == "Style"
+            && (string?)element.Attribute("Selector") == "Path.nav-icon");
+        var defaultStroke = Assert.Single(defaultStyle.Elements(), element =>
+            element.Name.LocalName == "Setter"
+            && (string?)element.Attribute("Property") == "Stroke");
+        Assert.Equal("{DynamicResource TextSecondaryBrush}", (string?)defaultStroke.Attribute("Value"));
+
+        var activeStyle = Assert.Single(document.Descendants(), element =>
+            element.Name.LocalName == "Style"
+            && (string?)element.Attribute("Selector") == "Button.nav-button.active Path.nav-icon");
+        var activeStroke = Assert.Single(activeStyle.Elements(), element =>
+            element.Name.LocalName == "Setter"
+            && (string?)element.Attribute("Property") == "Stroke");
+        Assert.Equal("{DynamicResource AccentBrush}", (string?)activeStroke.Attribute("Value"));
     }
 
     [Fact]

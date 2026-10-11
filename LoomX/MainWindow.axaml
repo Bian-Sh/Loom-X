@@ -56,10 +56,13 @@
     </Style>
     <Style Selector="Path.nav-icon">
       <Setter Property="Fill" Value="Transparent" />
-      <Setter Property="Stroke" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Stroke" Value="{DynamicResource TextSecondaryBrush}" />
       <Setter Property="StrokeThickness" Value="1.8" />
       <Setter Property="Stretch" Value="Uniform" />
       <Setter Property="StrokeLineCap" Value="Round" />
+    </Style>
+    <Style Selector="Button.nav-button.active Path.nav-icon">
+      <Setter Property="Stroke" Value="{DynamicResource AccentBrush}" />
     </Style>
     <Style Selector="Border.glass-sidebar">
       <Setter Property="Background" Value="{DynamicResource GlassBrush}" />
