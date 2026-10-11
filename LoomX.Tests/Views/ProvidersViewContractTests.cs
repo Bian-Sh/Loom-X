@@ -59,7 +59,7 @@ public sealed class ProvidersViewContractTests
     }
 
     [Fact]
-    public void ModelRowsExposeHoverCopyButtonForModelId()
+    public void ModelRowsExposeHoverCopyButtonNextToModelId()
     {
         var source = ReadDesktopFile("Views", "ProvidersView.axaml");
         var codeBehind = ReadDesktopFile("Views", "ProvidersView.axaml.cs");
@@ -67,11 +67,48 @@ public sealed class ProvidersViewContractTests
 
         Assert.Contains("Selector=\"Button.model-copy\"", source, StringComparison.Ordinal);
         Assert.Contains("Selector=\"Border.model-cell:pointerover Button.model-copy\"", source, StringComparison.Ordinal);
+        Assert.Contains("<StackPanel Grid.Column=\"2\" Orientation=\"Horizontal\" Spacing=\"4\">", modelsTab, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Grid Grid.Column=\"2\" ColumnDefinitions=\"*,Auto\">", modelsTab, StringComparison.Ordinal);
         Assert.Contains("Classes=\"model-copy\" Content=\"⧉\" Tag=\"{Binding ModelId}\"", modelsTab, StringComparison.Ordinal);
+        Assert.DoesNotContain("Classes=\"model-copy\" Content=\"⧉\" Tag=\"{Binding ModelId}\" ToolTip.Tip=\"{l:Locale providers.models.copy.tooltip}\" AutomationProperties.Name=\"{l:Locale providers.models.copy.tooltip}\" Click=\"CopyModelId_OnClick\" HorizontalAlignment=\"Right\"", modelsTab, StringComparison.Ordinal);
         Assert.Contains("ToolTip.Tip=\"{l:Locale providers.models.copy.tooltip}\"", modelsTab, StringComparison.Ordinal);
         Assert.Contains("Click=\"CopyModelId_OnClick\"", modelsTab, StringComparison.Ordinal);
         Assert.Contains("await clipboard.SetTextAsync(modelId);", codeBehind, StringComparison.Ordinal);
         Assert.Contains("viewModel.NotifyModelCopied();", codeBehind, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProviderBaseUrlRevealsLinkStylingAndOpensFromItsOwnButton()
+    {
+        var source = ReadDesktopFile("Views", "ProvidersView.axaml");
+        var codeBehind = ReadDesktopFile("Views", "ProvidersView.axaml.cs");
+
+        Assert.Contains("Selector=\"Button.provider-url-link\"", source, StringComparison.Ordinal);
+        Assert.Contains("Selector=\"Button.provider-url-link:pointerover TextBlock\"", source, StringComparison.Ordinal);
+        Assert.Contains("Property=\"Foreground\" Value=\"{DynamicResource AccentBrush}\"", source, StringComparison.Ordinal);
+        Assert.Contains("Property=\"TextDecorations\" Value=\"Underline\"", source, StringComparison.Ordinal);
+        Assert.Contains("Classes=\"provider-url-link\" Tag=\"{Binding BaseUrl}\" Click=\"ProviderBaseUrl_OnClick\"", source, StringComparison.Ordinal);
+        Assert.Contains("Process.Start(new ProcessStartInfo", codeBehind, StringComparison.Ordinal);
+        Assert.Contains("UseShellExecute = true", codeBehind, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://api.example.com/v1")]
+    [InlineData("http://localhost:11434")]
+    public void ProviderBaseUrlAllowsHttpAndHttps(string value)
+    {
+        Assert.True(ProvidersView.TryResolveProviderBaseUrl(value, out var target));
+        Assert.Equal(value, target.AbsoluteUri.TrimEnd('/'));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("not-a-url")]
+    [InlineData("file:///C:/secret.txt")]
+    [InlineData("javascript:alert(1)")]
+    public void ProviderBaseUrlRejectsEmptyInvalidAndNonHttpValues(string value)
+    {
+        Assert.False(ProvidersView.TryResolveProviderBaseUrl(value, out _));
     }
 
     [Fact]

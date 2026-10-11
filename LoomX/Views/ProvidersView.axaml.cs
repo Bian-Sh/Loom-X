@@ -296,6 +296,34 @@ public partial class ProvidersView : UserControl
             viewModel.NotifyModelCopied();
     }
 
+    private void ProviderBaseUrl_OnClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string value } || !TryResolveProviderBaseUrl(value, out var target)) return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = target.AbsoluteUri,
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+        }
+    }
+
+    internal static bool TryResolveProviderBaseUrl(string? value, out Uri target)
+    {
+        target = null!;
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var parsed)
+            || (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
+            return false;
+
+        target = parsed;
+        return true;
+    }
+
     private void DeleteTestResponseMenuItem_OnClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is ProvidersViewModel viewModel)
