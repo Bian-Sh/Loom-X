@@ -56,3 +56,9 @@ Mendel独立首审请求修改：I1 assembly验证/执行Manifest快照不一致
 - 再次默认新目录发布 outputs/20261012-064141，exit0，宿主SQLite托管/native各1、插件禁止负载0、双插件四语言/Skill/Roslyn/coreclr完整。首个检查通配名误把托管provider计成native属检查夹具错误，随后按native精确文件名核对通过。候选不可替换正式应用，不清理任何旧outputs。
 - 真实发布DLL无SDK执行探针完成：CLOSED-LOOP-FINAL 33断言、RESTART-FINAL 8断言，两进程exit0。PATH为空/禁用多级运行时与roll-forward，随附runtime/product DLL原件SHA256相同；使用实际发布组合根六工具、SQLite实际AppDataPaths/plugins唯一新测试id。系统本身有SDK、构建探针用了SDK；没有启动正式桌面UI、没有CUA，显式镜像临时安装根，不冒称物理无SDK设备或完整task7.4通过。详见integration/sdkless-published-20261012-0645/README.md；夹具deps/runtime与容器同步释放的两次失败不算产品RED。
 - Comet Runtime checkpoint已正确写stage=blocked、reviewRounds=1。Goal未标记完成，尚无Verify/Archive。其余已通过的消费者/组合根受未提交Runtime和Feedback依赖影响，不能孤立推送缺依赖的迁移/工具。
+## 后续自动 Goal turn：补充不越过授权边界的原生 UI 验收
+- 上一 Goal turn 属于实际进展：Compiler/报告推送、Runtime修复和独立复查、新全量/Playground/真实发布无SDK探针。本轮没有收到追加修复复查授权，不把自动Goal继续消息等同于用户额外授权。
+- 本轮只创建隔离验收壳，未改Runtime/Feedback/任何产品源码。最新发布DLL真实PluginsView/VM/Runtime与App资源、四语言同进程原生Avalonia窗口，通过cua-driver背景UIA操作与仅APP窗口PNG完成列表/详情/启停、zh-CN/zh-TW/ja-JP/en-US验证。6原始树披露检查通过，6产品/native关键DLL哈希与发布原件一致。启停真实Toast/Runtime事件正常，成功PID33328/HWND14424380正常关闭，本次CUA session结束；daemon确认无session后停止，不影响其他APP。
+- 新产物 outputs/ui-source-trust-2026-10-12_07-04-00/README.md 说明证据、源码、PNG、UIA、检查JSON和夹具错误。原生验收壳不是完整MainWindow，底部Toast显示是验收壳、不模拟自动隐藏；不声称完整安装入口/CUA主程序已通过，不用截图判断透明主题真实配色。原英文字符串核对假定与资源实际OS sandbox不符，修的是验收断言，不是产品文案。
+- 两项真实IMPORTANT阻塞未改变：Runtime原I3与Feedback原I2，各reviewRounds=1已用完，原审查者均terminal/closed，无任务正在等待，不能再轮询会话或擅自修复。不勾整个Runtime及7.4，不放行正式发布；完成仍15/44、Goal仍active。
+- 当前同一“两个审查包追加授权缺失”条件自用户触发/上一完整进展turn起连续出现第2个Goal turn。本轮仍有安全验证进展；若下一自动Goal turn复核仍无用户授权、无可推进的独立必要工作，在第3个Goal turn按blocked audit把Goal设blocked，而非无止境重复汇报或伪造进展。用户明确授权后才恢复受影响修复，保留原review次数不重置。
