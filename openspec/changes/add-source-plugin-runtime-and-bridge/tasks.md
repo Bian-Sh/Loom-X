@@ -27,17 +27,17 @@
 
 ## 4. C# 源码插件运行时
 
-- [ ] 4.1 在 PluginHost 引入随应用发布的 Roslyn 编译能力和固定编译选项，使用没有外部 `dotnet` SDK 参与的测试进程验证最小源码插件可生成 DLL 与 portable PDB。 <!-- comet-task:b8fb2332-bcc6-4f6c-bb6c-1b7ece04c426 -->
-- [ ] 4.2 实现 Manifest 显式 sources 收集和插件包路径验证，测试未声明 `.cs` 不参与、缺失文件被诊断、目录穿越和 reparse point 逃逸在读取前被拒绝。 <!-- comet-task:55e9dd95-5f68-494b-8ddb-7455b9e96b91 -->
-- [ ] 4.3 实现受控引用集合与禁止任意 NuGet/插件目录 DLL 解析的规则，测试框架 API 与 Abstractions 可用、未允许第三方引用产生结构化编译错误且无网络恢复行为。 <!-- comet-task:f95170f5-995f-48bb-a3d1-701c1e993205 -->
-- [ ] 4.4 实现包含规范化 Manifest、源码路径及内容、Plugin API、编译器和选项的缓存键，使用单项输入变化测试验证缓存命中、失效和不同插件隔离。 <!-- comet-task:bb87d631-934a-4a8d-af9a-e32a390d30fd -->
-- [ ] 4.5 实现候选目录、产物摘要、完整性元数据和原子缓存发布，测试残缺/篡改缓存触发重编译、失败编译不覆盖最近可用缓存且临时候选可清理。 <!-- comet-task:5bd5d58d-a15d-49c3-bbb1-2bf4de8727a6 -->
+- [x] 4.1 在 PluginHost 引入随应用发布的 Roslyn 编译能力和固定编译选项，使用没有外部 `dotnet` SDK 参与的测试进程验证最小源码插件可生成 DLL 与 portable PDB。 <!-- comet-task:b8fb2332-bcc6-4f6c-bb6c-1b7ece04c426 -->
+- [x] 4.2 实现 Manifest 显式 sources 收集和插件包路径验证，测试未声明 `.cs` 不参与、缺失文件被诊断、目录穿越和 reparse point 逃逸在读取前被拒绝。 <!-- comet-task:55e9dd95-5f68-494b-8ddb-7455b9e96b91 -->
+- [x] 4.3 实现受控引用集合与禁止任意 NuGet/插件目录 DLL 解析的规则，测试框架 API 与 Abstractions 可用、未允许第三方引用产生结构化编译错误且无网络恢复行为。 <!-- comet-task:f95170f5-995f-48bb-a3d1-701c1e993205 -->
+- [x] 4.4 实现包含规范化 Manifest、源码路径及内容、Plugin API、编译器和选项的缓存键，使用单项输入变化测试验证缓存命中、失效和不同插件隔离。 <!-- comet-task:bb87d631-934a-4a8d-af9a-e32a390d30fd -->
+- [x] 4.5 实现候选目录、产物摘要、完整性元数据和原子缓存发布，测试残缺/篡改缓存触发重编译、失败编译不覆盖最近可用缓存且临时候选可清理。 <!-- comet-task:5bd5d58d-a15d-49c3-bbb1-2bf4de8727a6 -->
 - [ ] 4.6 把 Roslyn、缓存、能力、加载与初始化错误统一映射为 `PluginDiagnostic`，测试文件、行、列、错误码与阶段完整，并验证诊断不含源码正文、外部绝对路径或敏感运行数据。 <!-- comet-task:0ba5923d-d44d-4722-b34a-70b3097a9f1a -->
 - [ ] 4.7 将成功编译产物接入现有 collectible ALC、Manifest 一致性、Extension/Pipeline 和 UI Contribution 流程，使用同功能的源码/预编译插件对照测试验证行为一致。 <!-- comet-task:80c29900-6775-41c0-971e-aaa986b0effe -->
 - [ ] 4.8 实现“先验证新实例、再原子替换”的 reload，测试成功切换、首次失败拒绝、更新失败保留当前实例和旧 ALC 回收失败仅产生安全诊断。 <!-- comet-task:1f5a8d6d-aa48-4d4f-bf1c-ef9bcb3a1948 -->
 - [ ] 4.9 在安装/启用源码插件入口增加可信代码边界披露及本地化文案，UI 测试验证不会把 ALC 或 Bridge 表述为安全沙箱。 <!-- comet-task:f7d28e73-a9a8-4bd8-97f4-db9621bb7705 -->
 
-- [ ] 4.10 随发布包提供固定编译引用集，并将引用和本地化负载纳入缓存输入，验证无 SDK 编译、引用缺失诊断、四语言缓存布局及文案更新生效。 <!-- comet-task:8fa61a79-c51c-4b2a-904e-a417c7a5a922 -->
+- [x] 4.10 随发布包提供固定编译引用集，并将引用和本地化负载纳入缓存输入，验证无 SDK 编译、引用缺失诊断、四语言缓存布局及文案更新生效。 <!-- comet-task:8fa61a79-c51c-4b2a-904e-a417c7a5a922 -->
 - [ ] 4.11 为 Provider 调用绑定 request/response 代际租约，覆盖新请求切换、旧请求/SSE 完成前资源不释放、启停竞争及组合根旧引用回归。 <!-- comet-task:d8c634f9-404e-406f-bd8c-6a4f79d97345 -->
 
 ## 5. Credential Protection 迁移

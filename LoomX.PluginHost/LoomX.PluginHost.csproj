@@ -11,4 +11,9 @@
     <InternalsVisibleTo Include="LoomX.Tests" />
     <InternalsVisibleTo Include="LoomX.PluginPlayground" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
+    <PackageDownload Include="Microsoft.NETCore.App.Ref" Version="[10.0.9]" />
+  </ItemGroup>
+  <Import Project="SourcePluginReferences.targets" />
 </Project>
