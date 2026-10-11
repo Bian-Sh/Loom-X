@@ -69,16 +69,6 @@
           </StackPanel>
         </Border>
 
-        <Border Classes="surface-card" Padding="16" IsVisible="{Binding HasLoadError}">
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-            <PathIcon Data="M 16,5 L 28,27 L 4,27 Z M 16,12 L 16,19 M 16,23 L 16,23" Foreground="{DynamicResource ErrorBrush}" Width="20" Height="20" VerticalAlignment="Top"/>
-            <StackPanel Grid.Column="1" Spacing="5">
-              <TextBlock Text="{l:Locale plugins.error.title}" Classes="section-title"/>
-              <TextBlock Text="{l:Locale plugins.error.description}" Classes="muted" TextWrapping="Wrap"/>
-            </StackPanel>
-          </Grid>
-        </Border>
-
         <ItemsControl ItemsSource="{Binding Plugins}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
@@ -152,7 +142,6 @@
           </StackPanel>
         </Border>
 
-        <TextBlock Text="{Binding Status}" Classes="tertiary" FontSize="11" HorizontalAlignment="Right" Margin="0,0,2,4"/>
       </StackPanel>
     </ScrollViewer>
     </Grid>

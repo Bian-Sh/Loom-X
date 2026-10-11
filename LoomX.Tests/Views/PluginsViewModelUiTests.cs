@@ -1,13 +1,59 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.VisualTree;
+using LoomX.Localization;
 using LoomX.Plugins;
 using LoomX.Plugins.Host;
 using LoomX.Services;
 using LoomX.ViewModels;
+using LoomX.Views;
 using Xunit;
 
 namespace LoomX.Tests.Views;
 
+[Collection("Avalonia UI")]
 public sealed class PluginsViewModelUiTests
 {
+    [Fact]
+    public void PluginList_DoesNotRenderTransientLoadStatus()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        const string statusMarker = "不应显示的插件加载状态";
+        var view = new PluginsView
+        {
+            DataContext = new PluginListContext(statusMarker),
+        };
+        var host = new Window { Content = view };
+        host.Measure(new Size(1000, 700));
+        host.Arrange(new Rect(0, 0, 1000, 700));
+        host.UpdateLayout();
+
+        Assert.DoesNotContain(
+            view.GetVisualDescendants().OfType<TextBlock>(),
+            item => item.Text == statusMarker);
+    }
+
+    [Fact]
+    public void PluginList_DoesNotRenderInlineLoadFailure()
+    {
+        AvaloniaTestBootstrap.Ensure();
+
+        var view = new PluginsView
+        {
+            DataContext = new PluginListContext("", HasLoadError: true),
+        };
+        var host = new Window { Content = view };
+        host.Measure(new Size(1000, 700));
+        host.Arrange(new Rect(0, 0, 1000, 700));
+        host.UpdateLayout();
+
+        var failureTitle = ResourceLookup.Resolve("plugins.error.title");
+        Assert.DoesNotContain(
+            view.GetVisualDescendants().OfType<TextBlock>(),
+            item => item.Text == failureTitle);
+    }
+
     [Fact]
     public void DetailNavigation_OnlyOpensValidatedDeclaredDetail()
     {
@@ -92,5 +138,18 @@ public sealed class PluginsViewModelUiTests
             queue.Enqueue("plugin-a");
 
         Assert.Equal(2, refreshCount);
+    }
+
+    private sealed record PluginListContext(string Status, bool HasLoadError = false)
+    {
+        public bool IsPluginListVisible => true;
+        public bool IsPluginDetailVisible => false;
+        public string PluginCountLabel => "2 个插件";
+        public string EnabledCountLabel => "2 个启用";
+        public string DiagnosticCountLabel => "0 条诊断";
+        public bool IsEmpty => false;
+        public bool HasDiagnostics => false;
+        public IReadOnlyList<object> Plugins => [];
+        public IReadOnlyList<string> Diagnostics => [];
     }
 }

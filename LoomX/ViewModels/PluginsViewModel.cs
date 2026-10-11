@@ -21,11 +21,8 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
     private readonly PluginUiRefreshQueue uiRefreshQueue;
     private PluginRuntime? runtime;
     private bool isLoading;
-    private string status = string.Empty;
     private int diagnosticCount;
     private bool hasLoadError;
-    private string statusKey = "plugins.status.waiting";
-    private int? statusCount;
     private bool disposed;
     private PluginItemViewModel? selectedPlugin;
 
@@ -34,7 +31,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
     public ICommand RefreshCommand { get; }
     public ICommand BackToPluginListCommand { get; }
     public bool IsLoading { get => isLoading; private set => SetProperty(ref isLoading, value); }
-    public string Status { get => status; private set => SetProperty(ref status, value); }
     public int PluginCount => Plugins.Count;
     public int EnabledPluginCount => Plugins.Count(item => item.Enabled);
     public int DiagnosticCount { get => diagnosticCount; private set => SetProperty(ref diagnosticCount, value); }
@@ -75,7 +71,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         RefreshCommand = new AsyncCommand(RefreshAsync, () => !IsLoading, this.logger);
         BackToPluginListCommand = new DelegateCommand(ShowPluginList);
         LocaleService.CultureChanged += OnCultureChanged;
-        SetStatus("plugins.status.waiting");
     }
 
     public async Task RefreshAsync()
@@ -86,7 +81,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         HasLoadError = false;
         RaiseSummaryChanged();
         (RefreshCommand as AsyncCommand)?.RaiseCanExecuteChanged();
-        SetStatus("plugins.status.loading");
         try
         {
             await gatewayService.EnsureHostedServicesAsync();
@@ -95,7 +89,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
                 throw new InvalidOperationException(Loc("plugins.status.runtime_unavailable"));
 
             Rebuild(runtime);
-            SetStatus("plugins.status.ready", PluginCount);
             logger.LogInformation(
                 "插件页面刷新完成，插件 {PluginCount} 个，启用 {EnabledPluginCount} 个，诊断 {DiagnosticCount} 条",
                 PluginCount,
@@ -105,7 +98,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             HasLoadError = true;
-            SetStatus("plugins.status.failed");
             logger.LogError(exception, "插件页面刷新失败");
             toastService.Show(Loc("plugins.toast.refresh_failed"), ToastLevel.Error);
         }
@@ -286,15 +278,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
 
     private string Loc(string key) => localizer[key]?.Value ?? key;
 
-    private void SetStatus(string key, int? count = null)
-    {
-        statusKey = key;
-        statusCount = count;
-        Status = count is null
-            ? Loc(key)
-            : string.Format(CultureInfo.CurrentCulture, Loc(key), count.Value);
-    }
-
     private void OnCultureChanged(object? sender, CultureInfo culture)
     {
         uiDispatcher(() =>
@@ -306,7 +289,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
                     runtime?.GetPluginDisplayInfo(plugin.Id, culture.Name));
                 RefreshPluginUi(plugin.Id, culture.Name);
             }
-            SetStatus(statusKey, statusCount);
             OnPropertyChanged(nameof(PluginCountLabel));
             OnPropertyChanged(nameof(EnabledCountLabel));
             OnPropertyChanged(nameof(DiagnosticCountLabel));
