@@ -28,7 +28,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
 
     public ObservableCollection<PluginItemViewModel> Plugins { get; } = [];
     public ObservableCollection<string> Diagnostics { get; } = [];
-    public ICommand RefreshCommand { get; }
     public ICommand BackToPluginListCommand { get; }
     public bool IsLoading { get => isLoading; private set => SetProperty(ref isLoading, value); }
     public int PluginCount => Plugins.Count;
@@ -68,7 +67,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         this.uiDispatcher = uiDispatcher ?? DispatchToUiThread;
         uiRefreshQueue = new PluginUiRefreshQueue(this.uiDispatcher, pluginId =>
             RefreshPluginUi(pluginId, CultureInfo.CurrentUICulture.Name));
-        RefreshCommand = new AsyncCommand(RefreshAsync, () => !IsLoading, this.logger);
         BackToPluginListCommand = new DelegateCommand(ShowPluginList);
         LocaleService.CultureChanged += OnCultureChanged;
     }
@@ -80,7 +78,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         IsLoading = true;
         HasLoadError = false;
         RaiseSummaryChanged();
-        (RefreshCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         try
         {
             await gatewayService.EnsureHostedServicesAsync();
@@ -105,7 +102,6 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
         {
             IsLoading = false;
             RaiseSummaryChanged();
-            (RefreshCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         }
     }
 

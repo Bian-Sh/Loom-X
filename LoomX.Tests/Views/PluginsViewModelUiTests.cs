@@ -1,5 +1,7 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using LoomX.Localization;
 using LoomX.Plugins;
@@ -14,6 +16,69 @@ namespace LoomX.Tests.Views;
 [Collection("Avalonia UI")]
 public sealed class PluginsViewModelUiTests
 {
+    [Fact]
+    public void PluginList_DoesNotExposeGlobalRefreshButton()
+    {
+        using var gatewayService = new GatewayProcessService();
+        using var viewModel = new PluginsViewModel(gatewayService);
+        viewModel.Plugins.Add(CreatePluginItem(viewModel));
+
+        var view = Render(viewModel);
+        var refreshText = ResourceLookup.Resolve("plugins.action.refresh");
+
+        Assert.DoesNotContain(
+            view.GetVisualDescendants().OfType<Button>(),
+            button => Equals(button.Content, refreshText));
+    }
+
+    [Fact]
+    public void PluginCard_UsesCompactStatusControlsAndInlineVersion()
+    {
+        using var gatewayService = new GatewayProcessService();
+        using var viewModel = new PluginsViewModel(gatewayService);
+        var item = CreatePluginItem(viewModel);
+        viewModel.Plugins.Add(item);
+
+        var view = Render(viewModel);
+        var texts = view.GetVisualDescendants().OfType<TextBlock>().ToArray();
+        var name = Assert.Single(texts, text => text.Text == item.DisplayName);
+        var version = Assert.Single(texts, text => text.Text == $"v{item.Version}");
+        var toggle = Assert.Single(view.GetVisualDescendants().OfType<ToggleSwitch>());
+        var gear = Assert.Single(
+            view.GetVisualDescendants().OfType<Button>(),
+            button => Equals(ToolTip.GetTip(button), ResourceLookup.Resolve("plugins.detail.open")));
+
+        Assert.DoesNotContain(texts, text => text.Text == item.StatusLabel);
+        Assert.Equal(string.Empty, toggle.OnContent);
+        Assert.Equal(string.Empty, toggle.OffContent);
+        Assert.Equal(item.StatusLabel, ToolTip.GetTip(toggle));
+        Assert.Equal(item.StatusLabel, AutomationProperties.GetName(toggle));
+        Assert.True(toggle.Bounds.Left < gear.Bounds.Left, "启用开关应位于设置按钮左侧。");
+        Assert.InRange(version.Bounds.Left - name.Bounds.Right, 0, 12);
+        Assert.Equal(name.Bounds.Bottom, version.Bounds.Bottom, 2);
+        Assert.InRange(version.FontSize, 11, name.FontSize);
+    }
+
+    [Fact]
+    public void PluginDetailHeader_UsesInlineVersionWithoutStatusText()
+    {
+        using var gatewayService = new GatewayProcessService();
+        using var viewModel = new PluginsViewModel(gatewayService);
+        var item = CreatePluginItem(viewModel);
+        viewModel.Plugins.Add(item);
+        item.OpenDetailCommand.Execute(null);
+
+        var view = Render(viewModel);
+        var texts = view.GetVisualDescendants().OfType<TextBlock>().ToArray();
+        var name = Assert.Single(texts, text => text.Text == item.DisplayName);
+        var version = Assert.Single(texts, text => text.Text == $"v{item.Version}");
+
+        Assert.DoesNotContain(texts, text => text.Text == item.StatusLabel);
+        Assert.InRange(version.Bounds.Left - name.Bounds.Right, 0, 12);
+        Assert.Equal(name.Bounds.Bottom, version.Bounds.Bottom, 2);
+        Assert.InRange(version.FontSize, 11, name.FontSize);
+    }
+
     [Fact]
     public void PluginList_DoesNotRenderTransientLoadStatus()
     {
@@ -151,5 +216,38 @@ public sealed class PluginsViewModelUiTests
         public bool HasDiagnostics => false;
         public IReadOnlyList<object> Plugins => [];
         public IReadOnlyList<string> Diagnostics => [];
+    }
+
+    private static PluginItemViewModel CreatePluginItem(PluginsViewModel viewModel)
+    {
+        var detail = new PluginUiContribution(
+            PluginUiContribution.CurrentSchemaVersion,
+            "settings",
+            PluginUiSlot.DetailBody,
+            new PluginUiTextNode("detail"));
+        return new PluginItemViewModel(
+            new LoadedPluginInfo("test.plugin", "1.2.3", [], 0, true, HasDetailUi: true),
+            cardContributions: [],
+            detailContributions: [detail],
+            setEnabled: static (_, _) => { },
+            openDetail: viewModel.OpenPluginDetail,
+            localize: static key => key switch
+            {
+                "plugins.status.enabled" => "已启用",
+                "plugins.status.disabled" => "已停用",
+                _ => key,
+            },
+            displayInfo: new PluginDisplayInfo("测试插件", "插件说明", "系统插件", "生命周期说明"));
+    }
+
+    private static PluginsView Render(object dataContext)
+    {
+        AvaloniaTestBootstrap.Ensure();
+        var view = new PluginsView { DataContext = dataContext };
+        var host = new Window { Content = view };
+        host.Measure(new Size(1000, 700));
+        host.Arrange(new Rect(0, 0, 1000, 700));
+        host.UpdateLayout();
+        return view;
     }
 }
