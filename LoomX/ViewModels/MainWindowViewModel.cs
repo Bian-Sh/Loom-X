@@ -38,6 +38,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
     private readonly Action<bool, int, int, string>? applyAppearance;
     private readonly Action<string>? applyTheme;
     private readonly IWindowsStartupService? windowsStartupService;
+    private readonly bool restoreStartupIntent;
     private readonly IStringLocalizer<MainWindowViewModel> _loc;
     private object currentView;
     private string currentViewKey = "nav.overview";
@@ -82,7 +83,9 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         Action? requestApplicationExit = null,
         Func<Task<bool>>? confirmUpdateInstall = null,
         Action<string>? applyTheme = null,
-        IWindowsStartupService? windowsStartupService = null)
+        IWindowsStartupService? windowsStartupService = null,
+        bool autoInitializeDataStore = true,
+        bool restoreStartupIntent = true)
     {
         this.gatewayService = gatewayService;
         this.toastService = toastService ?? new ToastService();
@@ -92,6 +95,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         this.applyAppearance = applyAppearance;
         this.applyTheme = applyTheme;
         this.windowsStartupService = windowsStartupService;
+        this.restoreStartupIntent = restoreStartupIntent;
         _loc = localizer ?? LocalizerFactory.Create<MainWindowViewModel>();
         consoleViewModel = new ConsoleViewModel(toastService: this.toastService, logger: this.loggerFactory.CreateLogger<ConsoleViewModel>());
         overviewViewModel = new OverviewViewModel(gatewayService, this.dataStore, this.loggerFactory.CreateLogger<MainWindowViewModel>());
@@ -125,7 +129,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             this.dataStore.GetUpdateProxySettingsAsync,
             this.loggerFactory.CreateLogger<ReleaseHistoryViewModel>());
         settingsViewModel = new SettingsViewModel(dataStore: this.dataStore, logger: this.loggerFactory.CreateLogger<SettingsViewModel>(), toastService: this.toastService, applyAppearance: this.applyAppearance, updateCoordinator: updateCoordinator, releaseHistory: releaseHistoryViewModel, localizer: LocalizerFactory.Create<SettingsViewModel>(), applyTheme: this.applyTheme, windowsStartupService: this.windowsStartupService);
-        currentView = new PlaceholderViewModel(Loc("app.loading.title"), Loc("app.loading.description"));
+        currentView = overviewViewModel;
         NavigationItems = new([
             new("nav.overview", "M 4,18 L 12,10 L 20,18 L 20,30 L 4,30 Z M 9,30 L 9,20 L 15,20 L 15,30", () => ShowOverview()),
             new("nav.assistant", "M 6,4 L 26,4 L 26,20 L 18,20 L 12,27 L 12,20 L 6,20 Z M 11,10 L 13,10 M 16,10 L 18,10 M 21,10 L 23,10", () => ShowAssistant()),
@@ -141,7 +145,8 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         this.dataStore.ConfigurationChanged += OnConfigurationChanged;
         gatewayService.StateChanged += OnGatewayStateChanged;
         LocaleService.CultureChanged += OnCultureChanged;
-        _ = InitializeDataStoreAsync();
+        if (autoInitializeDataStore)
+            _ = InitializeDataStoreAsync();
     }
 
     private string Loc(string key) => _loc[key]?.Value ?? key;
@@ -205,21 +210,32 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
 
     private void OnConfigurationReady(object? sender, EventArgs args)
     {
-        void Apply()
-        {
-            if (dataStore.Settings is { } settings)
-            {
-                LocaleService.SetCulture(settings.Language);
-                applyTheme?.Invoke(settings.Theme);
-                applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
-            }
-            ShowOverview();
-            updateCoordinator.Start();
-#if DEBUG
-            if (updatePreviewEnabled) _ = updateCoordinator.CheckNowAsync();
-#endif
-        }
+        void Apply() => ApplyLoadedConfiguration();
         if (Dispatcher.UIThread.CheckAccess()) Apply(); else Dispatcher.UIThread.Post(Apply);
+    }
+
+    public async Task InitializeAfterStartupAsync(CancellationToken cancellationToken = default)
+    {
+        if (!dataStore.IsInitialized)
+            await dataStore.InitializeAsync(cancellationToken);
+
+        ApplyLoadedConfiguration();
+        assistantViewModel.InitializeAfterStartup();
+    }
+
+    private void ApplyLoadedConfiguration()
+    {
+        if (dataStore.Settings is { } settings)
+        {
+            LocaleService.SetCulture(settings.Language);
+            applyTheme?.Invoke(settings.Theme);
+            applyAppearance?.Invoke(settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, settings.TransparencyAlgorithm);
+        }
+        ShowOverview();
+        updateCoordinator.Start();
+#if DEBUG
+        if (updatePreviewEnabled) _ = updateCoordinator.CheckNowAsync();
+#endif
     }
 
     private async Task InitializeDataStoreAsync()
@@ -227,7 +243,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
         try
         {
             await dataStore.InitializeAsync();
-            if (windowsStartupService is null || dataStore.Settings is not { } settings) return;
+            if (!restoreStartupIntent || windowsStartupService is null || dataStore.Settings is not { } settings) return;
 
             var gatewayEndpoint = dataStore.CurrentConfig.Server.Urls.FirstOrDefault();
             if (string.IsNullOrWhiteSpace(gatewayEndpoint)) gatewayEndpoint = "http://127.0.0.1:11434";

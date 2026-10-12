@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using LoomX.Configuration;
 using LoomX.Services;
+using LoomX.Tests.Logging;
 using Xunit;
 
 namespace LoomX.Tests;
@@ -203,6 +204,47 @@ public sealed class ConfigSnapshotServiceTests
         }
     }
 
+
+    [Fact]
+    public async Task StartupSnapshotLoadsAllConfigurationWithSingleDatabaseInitialization()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"loomx-config-startup-{Guid.NewGuid():N}.db");
+        try
+        {
+            var options = new DbContextOptionsBuilder<ConfigurationDbContext>()
+                .UseSqlite($"Data Source={path}")
+                .Options;
+            await using (var db = new ConfigurationDbContext(options))
+                await ConfigurationDatabase.InitializeAsync(db);
+
+            var logger = new RecordingLogger<ConfigSnapshotService>();
+            using (var service = new ConfigSnapshotService(path, logger))
+            {
+                var provider = await service.CreateProviderAsync(new ProviderInput("startup", "启动 Provider", "https://example.com", "openai", true, null, false, null));
+                await service.CreateModelAsync(provider.Id, new ModelInput("startup-model", "启动模型", null, "gpt", null, null, 128000, 4096, false, null, null, true, null, false, null, null));
+                await service.CreateGatewayComboAsync(new GatewayComboInput("startup-combo", true, 0));
+                logger.Messages.Clear();
+
+                var snapshot = await service.LoadStartupSnapshotAsync();
+
+                Assert.NotNull(snapshot.Config);
+                Assert.Single(snapshot.Providers);
+                Assert.Single(snapshot.Providers[0].Models);
+                Assert.NotNull(snapshot.Settings);
+                Assert.Equal(3, snapshot.GatewayEndpoints.Count);
+                Assert.Single(snapshot.GatewayCombos);
+                Assert.Single(snapshot.EnabledGatewayModels);
+                Assert.Single(snapshot.Config.Providers);
+                Assert.Single(snapshot.Config.Models);
+                Assert.Equal(3, snapshot.Config.GatewayEndpoints.Count);
+                Assert.Equal(1, logger.Messages.Count(message => message.Contains("配置库读取前初始化完成", StringComparison.Ordinal)));
+            }
+        }
+        finally
+        {
+            DeleteDatabaseFiles(path);
+        }
+    }
     private static void DeleteDatabaseFiles(string path)
     {
         foreach (var file in new[] { path, path + "-wal", path + "-shm" })
@@ -211,5 +253,4 @@ public sealed class ConfigSnapshotServiceTests
             catch (IOException) { }
         }
     }
-
 }

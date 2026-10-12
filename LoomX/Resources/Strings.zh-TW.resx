@@ -17,6 +17,15 @@
   <data name="app.loading.failed.description">
     <value>數據中心加載失敗：{0}，請通過頁面刷新重試。</value>
   </data>
+  <data name="app.splash.starting"><value>正在準備桌面環境</value></data>
+  <data name="app.splash.completed"><value>啟動完成</value></data>
+  <data name="app.splash.failed"><value>啟動失敗</value></data>
+  <data name="app.splash.close"><value>關閉</value></data>
+  <data name="app.splash.stage.database"><value>載入設定資料庫</value></data>
+  <data name="app.splash.stage.plugin.compile"><value>編譯外掛程式</value></data>
+  <data name="app.splash.stage.plugin.load"><value>載入外掛程式</value></data>
+  <data name="app.splash.stage.gateway"><value>啟動閘道服務</value></data>
+  <data name="app.splash.stage.shell"><value>準備主視窗</value></data>
   <data name="nav.overview">
     <value>概覽</value>
   </data>
@@ -1388,7 +1397,7 @@
     <value>尚未測試連接</value>
   </data>
   <data name="placeholder.empty.body">
-    <value>此頁面已完成導航接入，業務功能將在後續迭代中逐步實現。</value>
+    <value>目前沒有可顯示的詳細資訊。</value>
   </data>
   <data name="assistant.history.placeholder">
     <value>歷史會話…</value>

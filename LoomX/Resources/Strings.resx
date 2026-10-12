@@ -57,6 +57,15 @@
   <data name="app.loading.failed.description">
     <value>数据中心加载失败：{0}，请通过页面刷新重试。</value>
   </data>
+  <data name="app.splash.starting"><value>正在准备桌面环境</value></data>
+  <data name="app.splash.completed"><value>启动完成</value></data>
+  <data name="app.splash.failed"><value>启动失败</value></data>
+  <data name="app.splash.close"><value>关闭</value></data>
+  <data name="app.splash.stage.database"><value>加载配置数据库</value></data>
+  <data name="app.splash.stage.plugin.compile"><value>编译插件</value></data>
+  <data name="app.splash.stage.plugin.load"><value>加载插件</value></data>
+  <data name="app.splash.stage.gateway"><value>启动网关服务</value></data>
+  <data name="app.splash.stage.shell"><value>准备主界面</value></data>
 
   <!-- ============================================================ -->
   <!-- Main navigation                                              -->
@@ -1542,7 +1551,7 @@
 
   <!-- ========== Phase 2: Placeholder 视图 ========== -->
   <data name="placeholder.empty.body">
-    <value>此页面已完成导航接入，业务功能将在后续迭代中逐步实现。</value>
+    <value>当前没有可显示的详细信息。</value>
   </data>
   <data name="assistant.history.placeholder">
     <value>历史会话…</value>

@@ -1,0 +1,15 @@
+{
+  "change": "improve-startup-splash-screen",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "task_hash_policy": "task-content-v1",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "13b0c5d7b99bb968cccbe6926f8f012b70347db835d2a391ed930aba19816f1b",
+  "files": [
+    { "path": "openspec/changes/improve-startup-splash-screen/proposal.md", "sha256": "3c950f29db6581f44c05a8eefd96e8c9dc9c2e4d4a0571b55ac55a65cf0944a7" },
+    { "path": "openspec/changes/improve-startup-splash-screen/design.md", "sha256": "dbe73d58bb7bf56a289626e3a99bd59536be374307224eff08fdcfb27d7855e5" },
+    { "path": "openspec/changes/improve-startup-splash-screen/tasks.md", "sha256": "8b945e892efa45e7ba5d84b2d4e6285e9384f58cd2cd7fe8889dd78c3cfab178" },
+    { "path": "openspec/changes/improve-startup-splash-screen/specs/desktop-startup-splash/spec.md", "sha256": "2a3eb7f41d2360fc5d7ce4c1797fd1f72093812a2c57cbfa95ff71243d77374d" }
+  ]
+}

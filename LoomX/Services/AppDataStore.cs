@@ -394,12 +394,16 @@ public sealed class AppDataStore : IDisposable
         try
         {
             isLoading = true;
-            var config = await configService.LoadAsync(cancellationToken);
-            var providers = await configService.ListProvidersAsync(cancellationToken);
-            var settings = await configService.GetSettingsAsync(cancellationToken);
-            var endpoints = await configService.ListGatewayEndpointsAsync(cancellationToken);
-            var combos = await configService.ListGatewayCombosAsync(cancellationToken);
-            var enabledModels = await configService.ListEnabledGatewayModelsAsync(cancellationToken);
+            var startupSnapshot = isInitialLoad
+                ? await configService.LoadStartupSnapshotAsync(cancellationToken)
+                : null;
+            var config = startupSnapshot?.Config ?? await configService.LoadAsync(cancellationToken);
+            var providers = startupSnapshot?.Providers ?? await configService.ListProvidersAsync(cancellationToken);
+            var settings = startupSnapshot?.Settings ?? await configService.GetSettingsAsync(cancellationToken)
+                ?? throw new InvalidOperationException("配置快照缺少应用设置。");
+            var endpoints = startupSnapshot?.GatewayEndpoints ?? await configService.ListGatewayEndpointsAsync(cancellationToken);
+            var combos = startupSnapshot?.GatewayCombos ?? await configService.ListGatewayCombosAsync(cancellationToken);
+            var enabledModels = startupSnapshot?.EnabledGatewayModels ?? await configService.ListEnabledGatewayModelsAsync(cancellationToken);
             CurrentConfig = config;
             Providers = providers;
             Settings = settings;

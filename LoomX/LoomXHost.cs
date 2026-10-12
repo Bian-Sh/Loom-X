@@ -27,7 +27,8 @@ public static class LoomXHost
         Assistant.Browser.BrowserBridge? browserBridge,
         Assistant.Browser.BrowserBridgeLeaseManager? browserBridgeLeaseManager,
         CancellationToken cancellationToken = default,
-        ToastService? toastService = null)
+        ToastService? toastService = null,
+        Action<LoomX.Plugins.Host.PluginRuntimeStartupPhase>? pluginStartupProgress = null)
     {
         AppDataPaths.EnsureCreated();
 
@@ -139,6 +140,7 @@ public static class LoomXHost
                 DataRootDirectory = Path.Combine(AppDataPaths.RootDirectory, "plugins"),
                 BridgeFactory = services.GetRequiredService<PluginHostBridgeFactory>().CreateScope,
                 SourceCompiler = services.GetRequiredService<LoomX.Plugins.Host.SourcePluginCompiler>(),
+                StartupProgress = pluginStartupProgress,
             },
             services.GetRequiredService<ILoggerFactory>()));
         builder.Services.AddSingleton<IProviderExecutionPipeline>(services =>

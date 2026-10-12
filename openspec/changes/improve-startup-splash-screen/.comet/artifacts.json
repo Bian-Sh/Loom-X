@@ -1,0 +1,8 @@
+{
+  "openspec_proposal": "openspec/changes/improve-startup-splash-screen/proposal.md",
+  "openspec_design": "openspec/changes/improve-startup-splash-screen/design.md",
+  "openspec_tasks": "openspec/changes/improve-startup-splash-screen/tasks.md",
+  "openspec_delta_spec": "openspec/changes/improve-startup-splash-screen/specs/desktop-startup-splash/spec.md",
+  "handoff_context": "openspec/changes/improve-startup-splash-screen/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/improve-startup-splash-screen/.comet/handoff/design-context.md"
+}
