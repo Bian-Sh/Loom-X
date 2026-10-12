@@ -2,6 +2,7 @@
 change: add-source-plugin-runtime-and-bridge
 design-doc: openspec/changes/add-source-plugin-runtime-and-bridge/design.md
 base-ref: bf799431e0d2ec3c2ff1820e8b4a7b4a97ed6f7a
+archived-with: 2026-10-12-add-source-plugin-runtime-and-bridge
 ---
 
 # 源码插件与宿主 Bridge 实施计划
@@ -392,4 +393,3 @@ base-ref: bf799431e0d2ec3c2ff1820e8b4a7b4a97ed6f7a
 使用现有 Credential Protection 端到端请求/响应用例复验 placeholder 完整性指令、跨 chunk/SSE 恢复、未知或损坏 token fail closed、禁用与卸载生命周期均未改变。
 
 依赖：按上方工作包顺序；验收：第 7 组命令及本任务明确场景。
-

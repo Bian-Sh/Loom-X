@@ -13,8 +13,8 @@
 | 维度 | 当前结论 | 依据 |
 |---|---|---|
 | 完整性 | 44/44 任务，33/33 需求 | 三个 delta capability：source-plugin-runtime、plugin-host-bridge、plugin-development-skill；正式 tasks revision：`85195c241b77e3edefb7ab21edfb02a8adfea928b6ae64a276c1670079917127` |
-| 正确性 | 独立逐项覆盖 82/82 场景 PASS | [首审覆盖矩阵](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/handoff/coverage-matrix.md) + [原 reviewer 定向复查补足](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/handoff/final-integration-followup.md) |
-| 一致性 | 没有未关闭的阻塞性设计偏差 | [权威 design.md](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/design.md)；strict OpenSpec validate：valid=true、issues=[] |
+| 正确性 | 独立逐项覆盖 82/82 场景 PASS | [首审覆盖矩阵](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/handoff/coverage-matrix.md) + [原 reviewer 定向复查补足](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/handoff/final-integration-followup.md) |
+| 一致性 | 没有未关闭的阻塞性设计偏差 | [权威 design.md](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/design.md)；strict OpenSpec validate：valid=true、issues=[] |
 | 最终独立审查 | PASS，CRITICAL 0、IMPORTANT 0 | 保留一次全 change 首审及一次 I-1 定向复查，不用专家分段 PASS 替代最终审查 |
 
 proposal 目标没有缩减为 SQLite 去重：源码编译与缓存、版本化 Bridge、既有 Vault 兼容、开发工具/Skill、发布验证均在本次覆盖范围。原首审只有 42/44、31/33、81/82，通过修复和定向复查才补足；原报告、矩阵及历史不足没有删除或覆写。
@@ -23,14 +23,14 @@ proposal 目标没有缩减为 SQLite 去重：源码编译与缓存、版本化
 
 | 检查 | 实际结果 | 原始证据 |
 |---|---|---|
-| 提交后 solution build | exit 0，14 warnings、0 errors；输入前后摘要一致 | [最新 Build 日志](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/checks/5b7a8b2c-bae2-4265-b624-f79f09ae840b.log) |
+| 提交后 solution build | exit 0，14 warnings、0 errors；输入前后摘要一致 | [最新 Build 日志](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/checks/5b7a8b2c-bae2-4265-b624-f79f09ae840b.log) |
 | Build 阶段守卫 | 14/14 PASS，phase=verify、check_epoch=5 | `comet guard add-source-plugin-runtime-and-bridge build --apply --json` 的真实返回 |
-| 修复后 Build scope 完整回归 | 1896/1896，0 fail、0 skip，exit 0 | [BUILD-UI-FIX-VERIFIED.trx](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/BUILD-UI-FIX-VERIFIED.trx) |
-| 最终 Verify scope 完整回归 | 1896/1896，0 fail、0 skip，exit 0；正常 bin 布局，Runtime 前后指纹一致 | [VERIFY-UI-FIX-FINAL.trx](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/VERIFY-UI-FIX-FINAL.trx)、[Verify 日志](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/checks/1ab26b98-426c-49ad-8e0f-9e0511e575b1.log) |
-| Verify 阶段守卫 | 5/5 PASS，phase=archive、verify_result=pass、check_epoch=6 | [公开 CLI 原始返回](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/VERIFY-GUARD-FINAL.json) |
+| 修复后 Build scope 完整回归 | 1896/1896，0 fail、0 skip，exit 0 | [BUILD-UI-FIX-VERIFIED.trx](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/BUILD-UI-FIX-VERIFIED.trx) |
+| 最终 Verify scope 完整回归 | 1896/1896，0 fail、0 skip，exit 0；正常 bin 布局，Runtime 前后指纹一致 | [VERIFY-UI-FIX-FINAL.trx](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/VERIFY-UI-FIX-FINAL.trx)、[Verify 日志](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/checks/1ab26b98-426c-49ad-8e0f-9e0511e575b1.log) |
+| Verify 阶段守卫 | 5/5 PASS，phase=archive、verify_result=pass、check_epoch=6 | [公开 CLI 原始返回](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/VERIFY-GUARD-FINAL.json) |
 | Playground | 85/85，exit 0 | [最新实际日志](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/coordinator-ui-fix-20261012-1045.log) |
-| 最新发布布局 | 32/32；宿主 SQLite 托管/原生实现各 1 份；插件禁止负载 0；无根目录平铺 payload | [布局结果](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/published-20261012-104237/plugin-layout-validation.json) |
-| 发布二进制闭环与重启 | 两进程 33+8 项断言、exit 0；缓存命中，SQLite 计数 2→3；发布文件 464/464 hash 一致，实际加载模块 24/24 来源/hash 一致 | [最新发布探针证据](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/published-20261012-104237/attempts/20261012-104629-662-17c0a35f/) |
+| 最新发布布局 | 32/32；宿主 SQLite 托管/原生实现各 1 份；插件禁止负载 0；无根目录平铺 payload | [布局结果](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/published-20261012-104237/plugin-layout-validation.json) |
+| 发布二进制闭环与重启 | 两进程 33+8 项断言、exit 0；缓存命中，SQLite 计数 2→3；发布文件 464/464 hash 一致，实际加载模块 24/24 来源/hash 一致 | [最新发布探针证据](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/published-20261012-104237/attempts/20261012-104629-662-17c0a35f/) |
 
 最新 Build 输入摘要：`9d342ffb36a6fcc60568a824625d03c968603226226a80bc0e78cf79d7be0cd5`。日志 SHA-256：`9d33e6017f0c908b43293031e09e6b59b55e51968c9e7b5aa9b22e2c06eab5a3`。14 条警告包含可空性、未使用测试事件、同步等待分析器及异步 EndOfStream 分析器提示；本轮没有为了消除警告改动无关代码。此前增量构建的 0 warnings 仅为历史结果，不代表最新重新编译无警告。
 
@@ -38,10 +38,10 @@ proposal 目标没有缩减为 SQLite 去重：源码编译与缓存、版本化
 
 ## 已授权修复与审查轮次
 
-- Runtime：原 reviewer Mendel 第 2 轮定向复查 PASS，I3 关闭；正式相邻 24/24、原独立探针 4/4、敏感诊断及最终租约释放 2/2。[Runtime 复查](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/handoff/runtime-extra-followup.md)。
-- Feedback：原 reviewer Maxwell 第 2 轮 PASS，I2 关闭；正式回归 61/61，独立相邻守卫 12 组通过。[Feedback 复查](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/handoff/feedback-extra-followup.md)。
+- Runtime：原 reviewer Mendel 第 2 轮定向复查 PASS，I3 关闭；正式相邻 24/24、原独立探针 4/4、敏感诊断及最终租约释放 2/2。[Runtime 复查](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/handoff/runtime-extra-followup.md)。
+- Feedback：原 reviewer Maxwell 第 2 轮 PASS，I2 关闭；正式回归 61/61，独立相邻守卫 12 组通过。[Feedback 复查](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/handoff/feedback-extra-followup.md)。
 - 用户追加一次修复/原 reviewer 复查的授权和第 1 轮历史完整保留；没有重置次数、换人或再开第 3 轮。正式测试例数与独立守卫组数分别记录。
-- 全 change 最终集成：Pasteur 首审发现 IMPORTANT I-1；首次 verify-fail 自动回 Build。修复后由同一 reviewer 第 1 次定向复查 PASS。独立 source/assembly 邻界 36/36，正式窄跑 63/63 + 8/8，原发布探针重新执行 exit 0。[首审](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/handoff/final-integration-review.md)、[定向复查](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/handoff/final-integration-followup.md)。
+- 全 change 最终集成：Pasteur 首审发现 IMPORTANT I-1；首次 verify-fail 自动回 Build。修复后由同一 reviewer 第 1 次定向复查 PASS。独立 source/assembly 邻界 36/36，正式窄跑 63/63 + 8/8，原发布探针重新执行 exit 0。[首审](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/handoff/final-integration-review.md)、[定向复查](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/handoff/final-integration-followup.md)。
 - 非阻塞 MINOR：composition 测试的共享实例断言偏弱，以及计划 EOF 空行卫生建议。保留原分类，不冒称所有建议均已修复。
 
 ## I-1 根因、真实 TDD 与最小修复
@@ -50,7 +50,7 @@ proposal 目标没有缩减为 SQLite 去重：源码编译与缓存、版本化
 
 真实 RED：12 例中 10 fail / 2 pass，十个失败均为预期 reload=false 但实际 true。随后正式相邻回归发现两种旧夹具问题：候选与旧在途 UI 共用等待闸门、命令租约夹具声明 panel 却没有 UI provider。只修夹具，等待/释放断言和产品门禁均未弱化。最后窄跑 63/63、相邻 71/71、Build 完整 1896/1896。
 
-[修复说明](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/handoff/final-integration-fix.md)与[历史 TRX 计数/hash 索引](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/add-source-plugin-runtime-and-bridge/.comet/handoff/verify-evidence-summary.json)保留所有真实失败，没有用最终 PASS 擦除 RED 或夹具失败。
+[修复说明](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/handoff/final-integration-fix.md)与[历史 TRX 计数/hash 索引](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/openspec/changes/archive/2026-10-12-add-source-plugin-runtime-and-bridge/.comet/handoff/verify-evidence-summary.json)保留所有真实失败，没有用最终 PASS 擦除 RED 或夹具失败。
 
 ## 设计与安全边界
 
@@ -85,3 +85,9 @@ proposal 目标没有缩减为 SQLite 去重：源码编译与缓存、版本化
 当前 `phase=archive`、`verify_result=pass`、`verified_at=2026-10-12`、`check_epoch=6`、`branch_status=pending`、`archive_confirmation=pending`、`archived=false`。这些状态由 Verify 守卫真实更新，没有手设 pass。Runtime 将连续 verify_failures 自动清零为 0；先前 I-1 首次失败和修复历史仍保留在报告及原始证据中。
 
 归档仍未授权：不得合并三个 delta spec 到主 spec、标注文档或移动 change，不创建 PR、不合并 master。验证完成后将单独询问是否确认归档并立即推送当前绑定分支（不创建 PR）。
+
+## 归档收尾（2026-10-12）
+
+用户已明确确认先归档再逐个源码化。公开 CLI 已合并三份主 spec、标注文档并移动 change，恢复归档 8/8、最终归档守卫 6/6 均通过。原待确认状态为验证完成时的历史状态；当前 archived=true、archive_confirmation=confirmed、branch_status=handled。交付方式为推送当前绑定分支，不创建 PR、不合并 master。
+
+首次归档在全仓主规格卫生检查中遇到既有 desktop-startup-lifecycle 的 ADDED Requirements 标题；只改为 Requirements，需求/场景正文未变。公开 CLI 识别已移动 change 后恢复收尾，没有再次同步三份规格或丢弃原始证据。归档后主 spec strict 校验均通过。

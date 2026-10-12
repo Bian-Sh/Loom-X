@@ -2,6 +2,8 @@
 comet_change: add-source-plugin-runtime-and-bridge
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-10-12-add-source-plugin-runtime-and-bridge
+status: final
 ---
 
 # Design
