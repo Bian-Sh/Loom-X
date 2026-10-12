@@ -1,0 +1,17 @@
+{
+  "change": "migrate-first-party-plugins-to-source-runtime",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "task_hash_policy": "task-content-v1",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "355c8c0ac421f318a160371b6e24972b9df2670d4753152e95710cf97b6943a6",
+  "files": [
+    { "path": "openspec/changes/migrate-first-party-plugins-to-source-runtime/proposal.md", "sha256": "bbe51f6fdfffaa2f480ed9f7898c39c647241a4d61fdc5728dc4945b53a0e9e5" },
+    { "path": "openspec/changes/migrate-first-party-plugins-to-source-runtime/design.md", "sha256": "1145b749e5c84563bd38412cda057dac203a9d33caff2b0b3928a72b09eaeb53" },
+    { "path": "openspec/changes/migrate-first-party-plugins-to-source-runtime/tasks.md", "sha256": "f2e5c5b0fbdb6fe1f05e4d9422386139722b5ed82b3fd3c7ccba6639e7f80fd8" },
+    { "path": "openspec/changes/migrate-first-party-plugins-to-source-runtime/.openspec.yaml", "sha256": "1dfdca412094f24473d8b842866201ec26f200b29b17064b03f1e4982c35a7b9" },
+    { "path": "openspec/changes/migrate-first-party-plugins-to-source-runtime/specs/first-party-source-plugins/spec.md", "sha256": "6db4f5d851c21871034f3c32457f16d0e22fe001a2d98f872c4634286bdd91e5" },
+    { "path": "openspec/changes/migrate-first-party-plugins-to-source-runtime/specs/plugin-host-bridge/spec.md", "sha256": "ea49990f595e67a68d6c3be7996e89a465f8eee413ba54a8a63aeccc9512abd5" }
+  ]
+}

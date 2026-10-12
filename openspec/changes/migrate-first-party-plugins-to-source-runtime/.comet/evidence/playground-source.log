@@ -1,0 +1,87 @@
+本次隔离临时目录：C:\Users\BianShanghai\AppData\Local\Temp\LoomX-Playground-task7.1-c8ba8b5f53384ac1a53416e19b8f431d
+[PASS] Credential 插件包不含宿主 SQLite 动态依赖
+[PASS] 插件负载只有 plugins/<id> 布局，无根目录平铺副本
+[PASS] 公共包校验通过且源码/三种 Bridge 能力一致
+[PASS] 源码包无需 csproj 或编译程序集
+[PASS] 随附源码编译器成功生成程序集及 portable PDB，忽略未声明源码
+[PASS] 相同输入第二次编译命中相同缓存
+[PASS] Credential Protection 源码插件已发现
+[PASS] 源码插件经共享契约动态加载
+[PASS] 初始 Manifest/编译/能力/ALC 加载无诊断
+[PASS] Router Request 与 Response Pipeline 已注册
+[PASS] Credential Request metadata 已注册
+[PASS] Credential Response metadata 已注册
+[PASS] 源码成对 Pipeline metadata 与公共执行接口就绪
+[PASS] 源码 Bridge crud 的真实执行结果
+[PASS] 源码 Bridge commit 的真实执行结果
+[PASS] 源码 Bridge rollback 的真实执行结果
+[PASS] 源码 Bridge dispose-rollback 的真实执行结果
+[PASS] 源码 Bridge constraint-rollback 的真实执行结果
+[PASS] 源码 Bridge transaction-isolation 的真实执行结果
+[PASS] 源码 Bridge path-rejection 的真实执行结果
+[PASS] 源码 Bridge feedback-rejection 的真实执行结果
+[PASS] 源码 Bridge feedback-inactive-union 的真实执行结果
+[PASS] 源码 Bridge notify 的真实执行结果
+[PASS] 源码数据库只位于本插件隔离子目录
+[PASS] Logging Bridge 捕获绑定来源、模板和结构化字段
+[PASS] Notifications Bridge 捕获绑定来源与 Success 安全摘要
+[PASS] 源码成对 request/response 使用 g1
+[PASS] 源码 Entry 禁用后保持原样
+[PASS] 源码 Entry 重新启用恢复执行
+[PASS] 源码普通插件禁用跳过执行
+[PASS] 源码普通插件启用恢复执行
+[PASS] 成功 reload 返回成功
+[PASS] 新注册 metadata 与版本切换到 g2
+[PASS] reload 前保存的动态执行接口取得新代际
+[PASS] 新调用 request/response 使用同一 g2
+[PASS] 旧租约仍能使用 g1 SQLite 与成对 Pipeline
+[PASS] 旧租约未释放时旧 Bridge 仍可用
+[PASS] 旧租约排空后 Bridge 确定退休
+[PASS] 旧租约排空后数据库句柄拒绝复用
+[PASS] 退休拒绝调用不创建新数据库
+[PASS] 成功 reload 后最近可用 g2 编译缓存身份可追踪
+[PASS] g2 缓存摘要包含程序集、PDB 与完整性元数据
+[PASS] 源码编译失败 reload 返回失败
+[PASS] 编译失败保留 g2 实例与 Bridge
+[PASS] 编译失败提供安全相对路径与行列诊断
+[PASS] 失败编译不破坏已发布 g1 缓存
+[PASS] 失败编译保留最近可用 g2 全部缓存与认证元数据摘要
+[PASS] 编译失败保留成对注册的原 Extension 身份
+[PASS] 编译失败后同租约成对 Pipeline 仍执行原 g2
+[PASS] 候选初始化失败 reload 返回失败
+[PASS] 候选初始化失败不切换当前 Bridge 与 g2
+[PASS] 失败候选 Bridge 已释放
+[PASS] 失败 reload 诊断含初始化与保留原实例阶段
+[PASS] 初始化失败保留最近可用 g2 缓存摘要
+[PASS] 初始化失败保留成对注册的原 Extension 身份
+[PASS] 初始化失败后同租约成对 Pipeline 仍执行原 g2
+[PASS] 请求正文凭据脱敏并签发长期 token
+[PASS] placeholder 完整性指令临时注入 system/developer
+[PASS] 原始客户端请求未被改写
+[PASS] 普通业务请求原样通过
+[PASS] 动态响应 Pipeline 恢复新 token
+[PASS] Bridge 直接恢复预置旧格式 Vault token
+[PASS] 旧 Vault OriginalHash 稳定复用原 token
+[PASS] Credential Entry 禁用后跳过新脱敏
+[PASS] Credential Entry 重新启用恢复脱敏
+[PASS] 暂停主动保护停止新明文 token 化
+[PASS] 暂停主动保护仍为历史 token 注入完整性指令
+[PASS] 暂停主动保护保留 Vault 历史恢复能力
+[PASS] 第一个 runtime 退休释放 Credential Bridge
+[PASS] 新 runtime 同时重新加载两个源码插件且无诊断
+[PASS] 跨 runtime 重开 Vault 恢复原历史 token
+[PASS] 跨 runtime 重开 Vault 恢复前代签发 token
+[PASS] 跨 runtime 相同凭据继续复用原 token
+[PASS] 历史记录 DPAPI 密文与创建时间原样保留
+[PASS] Vault 只含两条稳定映射且不存明文
+[PASS] Credential 仅使用原 credential-tokens.db，不创建第二份 Vault
+[PASS] 跨 runtime 源码 SQLite 数据可重新打开
+[PASS] 第二个 runtime 所有能力作用域已退休
+[PASS] 编译/运行诊断不回显源码敏感字面量
+[PASS] Pipeline Entry 按 Router 配置顺序执行
+[PASS] 普通插件异常隔离且主流程继续
+[PASS] 数据安全插件异常 fail closed
+[PASS] 宿主日志与捕获通知均不含凭据/正文/token 哨兵
+[PASS] 宿主捕获源码编译开始/完成/失败事件
+[PASS] 宿主捕获 SQLite 完成与 reload 完成事件
+PluginPlayground：85 项检查，85 项通过，0 项失败。

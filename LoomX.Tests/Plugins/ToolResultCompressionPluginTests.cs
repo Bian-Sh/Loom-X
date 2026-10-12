@@ -156,27 +156,14 @@ public sealed class ToolResultCompressionPluginTests
     public async Task PluginRuntime_LoadsPluginAndCompressesThroughRequestPipeline()
     {
         var root = Path.Combine(Path.GetTempPath(), "loomx-trc-runtime", Guid.NewGuid().ToString("n"));
-        var packageDirectory = Path.Combine(root, "plugins", "LoomX.ToolResultCompression");
-        Directory.CreateDirectory(packageDirectory);
-        File.Copy(
-            typeof(ToolResultCompressionPlugin).Assembly.Location,
-            Path.Combine(packageDirectory, "LoomX.ToolResultCompression.dll"),
-            overwrite: true);
-        var depsSource = Path.ChangeExtension(
-            typeof(ToolResultCompressionPlugin).Assembly.Location, ".deps.json");
-        if (File.Exists(depsSource))
-            File.Copy(depsSource, Path.Combine(packageDirectory, "LoomX.ToolResultCompression.deps.json"), overwrite: true);
-        // 清单从插件源目录取：多个插件的 Manifest 同名，测试输出目录里的副本不一定是这一个。
-        File.Copy(
-            GetRepositoryFile("plugins", "LoomX.ToolResultCompression", "plugin.manifest.json"),
-            Path.Combine(packageDirectory, "plugin.manifest.json"),
-            overwrite: true);
+        FirstPartySourceTestPayload.Stage(Path.Combine(root, "plugins"), ToolResultCompressionPlugin.PluginId);
 
         var runtime = PluginRuntime.Start(
             new PluginRuntimeOptions
             {
                 PluginDirectory = Path.Combine(root, "plugins"),
                 DataRootDirectory = Path.Combine(root, "data"),
+                SourceCompiler = new SourcePluginCompiler(Path.Combine(root, "cache")),
             },
             NullLoggerFactory.Instance);
 
@@ -221,33 +208,16 @@ public sealed class ToolResultCompressionPluginTests
     private static (PluginRuntime Runtime, string DataRoot) StartRuntimeWithPlugin()
     {
         var root = Path.Combine(Path.GetTempPath(), "loomx-trc-runtime", Guid.NewGuid().ToString("n"));
-        var packageDirectory = Path.Combine(root, "plugins", "LoomX.ToolResultCompression");
-        Directory.CreateDirectory(packageDirectory);
-        File.Copy(
-            typeof(ToolResultCompressionPlugin).Assembly.Location,
-            Path.Combine(packageDirectory, "LoomX.ToolResultCompression.dll"),
-            overwrite: true);
-        File.Copy(
-            GetRepositoryFile("plugins", "LoomX.ToolResultCompression", "plugin.manifest.json"),
-            Path.Combine(packageDirectory, "plugin.manifest.json"),
-            overwrite: true);
+        FirstPartySourceTestPayload.Stage(Path.Combine(root, "plugins"), ToolResultCompressionPlugin.PluginId);
 
         return (PluginRuntime.Start(
             new PluginRuntimeOptions
             {
                 PluginDirectory = Path.Combine(root, "plugins"),
                 DataRootDirectory = Path.Combine(root, "data"),
+                SourceCompiler = new SourcePluginCompiler(Path.Combine(root, "cache")),
             },
             NullLoggerFactory.Instance), Path.Combine(root, "data"));
     }
 
-    private static string GetRepositoryFile(params string[] segments)
-    {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "LoomX.slnx")))
-            directory = directory.Parent;
-
-        Assert.NotNull(directory);
-        return Path.Combine([directory!.FullName, .. segments]);
-    }
 }

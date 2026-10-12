@@ -38,7 +38,7 @@ public sealed partial class CredentialProtectionPlugin : ILoomXPlugin, IPluginUi
     {
         ArgumentNullException.ThrowIfNull(context);
         if (tokenStore is not null) throw new InvalidOperationException("插件不得重复初始化。");
-        tokenStore = new CredentialTokenStore(context.Bridge.Storage);
+        tokenStore = new CredentialTokenStore(context.Bridge.Storage, context.Bridge.Protection);
         CredentialSynchronous.Run<bool>(async () =>
         {
             await tokenStore.InitializeAsync().ConfigureAwait(false);

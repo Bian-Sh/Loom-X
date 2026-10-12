@@ -22,10 +22,15 @@ public sealed class PluginHostBridgeFactoryTests
         PluginBridgeScope Create(string id)
         {
             var manifest = new PluginManifest(id, "1", "unused.dll", "Unused", [], [])
-            { HostCapabilities = ["storage.sqlite/v1", "logging/v1", "notifications/v1"] };
+            { HostCapabilities = ["storage.sqlite/v1", "logging/v1", "notifications/v1", "protection/v1"] };
             return Assert.IsType<PluginBridgeScope>(type.GetMethod("CreateScope")!.Invoke(factory, [manifest, Path.Combine(root, id)]));
         }
         await using var first = Create("example.first");
+        if (OperatingSystem.IsWindows())
+        {
+            var ciphertext = await first.Protection.EncryptAsync("组合点保护哨兵");
+            Assert.Equal("组合点保护哨兵", await first.Protection.DecryptAsync(ciphertext));
+        }
         await using var second = Create("example.second");
         await using var db = await first.Storage.OpenSqliteAsync("store.db");
         await db.ExecuteAsync(new("CREATE TABLE Events(Id INTEGER)"));

@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using Xunit;
 
 namespace LoomX.Tests.Plugins;
@@ -75,24 +76,38 @@ public sealed class PluginPublishContractTests
     {
         var references = typeof(LoomX.CredentialProtection.CredentialTokenStore).Assembly.GetReferencedAssemblies();
         Assert.Contains(references, item => item.Name == "LoomX.Plugin.Abstractions");
-        Assert.DoesNotContain(references, item => item.Name is "Microsoft.Data.Sqlite" or "LoomX.Plugin.Storage.Sqlite" or "LoomX.PluginHost");
+        Assert.DoesNotContain(references, item => item.Name is "Microsoft.Data.Sqlite" or "LoomX.Plugin.Storage.Sqlite" or "LoomX.PluginHost" or "System.Security.Cryptography.ProtectedData");
         Assert.DoesNotContain(references, item => item.Name?.StartsWith("SQLitePCLRaw.", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     [Fact]
     public void CredentialPluginBuildPayload_DoesNotCarrySqliteManagedOrNativeLibraries()
     {
-        var testOutput = new DirectoryInfo(AppContext.BaseDirectory);
-        // 同时支持独立 --artifacts-path 与默认 bin/Debug/net10.0 输出布局。
-        var pluginOutput = testOutput.Parent?.Name == "LoomX.Tests" && testOutput.Parent.Parent?.Name == "bin"
-            ? Path.Combine(testOutput.Parent.Parent.FullName, "LoomX.CredentialProtection", testOutput.Name)
-            : GetRepositoryFile("plugins", "LoomX.CredentialProtection", "bin", testOutput.Parent!.Name, testOutput.Name);
-        Assert.True(File.Exists(Path.Combine(pluginOutput, "LoomX.CredentialProtection.dll")));
-        Assert.True(File.Exists(Path.Combine(pluginOutput, "plugin.manifest.json")));
-        Assert.DoesNotContain(Directory.GetFiles(pluginOutput, "*", SearchOption.AllDirectories), IsSqlitePayload);
+        // 静态 DLL 仅服务单测；运行时负载只检查 plugins/<id> 源码包。
         var mirroredPayload = Path.Combine(AppContext.BaseDirectory, "plugins", "loomx.credential-protection");
         Assert.True(File.Exists(Path.Combine(mirroredPayload, "plugin.manifest.json")));
         Assert.DoesNotContain(Directory.GetFiles(mirroredPayload, "*", SearchOption.AllDirectories), IsSqlitePayload);
+    }
+
+    [Theory]
+    [InlineData("LoomX")]
+    [InlineData("LoomX.PluginPlayground")]
+    public void Consumers_DoNotRecursivelyCopyPluginBuildDirectories(string projectName)
+    {
+        var project = XDocument.Load(GetRepositoryFile(projectName, projectName + ".csproj"));
+        var includes = project.Descendants().Attributes("Include").Select(attribute => attribute.Value);
+        Assert.DoesNotContain(includes, value => value.Contains("OutputDir", StringComparison.Ordinal)
+            && value.Contains("**", StringComparison.Ordinal));
+        Assert.Contains(project.Descendants("Import"), import =>
+            ((string?)import.Attribute("Project"))?.EndsWith("FirstPartySourcePayload.targets", StringComparison.Ordinal) == true);
+        foreach (var target in project.Descendants("Target").Where(target =>
+            ((string?)target.Attribute("Name"))?.StartsWith("CopyFirstPartyPlugins", StringComparison.Ordinal) == true))
+        {
+            Assert.Contains(target.Descendants("Copy"), copy =>
+                (string?)copy.Attribute("SourceFiles") == "@(_CredentialPluginPayload)");
+            Assert.Contains(target.Descendants("Copy"), copy =>
+                (string?)copy.Attribute("SourceFiles") == "@(_CompressionPluginPayload)");
+        }
     }
 
     private static bool IsSqlitePayload(string file)
@@ -112,8 +127,11 @@ public sealed class PluginPublishContractTests
     {
         Assert.Contains("Name=\"CopyPluginPayloadToOutput\"", project, StringComparison.Ordinal);
         Assert.Contains("AfterTargets=\"Build\"", project, StringComparison.Ordinal);
-        Assert.Contains("PluginPayload Include=\"plugin.manifest.json\"", project, StringComparison.Ordinal);
-        Assert.Contains("PluginPayload Include=\"i18n\\**\\*.json\"", project, StringComparison.Ordinal);
+        Assert.Contains("FirstPartySourcePayload.targets", project, StringComparison.Ordinal);
+        Assert.Contains("<PluginPayload Include=\"@(_", project, StringComparison.Ordinal);
+        Assert.Contains("%(PackageRelativePath)", project, StringComparison.Ordinal);
+        Assert.Contains("<ImplicitUsings>disable</ImplicitUsings>", project, StringComparison.Ordinal);
+        Assert.Contains(@"i18n\en-US.json", project, StringComparison.Ordinal);
         Assert.DoesNotContain("Content Include=\"plugin.manifest.json\"", project, StringComparison.Ordinal);
         Assert.DoesNotContain("Content Include=\"i18n", project, StringComparison.Ordinal);
     }

@@ -11,8 +11,9 @@ public sealed class CredentialStorageMigrationTests
     [Fact]
     public void Store_ConsumesPublicStorageBridgeInsteadOfDirectory()
     {
-        Assert.NotNull(typeof(CredentialTokenStore).GetConstructor([typeof(IPluginStorageBridge)]));
+        Assert.NotNull(typeof(CredentialTokenStore).GetConstructor([typeof(IPluginStorageBridge), typeof(IPluginProtectionBridge)]));
         Assert.Null(typeof(CredentialTokenStore).GetConstructor([typeof(string)]));
+        Assert.DoesNotContain(typeof(CredentialTokenStore).Assembly.GetReferencedAssemblies(), item => item.Name == "System.Security.Cryptography.ProtectedData");
     }
 
     [Fact]

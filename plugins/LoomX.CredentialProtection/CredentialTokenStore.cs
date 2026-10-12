@@ -4,12 +4,12 @@ using LoomX.Plugins;
 
 namespace LoomX.CredentialProtection;
 
-/// <summary>长期凭据映射仅经公共存储契约访问原 Vault；原值仍使用当前用户 DPAPI 加密。</summary>
+/// <summary>长期凭据映射仅经公共存储契约访问原 Vault；加解密由宿主 Protection 承担。</summary>
 public sealed class CredentialTokenStore : IAsyncDisposable
 {
     private const string DatabaseFileName = "credential-tokens.db";
-    private const string ProtectedPrefix = "dpapi:v1:";
     private readonly IPluginStorageBridge storage;
+    private readonly IPluginProtectionBridge protection;
     private readonly SemaphoreSlim gate = new(1, 1);
     private readonly CancellationTokenSource lifetime = new();
     private readonly object disposalGate = new();
@@ -17,10 +17,12 @@ public sealed class CredentialTokenStore : IAsyncDisposable
     private IPluginSqliteDatabase? database;
     private int disposed;
 
-    public CredentialTokenStore(IPluginStorageBridge storage)
+    public CredentialTokenStore(IPluginStorageBridge storage, IPluginProtectionBridge protection)
     {
         ArgumentNullException.ThrowIfNull(storage);
+        ArgumentNullException.ThrowIfNull(protection);
         this.storage = storage;
+        this.protection = protection;
     }
 
     public async ValueTask InitializeAsync(CancellationToken cancellationToken = default)
@@ -64,7 +66,7 @@ public sealed class CredentialTokenStore : IAsyncDisposable
                             VALUES($token, $hash, $protected, $created);
                             """,
                             [Parameter("$token", candidate), Parameter("$hash", originalHash),
-                             Parameter("$protected", Protect(original)), Parameter("$created", DateTimeOffset.UtcNow.ToString("O"))]),
+                             Parameter("$protected", await protection.EncryptAsync(original, token).ConfigureAwait(false)), Parameter("$created", DateTimeOffset.UtcNow.ToString("O"))]),
                             token).ConfigureAwait(false);
                         await transaction.CommitAsync(token).ConfigureAwait(false);
                         return candidate;
@@ -103,8 +105,8 @@ public sealed class CredentialTokenStore : IAsyncDisposable
                 var row = await db.QuerySingleAsync(new PluginSqlCommand(
                     "SELECT ProtectedOriginal FROM CredentialTokens WHERE Token = $token LIMIT 1;",
                     [Parameter("$token", candidate)]), token).ConfigureAwait(false);
-                if (row is not null) result[candidate] = Unprotect(row[0].Text
-                    ?? throw new CryptographicException("凭据映射不是受保护文本。"));
+                if (row is not null) result[candidate] = await protection.DecryptAsync(row[0].Text
+                    ?? throw new CryptographicException("凭据映射不是受保护文本。"), token).ConfigureAwait(false);
             }
             return result;
         }
@@ -181,24 +183,4 @@ public sealed class CredentialTokenStore : IAsyncDisposable
     private static string ComputeHash(string original) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(original)));
 
-    private static string Protect(string original)
-    {
-        if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException("Credential token persistence requires Windows DPAPI.");
-        var protectedBytes = ProtectedData.Protect(
-            Encoding.UTF8.GetBytes(original),
-            optionalEntropy: null,
-            DataProtectionScope.CurrentUser);
-        return ProtectedPrefix + Convert.ToBase64String(protectedBytes);
-    }
-
-    private static string Unprotect(string value)
-    {
-        if (!value.StartsWith(ProtectedPrefix, StringComparison.Ordinal))
-            throw new CryptographicException("Credential token value is not DPAPI protected.");
-        if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException("Credential token persistence requires Windows DPAPI.");
-        var bytes = Convert.FromBase64String(value[ProtectedPrefix.Length..]);
-        return Encoding.UTF8.GetString(ProtectedData.Unprotect(bytes, null, DataProtectionScope.CurrentUser));
-    }
 }

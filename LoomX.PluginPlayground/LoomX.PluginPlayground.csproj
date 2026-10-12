@@ -18,16 +18,26 @@
                       ReferenceOutputAssembly="false"
                       OutputItemType="FirstPartyPlugin"
                       PrivateAssets="all" />
+    <ProjectReference Include="..\plugins\LoomX.ToolResultCompression\LoomX.ToolResultCompression.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="FirstPartyCompressionPlugin"
+                      PrivateAssets="all" />
   </ItemGroup>
+  <Import Project="..\FirstPartySourcePayload.targets" />
   <Target Name="CopyFirstPartyPlugins" AfterTargets="Build">
-    <PropertyGroup>
-      <_PluginOutputDir>@(FirstPartyPlugin->'%(RootDir)%(Directory)')</_PluginOutputDir>
-    </PropertyGroup>
-    <ItemGroup>
-      <_PluginPayload Include="$(_PluginOutputDir)**\*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_PluginPayload)"
-          DestinationFiles="@(_PluginPayload->'$(OutputPath)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
+    <Copy SourceFiles="@(_CredentialPluginPayload)"
+          DestinationFiles="@(_CredentialPluginPayload->'$(OutputPath)plugins\loomx.credential-protection\%(PackageRelativePath)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_CompressionPluginPayload)"
+          DestinationFiles="@(_CompressionPluginPayload->'$(OutputPath)plugins\loomx.tool-result-compression\%(PackageRelativePath)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyFirstPartyPluginsToPublish" AfterTargets="Publish">
+    <Copy SourceFiles="@(_CredentialPluginPayload)"
+          DestinationFiles="@(_CredentialPluginPayload->'$(PublishDir)plugins\loomx.credential-protection\%(PackageRelativePath)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_CompressionPluginPayload)"
+          DestinationFiles="@(_CompressionPluginPayload->'$(PublishDir)plugins\loomx.tool-result-compression\%(PackageRelativePath)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

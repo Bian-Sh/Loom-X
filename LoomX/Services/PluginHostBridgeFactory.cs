@@ -20,6 +20,8 @@ public sealed class PluginHostBridgeFactory(string dataRoot, ToastService toastS
             capabilities.Contains("logging/v1", StringComparer.Ordinal)
                 ? new PluginLogBridge(manifest.Id, loggerFactory.CreateLogger<PluginLogBridge>()) : null,
             capabilities.Contains("notifications/v1", StringComparer.Ordinal)
-                ? new PluginNotificationBridge(manifest.Id, toastService, loggerFactory.CreateLogger<PluginNotificationBridge>()) : null);
+                ? new PluginNotificationBridge(manifest.Id, toastService, loggerFactory.CreateLogger<PluginNotificationBridge>()) : null,
+            capabilities.Contains("protection/v1", StringComparer.Ordinal)
+                ? new PluginProtectionBridge(manifest.Id, loggerFactory.CreateLogger<PluginProtectionBridge>()) : null);
     }
 }

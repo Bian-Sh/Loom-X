@@ -30,32 +30,9 @@ public sealed class PluginRuntimeTests : IDisposable
         }
     }
 
-    /// <summary>把第一方插件负载（dll + manifest + deps）拷到测试插件目录，模拟生产布局。</summary>
-    private string StageCredentialProtectionPlugin()
-    {
-        var directory = Path.Combine(PluginDirectory, "loomx.credential-protection");
-        Directory.CreateDirectory(directory);
-        foreach (var fileName in new[]
-        {
-            "LoomX.CredentialProtection.dll",
-            "LoomX.CredentialProtection.deps.json",
-        })
-        {
-            var source = Path.Combine(AppContext.BaseDirectory, fileName);
-            if (File.Exists(source))
-                File.Copy(source, Path.Combine(directory, fileName), overwrite: true);
-        }
-
-        // 清单从插件源目录取：多个插件的 Manifest 同名，测试输出目录里的副本不一定是这一个。
-        var manifestSource = Path.Combine(
-            AppContext.BaseDirectory, "..", "..", "..", "..",
-            "plugins", "LoomX.CredentialProtection", ManifestParser.ManifestFileName);
-        if (!File.Exists(manifestSource))
-            manifestSource = Path.Combine(AppContext.BaseDirectory, ManifestParser.ManifestFileName);
-        File.Copy(manifestSource, Path.Combine(directory, ManifestParser.ManifestFileName), overwrite: true);
-
-        return directory;
-    }
+    /// <summary>从测试输出精确暂存第一方源码包，保持正式 manifest、sources 与四语言布局。</summary>
+    private string StageCredentialProtectionPlugin() =>
+        FirstPartySourceTestPayload.Stage(PluginDirectory, "loomx.credential-protection");
 
     private PluginRuntime StartRuntime(IDictionary<string, IReadOnlyList<string>>? pipelineOrder = null) =>
         PluginRuntime.Start(
@@ -63,9 +40,11 @@ public sealed class PluginRuntimeTests : IDisposable
             {
                 PluginDirectory = PluginDirectory,
                 DataRootDirectory = DataDirectory,
+                SourceCompiler = new SourcePluginCompiler(Path.Combine(rootDirectory, "cache")),
                 PipelineOrder = pipelineOrder ?? new Dictionary<string, IReadOnlyList<string>>(),
                 BridgeFactory = (manifest, _) => new(manifest.Id, manifest.HostCapabilities,
-                    storage: new LoomX.Plugin.Storage.Sqlite.PluginSqliteStorageBridge(manifest.Id, DataDirectory)),
+                    storage: new LoomX.Plugin.Storage.Sqlite.PluginSqliteStorageBridge(manifest.Id, DataDirectory),
+                    protection: new PluginProtectionBridge(manifest.Id, NullLogger<PluginProtectionBridge>.Instance)),
             },
             NullLoggerFactory.Instance);
 

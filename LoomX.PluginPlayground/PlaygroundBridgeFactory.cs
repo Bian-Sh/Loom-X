@@ -18,7 +18,9 @@ internal sealed class PlaygroundBridgeFactory(string dataRoot, ILoggerFactory lo
         var feedback = new FeedbackAdapter(this, manifest.Id, loggerFactory.CreateLogger<FeedbackAdapter>());
         var storage = manifest.HostCapabilities.Contains("storage.sqlite/v1", StringComparer.Ordinal)
             ? new PluginSqliteStorageBridge(manifest.Id, dataRoot, loggerFactory.CreateLogger<PluginSqliteStorageBridge>()) : null;
-        var scope = new PluginBridgeScope(manifest.Id, manifest.HostCapabilities, storage, feedback, feedback);
+        var scope = new PluginBridgeScope(manifest.Id, manifest.HostCapabilities, storage, feedback, feedback,
+            manifest.HostCapabilities.Contains("protection/v1", StringComparer.Ordinal)
+                ? new PluginProtectionBridge(manifest.Id, loggerFactory.CreateLogger<PluginProtectionBridge>()) : null);
         Scopes.Add((manifest.Id, scope));
         return scope;
     }

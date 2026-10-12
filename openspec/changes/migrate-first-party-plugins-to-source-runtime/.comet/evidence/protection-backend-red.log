@@ -1,0 +1,82 @@
+  LoomX.Harness -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Harness\bin\Debug\net10.0\LoomX.Harness.dll
+  LoomX.Plugin.Abstractions -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Plugin.Abstractions\bin\Debug\net10.0\LoomX.Plugin.Abstractions.dll
+  LoomX.Plugin.Storage.Sqlite -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Plugin.Storage.Sqlite\bin\Debug\net10.0\LoomX.Plugin.Storage.Sqlite.dll
+  LoomX.CredentialProtection -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\plugins\LoomX.CredentialProtection\bin\Debug\net10.0\LoomX.CredentialProtection.dll
+  LoomX.ToolResultCompression -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\plugins\LoomX.ToolResultCompression\bin\Debug\net10.0\LoomX.ToolResultCompression.dll
+  LoomX.PluginHost -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.PluginHost\bin\Debug\net10.0\LoomX.PluginHost.dll
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\ViewModels\SettingsViewModel.cs(173,12): warning CS8618: 在退出构造函数时，不可为 null 的 字段 "status" 必须包含非 null 值。请考虑添加 "required" 修饰符或将该 字段 声明为可为 null。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\LoomX.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\Services\AnthropicResponseMapper.cs(60,17): warning CA2024: 不要在异步方法中使用 ‘reader.EndOfStream’ (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2024) [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\LoomX.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\Services\AnthropicResponseMapper.cs(146,17): warning CA2024: 不要在异步方法中使用 ‘reader.EndOfStream’ (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2024) [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\LoomX.csproj]
+  LoomX -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\bin\Debug\net10.0\LoomX.dll
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Services\AnthropicRequestFactoryTests.cs(215,35): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Services\AnthropicRequestFactoryTests.cs(301,35): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs(40,22): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs(42,49): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs(43,33): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs(44,32): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginUiInteractiveRuntimeTests.cs(219,32): warning CS0067: 从不使用事件“InteractiveTestPlugin.UiInvalidated” [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\RuntimeUiTestPlugins.cs(56,32): warning CS0067: 从不使用事件“OversizedRuntimeUiTestPlugin.UiInvalidated” [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginUiInteractiveRuntimeTests.cs(276,32): warning CS0067: 从不使用事件“LegacyInteractiveTestPlugin.UiInvalidated” [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\CredentialProtectionDisableTests.cs(97,50): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\CredentialProtectionDisableTests.cs(131,50): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+  LoomX.Tests -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\bin\Debug\net10.0\LoomX.Tests.dll
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\bin\Debug\net10.0\LoomX.Tests.dll (.NETCoreApp,Version=v10.0)的测试运行
+总共 1 个测试文件与指定模式相匹配。
+[xUnit.net 00:00:00.38]     LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "dpapi:敏感测试输入") [FAIL]
+[xUnit.net 00:00:00.38]     LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "dpapi:v1:AA==") [FAIL]
+[xUnit.net 00:00:00.38]     LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "dpapi:v1:敏感测试输入") [FAIL]
+[xUnit.net 00:00:00.38]     LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "敏感测试输入") [FAIL]
+[xUnit.net 00:00:00.38]     LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "dpapi:v2:敏感测试输入") [FAIL]
+[xUnit.net 00:00:00.38]     LoomX.Tests.Plugins.PluginProtectionBackendTests.保护往返并兼容既有Windows密文 [FAIL]
+[xUnit.net 00:00:00.38]     LoomX.Tests.Plugins.PluginProtectionBackendTests.Scope检查声明取消和退休且旧默认不可用 [FAIL]
+  失败 LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "dpapi:敏感测试输入") [1 ms]
+  错误消息:
+   Assert.NotNull() Failure: Value is null
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.PluginProtectionBackendTests.Create(ILoggerFactory log) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 17
+   at LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(String input) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 48
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "dpapi:v1:AA==") [< 1 ms]
+  错误消息:
+   Assert.NotNull() Failure: Value is null
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.PluginProtectionBackendTests.Create(ILoggerFactory log) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 17
+   at LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(String input) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 48
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "dpapi:v1:敏感测试输入") [< 1 ms]
+  错误消息:
+   Assert.NotNull() Failure: Value is null
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.PluginProtectionBackendTests.Create(ILoggerFactory log) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 17
+   at LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(String input) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 48
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "敏感测试输入") [< 1 ms]
+  错误消息:
+   Assert.NotNull() Failure: Value is null
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.PluginProtectionBackendTests.Create(ILoggerFactory log) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 17
+   at LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(String input) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 48
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(input: "dpapi:v2:敏感测试输入") [< 1 ms]
+  错误消息:
+   Assert.NotNull() Failure: Value is null
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.PluginProtectionBackendTests.Create(ILoggerFactory log) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 17
+   at LoomX.Tests.Plugins.PluginProtectionBackendTests.非密文损坏和未知版本不原样回传且异常不泄密(String input) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 48
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginProtectionBackendTests.保护往返并兼容既有Windows密文 [1 ms]
+  错误消息:
+   Assert.NotNull() Failure: Value is null
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.PluginProtectionBackendTests.Create(ILoggerFactory log) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 17
+   at LoomX.Tests.Plugins.PluginProtectionBackendTests.保护往返并兼容既有Windows密文() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 24
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginProtectionBackendTests.Scope检查声明取消和退休且旧默认不可用 [< 1 ms]
+  错误消息:
+   Assert.NotNull() Failure: Value is null
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.PluginProtectionBackendTests.Create(ILoggerFactory log) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 17
+   at LoomX.Tests.Plugins.PluginProtectionBackendTests.Scope检查声明取消和退休且旧默认不可用() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginProtectionBackendTests.cs:line 58
+--- End of stack trace from previous location ---
+
+失败!  - 失败:     7，通过:     2，已跳过:     0，总计:     9，持续时间: 41 ms - LoomX.Tests.dll (net10.0)

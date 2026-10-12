@@ -1,0 +1,20 @@
+{
+  "stage": "task-review",
+  "taskIds": [
+    "26e1c0e4-e1b1-443d-a969-6253a8fd4da9",
+    "154ae18d-77ae-4e44-85d3-b85cd711dd82",
+    "a2b28ecd-5ac4-47ce-b016-934575f8a876"
+  ],
+  "sessionId": "01a12faf-0fa4-7a20-8c59-9e3d82a00c7a",
+  "unresolved": [
+    "source/payload风险段审查，正式publish和完整产品验收未做"
+  ],
+  "reviewRounds": 0,
+  "schemaVersion": 1,
+  "revision": "f2e5c5b0fbdb6fe1f05e4d9422386139722b5ed82b3fd3c7ccba6639e7f80fd8",
+  "evidence": [
+    "evidence/first-party-source-red.log:13/13预期失败",
+    "evidence/first-party-source-green.log:13/13通过",
+    "独立补充生产流包装器测试首轮16/17，已按实际异常类型纠正并运行Plugins全集"
+  ]
+}

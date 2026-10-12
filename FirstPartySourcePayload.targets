@@ -1,0 +1,49 @@
+<Project>
+  <!-- 显式维护源码包负载；构建、发布、测试与 Playground 共用，禁止递归扫描 bin/obj。 -->
+  <ItemGroup>
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\plugin.manifest.json" PackageRelativePath="plugin.manifest.json" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialBuiltinGroups.cs" PackageRelativePath="CredentialBuiltinGroups.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialEngine.cs" PackageRelativePath="CredentialEngine.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialProtectionObservability.cs" PackageRelativePath="CredentialProtectionObservability.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialProtectionPlugin.cs" PackageRelativePath="CredentialProtectionPlugin.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialProtectionPlugin.DisplayInfo.cs" PackageRelativePath="CredentialProtectionPlugin.DisplayInfo.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialSettingsCommands.cs" PackageRelativePath="CredentialSettingsCommands.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialSettingsText.cs" PackageRelativePath="CredentialSettingsText.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialSettingsUi.cs" PackageRelativePath="CredentialSettingsUi.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialSynchronous.cs" PackageRelativePath="CredentialSynchronous.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\CredentialTokenStore.cs" PackageRelativePath="CredentialTokenStore.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\GlobalUsings.cs" PackageRelativePath="GlobalUsings.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\SensitiveRuleStore.cs" PackageRelativePath="SensitiveRuleStore.cs" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\i18n\zh-CN.json" PackageRelativePath="i18n\zh-CN.json" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\i18n\zh-TW.json" PackageRelativePath="i18n\zh-TW.json" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\i18n\ja-JP.json" PackageRelativePath="i18n\ja-JP.json" />
+    <_CredentialPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.CredentialProtection\i18n\en-US.json" PackageRelativePath="i18n\en-US.json" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\plugin.manifest.json" PackageRelativePath="plugin.manifest.json" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\CompressionSettingsCommands.cs" PackageRelativePath="CompressionSettingsCommands.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\CompressionSettingsText.cs" PackageRelativePath="CompressionSettingsText.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\CompressionSettingsUi.cs" PackageRelativePath="CompressionSettingsUi.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\CompressionStatsStore.cs" PackageRelativePath="CompressionStatsStore.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\CompressionTokenEstimator.cs" PackageRelativePath="CompressionTokenEstimator.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\GlobalUsings.cs" PackageRelativePath="GlobalUsings.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressionObservability.cs" PackageRelativePath="ToolResultCompressionObservability.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressionOptions.cs" PackageRelativePath="ToolResultCompressionOptions.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressionOptionsStore.cs" PackageRelativePath="ToolResultCompressionOptionsStore.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressionPlugin.Commands.cs" PackageRelativePath="ToolResultCompressionPlugin.Commands.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressionPlugin.cs" PackageRelativePath="ToolResultCompressionPlugin.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressionPlugin.DisplayInfo.cs" PackageRelativePath="ToolResultCompressionPlugin.DisplayInfo.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressionPlugin.Ui.cs" PackageRelativePath="ToolResultCompressionPlugin.Ui.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressionRequestExtension.cs" PackageRelativePath="ToolResultCompressionRequestExtension.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressionUiText.cs" PackageRelativePath="ToolResultCompressionUiText.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressor.cs" PackageRelativePath="ToolResultCompressor.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressor.Git.cs" PackageRelativePath="ToolResultCompressor.Git.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressor.Json.cs" PackageRelativePath="ToolResultCompressor.Json.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressor.Noise.cs" PackageRelativePath="ToolResultCompressor.Noise.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultCompressor.Output.cs" PackageRelativePath="ToolResultCompressor.Output.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultRequestRewriter.cs" PackageRelativePath="ToolResultRequestRewriter.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\ToolResultRequestRewriter.Slots.cs" PackageRelativePath="ToolResultRequestRewriter.Slots.cs" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\i18n\zh-CN.json" PackageRelativePath="i18n\zh-CN.json" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\i18n\zh-TW.json" PackageRelativePath="i18n\zh-TW.json" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\i18n\ja-JP.json" PackageRelativePath="i18n\ja-JP.json" />
+    <_CompressionPluginPayload Include="$(MSBuildThisFileDirectory)plugins\LoomX.ToolResultCompression\i18n\en-US.json" PackageRelativePath="i18n\en-US.json" />
+  </ItemGroup>
+</Project>

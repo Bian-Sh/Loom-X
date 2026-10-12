@@ -1,0 +1,12 @@
+  LoomX.Plugin.Abstractions -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Plugin.Abstractions\bin\Debug\net10.0\LoomX.Plugin.Abstractions.dll
+  LoomX.Harness -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Harness\bin\Debug\net10.0\LoomX.Harness.dll
+  LoomX.Plugin.Storage.Sqlite -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Plugin.Storage.Sqlite\bin\Debug\net10.0\LoomX.Plugin.Storage.Sqlite.dll
+  LoomX.ToolResultCompression -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\plugins\LoomX.ToolResultCompression\bin\Debug\net10.0\LoomX.ToolResultCompression.dll
+  LoomX.CredentialProtection -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\plugins\LoomX.CredentialProtection\bin\Debug\net10.0\LoomX.CredentialProtection.dll
+  LoomX.PluginHost -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.PluginHost\bin\Debug\net10.0\LoomX.PluginHost.dll
+  LoomX -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\bin\Debug\net10.0\LoomX.dll
+  LoomX.Tests -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\bin\Debug\net10.0\LoomX.Tests.dll
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\bin\Debug\net10.0\LoomX.Tests.dll (.NETCoreApp,Version=v10.0)的测试运行
+总共 1 个测试文件与指定模式相匹配。
+
+已通过! - 失败:     0，通过:   680，已跳过:     0，总计:   680，持续时间: 36 s - LoomX.Tests.dll (net10.0)

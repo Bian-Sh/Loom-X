@@ -1,6 +1,8 @@
 using LoomX.CredentialProtection;
 using LoomX.Plugin.Storage.Sqlite;
 using LoomX.Plugins;
+using LoomX.Plugins.Host;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Tests.Plugins;
@@ -19,9 +21,12 @@ internal sealed class CredentialTestFactory : IDisposable
         return storage;
     }
 
+    internal static IPluginProtectionBridge CreateProtection() =>
+        new PluginProtectionBridge(CredentialProtectionPlugin.PluginId, NullLogger<PluginProtectionBridge>.Instance);
+
     internal CredentialTokenStore CreateStore(string dataDirectory)
     {
-        var store = new CredentialTokenStore(CreateStorage(dataDirectory));
+        var store = new CredentialTokenStore(CreateStorage(dataDirectory), CreateProtection());
         resources.Add(store);
         return store;
     }
@@ -56,6 +61,7 @@ internal sealed class CredentialTestFactory : IDisposable
     private sealed class TestBridge(IPluginStorageBridge storage) : IPluginBridge
     {
         public IPluginStorageBridge Storage => storage;
+        public IPluginProtectionBridge Protection { get; } = CreateProtection();
         public IPluginLogBridge Log => PluginBridgeDefaults.Unavailable.Log;
         public IPluginNotificationBridge Notifications => PluginBridgeDefaults.Unavailable.Notifications;
     }

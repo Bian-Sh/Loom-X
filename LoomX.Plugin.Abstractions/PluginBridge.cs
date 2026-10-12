@@ -6,6 +6,14 @@ public interface IPluginBridge
     IPluginStorageBridge Storage { get; }
     IPluginLogBridge Log { get; }
     IPluginNotificationBridge Notifications { get; }
+    IPluginProtectionBridge Protection => PluginBridgeDefaults.Unavailable.Protection;
+}
+
+/// <summary>显式保护字符串；不提供 SQL 自动加密，也不开放算法或密钥配置。</summary>
+public interface IPluginProtectionBridge
+{
+    ValueTask<string> EncryptAsync(string plaintext, CancellationToken cancellationToken = default);
+    ValueTask<string> DecryptAsync(string ciphertext, CancellationToken cancellationToken = default);
 }
 
 public interface IPluginStorageBridge
@@ -135,11 +143,17 @@ public static class PluginBridgeDefaults
 {
     public static IPluginBridge Unavailable { get; } = new UnavailableBridge();
 
-    private sealed class UnavailableBridge : IPluginBridge, IPluginStorageBridge, IPluginLogBridge, IPluginNotificationBridge
+    private sealed class UnavailableBridge : IPluginBridge, IPluginStorageBridge, IPluginLogBridge, IPluginNotificationBridge, IPluginProtectionBridge
     {
         public IPluginStorageBridge Storage => this;
         public IPluginLogBridge Log => this;
         public IPluginNotificationBridge Notifications => this;
+        public IPluginProtectionBridge Protection => this;
+        public ValueTask<string> EncryptAsync(string plaintext, CancellationToken cancellationToken = default) => UnavailableProtection(cancellationToken);
+        public ValueTask<string> DecryptAsync(string ciphertext, CancellationToken cancellationToken = default) => UnavailableProtection(cancellationToken);
+        private static ValueTask<string> UnavailableProtection(CancellationToken token) => token.IsCancellationRequested
+            ? ValueTask.FromCanceled<string>(token)
+            : ValueTask.FromException<string>(new PluginBridgeException(PluginBridgeError.CapabilityNotSupported, "宿主未提供字符串保护能力。"));
         private static PluginBridgeException Denied() => new(PluginBridgeError.CapabilityNotDeclared, "插件未声明所需宿主能力。");
         public ValueTask<IPluginSqliteDatabase> OpenSqliteAsync(string relativePath, CancellationToken cancellationToken = default) =>
             ValueTask.FromException<IPluginSqliteDatabase>(Denied());

@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using LoomX.Plugins;
 using LoomX.Plugins.Host;
 using LoomX.ToolResultCompression;
@@ -56,6 +57,7 @@ public sealed class ToolResultCompressionLocalizationTests : IDisposable
             {
                 PluginDirectory = Path.Combine(rootDirectory, "plugins"),
                 DataRootDirectory = Path.Combine(rootDirectory, "data"),
+                SourceCompiler = new SourcePluginCompiler(Path.Combine(rootDirectory, "cache")),
             },
             NullLoggerFactory.Instance);
 
@@ -130,38 +132,40 @@ public sealed class ToolResultCompressionLocalizationTests : IDisposable
     [Fact]
     public void PluginPayload_ShipsLocalizationFiles()
     {
-        foreach (var plugin in new[] { "LoomX.ToolResultCompression", "LoomX.CredentialProtection" })
+        var payload = XDocument.Load(GetRepositoryFile("FirstPartySourcePayload.targets"));
+        foreach (var (plugin, pluginId, itemName) in new[]
         {
-            var i18nDirectory = GetRepositoryFile("plugins", plugin, "i18n");
-            var project = File.ReadAllText(GetRepositoryFile("plugins", plugin, plugin + ".csproj"));
-
-            // 文案随插件负载分发：文件名固定 <culture>.json，由插件工程自己的目标拷进输出目录，
-            // 宿主与测试工程再把整个目录放进 plugins/<id>/。
-            Assert.Contains("PluginPayload Include=\"i18n\\**\\*.json\"", project, StringComparison.Ordinal);
-            Assert.Contains("Name=\"CopyPluginPayloadToOutput\"", project, StringComparison.Ordinal);
+            ("LoomX.ToolResultCompression", "loomx.tool-result-compression", "_CompressionPluginPayload"),
+            ("LoomX.CredentialProtection", "loomx.credential-protection", "_CredentialPluginPayload"),
+        })
+        {
+            var project = XDocument.Load(GetRepositoryFile("plugins", plugin, plugin + ".csproj"));
+            // 两个工程导入同一显式负载表，不要求恢复已经移除的递归 i18n glob。
+            Assert.Contains(project.Descendants("Import"), item =>
+                (string?)item.Attribute("Project") == "..\\..\\FirstPartySourcePayload.targets");
+            Assert.Contains(project.Descendants("PluginPayload"), item =>
+                (string?)item.Attribute("Include") == "@(" + itemName + ")");
+            Assert.Contains(project.Descendants("Target"), item =>
+                (string?)item.Attribute("Name") == "CopyPluginPayloadToOutput");
+            var items = payload.Descendants(itemName).ToArray();
+            Assert.NotEmpty(items);
+            Assert.DoesNotContain(items, item => ((string?)item.Attribute("Include") ?? string.Empty).IndexOfAny(['*', '?']) >= 0);
             foreach (var culture in new[] { "zh-CN", "zh-TW", "ja-JP", "en-US" })
-                Assert.True(File.Exists(Path.Combine(i18nDirectory, culture + ".json")), plugin + "/" + culture);
+            {
+                var relativePath = "i18n/" + culture + ".json";
+                var localization = Assert.Single(items, item =>
+                    ((string?)item.Attribute("PackageRelativePath"))?.Replace('\\', '/') == relativePath);
+                Assert.Equal("$(MSBuildThisFileDirectory)plugins\\" + plugin + "\\i18n\\" + culture + ".json",
+                    (string?)localization.Attribute("Include"));
+                Assert.True(File.Exists(GetRepositoryFile("plugins", plugin, "i18n", culture + ".json")), plugin + "/" + culture);
+                Assert.True(File.Exists(Path.Combine(AppContext.BaseDirectory, "plugins", pluginId, "i18n", culture + ".json")),
+                    "测试输出缺少插件文案：" + pluginId + "/" + culture);
+            }
         }
     }
 
-    private void StartRuntimeWithCompressionPlugin()
-    {
-        var packageDirectory = Path.Combine(rootDirectory, "plugins", "LoomX.ToolResultCompression");
-        Directory.CreateDirectory(packageDirectory);
-        var assemblyPath = typeof(ToolResultCompressionPlugin).Assembly.Location;
-        File.Copy(assemblyPath, Path.Combine(packageDirectory, Path.GetFileName(assemblyPath)), overwrite: true);
-        File.Copy(
-            GetRepositoryFile("plugins", "LoomX.ToolResultCompression", "plugin.manifest.json"),
-            Path.Combine(packageDirectory, "plugin.manifest.json"),
-            overwrite: true);
-        // 插件文案随负载分发：宿主只认插件目录里的 i18n 资源。
-        foreach (var file in Directory.GetFiles(
-                     GetRepositoryFile("plugins", "LoomX.ToolResultCompression", "i18n"), "*.json"))
-        {
-            Directory.CreateDirectory(Path.Combine(packageDirectory, "i18n"));
-            File.Copy(file, Path.Combine(packageDirectory, "i18n", Path.GetFileName(file)), overwrite: true);
-        }
-    }
+    private void StartRuntimeWithCompressionPlugin() =>
+        FirstPartySourceTestPayload.Stage(Path.Combine(rootDirectory, "plugins"), ToolResultCompressionPlugin.PluginId);
 
     private static string CollectText(ToolResultCompressionPlugin plugin, string cultureName)
     {

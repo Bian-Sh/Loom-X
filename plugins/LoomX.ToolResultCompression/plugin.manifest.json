@@ -1,8 +1,34 @@
 {
   "id": "loomx.tool-result-compression",
   "version": "0.2.0",
-  "assembly": "LoomX.ToolResultCompression.dll",
-  "plugin_type": "LoomX.ToolResultCompression.ToolResultCompressionPlugin",
+  "runtime": {
+    "kind": "csharp-source",
+    "entry_type": "LoomX.ToolResultCompression.ToolResultCompressionPlugin",
+    "sources": [
+      "CompressionSettingsCommands.cs",
+      "CompressionSettingsText.cs",
+      "CompressionSettingsUi.cs",
+      "CompressionStatsStore.cs",
+      "CompressionTokenEstimator.cs",
+      "GlobalUsings.cs",
+      "ToolResultCompressionObservability.cs",
+      "ToolResultCompressionOptions.cs",
+      "ToolResultCompressionOptionsStore.cs",
+      "ToolResultCompressionPlugin.Commands.cs",
+      "ToolResultCompressionPlugin.cs",
+      "ToolResultCompressionPlugin.DisplayInfo.cs",
+      "ToolResultCompressionPlugin.Ui.cs",
+      "ToolResultCompressionRequestExtension.cs",
+      "ToolResultCompressionUiText.cs",
+      "ToolResultCompressor.cs",
+      "ToolResultCompressor.Git.cs",
+      "ToolResultCompressor.Json.cs",
+      "ToolResultCompressor.Noise.cs",
+      "ToolResultCompressor.Output.cs",
+      "ToolResultRequestRewriter.cs",
+      "ToolResultRequestRewriter.Slots.cs"
+    ]
+  },
   "capabilities": ["toolresult.compress", "toolresult.dedupe", "toolresult.truncate", "toolresult.summarize"],
   "ui": {
     "contributions": [

@@ -29,7 +29,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
         _ = new CredentialLegacyVault(legacyDirectory);
         var storage = factory.CreateStorage(newDirectory);
         var probe = new CredentialBridgeProbe(storage);
-        await using var store = new CredentialTokenStore(probe);
+        await using var store = new CredentialTokenStore(probe, CredentialTestFactory.CreateProtection());
         await store.InitializeAsync();
         Assert.Equal(["credential-tokens.db"], probe.Paths.ToArray());
         Assert.Equal(new[] { "PRAGMA journal_mode=WAL;", "PRAGMA synchronous=NORMAL;", "PRAGMA busy_timeout=5000;" },
@@ -49,7 +49,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     {
         var storage = factory.CreateStorage(directory);
         var probe = new CredentialBridgeProbe(storage);
-        await using var first = new CredentialTokenStore(probe);
+        await using var first = new CredentialTokenStore(probe, CredentialTestFactory.CreateProtection());
         const string original = "sk-bridge-stable-abcdefghij0123456789";
         var token = await first.GetOrCreateTokenAsync(original, () => TokenA);
         Assert.Equal(token, await first.GetOrCreateTokenAsync(original, () => throw new InvalidOperationException("不应重签发。")));
@@ -72,7 +72,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
         var protectedOriginal = Assert.Single(before)[2].Text!;
         Assert.StartsWith("dpapi:v1:", protectedOriginal, StringComparison.Ordinal);
         Assert.Equal(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(original))), before[0][1].Text);
-        await using var upgraded = new CredentialTokenStore(storage);
+        await using var upgraded = new CredentialTokenStore(storage, CredentialTestFactory.CreateProtection());
         Assert.Equal(original, (await upgraded.ResolveTokensAsync([token]))[token]);
         Assert.Equal(token, await upgraded.GetOrCreateTokenAsync(original, () => TokenB));
         var after = await RowsAsync(storage);
@@ -85,8 +85,8 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     public async Task ConcurrentOriginalHashConflict_DisposesFailedTransactionBeforeExactRequery()
     {
         var probes = new[] { new CredentialBridgeProbe(factory.CreateStorage(directory)), new CredentialBridgeProbe(factory.CreateStorage(directory)) };
-        await using var first = new CredentialTokenStore(probes[0]);
-        await using var second = new CredentialTokenStore(probes[1]);
+        await using var first = new CredentialTokenStore(probes[0], CredentialTestFactory.CreateProtection());
+        await using var second = new CredentialTokenStore(probes[1], CredentialTestFactory.CreateProtection());
         await first.InitializeAsync();
         await second.InitializeAsync();
         var bothRead = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -116,7 +116,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     public async Task TokenCollision_RechecksHashAfterDisposalThenUsesFreshTransaction()
     {
         var probe = new CredentialBridgeProbe(factory.CreateStorage(directory));
-        await using var store = new CredentialTokenStore(probe);
+        await using var store = new CredentialTokenStore(probe, CredentialTestFactory.CreateProtection());
         await store.GetOrCreateTokenAsync("第一段凭据", () => TokenA);
         var attempts = 0;
         var token = await store.GetOrCreateTokenAsync("第二段凭据", () => ++attempts == 1 ? TokenA : TokenB);
@@ -134,7 +134,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     public async Task CancelledAndDisposedStore_NeverOpensOrRecreatesVault()
     {
         var probe = new CredentialBridgeProbe(factory.CreateStorage(directory));
-        var store = new CredentialTokenStore(probe);
+        var store = new CredentialTokenStore(probe, CredentialTestFactory.CreateProtection());
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => store.GetOrCreateTokenAsync("凭据", () => TokenA, cancelled.Token).AsTask());
@@ -151,7 +151,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     public async Task CancellationDuringTransaction_RollsBackWithoutIssuingTokenAndStoreRemainsUsable()
     {
         var probe = new CredentialBridgeProbe(factory.CreateStorage(directory));
-        await using var store = new CredentialTokenStore(probe);
+        await using var store = new CredentialTokenStore(probe, CredentialTestFactory.CreateProtection());
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         probe.Before = async (operation, _, token) =>
         {
@@ -175,7 +175,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     {
         var storage = factory.CreateStorage(directory);
         var probe = new CredentialBridgeProbe(storage);
-        var store = new CredentialTokenStore(probe);
+        var store = new CredentialTokenStore(probe, CredentialTestFactory.CreateProtection());
         await store.GetOrCreateTokenAsync("释放凭据", () => TokenA);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         probe.Before = async (operation, _, token) =>
@@ -202,7 +202,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     public async Task BridgeFailures_BlockRequestsAndResponsesWithoutLeakingOriginal(PluginSqlError error)
     {
         var probe = new CredentialBridgeProbe(factory.CreateStorage(directory));
-        await using var store = new CredentialTokenStore(probe);
+        await using var store = new CredentialTokenStore(probe, CredentialTestFactory.CreateProtection());
         var engine = new CredentialEngine(new SensitiveRuleStore(directory), store);
         const string original = "sk-failure-abcdefghij0123456789";
         var issued = engine.Sanitize(original, out _);
@@ -229,7 +229,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
         await using (var db = await storage.OpenSqliteAsync("credential-tokens.db"))
             await db.ExecuteAsync(new PluginSqlCommand("UPDATE CredentialTokens SET ProtectedOriginal = $value WHERE Token = $token;",
                 [new("$value", PluginSqlValue.FromText(protectedOriginal)), new("$token", PluginSqlValue.FromText(TokenA))]));
-        await using var store = new CredentialTokenStore(storage);
+        await using var store = new CredentialTokenStore(storage, CredentialTestFactory.CreateProtection());
         var engine = new CredentialEngine(new SensitiveRuleStore(directory), store);
         var response = await new CredentialResponseExtension(engine).ProcessResponseAsync(new PipelineContext("response"), TokenA, CancellationToken.None);
         Assert.Equal(PipelineOutcome.Blocked, response.Outcome);
@@ -255,7 +255,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     {
         var probe = new CredentialBridgeProbe(factory.CreateStorage(directory));
         probe.Before = async (_, _, _) => { await Task.Yield(); };
-        await using var store = new CredentialTokenStore(probe);
+        await using var store = new CredentialTokenStore(probe, CredentialTestFactory.CreateProtection());
         var engine = new CredentialEngine(new SensitiveRuleStore(directory), store);
         var context = new NonPumpingContext();
         var completed = new TaskCompletionSource<(string Json, string Sse)>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -300,7 +300,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     public async Task ResponsePipeline_ForwardsInflightCancellationIntoStorage()
     {
         var probe = new CredentialBridgeProbe(factory.CreateStorage(directory));
-        await using var store = new CredentialTokenStore(probe);
+        await using var store = new CredentialTokenStore(probe, CredentialTestFactory.CreateProtection());
         var engine = new CredentialEngine(new SensitiveRuleStore(directory), store);
         var issued = engine.Sanitize("sk-cancel-forward-abcdefghij0123456789", out _);
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -368,7 +368,7 @@ public sealed class CredentialStorageBridgeTests : IDisposable
     {
         var logger = new CredentialBridgeLogger();
         var storage = factory.CreateStorage(directory, logger);
-        await using var store = new CredentialTokenStore(storage);
+        await using var store = new CredentialTokenStore(storage, CredentialTestFactory.CreateProtection());
         const string first = "sk-log-first-abcdefghij0123456789";
         const string second = "sk-log-second-abcdefghij0123456789";
         await store.GetOrCreateTokenAsync(first, () => TokenA);

@@ -110,7 +110,7 @@ await Scenario("源码与 Credential 端到端", async () =>
         BridgeFactory = bridgeFactory.Create,
     };
     await using var runtime = PluginRuntime.Start(Options(), loggerFactory);
-    Check("Credential Protection 预编译插件已发现", runtime.PluginInfos.Any(info => info.Id == LegacyVaultFixture.PluginId && info.RuntimeKind == "assembly"));
+    Check("Credential Protection 源码插件已发现", runtime.PluginInfos.Any(info => info.Id == LegacyVaultFixture.PluginId && info.RuntimeKind == "csharp-source"));
     Check("源码插件经共享契约动态加载", runtime.PluginInfos.Any(info => info.Id == SourcePluginFixture.Id && info.RuntimeKind == "csharp-source"));
     Check("初始 Manifest/编译/能力/ALC 加载无诊断", runtime.Diagnostics.Count == 0 && runtime.StructuredDiagnostics.Count == 0);
     var request = runtime.GetPipeline("request");
@@ -254,7 +254,7 @@ await Scenario("源码与 Credential 端到端", async () =>
         await runtime.DisposeAsync();
         Check("第一个 runtime 退休释放 Credential Bridge", credentialScopes.Length == 1 && await BridgeDisposed(credentialScopes[0]));
         await using var reopened = PluginRuntime.Start(Options(), loggerFactory);
-        Check("新 runtime 同时重新加载源码与预编译插件且无诊断", reopened.PluginInfos.Count == 2 && reopened.Diagnostics.Count == 0);
+        Check("新 runtime 同时重新加载两个源码插件且无诊断", reopened.PluginInfos.Count == 2 && reopened.Diagnostics.Count == 0);
         var reopenedRequest = (IContextualPipeline)reopened.GetPipeline("request")!;
         var reopenedResponse = reopened.GetPipeline("response")!;
         Check("跨 runtime 重开 Vault 恢复原历史 token", Modified(await reopenedResponse.ExecuteAsync(ResponseBody(LegacyVaultFixture.Token)), ResponseBody(LegacyVaultFixture.Secret)));

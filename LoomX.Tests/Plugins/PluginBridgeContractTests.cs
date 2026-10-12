@@ -16,6 +16,7 @@ public sealed class PluginBridgeContractTests
     [InlineData("IPluginSqliteTransaction")]
     [InlineData("IPluginLogBridge")]
     [InlineData("IPluginNotificationBridge")]
+    [InlineData("IPluginProtectionBridge")]
     [InlineData("PluginSqlValue")]
     [InlineData("PluginSqlCommand")]
     [InlineData("PluginSqlRow")]
@@ -41,7 +42,7 @@ public sealed class PluginBridgeContractTests
         var bridge = Contracts.GetType("LoomX.Plugins.IPluginBridge");
         Assert.NotNull(bridge);
         var types = new[] { "IPluginBridge", "IPluginStorageBridge", "IPluginSqliteDatabase",
-            "IPluginSqliteTransaction", "IPluginLogBridge", "IPluginNotificationBridge" };
+            "IPluginSqliteTransaction", "IPluginLogBridge", "IPluginNotificationBridge", "IPluginProtectionBridge" };
         foreach (var name in types)
         {
             var type = Contracts.GetType("LoomX.Plugins." + name);

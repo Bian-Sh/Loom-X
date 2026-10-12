@@ -1,0 +1,12 @@
+  LoomX.Plugin.Abstractions -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Plugin.Abstractions\debug\LoomX.Plugin.Abstractions.dll
+  LoomX.Harness -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Harness\debug\LoomX.Harness.dll
+  LoomX.CredentialProtection -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.CredentialProtection\debug\LoomX.CredentialProtection.dll
+  LoomX.ToolResultCompression -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.ToolResultCompression\debug\LoomX.ToolResultCompression.dll
+  LoomX.Plugin.Storage.Sqlite -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Plugin.Storage.Sqlite\debug\LoomX.Plugin.Storage.Sqlite.dll
+  LoomX.PluginHost -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.PluginHost\debug\LoomX.PluginHost.dll
+  LoomX -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX\debug\LoomX.dll
+  LoomX.Tests -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Tests\debug\LoomX.Tests.dll
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Tests\debug\LoomX.Tests.dll (.NETCoreApp,Version=v10.0)的测试运行
+总共 1 个测试文件与指定模式相匹配。
+
+已通过! - 失败:     0，通过:    13，已跳过:     0，总计:    13，持续时间: 12 s - LoomX.Tests.dll (net10.0)

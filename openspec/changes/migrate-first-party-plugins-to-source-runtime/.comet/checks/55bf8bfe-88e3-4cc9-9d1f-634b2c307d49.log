@@ -1,0 +1,308 @@
+  LoomX.Plugin.Abstractions -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Plugin.Abstractions\debug\LoomX.Plugin.Abstractions.dll
+  LoomX.Harness -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Harness\debug\LoomX.Harness.dll
+  LoomX.CredentialProtection -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.CredentialProtection\debug\LoomX.CredentialProtection.dll
+  LoomX.ToolResultCompression -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.ToolResultCompression\debug\LoomX.ToolResultCompression.dll
+  LoomX.Plugin.Storage.Sqlite -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Plugin.Storage.Sqlite\debug\LoomX.Plugin.Storage.Sqlite.dll
+  LoomX.PluginHost -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.PluginHost\debug\LoomX.PluginHost.dll
+  LoomX -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX\debug\LoomX.dll
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Services\AnthropicRequestFactoryTests.cs(215,35): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Services\AnthropicRequestFactoryTests.cs(301,35): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs(40,22): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs(42,49): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs(43,33): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs(44,32): warning CS8602: 解引用可能出现空引用。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginUiInteractiveRuntimeTests.cs(219,32): warning CS0067: 从不使用事件“InteractiveTestPlugin.UiInvalidated” [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginUiInteractiveRuntimeTests.cs(276,32): warning CS0067: 从不使用事件“LegacyInteractiveTestPlugin.UiInvalidated” [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\RuntimeUiTestPlugins.cs(56,32): warning CS0067: 从不使用事件“OversizedRuntimeUiTestPlugin.UiInvalidated” [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\CredentialProtectionDisableTests.cs(131,50): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\CredentialProtectionDisableTests.cs(97,50): warning xUnit1031: Test methods should not use blocking task operations, as they can cause deadlocks. Use an async test method and await instead. (https://xunit.net/xunit.analyzers/rules/xUnit1031) [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\LoomX.Tests.csproj]
+  LoomX.Tests -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Tests\debug\LoomX.Tests.dll
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Tests\debug\LoomX.Tests.dll (.NETCoreApp,Version=v10.0)的测试运行
+总共 1 个测试文件与指定模式相匹配。
+[xUnit.net 00:00:15.46]     LoomX.Tests.Plugins.ToolResultCompressionLocalizationTests.PluginRuntime_ExposesDisplayInfoFromPlugin [FAIL]
+[xUnit.net 00:00:15.47]     LoomX.Tests.Plugins.ToolResultCompressionLocalizationTests.PluginPayload_ShipsLocalizationFiles [FAIL]
+  失败 LoomX.Tests.Plugins.ToolResultCompressionLocalizationTests.PluginRuntime_ExposesDisplayInfoFromPlugin [59 ms]
+  错误消息:
+   Assert.NotNull() Failure: Value is null
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.ToolResultCompressionLocalizationTests.PluginRuntime_ExposesDisplayInfoFromPlugin() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs:line 64
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  失败 LoomX.Tests.Plugins.ToolResultCompressionLocalizationTests.PluginPayload_ShipsLocalizationFiles [3 ms]
+  错误消息:
+   Assert.Contains() Failure: Sub-string not found
+String:    "<Project Sdk="Microsoft.NET.Sdk">\r\n  <Pro"···
+Not found: "PluginPayload Include="i18n\\**\\*.json""
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.ToolResultCompressionLocalizationTests.PluginPayload_ShipsLocalizationFiles() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionLocalizationTests.cs:line 140
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:16.02]     LoomX.Tests.Views.PluginsViewContractTests.PluginPageReadsRuntimeSummariesWithoutExposingSensitivePayloads [FAIL]
+[xUnit.net 00:00:16.02]     LoomX.Tests.Views.PluginsViewContractTests.PluginUiRefreshUsesDispatcherCoalescingAndCultureSpecificSnapshots [FAIL]
+[xUnit.net 00:00:16.02]     LoomX.Tests.Views.PluginsViewContractTests.PluginPageIsRegisteredAsAFirstClassNavigationPage [FAIL]
+  失败 LoomX.Tests.Views.PluginsViewContractTests.PluginPageReadsRuntimeSummariesWithoutExposingSensitivePayloads [< 1 ms]
+  错误消息:
+   System.IO.DirectoryNotFoundException : Could not find a part of the path 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\LoomX\ViewModels\PluginsViewModel.cs'.
+  堆栈跟踪:
+     at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Int32 bufferSize)
+   at System.IO.File.ReadAllText(String path, Encoding encoding)
+   at LoomX.Tests.Views.PluginsViewContractTests.PluginPageReadsRuntimeSummariesWithoutExposingSensitivePayloads() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Views\PluginsViewContractTests.cs:line 143
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  失败 LoomX.Tests.Views.PluginsViewContractTests.PluginUiRefreshUsesDispatcherCoalescingAndCultureSpecificSnapshots [< 1 ms]
+  错误消息:
+   System.IO.DirectoryNotFoundException : Could not find a part of the path 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\LoomX\ViewModels\PluginsViewModel.cs'.
+  堆栈跟踪:
+     at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Int32 bufferSize)
+   at System.IO.File.ReadAllText(String path, Encoding encoding)
+   at LoomX.Tests.Views.PluginsViewContractTests.PluginUiRefreshUsesDispatcherCoalescingAndCultureSpecificSnapshots() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Views\PluginsViewContractTests.cs:line 132
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  失败 LoomX.Tests.Views.PluginsViewContractTests.PluginPageIsRegisteredAsAFirstClassNavigationPage [< 1 ms]
+  错误消息:
+   System.IO.DirectoryNotFoundException : Could not find a part of the path 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\LoomX\ViewModels\MainWindowViewModel.cs'.
+  堆栈跟踪:
+     at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Int32 bufferSize)
+   at System.IO.File.ReadAllText(String path, Encoding encoding)
+   at LoomX.Tests.Views.PluginsViewContractTests.PluginPageIsRegisteredAsAFirstClassNavigationPage() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Views\PluginsViewContractTests.cs:line 14
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:16.02]     LoomX.Tests.Views.PluginsViewContractTests.EveryPluginCanBeToggledAndCarriesItsOwnLifecycleText [FAIL]
+[xUnit.net 00:00:16.02]     LoomX.Tests.Views.PluginsViewContractTests.PluginCardsRenderOnlyGenericCardBodyContributions [FAIL]
+[xUnit.net 00:00:16.02]     LoomX.Tests.Views.PluginsViewContractTests.PluginIconOnlyButtonStaysCloseToTextHeight [FAIL]
+[xUnit.net 00:00:16.03]     LoomX.Tests.Views.PluginsViewContractTests.PluginDetailHeaderStaysFixedAndOwnsSingleBackCommand [FAIL]
+[xUnit.net 00:00:16.03]     LoomX.Tests.Views.PluginsViewContractTests.DetailBodyUsesHostNavigationShellAndManifestDrivenGear [FAIL]
+  失败 LoomX.Tests.Views.PluginsViewContractTests.EveryPluginCanBeToggledAndCarriesItsOwnLifecycleText [< 1 ms]
+  错误消息:
+   System.IO.DirectoryNotFoundException : Could not find a part of the path 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\LoomX\ViewModels\PluginsViewModel.cs'.
+  堆栈跟踪:
+     at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Int32 bufferSize)
+   at System.IO.File.ReadAllText(String path, Encoding encoding)
+   at LoomX.Tests.Views.PluginsViewContractTests.EveryPluginCanBeToggledAndCarriesItsOwnLifecycleText() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Views\PluginsViewContractTests.cs:line 52
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  失败 LoomX.Tests.Views.PluginsViewContractTests.PluginCardsRenderOnlyGenericCardBodyContributions [< 1 ms]
+  错误消息:
+   System.IO.DirectoryNotFoundException : Could not find a part of the path 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\LoomX\ViewModels\PluginsViewModel.cs'.
+  堆栈跟踪:
+     at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Int32 bufferSize)
+   at System.IO.File.ReadAllText(String path, Encoding encoding)
+   at LoomX.Tests.Views.PluginsViewContractTests.PluginCardsRenderOnlyGenericCardBodyContributions() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Views\PluginsViewContractTests.cs:line 70
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  失败 LoomX.Tests.Views.PluginsViewContractTests.PluginIconOnlyButtonStaysCloseToTextHeight [2 ms]
+  错误消息:
+   System.IO.DirectoryNotFoundException : Could not find a part of the path 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\LoomX\App.axaml'.
+  堆栈跟踪:
+     at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share, Int32 bufferSize)
+   at System.Xml.XmlDownloadManager.GetStream(Uri uri, ICredentials credentials, IWebProxy proxy)
+   at System.Xml.XmlTextReaderImpl.FinishInitUriString()
+   at System.Xml.XmlReaderSettings.CreateReader(String inputUri, XmlParserContext inputContext)
+   at System.Xml.Linq.XDocument.Load(String uri, LoadOptions options)
+   at LoomX.Tests.Views.PluginsViewContractTests.PluginIconOnlyButtonStaysCloseToTextHeight() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Views\PluginsViewContractTests.cs:line 28
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  失败 LoomX.Tests.Views.PluginsViewContractTests.PluginDetailHeaderStaysFixedAndOwnsSingleBackCommand [< 1 ms]
+  错误消息:
+   System.IO.DirectoryNotFoundException : Could not find a part of the path 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\LoomX\Views\PluginsView.axaml'.
+  堆栈跟踪:
+     at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Int32 bufferSize)
+   at System.IO.File.ReadAllText(String path, Encoding encoding)
+   at LoomX.Tests.Views.PluginsViewContractTests.PluginDetailHeaderStaysFixedAndOwnsSingleBackCommand() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Views\PluginsViewContractTests.cs:line 99
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+  失败 LoomX.Tests.Views.PluginsViewContractTests.DetailBodyUsesHostNavigationShellAndManifestDrivenGear [< 1 ms]
+  错误消息:
+   System.IO.DirectoryNotFoundException : Could not find a part of the path 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\LoomX\Views\PluginsView.axaml'.
+  堆栈跟踪:
+     at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.StreamReader.ValidateArgsAndOpenPath(String path, Int32 bufferSize)
+   at System.IO.File.ReadAllText(String path, Encoding encoding)
+   at LoomX.Tests.Views.PluginsViewContractTests.DetailBodyUsesHostNavigationShellAndManifestDrivenGear() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Views\PluginsViewContractTests.cs:line 84
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+[xUnit.net 00:00:19.79]     LoomX.Tests.Plugins.ToolResultCompressionPluginTests.PluginRuntime_ForwardsInteractiveSettingsCommand [FAIL]
+[xUnit.net 00:00:19.83]     LoomX.Tests.Plugins.ToolResultCompressionPluginTests.PluginRuntime_LoadsPluginAndCompressesThroughRequestPipeline [FAIL]
+  失败 LoomX.Tests.Plugins.ToolResultCompressionPluginTests.PluginRuntime_ForwardsInteractiveSettingsCommand [40 ms]
+  错误消息:
+   Assert.True() Failure
+Expected: True
+Actual:   False
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.ToolResultCompressionPluginTests.PluginRuntime_ForwardsInteractiveSettingsCommand() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionPluginTests.cs:line 212
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.ToolResultCompressionPluginTests.PluginRuntime_LoadsPluginAndCompressesThroughRequestPipeline [39 ms]
+  错误消息:
+   Assert.NotNull() Failure: Value is null
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.ToolResultCompressionPluginTests.PluginRuntime_LoadsPluginAndCompressesThroughRequestPipeline() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\ToolResultCompressionPluginTests.cs:line 184
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:20.00]     LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(position: "file") [FAIL]
+  失败 LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(position: "file") [82 ms]
+  错误消息:
+   System.UnauthorizedAccessException : Access to the path 'C:\Users\BianShanghai\AppData\Local\Temp\LoomX-SqliteBridge-bb30069d1fab4abe8bc4fded04ad1014\example.plugin\data.db' is denied.
+  堆栈跟踪:
+     at Interop.Kernel32.CreateSymbolicLink(String symlinkFileName, String targetFileName, Boolean isDirectory)
+   at System.IO.File.CreateSymbolicLink(String path, String pathToTarget)
+   at LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(String position) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 106
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:20.08]     LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(position: "journal") [FAIL]
+[xUnit.net 00:00:20.15]     LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(position: "root") [FAIL]
+[xUnit.net 00:00:20.22]     LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(position: "parent") [FAIL]
+  失败 LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(position: "journal") [77 ms]
+  错误消息:
+   System.UnauthorizedAccessException : Access to the path 'C:\Users\BianShanghai\AppData\Local\Temp\LoomX-SqliteBridge-9f5e400d38ee4ef495385df1fd0c3b02\example.plugin\data.db-journal' is denied.
+  堆栈跟踪:
+     at Interop.Kernel32.CreateSymbolicLink(String symlinkFileName, String targetFileName, Boolean isDirectory)
+   at System.IO.File.CreateSymbolicLink(String path, String pathToTarget)
+   at LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(String position) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 106
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(position: "root") [68 ms]
+  错误消息:
+   System.UnauthorizedAccessException : Access to the path 'C:\Users\BianShanghai\AppData\Local\Temp\LoomX-SqliteBridge-5ec6c407a41842b2ba8c7a802edc18eb\example.plugin' is denied.
+  堆栈跟踪:
+     at Interop.Kernel32.CreateSymbolicLink(String symlinkFileName, String targetFileName, Boolean isDirectory)
+   at System.IO.Directory.CreateSymbolicLink(String path, String pathToTarget)
+   at LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(String position) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 98
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(position: "parent") [71 ms]
+  错误消息:
+   System.UnauthorizedAccessException : Access to the path 'C:\Users\BianShanghai\AppData\Local\Temp\LoomX-SqliteBridge-517e20c0d12c4b6a99afe111e704cac0\example.plugin\cache' is denied.
+  堆栈跟踪:
+     at Interop.Kernel32.CreateSymbolicLink(String symlinkFileName, String targetFileName, Boolean isDirectory)
+   at System.IO.Directory.CreateSymbolicLink(String path, String pathToTarget)
+   at LoomX.Tests.Plugins.PluginStoragePathTests.Junction和文件符号链接均不能绕过路径边界(String position) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 102
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:20.46]     LoomX.Tests.Plugins.PluginStoragePathTests.打开之后出现侧车链接也会在下一操作拒绝 [FAIL]
+[xUnit.net 00:00:20.56]     LoomX.Tests.Plugins.PluginStoragePathTests.首审M2_受控置换发生在创建或打开与后置检查之间仍拒绝(stage: "目录已创建") [FAIL]
+[xUnit.net 00:00:20.65]     LoomX.Tests.Plugins.PluginStoragePathTests.首审M2_受控置换发生在创建或打开与后置检查之间仍拒绝(stage: "连接已打开") [FAIL]
+[xUnit.net 00:00:20.89]     LoomX.Tests.Plugins.PluginStoragePathTests.Windows真实Junction父目录不能逃逸 [FAIL]
+  失败 LoomX.Tests.Plugins.PluginStoragePathTests.打开之后出现侧车链接也会在下一操作拒绝 [85 ms]
+  错误消息:
+   System.UnauthorizedAccessException : Access to the path 'C:\Users\BianShanghai\AppData\Local\Temp\LoomX-SqliteBridge-2da2e03ed5cc4664b3894f5e4e653e91\example.plugin\cache\data.db-journal' is denied.
+  堆栈跟踪:
+     at Interop.Kernel32.CreateSymbolicLink(String symlinkFileName, String targetFileName, Boolean isDirectory)
+   at System.IO.File.CreateSymbolicLink(String path, String pathToTarget)
+   at LoomX.Tests.Plugins.PluginStoragePathTests.打开之后出现侧车链接也会在下一操作拒绝() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 120
+   at LoomX.Tests.Plugins.PluginStoragePathTests.打开之后出现侧车链接也会在下一操作拒绝() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 122
+   at LoomX.Tests.Plugins.PluginStoragePathTests.打开之后出现侧车链接也会在下一操作拒绝() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 122
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginStoragePathTests.首审M2_受控置换发生在创建或打开与后置检查之间仍拒绝(stage: "目录已创建") [92 ms]
+  错误消息:
+   Assert.Equal() Failure: Values differ
+Expected: InvalidPath
+Actual:   PermissionDenied
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.SqliteBridgeFixture.Error(PluginSqlError error, Func`1 action) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginSqliteBridgeTests.cs:line 433
+   at LoomX.Tests.Plugins.PluginStoragePathTests.首审M2_受控置换发生在创建或打开与后置检查之间仍拒绝(String stage) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 149
+   at LoomX.Tests.Plugins.PluginStoragePathTests.首审M2_受控置换发生在创建或打开与后置检查之间仍拒绝(String stage) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 156
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginStoragePathTests.首审M2_受控置换发生在创建或打开与后置检查之间仍拒绝(stage: "连接已打开") [88 ms]
+  错误消息:
+   Assert.Equal() Failure: Values differ
+Expected: InvalidPath
+Actual:   PermissionDenied
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.SqliteBridgeFixture.Error(PluginSqlError error, Func`1 action) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginSqliteBridgeTests.cs:line 433
+   at LoomX.Tests.Plugins.PluginStoragePathTests.首审M2_受控置换发生在创建或打开与后置检查之间仍拒绝(String stage) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 149
+   at LoomX.Tests.Plugins.PluginStoragePathTests.首审M2_受控置换发生在创建或打开与后置检查之间仍拒绝(String stage) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 156
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginStoragePathTests.Windows真实Junction父目录不能逃逸 [241 ms]
+  错误消息:
+   Assert.Equal() Failure: Values differ
+Expected: 0
+Actual:   1
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.PluginStoragePathTests.Windows真实Junction父目录不能逃逸() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginStoragePathTests.cs:line 168
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:30.02]     LoomX.Tests.Plugins.SourcePluginCompilerTests.JunctionSource_IsRejectedBeforeReadingOutsidePackage [FAIL]
+  失败 LoomX.Tests.Plugins.SourcePluginCompilerTests.JunctionSource_IsRejectedBeforeReadingOutsidePackage [928 ms]
+  错误消息:
+   Assert.Equal() Failure: Values differ
+Expected: 0
+Actual:   1
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.SourcePluginCompilerTests.JunctionSource_IsRejectedBeforeReadingOutsidePackage() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\SourcePluginCompilerTests.cs:line 82
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:39.40]     LoomX.Tests.Views.MainWindowNavigationContractTests.NavigationPlacesPluginsBelowActivityAndAboveConsole [FAIL]
+  失败 LoomX.Tests.Views.MainWindowNavigationContractTests.NavigationPlacesPluginsBelowActivityAndAboveConsole [< 1 ms]
+  错误消息:
+   System.IO.DirectoryNotFoundException : Could not find a part of the path 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\LoomX\ViewModels\MainWindowViewModel.cs'.
+  堆栈跟踪:
+     at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+   at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+   at System.IO.File.ReadAllText(String path)
+   at LoomX.Tests.Views.MainWindowNavigationContractTests.NavigationPlacesPluginsBelowActivityAndAboveConsole() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Views\MainWindowNavigationContractTests.cs:line 51
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+[xUnit.net 00:00:39.59]     LoomX.Tests.Plugins.PluginRuntimeTests.EntryDisable_SkipsOnlyThatEntry [FAIL]
+[xUnit.net 00:00:39.60]     LoomX.Tests.Plugins.PluginRuntimeTests.InvalidManifestPlugin_IsRejected_WithoutAffectingValidPlugins [FAIL]
+[xUnit.net 00:00:39.61]     LoomX.Tests.Plugins.PluginRuntimeTests.PluginDisable_PipelineSkipsEntries_ReenableRestores [FAIL]
+  失败 LoomX.Tests.Plugins.PluginRuntimeTests.EntryDisable_SkipsOnlyThatEntry [13 ms]
+  错误消息:
+   System.IO.FileNotFoundException : Could not find file 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Tests\debug\plugin.manifest.json'.
+  堆栈跟踪:
+     at System.IO.File.Copy(String sourceFileName, String destFileName, Boolean overwrite)
+   at LoomX.Tests.Plugins.PluginRuntimeTests.StageCredentialProtectionPlugin() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginRuntimeTests.cs:line 55
+   at LoomX.Tests.Plugins.PluginRuntimeTests.EntryDisable_SkipsOnlyThatEntry() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginRuntimeTests.cs:line 142
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.PluginRuntimeTests.InvalidManifestPlugin_IsRejected_WithoutAffectingValidPlugins [9 ms]
+  错误消息:
+   System.IO.FileNotFoundException : Could not find file 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Tests\debug\plugin.manifest.json'.
+  堆栈跟踪:
+     at System.IO.File.Copy(String sourceFileName, String destFileName, Boolean overwrite)
+   at LoomX.Tests.Plugins.PluginRuntimeTests.StageCredentialProtectionPlugin() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginRuntimeTests.cs:line 55
+   at LoomX.Tests.Plugins.PluginRuntimeTests.InvalidManifestPlugin_IsRejected_WithoutAffectingValidPlugins() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginRuntimeTests.cs:line 100
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+  失败 LoomX.Tests.Plugins.PluginRuntimeTests.PluginDisable_PipelineSkipsEntries_ReenableRestores [11 ms]
+  错误消息:
+   System.IO.FileNotFoundException : Could not find file 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Tests\debug\plugin.manifest.json'.
+  堆栈跟踪:
+     at System.IO.File.Copy(String sourceFileName, String destFileName, Boolean overwrite)
+   at LoomX.Tests.Plugins.PluginRuntimeTests.StageCredentialProtectionPlugin() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginRuntimeTests.cs:line 55
+   at LoomX.Tests.Plugins.PluginRuntimeTests.PluginDisable_PipelineSkipsEntries_ReenableRestores() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginRuntimeTests.cs:line 115
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:39.63]     LoomX.Tests.Plugins.PluginRuntimeTests.CredentialProtectionPlugin_LoadsInIsolatedAlc_WithSharedContractIdentity [FAIL]
+  失败 LoomX.Tests.Plugins.PluginRuntimeTests.CredentialProtectionPlugin_LoadsInIsolatedAlc_WithSharedContractIdentity [10 ms]
+  错误消息:
+   System.IO.FileNotFoundException : Could not find file 'D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\.comet\evidence\payload-artifacts\green\bin\LoomX.Tests\debug\plugin.manifest.json'.
+  堆栈跟踪:
+     at System.IO.File.Copy(String sourceFileName, String destFileName, Boolean overwrite)
+   at LoomX.Tests.Plugins.PluginRuntimeTests.StageCredentialProtectionPlugin() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginRuntimeTests.cs:line 55
+   at LoomX.Tests.Plugins.PluginRuntimeTests.CredentialProtectionPlugin_LoadsInIsolatedAlc_WithSharedContractIdentity() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\PluginRuntimeTests.cs:line 75
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.RuntimeMethodInfo.Invoke(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+
+失败!  - 失败:    26，通过:   668，已跳过:     0，总计:   694，持续时间: 40 s - LoomX.Tests.dll (net10.0)
