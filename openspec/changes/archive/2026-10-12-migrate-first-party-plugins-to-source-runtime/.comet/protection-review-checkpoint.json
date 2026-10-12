@@ -1,0 +1,24 @@
+{
+  "stage": "task-review",
+  "revision": "f2e5c5b0fbdb6fe1f05e4d9422386139722b5ed82b3fd3c7ccba6639e7f80fd8",
+  "sessionId": "01a12faf-0fa4-7a20-8c59-9e3d82a00c7a",
+  "taskIds": [
+    "ddb0af83-e457-40da-940e-c5339e893511",
+    "4e3aeb40-0929-4a21-89fc-d5b21ad89279",
+    "9271a759-7110-47cf-99f6-51cb56e7b59b"
+  ],
+  "evidence": [
+    "protection-contract-red.log",
+    "protection-backend-red.log",
+    "credential-protection-red.log",
+    "credential-protection-green.log:134/134",
+    "checks/a380c9eb-09a2-4a46-9680-2d598bcb8105.log",
+    "evidence/protection-sampling-red.log:128次恢复产生129事件，真实RED",
+    "evidence/protection-sampling-green.log:11/11，改首个及每64次采样Debug"
+  ],
+  "unresolved": [
+    "原reviewer针对Protection日志高频一次修复复查"
+  ],
+  "schemaVersion": 1,
+  "reviewRounds": 1
+}

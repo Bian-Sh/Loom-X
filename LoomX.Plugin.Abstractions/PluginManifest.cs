@@ -38,6 +38,14 @@ public sealed record PluginManifestUiContribution(string Id, PluginUiSlot Slot, 
 /// <summary>插件可选的 UI 声明集合。</summary>
 public sealed record PluginManifestUi(IReadOnlyList<PluginManifestUiContribution> Contributions);
 
+/// <summary>显式声明的程序集或 C# 源码加载入口，不包含宿主实现类型。</summary>
+public sealed record PluginRuntimeManifest(
+    string Kind,
+    string EntryType,
+    string? Assembly = null,
+    IReadOnlyList<string>? Sources = null);
+
+/// <summary>插件清单；保留既有位置构造与解构签名以兼容旧插件。</summary>
 public sealed record PluginManifest(
     string Id,
     string Version,
@@ -45,4 +53,11 @@ public sealed record PluginManifest(
     string PluginType,
     IReadOnlyList<string> Capabilities,
     IReadOnlyList<PluginManifestExtension> Extensions,
-    PluginManifestUi? Ui = null);
+    PluginManifestUi? Ui = null)
+{
+    /// <summary>可选加载入口；解析旧清单时规范化为 assembly Runtime。</summary>
+    public PluginRuntimeManifest? Runtime { get; init; }
+
+    /// <summary>向宿主申请的版本化能力，与插件自身的 Capabilities 分离。</summary>
+    public IReadOnlyList<string> HostCapabilities { get; init; } = [];
+}

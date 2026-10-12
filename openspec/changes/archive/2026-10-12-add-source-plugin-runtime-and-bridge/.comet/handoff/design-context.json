@@ -1,0 +1,18 @@
+{
+  "change": "add-source-plugin-runtime-and-bridge",
+  "phase": "design",
+  "mode": "full",
+  "canonical_spec": "openspec",
+  "task_hash_policy": "task-content-v1",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "d8db719913a358d7ee7b8f590deb939b2c764e0cb19004db35c4d570585c60c9",
+  "files": [
+    { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/proposal.md", "sha256": "fdb2d991879337af9330d0a0d204b54379f4e04e1e113ed983e2aa373f658223" },
+    { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/design.md", "sha256": "bd3aa437acd0225cfccf5a694bfed0c58cc34deaccc537b69cb4b9382532dbdd" },
+    { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/tasks.md", "sha256": "85195c241b77e3edefb7ab21edfb02a8adfea928b6ae64a276c1670079917127" },
+    { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/.openspec.yaml", "sha256": "1dfdca412094f24473d8b842866201ec26f200b29b17064b03f1e4982c35a7b9" },
+    { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-development-skill/spec.md", "sha256": "b8377c76c2475d7c74638120bd4158f9f478a95319023fa9f081830bbe28b48f" },
+    { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-host-bridge/spec.md", "sha256": "4bf68ae56351cd3a057cb3c3df146203ff6be3249b34eb6b7e0e56d3054acde3" },
+    { "path": "openspec/changes/add-source-plugin-runtime-and-bridge/specs/source-plugin-runtime/spec.md", "sha256": "165efc33000034a7fd660244bdfef50b30a9afd6968cd1b195c2f0bd7aaa3930" }
+  ]
+}

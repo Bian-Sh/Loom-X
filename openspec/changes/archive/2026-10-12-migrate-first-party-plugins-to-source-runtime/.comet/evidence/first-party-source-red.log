@@ -1,0 +1,126 @@
+C:\Users\BianShanghai\AppData\Local\Temp\loomx-first-party-runtime-build-8c863fbac3094bd88a5d44f39d20dafc\bin\LoomX.Tests\debug\LoomX.Tests.dll (.NETCoreApp,Version=v10.0)的测试运行
+总共 1 个测试文件与指定模式相匹配。
+[xUnit.net 00:00:00.64]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据UI新增前缀落库并跨重载参与实际请求脱敏 [FAIL]
+[xUnit.net 00:00:00.65]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.第一方清单必须显式声明源码Runtime(pluginId: "loomx.tool-result-compression", sourceDirectory: "LoomX.ToolResultCompression") [FAIL]
+[xUnit.net 00:00:00.65]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.第一方清单必须显式声明源码Runtime(pluginId: "loomx.credential-protection", sourceDirectory: "LoomX.CredentialProtection") [FAIL]
+[xUnit.net 00:00:00.69]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.两个真实源码包必须动态编译并注册Pipeline [FAIL]
+[xUnit.net 00:00:00.80]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据直接恢复测试生成的历史Vault且复用原映射 [FAIL]
+[xUnit.net 00:00:00.82]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据请求脱敏并注入完整性指令且响应精确恢复 [FAIL]
+[xUnit.net 00:00:00.88]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据历史密文损坏时响应安全失败且不透传原文 [FAIL]
+[xUnit.net 00:00:00.90]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态插件四语言展示与设置节点来自对应插件负载(pluginId: "loomx.tool-result-compression") [FAIL]
+[xUnit.net 00:00:00.92]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态插件四语言展示与设置节点来自对应插件负载(pluginId: "loomx.credential-protection") [FAIL]
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据UI新增前缀落库并跨重载参与实际请求脱敏 [93 ms]
+  错误消息:
+   实际加载数=0；loomx.credential-protection/Load/LX_ENTRY_INVALID/LoomX.CredentialProtection.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据UI新增前缀落库并跨重载参与实际请求脱敏() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 258
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据UI新增前缀落库并跨重载参与实际请求脱敏() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 272
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.第一方清单必须显式声明源码Runtime(pluginId: "loomx.tool-result-compression", sourceDirectory: "LoomX.ToolResultCompression") [3 ms]
+  错误消息:
+   Assert.Equal() Failure: Strings differ
+           ↓ (pos 0)
+Expected: "csharp-source"
+Actual:   "assembly"
+           ↑ (pos 0)
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.第一方清单必须显式声明源码Runtime(String pluginId, String sourceDirectory) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 46
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.第一方清单必须显式声明源码Runtime(pluginId: "loomx.credential-protection", sourceDirectory: "LoomX.CredentialProtection") [1 ms]
+  错误消息:
+   Assert.Equal() Failure: Strings differ
+           ↓ (pos 0)
+Expected: "csharp-source"
+Actual:   "assembly"
+           ↑ (pos 0)
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.第一方清单必须显式声明源码Runtime(String pluginId, String sourceDirectory) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 46
+   at InvokeStub_FirstPartySourcePluginRuntimeTests.第一方清单必须显式声明源码Runtime(Object, Span`1)
+   at System.Reflection.MethodBaseInvoker.InvokeWithFewArgs(Object obj, BindingFlags invokeAttr, Binder binder, Object[] parameters, CultureInfo culture)
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.两个真实源码包必须动态编译并注册Pipeline [33 ms]
+  错误消息:
+   实际加载数=0；loomx.credential-protection/Load/LX_ENTRY_INVALID/LoomX.CredentialProtection.dll:；loomx.tool-result-compression/Load/LX_ENTRY_INVALID/LoomX.ToolResultCompression.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.两个真实源码包必须动态编译并注册Pipeline() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 69
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.两个真实源码包必须动态编译并注册Pipeline() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 83
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据直接恢复测试生成的历史Vault且复用原映射 [112 ms]
+  错误消息:
+   实际加载数=0；loomx.credential-protection/Load/LX_ENTRY_INVALID/LoomX.CredentialProtection.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据直接恢复测试生成的历史Vault且复用原映射() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 118
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据直接恢复测试生成的历史Vault且复用原映射() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 126
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据请求脱敏并注入完整性指令且响应精确恢复 [19 ms]
+  错误消息:
+   实际加载数=0；loomx.credential-protection/Load/LX_ENTRY_INVALID/LoomX.CredentialProtection.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据请求脱敏并注入完整性指令且响应精确恢复() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 92
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据请求脱敏并注入完整性指令且响应精确恢复() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 108
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据历史密文损坏时响应安全失败且不透传原文 [57 ms]
+  错误消息:
+   实际加载数=0；loomx.credential-protection/Load/LX_ENTRY_INVALID/LoomX.CredentialProtection.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据历史密文损坏时响应安全失败且不透传原文() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 143
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据历史密文损坏时响应安全失败且不透传原文() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 148
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态插件四语言展示与设置节点来自对应插件负载(pluginId: "loomx.tool-result-compression") [18 ms]
+  错误消息:
+   实际加载数=0；loomx.tool-result-compression/Load/LX_ENTRY_INVALID/LoomX.ToolResultCompression.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态插件四语言展示与设置节点来自对应插件负载(String pluginId) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 282
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态插件四语言展示与设置节点来自对应插件负载(String pluginId) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 283
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态插件四语言展示与设置节点来自对应插件负载(pluginId: "loomx.credential-protection") [19 ms]
+  错误消息:
+   实际加载数=0；loomx.credential-protection/Load/LX_ENTRY_INVALID/LoomX.CredentialProtection.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态插件四语言展示与设置节点来自对应插件负载(String pluginId) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 282
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态插件四语言展示与设置节点来自对应插件负载(String pluginId) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 283
+--- End of stack trace from previous location ---
+[xUnit.net 00:00:00.96]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据禁用只停止新脱敏且历史指令与恢复仍有效 [FAIL]
+[xUnit.net 00:00:00.98]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态压缩UI配置落在插件目录且重载后仍生效 [FAIL]
+[xUnit.net 00:00:01.00]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态压缩经Request折叠历史结果但保留最近工具结果 [FAIL]
+[xUnit.net 00:00:01.02]     LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据重载退休旧Bridge并保留Vault及禁用语义 [FAIL]
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据禁用只停止新脱敏且历史指令与恢复仍有效 [18 ms]
+  错误消息:
+   实际加载数=0；loomx.credential-protection/Load/LX_ENTRY_INVALID/LoomX.CredentialProtection.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据禁用只停止新脱敏且历史指令与恢复仍有效() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 156
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据禁用只停止新脱敏且历史指令与恢复仍有效() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 171
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态压缩UI配置落在插件目录且重载后仍生效 [18 ms]
+  错误消息:
+   实际加载数=0；loomx.tool-result-compression/Load/LX_ENTRY_INVALID/LoomX.ToolResultCompression.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态压缩UI配置落在插件目录且重载后仍生效() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 230
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态压缩UI配置落在插件目录且重载后仍生效() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 250
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态压缩经Request折叠历史结果但保留最近工具结果 [17 ms]
+  错误消息:
+   实际加载数=0；loomx.tool-result-compression/Load/LX_ENTRY_INVALID/LoomX.ToolResultCompression.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态压缩经Request折叠历史结果但保留最近工具结果() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 209
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态压缩经Request折叠历史结果但保留最近工具结果() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 222
+--- End of stack trace from previous location ---
+  失败 LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据重载退休旧Bridge并保留Vault及禁用语义 [18 ms]
+  错误消息:
+   实际加载数=0；loomx.credential-protection/Load/LX_ENTRY_INVALID/LoomX.CredentialProtection.dll:
+  堆栈跟踪:
+     at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.AssertLoaded(PluginRuntime runtime, String pluginId, Int32 extensionCount) in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 334
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据重载退休旧Bridge并保留Vault及禁用语义() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 179
+   at LoomX.Tests.Plugins.FirstPartySourcePluginRuntimeTests.动态凭据重载退休旧Bridge并保留Vault及禁用语义() in D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Tests\Plugins\FirstPartySourcePluginRuntimeTests.cs:line 201
+--- End of stack trace from previous location ---
+
+失败!  - 失败:    13，通过:     0，已跳过:     0，总计:    13，持续时间: 467 ms - LoomX.Tests.dll (net10.0)

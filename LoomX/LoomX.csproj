@@ -12,6 +12,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <!-- 只保留产品支持语种的 NuGet satellite 资源，避免内置 Roslyn 编译器带入其他本地化资产。 -->
+    <SatelliteResourceLanguages>zh-CN;zh-TW;ja-JP;en-US</SatelliteResourceLanguages>
     <!-- i18n: default resource language -->
     <DefaultLanguage>zh-CN</DefaultLanguage>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
@@ -38,6 +40,7 @@
     <PackageReference Include="Tomlyn" Version="2.10.1" />
     <ProjectReference Include="..\LoomX.Harness\LoomX.Harness.csproj" />
     <ProjectReference Include="..\LoomX.PluginHost\LoomX.PluginHost.csproj" />
+    <ProjectReference Include="..\LoomX.Plugin.Storage.Sqlite\LoomX.Plugin.Storage.Sqlite.csproj" />
     <PackageReference Include="Avalonia" Version="11.3.20" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.20" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.20" />
@@ -57,7 +60,7 @@
     <!-- 第一方插件只作为负载拷贝到输出 plugins 目录供运行时动态发现，不做静态引用（验证 ALC 加载路径）。
          每个插件用独立的 OutputItemType：共用一个会让两个插件的负载落到同一目录互相覆盖。
          这里不需要、也没有加 ExcludeAssets="content"：插件负载已不再以 MSBuild Content 声明
-         （插件工程用自定义目标拷进自己的输出目录），MSBuild 不会把它传给本工程；
+         （插件工程仅使用自定义负载项与拷贝目标），MSBuild 不会把它传给本工程；
          负载本来也不该出现在应用根目录，统一由下面的拷贝目标放进 plugins/<id>/。 -->
     <ProjectReference Include="..\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj"
                       ReferenceOutputAssembly="false"
@@ -68,36 +71,21 @@
                       OutputItemType="FirstPartyCompressionPlugin"
                       PrivateAssets="all" />
   </ItemGroup>
+  <Import Project="..\FirstPartySourcePayload.targets" />
   <Target Name="CopyFirstPartyPlugins" AfterTargets="Build">
-    <PropertyGroup>
-      <_CredentialPluginOutputDir>@(FirstPartyCredentialPlugin->'%(RootDir)%(Directory)')</_CredentialPluginOutputDir>
-      <_CompressionPluginOutputDir>@(FirstPartyCompressionPlugin->'%(RootDir)%(Directory)')</_CompressionPluginOutputDir>
-    </PropertyGroup>
-    <ItemGroup>
-      <_CredentialPluginPayload Include="$(_CredentialPluginOutputDir)**\*" />
-      <_CompressionPluginPayload Include="$(_CompressionPluginOutputDir)**\*" />
-    </ItemGroup>
     <Copy SourceFiles="@(_CredentialPluginPayload)"
-          DestinationFiles="@(_CredentialPluginPayload->'$(OutputPath)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
+          DestinationFiles="@(_CredentialPluginPayload->'$(OutputPath)plugins\loomx.credential-protection\%(PackageRelativePath)')"
           SkipUnchangedFiles="true" />
     <Copy SourceFiles="@(_CompressionPluginPayload)"
-          DestinationFiles="@(_CompressionPluginPayload->'$(OutputPath)plugins\loomx.tool-result-compression\%(RecursiveDir)%(Filename)%(Extension)')"
+          DestinationFiles="@(_CompressionPluginPayload->'$(OutputPath)plugins\loomx.tool-result-compression\%(PackageRelativePath)')"
           SkipUnchangedFiles="true" />
   </Target>
   <Target Name="CopyFirstPartyPluginsToPublish" AfterTargets="Publish">
-    <PropertyGroup>
-      <_CredentialPluginPublishOutputDir>@(FirstPartyCredentialPlugin->'%(RootDir)%(Directory)')</_CredentialPluginPublishOutputDir>
-      <_CompressionPluginPublishOutputDir>@(FirstPartyCompressionPlugin->'%(RootDir)%(Directory)')</_CompressionPluginPublishOutputDir>
-    </PropertyGroup>
-    <ItemGroup>
-      <_CredentialPluginPublishPayload Include="$(_CredentialPluginPublishOutputDir)**\*" />
-      <_CompressionPluginPublishPayload Include="$(_CompressionPluginPublishOutputDir)**\*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_CredentialPluginPublishPayload)"
-          DestinationFiles="@(_CredentialPluginPublishPayload->'$(PublishDir)plugins\loomx.credential-protection\%(RecursiveDir)%(Filename)%(Extension)')"
+    <Copy SourceFiles="@(_CredentialPluginPayload)"
+          DestinationFiles="@(_CredentialPluginPayload->'$(PublishDir)plugins\loomx.credential-protection\%(PackageRelativePath)')"
           SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(_CompressionPluginPublishPayload)"
-          DestinationFiles="@(_CompressionPluginPublishPayload->'$(PublishDir)plugins\loomx.tool-result-compression\%(RecursiveDir)%(Filename)%(Extension)')"
+    <Copy SourceFiles="@(_CompressionPluginPayload)"
+          DestinationFiles="@(_CompressionPluginPayload->'$(PublishDir)plugins\loomx.tool-result-compression\%(PackageRelativePath)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

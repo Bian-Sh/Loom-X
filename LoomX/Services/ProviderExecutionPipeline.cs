@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using LoomX.Plugins;
+using LoomX.Plugins.Host;
 using Microsoft.Extensions.Logging;
 
 namespace LoomX.Services;
@@ -35,7 +36,7 @@ public sealed record ProviderExecutionResult(
 }
 
 /// <summary>调用方负责释放响应和正文流；成功响应不预读正文。</summary>
-public sealed class ProviderStreamingResult(HttpResponseMessage response, Stream body) : IAsyncDisposable
+public sealed class ProviderStreamingResult(HttpResponseMessage response, Stream body, IAsyncDisposable? lease = null) : IAsyncDisposable
 {
     public HttpStatusCode StatusCode => response.StatusCode;
     public string? ContentType => response.Content.Headers.ContentType?.MediaType;
@@ -44,10 +45,16 @@ public sealed class ProviderStreamingResult(HttpResponseMessage response, Stream
     public TimeSpan? RetryAfter => response.Headers.RetryAfter?.Delta
         ?? (response.Headers.RetryAfter?.Date is { } date ? date - DateTimeOffset.UtcNow : null);
 
+    private int disposed;
     public async ValueTask DisposeAsync()
     {
-        await body.DisposeAsync();
-        response.Dispose();
+        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+        try { await body.DisposeAsync().ConfigureAwait(false); }
+        finally
+        {
+            response.Dispose();
+            if (lease is not null) await lease.DisposeAsync().ConfigureAwait(false);
+        }
     }
 }
 
@@ -73,7 +80,8 @@ public interface IProviderExecutionPipeline
 public sealed class ProviderExecutionPipeline(
     ILogger<ProviderExecutionPipeline>? logger = null,
     IPipeline? requestPipeline = null,
-    IPipeline? responsePipeline = null) : IProviderExecutionPipeline
+    IPipeline? responsePipeline = null,
+    PluginRuntime? runtime = null) : IProviderExecutionPipeline
 {
     public async Task<ProviderStreamingResult> ExecuteStreamingAsync(
         HttpClient httpClient,
@@ -84,12 +92,15 @@ public sealed class ProviderExecutionPipeline(
         ArgumentNullException.ThrowIfNull(httpClient);
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(context);
-
-        await ApplyRequestPipelineAsync(request, context, cancellationToken);
-        var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        var lease = runtime?.AcquireLease();
+        HttpResponseMessage? response = null;
         try
         {
-            Stream body = await response.Content.ReadAsStreamAsync(cancellationToken);
+            var activeRequest = lease?.GetPipeline("request") ?? requestPipeline;
+            var activeResponse = lease?.GetPipeline("response") ?? responsePipeline;
+            await ApplyRequestPipelineAsync(request, context, cancellationToken, activeRequest).ConfigureAwait(false);
+            response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+            Stream body = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             foreach (var encoding in response.Content.Headers.ContentEncoding.Reverse())
             {
                 body = encoding.Trim().ToLowerInvariant() switch
@@ -98,39 +109,25 @@ public sealed class ProviderExecutionPipeline(
                     "deflate" => new DeflateStream(body, CompressionMode.Decompress),
                     "br" => new BrotliStream(body, CompressionMode.Decompress),
                     "identity" => body,
-                    _ => throw new NotSupportedException($"不支持的响应压缩格式：{encoding}"),
+                    _ => throw new NotSupportedException("不支持的响应压缩格式。"),
                 };
             }
-
-            if (responsePipeline is not null && response.IsSuccessStatusCode)
+            if (activeResponse is not null && response.IsSuccessStatusCode)
             {
-                body = string.Equals(
-                    response.Content.Headers.ContentType?.MediaType,
-                    "text/event-stream",
-                    StringComparison.OrdinalIgnoreCase)
-                    ? new SsePipelineRestoringStream(
-                        body,
-                        responsePipeline,
-                        context,
-                        logger,
-                        cancellationToken)
-                    : new PipelineRestoringStream(
-                        body,
-                        responsePipeline,
-                        context,
-                        logger,
-                        cancellationToken);
+                body = string.Equals(response.Content.Headers.ContentType?.MediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase)
+                    ? new SsePipelineRestoringStream(body, activeResponse, context, logger, cancellationToken)
+                    : new PipelineRestoringStream(body, activeResponse, context, logger, cancellationToken);
             }
-
-            return new ProviderStreamingResult(response, body);
+            if (lease is not null) body = new PluginLeaseStream(body, lease);
+            return new ProviderStreamingResult(response, body, lease);
         }
         catch
         {
-            response.Dispose();
+            response?.Dispose();
+            if (lease is not null) await lease.DisposeAsync().ConfigureAwait(false);
             throw;
         }
     }
-
     public async Task<ProviderExecutionResult> ExecuteAsync(
         HttpClient httpClient,
         HttpRequestMessage request,
@@ -141,7 +138,10 @@ public sealed class ProviderExecutionPipeline(
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(context);
 
-        await ApplyRequestPipelineAsync(request, context, cancellationToken);
+        await using var lease = runtime?.AcquireLease();
+        var activeRequest = lease?.GetPipeline("request") ?? requestPipeline;
+        var activeResponse = lease?.GetPipeline("response") ?? responsePipeline;
+        await ApplyRequestPipelineAsync(request, context, cancellationToken, activeRequest);
         using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         var headers = CaptureHeaders(response);
         var body = await response.Content.ReadAsByteArrayAsync(cancellationToken);
@@ -159,14 +159,14 @@ public sealed class ProviderExecutionPipeline(
             normalized = ProviderResponseNormalizer.TryNormalizeOpenAiFinishReasons(body, contentType, out body);
         }
 
-        if (responsePipeline is not null && response.IsSuccessStatusCode && body.Length > 0)
+        if (activeResponse is not null && response.IsSuccessStatusCode && body.Length > 0)
         {
             var originalBody = body;
             if (string.Equals(contentType, "text/event-stream", StringComparison.OrdinalIgnoreCase))
             {
                 await using var source = new MemoryStream(body, writable: false);
                 await using var restoring = new SsePipelineRestoringStream(
-                    source, responsePipeline, context, logger, cancellationToken);
+                    source, activeResponse, context, logger, cancellationToken);
                 using var restoredOutput = new MemoryStream();
                 await restoring.CopyToAsync(restoredOutput, cancellationToken);
                 body = restoredOutput.ToArray();
@@ -174,7 +174,7 @@ public sealed class ProviderExecutionPipeline(
             else
             {
                 var restored = await ApplyResponsePipelineAsync(
-                    Encoding.UTF8.GetString(body), context, cancellationToken);
+                    Encoding.UTF8.GetString(body), context, cancellationToken, activeResponse);
                 if (restored.Modified) body = Encoding.UTF8.GetBytes(restored.Payload);
             }
 
@@ -195,7 +195,7 @@ public sealed class ProviderExecutionPipeline(
     private async Task ApplyRequestPipelineAsync(
         HttpRequestMessage request,
         ProviderExecutionContext context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IPipeline? requestPipeline)
     {
         if (requestPipeline is null || request.Content is null) return;
 
@@ -284,7 +284,7 @@ public sealed class ProviderExecutionPipeline(
     private async ValueTask<(string Payload, bool Modified)> ApplyResponsePipelineAsync(
         string payload,
         ProviderExecutionContext context,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IPipeline responsePipeline)
     {
         PipelineResult result;
         try

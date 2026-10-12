@@ -1,0 +1,2 @@
+loomx.credential-protection : kind=csharp-source, files=17, no-binary-dependencies=true
+loomx.tool-result-compression : kind=csharp-source, files=27, no-binary-dependencies=true

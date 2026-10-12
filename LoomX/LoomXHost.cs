@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
@@ -26,7 +26,8 @@ public static class LoomXHost
     internal static async Task<WebApplication> CreateAsync(
         Assistant.Browser.BrowserBridge? browserBridge,
         Assistant.Browser.BrowserBridgeLeaseManager? browserBridgeLeaseManager,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ToastService? toastService = null)
     {
         AppDataPaths.EnsureCreated();
 
@@ -34,6 +35,9 @@ public static class LoomXHost
         var databasePath = AppDataPaths.DatabasePath;
         var builder = WebApplication.CreateBuilder(Array.Empty<string>());
         builder.Host.UseSerilog();
+        builder.Services.AddSingleton(toastService ?? new ToastService());
+        builder.Services.AddSingleton(services => new PluginHostBridgeFactory(
+            Path.Combine(AppDataPaths.RootDirectory, "plugins"), services.GetRequiredService<ToastService>(), services.GetRequiredService<ILoggerFactory>()));
 
         var dbOptions = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite(CreateConnectionString(databasePath)).Options;
         var startupDb = new ConfigurationDbContext(dbOptions);
@@ -95,6 +99,9 @@ public static class LoomXHost
         {
             builder.Services.AddSingleton(browserBridgeLeaseManager);
         }
+        PluginDevelopmentComposition.RegisterServices(builder.Services,
+            Path.Combine(AppDataPaths.RootDirectory, "plugin-development"),
+            Path.Combine(AppDataPaths.RootDirectory, "plugin-cache", "source"));
         builder.Services.AddSingleton(services =>
         {
             var registry = new Assistant.ToolRegistry();
@@ -119,6 +126,7 @@ public static class LoomXHost
                 registry,
                 services.GetRequiredService<Assistant.DiagnosticSubagent>(),
                 services.GetRequiredService<Assistant.AssistantModelClientFactory>().TryCreateAsync);
+            PluginDevelopmentComposition.RegisterTools(registry, services);
             return registry;
         });
 
@@ -129,6 +137,8 @@ public static class LoomXHost
             {
                 PluginDirectory = Path.Combine(AppContext.BaseDirectory, "plugins"),
                 DataRootDirectory = Path.Combine(AppDataPaths.RootDirectory, "plugins"),
+                BridgeFactory = services.GetRequiredService<PluginHostBridgeFactory>().CreateScope,
+                SourceCompiler = services.GetRequiredService<LoomX.Plugins.Host.SourcePluginCompiler>(),
             },
             services.GetRequiredService<ILoggerFactory>()));
         builder.Services.AddSingleton<IProviderExecutionPipeline>(services =>
@@ -136,8 +146,7 @@ public static class LoomXHost
             var runtime = services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>();
             return new ProviderExecutionPipeline(
                 services.GetRequiredService<ILogger<ProviderExecutionPipeline>>(),
-                runtime.GetPipeline("request"),
-                runtime.GetPipeline("response"));
+                runtime: runtime);
         });
 
         // 小助手（Phase 4）：会话门面与持久化。小助手不经过对外 HTTP Server、Endpoint 鉴权或 Combo 路由，

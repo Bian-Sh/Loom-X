@@ -17,19 +17,21 @@ namespace LoomX.Tests.Plugins;
 /// </summary>
 public sealed class RouterRequestPipelineTests : IDisposable
 {
+    private readonly CredentialTestFactory factory = new();
     private const string ApiKey = "sk-abcdefghij0123456789abcd";
     private readonly string dataDirectory =
         Path.Combine(Path.GetTempPath(), "loomx-router-request-pipeline-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
+        factory.Dispose();
         if (Directory.Exists(dataDirectory)) Directory.Delete(dataDirectory, recursive: true);
     }
 
     private IPipeline CreateCredentialPipeline()
     {
         Directory.CreateDirectory(dataDirectory);
-        var engine = new CredentialEngine(new SensitiveRuleStore(dataDirectory));
+        var engine = factory.CreateEngine(dataDirectory);
         var pipeline = new Pipeline("request", ExtensionKind.Request, NullLogger.Instance);
         pipeline.AddEntry(new PipelineEntry(
             new CredentialRequestExtension(engine),

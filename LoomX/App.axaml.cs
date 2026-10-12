@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
@@ -137,9 +137,9 @@ public partial class App : Application
                 }));
             }
             var configService = new ConfigSnapshotService(loggerFactory.CreateLogger<ConfigSnapshotService>());
-            gatewayService = new GatewayProcessService();
-            var windowsStartupService = new WindowsStartupService(loggerFactory.CreateLogger<WindowsStartupService>());
             var toastService = new ToastService();
+            gatewayService = new GatewayProcessService(toastService);
+            var windowsStartupService = new WindowsStartupService(loggerFactory.CreateLogger<WindowsStartupService>());
             dataStore = new AppDataStore(configService, gatewayService, loggerFactory.CreateLogger<AppDataStore>());
             mainWindow = new MainWindow(
                 toastService,

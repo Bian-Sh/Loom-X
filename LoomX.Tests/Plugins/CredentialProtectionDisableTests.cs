@@ -11,11 +11,13 @@ namespace LoomX.Tests.Plugins;
 /// </summary>
 public sealed class CredentialProtectionDisableTests : IDisposable
 {
+    private readonly CredentialTestFactory factory = new();
     private readonly string dataDirectory =
         Path.Combine(Path.GetTempPath(), "loomx-credential-disable-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
+        factory.Dispose();
         try
         {
             if (Directory.Exists(dataDirectory)) Directory.Delete(dataDirectory, recursive: true);
@@ -30,7 +32,7 @@ public sealed class CredentialProtectionDisableTests : IDisposable
     {
         Directory.CreateDirectory(dataDirectory);
         var plugin = new CredentialProtectionPlugin();
-        plugin.Initialize(new PluginInitializationContext("loomx.credential-protection", dataDirectory));
+        plugin.Initialize(factory.CreateContext(dataDirectory));
         // CreateExtensions 是迭代器：必须实际枚举，引擎才会被创建。
         var extensions = plugin.CreateExtensions().ToArray();
         return (plugin, plugin.Engine ?? throw new InvalidOperationException("引擎未创建。"), extensions);
@@ -113,7 +115,7 @@ public sealed class CredentialProtectionDisableTests : IDisposable
     {
         Directory.CreateDirectory(dataDirectory);
         var plugin = new CredentialProtectionPlugin();
-        plugin.Initialize(new PluginInitializationContext("loomx.credential-protection", dataDirectory));
+        plugin.Initialize(factory.CreateContext(dataDirectory));
         var extensions = plugin.CreateExtensions().ToArray();
         var engine = plugin.Engine!;
         var response = extensions.OfType<CredentialResponseExtension>().Single();
@@ -157,7 +159,7 @@ public sealed class CredentialProtectionDisableTests : IDisposable
         plugin.OnPluginEnabledChanged(false);
 
         // 模拟重启：新建store 与引擎，历史 placeholder 仍可恢复。
-        var reloaded = new CredentialEngine(new SensitiveRuleStore(dataDirectory));
+        var reloaded = factory.CreateEngine(dataDirectory);
         var restored = reloaded.RestoreTransportPayload(sanitized, out var changed);
 
         Assert.True(changed);

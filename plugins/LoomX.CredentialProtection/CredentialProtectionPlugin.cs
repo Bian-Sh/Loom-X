@@ -9,12 +9,13 @@ namespace LoomX.CredentialProtection;
 /// 第一方 Credential Protection Router 插件：在请求正文离开本地安全边界、
 /// 发送给外部 Provider 前完成凭据检测与脱敏。规则数据 Plugin-owned，脱敏失败 fail closed。
 /// </summary>
-public sealed partial class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContributionProvider, IPluginUiCommandHandler, IPluginEnableStateAware
+public sealed partial class CredentialProtectionPlugin : ILoomXPlugin, IPluginUiContributionProvider, IPluginUiCommandHandler, IPluginEnableStateAware, IAsyncDisposable
 {
     public const string PluginId = "loomx.credential-protection";
 
     private readonly CredentialProtectionObservability observability = new();
     private SensitiveRuleStore? ruleStore;
+    private CredentialTokenStore? tokenStore;
 
     public string Id => PluginId;
 
@@ -36,6 +37,13 @@ public sealed partial class CredentialProtectionPlugin : ILoomXPlugin, IPluginUi
     public void Initialize(PluginInitializationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
+        if (tokenStore is not null) throw new InvalidOperationException("插件不得重复初始化。");
+        tokenStore = new CredentialTokenStore(context.Bridge.Storage, context.Bridge.Protection);
+        CredentialSynchronous.Run<bool>(async () =>
+        {
+            await tokenStore.InitializeAsync().ConfigureAwait(false);
+            return true;
+        });
         ruleStore = new SensitiveRuleStore(context.DataDirectory);
         // 规则变更让宿主重新拉取声明式 UI 快照。
         ruleStore.Changed += (_, _) => observability.RaiseChanged();
@@ -146,14 +154,15 @@ public sealed partial class CredentialProtectionPlugin : ILoomXPlugin, IPluginUi
 
     public IEnumerable<IPipelineExtension> CreateExtensions()
     {
-        // 宿主保证 Initialize 先于 CreateExtensions 调用；防御性兜底避免空引用。
-        var store = ruleStore ?? new SensitiveRuleStore(
-            Path.Combine(Path.GetTempPath(), PluginId));
-        var created = new CredentialEngine(store) { ActiveProtectionEnabled = ActiveProtectionEnabled };
+        // 必须使用初始化时授予的 Bridge，禁止兜底创建另一份 Vault。
+        var created = new CredentialEngine(RuleStore, tokenStore
+            ?? throw new InvalidOperationException("插件尚未初始化。")) { ActiveProtectionEnabled = ActiveProtectionEnabled };
         engine = created;
         yield return new CredentialRequestExtension(created, observability);
         yield return new CredentialResponseExtension(created, observability);
     }
+
+    public ValueTask DisposeAsync() => tokenStore?.DisposeAsync() ?? ValueTask.CompletedTask;
 
     public async ValueTask<PluginUiCommandResult> ExecuteUiCommandAsync(
         PluginUiCommand command,
@@ -238,7 +247,11 @@ public sealed class CredentialRequestExtension(
     {
         try
         {
-            var sanitized = engine.Sanitize(payload, out var sanitizedChanged, out var replacementCount);
+            var (sanitized, sanitizedChanged, replacementCount) = engine.WithCancellation(cancellationToken, () =>
+            {
+                var value = engine.Sanitize(payload, out var changed, out var count);
+                return (value, changed, count);
+            });
             var transformed = sanitized;
             var instructionChanged = false;
             if (CredentialEngine.ContainsPlaceholderCandidate(sanitized))
@@ -403,7 +416,11 @@ public sealed class CredentialResponseExtension(
     {
         try
         {
-            var restored = engine.RestoreTransportPayload(payload, out var changed);
+            var (restored, changed) = engine.WithCancellation(cancellationToken, () =>
+            {
+                var value = engine.RestoreTransportPayload(payload, out var didChange);
+                return (value, didChange);
+            });
             if (changed) observability.RecordRestoredResponse();
             return ValueTask.FromResult(changed
                 ? PipelineResult.Modify(restored, "本地占位符已恢复。")

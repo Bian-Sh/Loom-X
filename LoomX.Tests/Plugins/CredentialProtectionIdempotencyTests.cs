@@ -11,11 +11,13 @@ namespace LoomX.Tests.Plugins;
 /// </summary>
 public sealed class CredentialProtectionIdempotencyTests : IDisposable
 {
+    private readonly CredentialTestFactory factory = new();
     private readonly string dataDirectory =
         Path.Combine(Path.GetTempPath(), "loomx-credential-idem-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
+        factory.Dispose();
         try
         {
             if (Directory.Exists(dataDirectory)) Directory.Delete(dataDirectory, recursive: true);
@@ -29,7 +31,7 @@ public sealed class CredentialProtectionIdempotencyTests : IDisposable
     private CredentialEngine CreateEngine()
     {
         Directory.CreateDirectory(dataDirectory);
-        return new CredentialEngine(new SensitiveRuleStore(dataDirectory));
+        return factory.CreateEngine(dataDirectory);
     }
 
     /// <summary>

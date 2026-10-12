@@ -1,0 +1,20 @@
+<Project>
+  <!-- 编译引用内嵌在宿主中，不依赖用户机器 SDK，也不通过 Content 传播。 -->
+  <Target Name="EmbedSourcePluginReferences" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <SourcePluginReference Include="$(NuGetPackageRoot)microsoft.netcore.app.ref/10.0.9/ref/net10.0/*.dll" />
+      <SourcePluginReference Include="@(ReferencePath->WithMetadataValue('Filename', 'LoomX.Plugin.Abstractions'))" />
+    </ItemGroup>
+    <Error Condition="!Exists('$(NuGetPackageRoot)microsoft.netcore.app.ref/10.0.9/ref/net10.0/System.Runtime.dll')" Text="固定 net10.0 源码编译引用缺失。" />
+    <GetFileHash Files="@(SourcePluginReference)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="SourcePluginHashedReference" />
+    </GetFileHash>
+    <WriteLinesToFile File="$(IntermediateOutputPath)source-plugin-references.sha256" Lines="net10.0|10.0.9;@(SourcePluginHashedReference->'%(Filename)%(Extension)|%(FileHash)')" Overwrite="true" WriteOnlyWhenDifferent="true" Encoding="UTF-8" />
+    <ItemGroup>
+      <EmbeddedResource Include="@(SourcePluginReference)">
+        <LogicalName>LoomX.SourceReferences.%(Filename)%(Extension)</LogicalName>
+      </EmbeddedResource>
+      <EmbeddedResource Include="$(IntermediateOutputPath)source-plugin-references.sha256" LogicalName="LoomX.SourceReferences.sha256" />
+    </ItemGroup>
+  </Target>
+</Project>

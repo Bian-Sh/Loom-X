@@ -669,4 +669,7 @@
   <data name="update.install.confirm.cancel"><value>Not now</value></data>
   <data name="plugins.detail.open"><value>Open plugin details</value></data>
   <data name="plugins.detail.back"><value>Back to plugins</value></data>
+  <data name="plugins.source.trust.title"><value>Source plugins: trusted code boundary</value></data>
+  <data name="plugins.source.trust.description"><value>Only install or enable source plugins from trusted sources. Source plugins run in the same process as LoomX with current user permissions and can access files and networks available to that user. AssemblyLoadContext only handles loading and unloading; Bridge is only a host service boundary. Neither is an OS sandbox or isolates malicious code.</value></data>
+  <data name="plugins.source.trust.enabled"><value>Source plugin enabled. Only install or enable source plugins from trusted sources. Source plugins run in the same process as LoomX with current user permissions and can access files and networks available to that user. AssemblyLoadContext only handles loading and unloading; Bridge is only a host service boundary. Neither is an OS sandbox or isolates malicious code.</value></data>
 </root>

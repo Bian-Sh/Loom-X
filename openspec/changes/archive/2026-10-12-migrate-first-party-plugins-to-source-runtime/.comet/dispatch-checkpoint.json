@@ -1,0 +1,18 @@
+{
+  "evidence": [
+    "evidence/first-party-source-red.log:13/13因旧assembly清单失败",
+    "LoomX.Tests/Plugins/FirstPartySourcePluginRuntimeTests.cs:已整合13项真实动态测试"
+  ],
+  "revision": "a6ca9e530f61a61c8f89d9f159ee83fc76966dfc89cc4eef19dbb66e6b861a75",
+  "stage": "checkoff",
+  "unresolved": [
+    "待源码负载目标完成后由主会话运行GREEN"
+  ],
+  "schemaVersion": 1,
+  "taskIds": [
+    "26e1c0e4-e1b1-443d-a969-6253a8fd4da9",
+    "154ae18d-77ae-4e44-85d3-b85cd711dd82"
+  ],
+  "reviewRounds": 0,
+  "sessionId": "01a12fa8-787f-7050-a36e-4fafb2ff9d33"
+}

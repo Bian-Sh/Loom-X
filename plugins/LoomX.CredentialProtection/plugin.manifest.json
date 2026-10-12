@@ -1,8 +1,24 @@
 {
   "id": "loomx.credential-protection",
   "version": "0.7.0",
-  "assembly": "LoomX.CredentialProtection.dll",
-  "plugin_type": "LoomX.CredentialProtection.CredentialProtectionPlugin",
+  "runtime": {
+    "kind": "csharp-source",
+    "entry_type": "LoomX.CredentialProtection.CredentialProtectionPlugin",
+    "sources": [
+      "CredentialBuiltinGroups.cs",
+      "CredentialEngine.cs",
+      "CredentialProtectionObservability.cs",
+      "CredentialProtectionPlugin.cs",
+      "CredentialProtectionPlugin.DisplayInfo.cs",
+      "CredentialSettingsCommands.cs",
+      "CredentialSettingsText.cs",
+      "CredentialSettingsUi.cs",
+      "CredentialSynchronous.cs",
+      "CredentialTokenStore.cs",
+      "GlobalUsings.cs",
+      "SensitiveRuleStore.cs"
+    ]
+  },
   "capabilities": ["credential.detect", "credential.mask", "credential.integrity-instruction", "credential.restore"],
   "ui": {
     "contributions": [
@@ -10,6 +26,7 @@
       { "id": "settings", "slot": "detail-body", "interactive": true }
     ]
   },
+  "host_capabilities": ["storage.sqlite/v1", "protection/v1"],
   "extensions": [
     {
       "id": "credential.request",

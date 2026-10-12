@@ -1,0 +1,19 @@
+{
+  "stage": "checkoff",
+  "sessionId": "01a12fa8-787f-7050-a36e-4fafb2ff9d33",
+  "revision": "f2e5c5b0fbdb6fe1f05e4d9422386139722b5ed82b3fd3c7ccba6639e7f80fd8",
+  "reviewRounds": 0,
+  "evidence": [
+    "checks/55bf8bfe-88e3-4cc9-9d1f-634b2c307d49.log:旧DLL测试夹具与源码manifest不匹配",
+    "evidence/direct-link-regression.log:相同9项symlink/Junction直接dotnet全部通过，Comet子进程环境差异待诊断",
+    "旧源码测试夹具21/21通过；改用真实镜像源码与SourceCompiler/Protection"
+  ],
+  "unresolved": [
+    "全测试正在默认输出复跑"
+  ],
+  "schemaVersion": 1,
+  "taskIds": [
+    "26e1c0e4-e1b1-443d-a969-6253a8fd4da9",
+    "154ae18d-77ae-4e44-85d3-b85cd711dd82"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "revision": "a6ca9e530f61a61c8f89d9f159ee83fc76966dfc89cc4eef19dbb66e6b861a75",
+  "schemaVersion": 1,
+  "reviewRounds": 0,
+  "sessionId": "01a12fb0-618c-7ba2-bc03-ca6de8d741f5",
+  "unresolved": [
+    "侧车维护Build/Publish源码负载及布局测试，不修改插件业务/manifest"
+  ],
+  "evidence": [
+    "宿主与凭据Protection已通过134项定向测试"
+  ],
+  "taskIds": [
+    "a2b28ecd-5ac4-47ce-b016-934575f8a876"
+  ],
+  "stage": "implementing"
+}

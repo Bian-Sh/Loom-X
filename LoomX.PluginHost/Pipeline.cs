@@ -39,6 +39,7 @@ public sealed class Pipeline : IContextualPipeline
     public IReadOnlyList<PipelineEntry> Entries => entries;
 
     internal void AddEntry(PipelineEntry entry) => entries.Add(entry);
+    internal void RemovePluginEntries(string pluginId) => entries.RemoveAll(entry => entry.PluginId == pluginId);
 
     /// <summary>按配置顺序重排 Entry（只调整顺序，不增删）。</summary>
     internal void Reorder(IReadOnlyList<PipelineEntry> configuredOrder)

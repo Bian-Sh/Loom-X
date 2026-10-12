@@ -1783,4 +1783,7 @@
   <data name="update.install.confirm.cancel"><value>暂不安装</value></data>
   <data name="plugins.detail.open"><value>打开插件详情</value></data>
   <data name="plugins.detail.back"><value>返回插件列表</value></data>
+  <data name="plugins.source.trust.title"><value>源码插件：可信代码边界</value></data>
+  <data name="plugins.source.trust.description"><value>仅安装或启用可信来源的源码插件。源码插件在 LoomX 同一进程中以当前用户权限执行，可访问该用户可访问的文件与网络。AssemblyLoadContext 仅负责加载与卸载，Bridge 仅是宿主服务边界；两者均不构成操作系统沙箱，不能隔离恶意代码。</value></data>
+  <data name="plugins.source.trust.enabled"><value>源码插件已启用。仅安装或启用可信来源的源码插件。源码插件在 LoomX 同一进程中以当前用户权限执行，可访问该用户可访问的文件与网络。AssemblyLoadContext 仅负责加载与卸载，Bridge 仅是宿主服务边界；两者均不构成操作系统沙箱，不能隔离恶意代码。</value></data>
 </root>

@@ -1,0 +1,21 @@
+发布 Windows 桌面应用到：D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\outputs\source-plugin-migration-2026-10-12_18-57-37
+  正在确定要还原的项目…
+  已还原 D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Harness\LoomX.Harness.csproj (用时 214 毫秒)。
+  已还原 D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Plugin.Abstractions\LoomX.Plugin.Abstractions.csproj (用时 214 毫秒)。
+  已还原 D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\plugins\LoomX.CredentialProtection\LoomX.CredentialProtection.csproj (用时 218 毫秒)。
+  已还原 D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\plugins\LoomX.ToolResultCompression\LoomX.ToolResultCompression.csproj (用时 218 毫秒)。
+  已还原 D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.PluginHost\LoomX.PluginHost.csproj (用时 226 毫秒)。
+  已还原 D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Plugin.Storage.Sqlite\LoomX.Plugin.Storage.Sqlite.csproj (用时 230 毫秒)。
+  已还原 D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\LoomX.csproj (用时 252 毫秒)。
+  LoomX.Plugin.Abstractions -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Plugin.Abstractions\bin\Release\net10.0\LoomX.Plugin.Abstractions.dll
+  LoomX.Harness -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Harness\bin\Release\net10.0\LoomX.Harness.dll
+  LoomX.Plugin.Storage.Sqlite -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.Plugin.Storage.Sqlite\bin\Release\net10.0\LoomX.Plugin.Storage.Sqlite.dll
+  LoomX.PluginHost -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX.PluginHost\bin\Release\net10.0\LoomX.PluginHost.dll
+  LoomX.CredentialProtection -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\plugins\LoomX.CredentialProtection\bin\Release\net10.0\LoomX.CredentialProtection.dll
+  LoomX.ToolResultCompression -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\plugins\LoomX.ToolResultCompression\bin\Release\net10.0\LoomX.ToolResultCompression.dll
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\ViewModels\SettingsViewModel.cs(173,12): warning CS8618: 在退出构造函数时，不可为 null 的 字段 "status" 必须包含非 null 值。请考虑添加 "required" 修饰符或将该 字段 声明为可为 null。 [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\LoomX.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\Services\AnthropicResponseMapper.cs(60,17): warning CA2024: 不要在异步方法中使用 ‘reader.EndOfStream’ (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2024) [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\LoomX.csproj]
+D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\Services\AnthropicResponseMapper.cs(146,17): warning CA2024: 不要在异步方法中使用 ‘reader.EndOfStream’ (https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2024) [D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\LoomX.csproj]
+  LoomX -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\LoomX\bin\Release\net10.0\win-x64\LoomX.dll
+  LoomX -> D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\outputs\source-plugin-migration-2026-10-12_18-57-37\
+发布目录：D:\AppData\Github\Loom-X\.worktrees\add-source-plugin-runtime-and-bridge\outputs\source-plugin-migration-2026-10-12_18-57-37

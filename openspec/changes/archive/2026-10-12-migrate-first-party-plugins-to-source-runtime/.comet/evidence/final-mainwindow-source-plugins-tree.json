@@ -1,0 +1,442 @@
+{
+  "_note": "Prefer `elements` — `tree_markdown` will continue to work but new fields will only be added to the structured side. Issue #22865: use `max_elements` / `max_depth` to bound the UIA walk on apps with very large trees.",
+  "app_name": "LoomX.exe",
+  "element_count": 24,
+  "elements": [
+    {
+      "actions": [
+        "scroll"
+      ],
+      "depth": 1,
+      "element_index": 0,
+      "element_token": "s00000008:0",
+      "enabled": true,
+      "frame": {
+        "h": 623,
+        "w": 195,
+        "x": 250,
+        "y": 316
+      },
+      "role": "Pane"
+    },
+    {
+      "actions": [
+        "scroll"
+      ],
+      "depth": 2,
+      "element_index": 1,
+      "element_token": "s00000008:1",
+      "enabled": true,
+      "frame": {
+        "h": 623,
+        "w": 195,
+        "x": 250,
+        "y": 316
+      },
+      "parent_index": 0,
+      "role": "List"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 3,
+      "element_index": 2,
+      "element_token": "s00000008:2",
+      "enabled": true,
+      "frame": {
+        "h": 42,
+        "w": 195,
+        "x": 250,
+        "y": 318
+      },
+      "label": "Avalonia.Controls.StackPanel",
+      "parent_index": 1,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 3,
+      "element_index": 3,
+      "element_token": "s00000008:3",
+      "enabled": true,
+      "frame": {
+        "h": 42,
+        "w": 195,
+        "x": 250,
+        "y": 364
+      },
+      "label": "Avalonia.Controls.StackPanel",
+      "parent_index": 1,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 3,
+      "element_index": 4,
+      "element_token": "s00000008:4",
+      "enabled": true,
+      "frame": {
+        "h": 42,
+        "w": 195,
+        "x": 250,
+        "y": 410
+      },
+      "label": "Avalonia.Controls.StackPanel",
+      "parent_index": 1,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 3,
+      "element_index": 5,
+      "element_token": "s00000008:5",
+      "enabled": true,
+      "frame": {
+        "h": 42,
+        "w": 195,
+        "x": 250,
+        "y": 456
+      },
+      "label": "Avalonia.Controls.StackPanel",
+      "parent_index": 1,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 3,
+      "element_index": 6,
+      "element_token": "s00000008:6",
+      "enabled": true,
+      "frame": {
+        "h": 42,
+        "w": 195,
+        "x": 250,
+        "y": 502
+      },
+      "label": "Avalonia.Controls.StackPanel",
+      "parent_index": 1,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 3,
+      "element_index": 7,
+      "element_token": "s00000008:7",
+      "enabled": true,
+      "frame": {
+        "h": 42,
+        "w": 195,
+        "x": 250,
+        "y": 548
+      },
+      "label": "Avalonia.Controls.StackPanel",
+      "parent_index": 1,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 3,
+      "element_index": 8,
+      "element_token": "s00000008:8",
+      "enabled": true,
+      "frame": {
+        "h": 42,
+        "w": 195,
+        "x": 250,
+        "y": 594
+      },
+      "label": "Avalonia.Controls.StackPanel",
+      "parent_index": 1,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 3,
+      "element_index": 9,
+      "element_token": "s00000008:9",
+      "enabled": true,
+      "frame": {
+        "h": 42,
+        "w": 195,
+        "x": 250,
+        "y": 640
+      },
+      "label": "Avalonia.Controls.StackPanel",
+      "parent_index": 1,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 1,
+      "element_index": 10,
+      "element_token": "s00000008:10",
+      "enabled": true,
+      "frame": {
+        "h": 160,
+        "w": 24,
+        "x": 450,
+        "y": 534
+      },
+      "label": "Avalonia.Controls.Border",
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "scroll"
+      ],
+      "depth": 2,
+      "element_index": 11,
+      "element_token": "s00000008:11",
+      "enabled": true,
+      "frame": {
+        "h": 540,
+        "w": 888,
+        "x": 494,
+        "y": 434
+      },
+      "role": "Pane"
+    },
+    {
+      "actions": [
+        "scroll"
+      ],
+      "depth": 3,
+      "element_index": 12,
+      "element_token": "s00000008:12",
+      "enabled": true,
+      "frame": {
+        "h": 807,
+        "w": 880,
+        "x": 494,
+        "y": 434
+      },
+      "parent_index": 11,
+      "role": "List"
+    },
+    {
+      "actions": [
+        "toggle"
+      ],
+      "depth": 4,
+      "element_index": 13,
+      "element_token": "s00000008:13",
+      "enabled": true,
+      "frame": {
+        "h": 32,
+        "w": 52,
+        "x": 1263,
+        "y": 454
+      },
+      "label": "已启用",
+      "parent_index": 12,
+      "role": "Button",
+      "selected": true
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 4,
+      "element_index": 14,
+      "element_token": "s00000008:14",
+      "enabled": true,
+      "frame": {
+        "h": 32,
+        "w": 32,
+        "x": 1325,
+        "y": 454
+      },
+      "label": "Avalonia.Controls.PathIcon",
+      "parent_index": 12,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "toggle"
+      ],
+      "depth": 4,
+      "element_index": 15,
+      "element_token": "s00000008:15",
+      "enabled": true,
+      "frame": {
+        "h": 32,
+        "w": 52,
+        "x": 1263,
+        "y": 863
+      },
+      "label": "已启用",
+      "parent_index": 12,
+      "role": "Button",
+      "selected": true
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 4,
+      "element_index": 16,
+      "element_token": "s00000008:16",
+      "enabled": true,
+      "frame": {
+        "h": 32,
+        "w": 32,
+        "x": 1325,
+        "y": 863
+      },
+      "label": "Avalonia.Controls.PathIcon",
+      "parent_index": 12,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "set_value"
+      ],
+      "depth": 3,
+      "element_index": 17,
+      "element_token": "s00000008:17",
+      "enabled": true,
+      "frame": {
+        "h": 540,
+        "w": 6,
+        "x": 1376,
+        "y": 434
+      },
+      "label": "PART_VerticalScrollBar",
+      "parent_index": 11,
+      "role": "ScrollBar"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 4,
+      "element_index": 18,
+      "element_token": "s00000008:18",
+      "enabled": true,
+      "label": "PART_PageUpButton",
+      "parent_index": 17,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 4,
+      "element_index": 19,
+      "element_token": "s00000008:19",
+      "enabled": true,
+      "frame": {
+        "h": 179,
+        "w": 6,
+        "x": 1376,
+        "y": 795
+      },
+      "label": "PART_PageDownButton",
+      "parent_index": 17,
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 1,
+      "element_index": 20,
+      "element_token": "s00000008:20",
+      "enabled": true,
+      "frame": {
+        "h": 32,
+        "w": 32,
+        "x": 1256,
+        "y": 234
+      },
+      "label": "安装",
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 1,
+      "element_index": 21,
+      "element_token": "s00000008:21",
+      "enabled": true,
+      "frame": {
+        "h": 32,
+        "w": 42,
+        "x": 1288,
+        "y": 234
+      },
+      "label": "最小化",
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 1,
+      "element_index": 22,
+      "element_token": "s00000008:22",
+      "enabled": true,
+      "frame": {
+        "h": 32,
+        "w": 42,
+        "x": 1330,
+        "y": 234
+      },
+      "label": "最大化或还原",
+      "role": "Button"
+    },
+    {
+      "actions": [
+        "invoke"
+      ],
+      "depth": 1,
+      "element_index": 23,
+      "element_token": "s00000008:23",
+      "enabled": true,
+      "frame": {
+        "h": 32,
+        "w": 42,
+        "x": 1372,
+        "y": 234
+      },
+      "label": "关闭",
+      "role": "Button"
+    }
+  ],
+  "elements_complete": false,
+  "pid": 30444,
+  "returned_element_count": 24,
+  "screenshot_file_path": "\\\\?\\D:\\AppData\\Github\\Loom-X\\.worktrees\\add-source-plugin-runtime-and-bridge\\openspec\\changes\\migrate-first-party-plugins-to-source-runtime\\.comet\\evidence\\final-mainwindow-source-plugins.png",
+  "screenshot_height": 758,
+  "screenshot_mime_type": "image/png",
+  "screenshot_width": 1178,
+  "snapshot_id": "s00000008",
+  "total_element_count": 24,
+  "tree_markdown": "- Window \"Loom-X\"\n  - Text \"Loom-X\"\n  - [0] Pane [actions=[scroll]]\n    - [1] List [actions=[scroll]]\n      - [2] Button \"Avalonia.Controls.StackPanel\" [help=\"概览\" actions=[invoke]]\n        - Text \"概览\"\n      - [3] Button \"Avalonia.Controls.StackPanel\" [help=\"AI 助手\" actions=[invoke]]\n        - Text \"AI 助手\"\n      - [4] Button \"Avalonia.Controls.StackPanel\" [help=\"网关\" actions=[invoke]]\n        - Text \"网关\"\n      - [5] Button \"Avalonia.Controls.StackPanel\" [help=\"提供商\" actions=[invoke]]\n        - Text \"提供商\"\n      - [6] Button \"Avalonia.Controls.StackPanel\" [help=\"活动\" actions=[invoke]]\n        - Text \"活动\"\n      - [7] Button \"Avalonia.Controls.StackPanel\" [help=\"插件\" actions=[invoke]]\n        - Text \"插件\"\n      - [8] Button \"Avalonia.Controls.StackPanel\" [help=\"控制台\" actions=[invoke]]\n        - Text \"控制台\"\n      - [9] Button \"Avalonia.Controls.StackPanel\" [help=\"设置\" actions=[invoke]]\n        - Text \"设置\"\n  - Text \"v0.12.6\"\n  - [10] Button \"Avalonia.Controls.Border\" [id=sidebarCollapseButton help=\"折叠侧边栏\" actions=[invoke]]\n  - Text \"插件\"\n  - Text \"查看已加载扩展、运行状态、能力与安全生命周期。\"\n    - Text \"已加载\"\n    - Text \"2 个插件\"\n    - Text \"运行中\"\n    - Text \"2 个已启用\"\n    - Text \"诊断\"\n    - Text \"0 条诊断\"\n    - [11] Pane [actions=[scroll]]\n      - [12] List [actions=[scroll]]\n        - Text \"凭据保护\"\n        - Text \"v0.7.0\"\n        - Text \"系统插件\"\n        - Text \"loomx.credential-protection\"\n        - [13] Button \"已启用\" [help=\"已启用\" actions=[toggle]]\n        - [14] Button \"Avalonia.Controls.PathIcon\" [help=\"打开插件详情\" actions=[invoke]]\n        - Text \"在 Router 请求链路中识别并掩码敏感凭据，向模型注入 placeholder 完整性约束，并在响应链路恢复原值。\"\n        - Text \"2 个扩展点\"\n        - Text \"credential.detect  ·  credential.mask  ·  credential.integrity-instruction  ·  credential.restore\"\n        - Text \"源码插件：可信代码边界\"\n        - Text \"仅安装或启用可信来源的源码插件。源码插件在 LoomX 同一进程中以当前用户权限执行，可访问该用户可访问的文件与网络。AssemblyLoadContext 仅负责加载与卸载，Bridge 仅是宿主服务边界；两者均不构成操作系统沙箱，不能隔离恶意代码。\"\n        - Text \"已脱敏请求\"\n        - Text \"0/0\"\n        - Text \"累计脱敏词项 0\"\n        - Text \"已还原回复\"\n        - Text \"0\"\n        - Text \"模型回复已成功还原\"\n        - Text \"异常与告警\"\n        - Text \"0\"\n        - Text \"请求或响应处理异常\"\n        - Text \"可以停用：停用只停止检测与替换新送出的明文。历史会话中已签发的凭据引用仍会识别、仍注入完整性指令并在响应中还原，判定依据是上下文中是否存在本插件注入的提示词。停用后新请求可能携带未经处理的凭据明文。\"\n        - Text \"工具结果压缩\"\n        - Text \"v0.2.0\"\n        - Text \"系统插件\"\n        - Text \"loomx.tool-result-compression\"\n        - [15] Button \"已启用\" [help=\"已启用\" actions=[toggle]]\n        - [16] Button \"Avalonia.Controls.PathIcon\" [help=\"打开插件详情\" actions=[invoke]]\n        - Text \"在 Router 请求链路中压缩历史工具调用结果：噪音过滤、重复行折叠、头尾截断与命令输出专用过滤，末尾若干条最新结果保留原文。\"\n        - Text \"1 个扩展点\"\n        - Text \"toolresult.compress  ·  toolresult.dedupe  ·  toolresult.truncate  ·  toolresult.summarize\"\n        - Text \"源码插件：可信代码边界\"\n        - Text \"仅安装或启用可信来源的源码插件。源码插件在 LoomX 同一进程中以当前用户权限执行，可访问该用户可访问的文件与网络。AssemblyLoadContext 仅负责加载与卸载，Bridge 仅是宿主服务边界；两者均不构成操作系统沙箱，不能隔离恶意代码。\"\n        - Text \"累计节省（估算）\"\n        - Text \"0 token\"\n        - Text \"较原文减少 0%\"\n        - Text \"已压缩请求\"\n        - Text \"0/0\"\n        - Text \"累计压缩工具结果 0 条\"\n        - Text \"异常与告警\"\n        - Text \"0\"\n        - Text \"处理失败时已放行原文\"\n        - Text \"可以停用：停用后不再改写请求正文，统计仍会继续。压缩不是数据安全能力，处理异常时一律放行原文，不会阻断请求。\"\n      - [17] ScrollBar [id=PART_VerticalScrollBar actions=[set_value]]\n        - [18] Button [id=PART_PageUpButton actions=[invoke]]\n        - [19] Button [id=PART_PageDownButton actions=[invoke]]\n  - [20] Button \"安装\" [id=updateEntryButton help=\"安装\" actions=[invoke]]\n    - Text \"安装\"\n  - [21] Button \"最小化\" [help=\"最小化\" actions=[invoke]]\n  - [22] Button \"最大化或还原\" [help=\"最大化或还原\" actions=[invoke]]\n  - [23] Button \"关闭\" [help=\"关闭\" actions=[invoke]]\n",
+  "window_bounds": {
+    "height": 760,
+    "width": 1180,
+    "x": 234,
+    "y": 234
+  },
+  "window_id": 63967560,
+  "window_title": "Loom-X"
+}

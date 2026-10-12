@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Xml.Linq;
 using LoomX.CredentialProtection;
 using LoomX.Plugins;
 using LoomX.ToolResultCompression;
@@ -60,19 +61,9 @@ public sealed class PluginPayloadLayoutTests
     {
         var project = File.ReadAllText(GetRepositoryFile("LoomX.Tests", "LoomX.Tests.csproj"));
 
-        // 镜像项必须直接指向 plugins/<id>/，不能改名、不能按程序集名分层。
+        Assert.Contains("FirstPartySourcePayload.targets", project, StringComparison.Ordinal);
         foreach (var pluginId in FirstPartyPluginIds)
-        {
-            Assert.Contains(
-                "plugins\\" + pluginId + "\\plugin.manifest.json",
-                project,
-                StringComparison.Ordinal);
-            Assert.Contains(
-                "plugins\\" + pluginId + "\\i18n\\%(Filename)%(Extension)",
-                project,
-                StringComparison.Ordinal);
-        }
-
+            Assert.Contains(@"$(OutputPath)plugins\" + pluginId + @"\%(PackageRelativePath)", project, StringComparison.Ordinal);
         Assert.DoesNotContain("plugin-manifests", project, StringComparison.Ordinal);
     }
 
@@ -106,6 +97,64 @@ public sealed class PluginPayloadLayoutTests
                 Assert.Equal(expected, Resolve(pluginId, culture));
             }
         }
+    }
+
+    [Theory]
+    [InlineData("loomx.credential-protection")]
+    [InlineData("loomx.tool-result-compression")]
+    public void TestOutput_ContainsExactSourcePackageWithoutBinaryDependencies(string pluginId)
+    {
+        var packageDirectory = Path.Combine(AppContext.BaseDirectory, "plugins", pluginId);
+        Assert.True(File.Exists(Path.Combine(packageDirectory, "GlobalUsings.cs")),
+            "源码包必须包含显式 GlobalUsings.cs，不能依赖静态 SDK 生成源码");
+        using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(packageDirectory, "plugin.manifest.json")));
+        var runtime = manifest.RootElement.GetProperty("runtime");
+        Assert.Equal("csharp-source", runtime.GetProperty("kind").GetString());
+        var sources = runtime.GetProperty("sources").EnumerateArray().Select(item => item.GetString()!).ToArray();
+        Assert.NotEmpty(sources);
+        Assert.All(sources, source =>
+        {
+            Assert.Equal(Path.GetFileName(source), source);
+            Assert.EndsWith(".cs", source, StringComparison.Ordinal);
+        });
+        var expected = sources.Concat(Cultures.Select(culture => "i18n/" + culture + ".json"))
+            .Append("plugin.manifest.json").Order(StringComparer.Ordinal).ToArray();
+        var actual = Directory.GetFiles(packageDirectory, "*", SearchOption.AllDirectories)
+            .Select(file => Path.GetRelativePath(packageDirectory, file).Replace(Path.DirectorySeparatorChar, '/'))
+            .Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(expected, actual);
+        var repositoryFolder = pluginId == CredentialProtectionPlugin.PluginId
+            ? "LoomX.CredentialProtection" : "LoomX.ToolResultCompression";
+        foreach (var relativePath in expected)
+            Assert.Equal(File.ReadAllBytes(GetRepositoryFile("plugins", repositoryFolder, relativePath)),
+                File.ReadAllBytes(Path.Combine(packageDirectory, relativePath)));
+    }
+
+    [Theory]
+    [InlineData("LoomX.CredentialProtection", "_CredentialPluginPayload")]
+    [InlineData("LoomX.ToolResultCompression", "_CompressionPluginPayload")]
+    public void SharedPayloadList_EqualsManifestSourcesAndFourCultures(string sourceFolder, string itemName)
+    {
+        using var manifest = JsonDocument.Parse(File.ReadAllText(GetRepositoryFile("plugins", sourceFolder, "plugin.manifest.json")));
+        var sources = manifest.RootElement.GetProperty("runtime").GetProperty("sources")
+            .EnumerateArray().Select(item => item.GetString()!).ToArray();
+        var topLevelSources = Directory.GetFiles(GetRepositoryFile("plugins", sourceFolder), "*.cs")
+            .Select(Path.GetFileName).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(topLevelSources, sources.Order(StringComparer.Ordinal).ToArray());
+        var payload = XDocument.Load(GetRepositoryFile("FirstPartySourcePayload.targets"));
+        Assert.Empty(payload.Descendants("Content"));
+        var items = payload.Descendants(itemName).ToArray();
+        Assert.All(items, item =>
+        {
+            var relativePath = (string)item.Attribute("PackageRelativePath")!;
+            Assert.Equal(@"$(MSBuildThisFileDirectory)plugins\" + sourceFolder + @"\" + relativePath,
+                (string?)item.Attribute("Include"));
+        });
+        var expected = sources.Concat(Cultures.Select(culture => "i18n/" + culture + ".json"))
+            .Append("plugin.manifest.json").Order(StringComparer.Ordinal).ToArray();
+        var actual = items.Select(item => ((string)item.Attribute("PackageRelativePath")!)
+            .Replace(Path.DirectorySeparatorChar, '/')).Order(StringComparer.Ordinal).ToArray();
+        Assert.Equal(expected, actual);
     }
 
     private static string[] FirstPartyPluginIds =>

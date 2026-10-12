@@ -2,7 +2,7 @@
 
 定义 Loom-X 在 Windows 登录后的可选自动启动行为，以及桌面应用跨运行周期恢复用户明确选择的网关运行意图。
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: 用户可以配置开机自启动
 

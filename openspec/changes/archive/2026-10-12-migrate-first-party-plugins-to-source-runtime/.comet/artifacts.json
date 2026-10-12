@@ -1,0 +1,9 @@
+{
+  "openspec_proposal": "openspec/changes/migrate-first-party-plugins-to-source-runtime/proposal.md",
+  "openspec_design": "openspec/changes/migrate-first-party-plugins-to-source-runtime/design.md",
+  "openspec_tasks": "openspec/changes/migrate-first-party-plugins-to-source-runtime/tasks.md",
+  "openspec_delta_spec": "openspec/changes/migrate-first-party-plugins-to-source-runtime/specs/first-party-source-plugins/spec.md",
+  "handoff_context": "openspec/changes/archive/2026-10-12-migrate-first-party-plugins-to-source-runtime/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/archive/2026-10-12-migrate-first-party-plugins-to-source-runtime/.comet/handoff/design-context.md",
+  "archive_directory": "openspec/changes/archive/2026-10-12-migrate-first-party-plugins-to-source-runtime"
+}

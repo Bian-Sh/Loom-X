@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace LoomX.Plugins.Host;
 
@@ -44,13 +45,31 @@ public static class ManifestParser
         }
 
         if (string.IsNullOrWhiteSpace(dto.Id)) errors.Add("Manifest 缺少必备字段 id。");
+        else if (dto.Id.Contains("..", StringComparison.Ordinal)
+                 || dto.Id.IndexOfAny(['/', '\\', ':', '<', '>', '"', '|', '?', '*']) >= 0
+                 || dto.Id.Any(char.IsControl)
+                 || dto.Id == "."
+                 || dto.Id.EndsWith('.')
+                 || dto.Id != dto.Id.Trim())
+            errors.Add("Manifest 的 id 不是安全的插件目录名称。");
         if (string.IsNullOrWhiteSpace(dto.Version)) errors.Add("Manifest 缺少必备字段 version。");
-        if (dto.Capabilities is null || dto.Capabilities.Count == 0)
+
+        var runtime = ParseRuntime(dto, errors);
+        var sourceRuntime = runtime?.Kind == "csharp-source";
+        if (dto.Capabilities is null || (!sourceRuntime && dto.Capabilities.Count == 0))
             errors.Add("Manifest 缺少必备字段 capabilities。");
-        if (dto.Extensions is null || dto.Extensions.Count == 0)
+        if (dto.Extensions is null || (!sourceRuntime && dto.Extensions.Count == 0))
             errors.Add("Manifest 缺少必备字段 extensions。");
-        if (string.IsNullOrWhiteSpace(dto.Assembly)) errors.Add("Manifest 缺少加载入口 assembly。");
-        if (string.IsNullOrWhiteSpace(dto.PluginType)) errors.Add("Manifest 缺少加载入口 plugin_type。");
+
+        var hostCapabilities = dto.HostCapabilities?.ToArray() ?? [];
+        var capabilityNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var capability in hostCapabilities)
+        {
+            if (capability is null || !Regex.IsMatch(capability, @"\A[A-Za-z0-9_.-]+/v[1-9][0-9]*\z", RegexOptions.CultureInvariant))
+                errors.Add("Manifest 的 host_capabilities 必须使用 <name>/v<正整数> 格式。");
+            else if (!capabilityNames.Add(capability))
+                errors.Add("Manifest 的 host_capabilities 包含重复声明。");
+        }
         if (errors.Count > 0) return null;
 
         var extensions = new List<PluginManifestExtension>(dto.Extensions!.Count);
@@ -127,11 +146,59 @@ public static class ManifestParser
         return new PluginManifest(
             dto.Id!,
             dto.Version!,
-            dto.Assembly!,
-            dto.PluginType!,
+            runtime!.Assembly ?? string.Empty,
+            runtime.EntryType,
             dto.Capabilities!.Where(item => !string.IsNullOrWhiteSpace(item)).ToArray(),
             extensions,
-            ui);
+            ui)
+        {
+            Runtime = runtime,
+            HostCapabilities = hostCapabilities,
+        };
+    }
+
+    private static PluginRuntimeManifest? ParseRuntime(ManifestDto dto, IList<string> errors)
+    {
+        if (dto.Runtime is null)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Assembly)) errors.Add("Manifest 缺少加载入口 assembly。");
+            if (string.IsNullOrWhiteSpace(dto.PluginType)) errors.Add("Manifest 缺少加载入口 plugin_type。");
+            return new PluginRuntimeManifest("assembly", dto.PluginType ?? string.Empty, dto.Assembly);
+        }
+
+        if (dto.HasAssembly || dto.HasPluginType)
+            errors.Add("Manifest 不得同时声明 runtime 与顶层 assembly/plugin_type 加载入口。");
+
+        var runtime = dto.Runtime;
+        if (runtime.Kind is not ("assembly" or "csharp-source"))
+            errors.Add("Manifest 的 runtime.kind 必须为 assembly 或 csharp-source。");
+        if (string.IsNullOrWhiteSpace(runtime.EntryType))
+            errors.Add("Manifest 缺少加载入口 runtime.entry_type。");
+        if (runtime.Kind == "assembly" && string.IsNullOrWhiteSpace(runtime.Assembly))
+            errors.Add("Manifest 缺少加载入口 runtime.assembly。");
+        if (runtime.Kind == "csharp-source")
+        {
+            if (runtime.Sources is null || runtime.Sources.Count == 0)
+                errors.Add("Manifest 的 runtime.sources 必须包含显式源码路径。");
+            else
+            {
+                // Windows 路径的大小写与分隔符别名不能让同一源码重复参与编译。
+                var sourcePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var source in runtime.Sources)
+                {
+                    if (string.IsNullOrWhiteSpace(source))
+                        errors.Add("Manifest 的 runtime.sources 包含空路径。");
+                    else if (!sourcePaths.Add(source.Replace('\\', '/')))
+                        errors.Add("Manifest 的 runtime.sources 包含重复路径。");
+                }
+            }
+        }
+
+        return new PluginRuntimeManifest(
+            runtime.Kind ?? string.Empty,
+            runtime.EntryType ?? string.Empty,
+            runtime.Assembly,
+            runtime.Sources?.ToArray());
     }
 
     private static bool TryParseKind(string? value, out ExtensionKind kind)
@@ -172,12 +239,28 @@ public static class ManifestParser
     {
         public string? Id { get; set; }
         public string? Version { get; set; }
-        public string? Assembly { get; set; }
+        private string? assembly;
+        private string? pluginType;
+        public string? Assembly { get => assembly; set { assembly = value; HasAssembly = true; } }
         [JsonPropertyName("plugin_type")]
-        public string? PluginType { get; set; }
+        public string? PluginType { get => pluginType; set { pluginType = value; HasPluginType = true; } }
+        [JsonIgnore]
+        public bool HasAssembly { get; private set; }
+        [JsonIgnore]
+        public bool HasPluginType { get; private set; }
+        public RuntimeDto? Runtime { get; set; }
+        public List<string>? HostCapabilities { get; set; }
         public List<string>? Capabilities { get; set; }
         public List<ExtensionDto>? Extensions { get; set; }
         public UiDto? Ui { get; set; }
+    }
+
+    private sealed class RuntimeDto
+    {
+        public string? Kind { get; set; }
+        public string? EntryType { get; set; }
+        public string? Assembly { get; set; }
+        public List<string>? Sources { get; set; }
     }
 
     private sealed class ExtensionDto

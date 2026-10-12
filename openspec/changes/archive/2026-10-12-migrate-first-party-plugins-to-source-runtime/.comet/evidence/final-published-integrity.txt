@@ -1,0 +1,3 @@
+loomx.credential-protection 全部负载内容与本次源码SHA256一致
+loomx.tool-result-compression 全部负载内容与本次源码SHA256一致
+修复后宿主PluginHost.dll SHA256=4CB86ABF016178A7708D14E01BAF1E2FECB82C3591C1E66DBA3D8DA6F222D858，与Release构建一致

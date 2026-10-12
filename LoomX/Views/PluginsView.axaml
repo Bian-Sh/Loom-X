@@ -75,7 +75,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate>
               <Border Classes="surface-card" Padding="16" Margin="0,0,0,10">
-                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="11">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="11">
                   <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                     <Border Width="38" Height="38" Background="{DynamicResource AccentSoftBrush}" CornerRadius="9">
                       <PathIcon Data="M 8,13 L 13,13 L 13,8 L 19,8 L 19,13 L 24,13 L 24,19 L 19,19 L 19,24 L 13,24 L 13,19 L 8,19 Z" Foreground="{DynamicResource AccentBrush}" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -110,13 +110,20 @@
                     <TextBlock Grid.Column="1" Text="{Binding CapabilitySummary}" Classes="tertiary" FontSize="11" TextWrapping="Wrap"/>
                   </Grid>
 
-                  <controls:PluginUiPresenter Grid.Row="3"
+                  <Border Grid.Row="3" IsVisible="{Binding IsSourcePlugin}" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9">
+                    <StackPanel Spacing="5">
+                      <TextBlock Text="{Binding SourceTrustTitle}" FontWeight="SemiBold" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap"/>
+                      <TextBlock Text="{Binding SourceTrustDescription}" FontSize="12" TextWrapping="Wrap"/>
+                    </StackPanel>
+                  </Border>
+
+                  <controls:PluginUiPresenter Grid.Row="4"
                                               Contributions="{Binding CardContributions}"
                                               IsVisible="{Binding HasCardUi}"
                                               IsInteractive="{Binding IsCardInteractive}"
                                               CommandSink="{Binding UiCommandSink}"/>
 
-                  <Border Grid.Row="4" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9">
+                  <Border Grid.Row="5" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9">
                     <Grid ColumnDefinitions="Auto,*" ColumnSpacing="9">
                       <PathIcon Data="M 16,5 L 27,10 L 27,17 C 27,24 22,29 16,31 C 10,29 5,24 5,17 L 5,10 Z M 11,17 L 15,21 L 22,13" Foreground="{DynamicResource AccentBrush}" Width="16" Height="16" VerticalAlignment="Top" Margin="0,1,0,0"/>
                       <TextBlock Grid.Column="1" Text="{Binding LifecycleNote}" Classes="muted" FontSize="11" TextWrapping="Wrap"/>
@@ -169,6 +176,12 @@
         <ScrollViewer Grid.Row="1" Margin="0,14,8,0" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="14">
             <TextBlock Text="{Binding SelectedPlugin.Description}" Classes="muted" TextWrapping="Wrap"/>
+            <Border IsVisible="{Binding SelectedPlugin.IsSourcePlugin}" Background="{DynamicResource SurfaceSubtleBrush}" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1" CornerRadius="8" Padding="12,9">
+              <StackPanel Spacing="5">
+                <TextBlock Text="{Binding SelectedPlugin.SourceTrustTitle}" FontWeight="SemiBold" Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding SelectedPlugin.SourceTrustDescription}" FontSize="12" TextWrapping="Wrap"/>
+              </StackPanel>
+            </Border>
             <controls:PluginUiPresenter Contributions="{Binding SelectedPlugin.DetailContributions}"
                                         IsInteractive="{Binding SelectedPlugin.IsDetailInteractive}"
                                         CommandSink="{Binding SelectedPlugin.UiCommandSink}"/>

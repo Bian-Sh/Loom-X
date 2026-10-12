@@ -1,0 +1,137 @@
+{
+  "date": "2026-10-12",
+  "productBaseline": "f066e16aeb5a2927337178902d13ba64e371deec",
+  "reviewer": "01a12ddc-9325-7752-a523-57198892c091",
+  "initialResult": "IMPORTANT I-1",
+  "followupResult": "PASS",
+  "critical": 0,
+  "important": 0,
+  "tasksPass": 44,
+  "requirementsPass": 33,
+  "scenariosPass": 82,
+  "originalRuntimeReviewRounds": 2,
+  "originalFeedbackReviewRounds": 2,
+  "finalIntegrationInitialReviews": 1,
+  "finalIntegrationTargetedFollowups": 1,
+  "published": "outputs/20261012-104237",
+  "nativeUi": "outputs/ui-reload-candidate-2026-10-12_10-48-00",
+  "trx": [
+    {
+      "path": "integration/VERIFY-FINAL.trx",
+      "sha256": "CD3B5AF2A2B2E16290B19DFE55CF81AF7C0CE65A5D3F8EA169BC7FDBD68CD14B",
+      "total": 1884,
+      "passed": 1884,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
+    },
+    {
+      "path": "integration-ui-fix/UI-RED.trx",
+      "sha256": "1F0AEDC6FE67FA9F387EA01589130E60912C1B3DCD99ED54B02553805C23666D",
+      "total": 12,
+      "passed": 2,
+      "failed": 10,
+      "notExecuted": 0,
+      "outcome": "Failed"
+    },
+    {
+      "path": "integration-ui-fix/UI-GREEN.trx",
+      "sha256": "148363F030529223BD58F42F3357D4963389EF35D4334DE4E2A2F5BF0FCBA763",
+      "total": 63,
+      "passed": 61,
+      "failed": 2,
+      "notExecuted": 0,
+      "outcome": "Failed"
+    },
+    {
+      "path": "integration-ui-fix/UI-GREEN-VERIFIED.trx",
+      "sha256": "25EF286B428B9BA745886037653AB24BA0C4655BA94A7274D6D698B46A2DE3A5",
+      "total": 63,
+      "passed": 63,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
+    },
+    {
+      "path": "integration-ui-fix/UI-ADJACENT-FINAL.trx",
+      "sha256": "BE1A75B10FDE2126B45389BC955DC7E2E8B920037B3BA366980B7860DA21939A",
+      "total": 71,
+      "passed": 71,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
+    },
+    {
+      "path": "integration-ui-fix/BUILD-UI-FIX-FULL.trx",
+      "sha256": "8DD242DB0479658237817BF539E0FEFA1BF1627BF89A03CF15919D940813A88D",
+      "total": 1896,
+      "passed": 1895,
+      "failed": 1,
+      "notExecuted": 0,
+      "outcome": "Failed"
+    },
+    {
+      "path": "integration-ui-fix/BUILD-UI-FIX-VERIFIED.trx",
+      "sha256": "3D41B20AB4CC92C9BE50A4E25E0328A698DE89667857BADCEDA1B66691B2AFDB",
+      "total": 1896,
+      "passed": 1896,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
+    },
+    {
+      "path": "integration-ui-fix/VERIFY-UI-FIX-FINAL.trx",
+      "sha256": "F7D577B65BAD2A96D67B2264613BA0BFAD522A1148848FE2E6B146A0DDF16CA5",
+      "total": 1896,
+      "passed": 1896,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
+    }
+  ],
+  "finalVerification": {
+    "productCommit": "d93074573d22be7d87503f55b3c7151dae54608f",
+    "inputBefore": "9d342ffb36a6fcc60568a824625d03c968603226226a80bc0e78cf79d7be0cd5",
+    "inputAfter": "9d342ffb36a6fcc60568a824625d03c968603226226a80bc0e78cf79d7be0cd5",
+    "changedDuringExecution": [],
+    "build": {
+      "exitCode": 0,
+      "warnings": 14,
+      "errors": 0,
+      "checkEpoch": 4,
+      "sequence": 30,
+      "log": "openspec/changes/add-source-plugin-runtime-and-bridge/.comet/checks/5b7a8b2c-bae2-4265-b624-f79f09ae840b.log",
+      "sha256": "9D33E6017F0C908B43293031E09E6B59B55E51968C9E7B5AA9B22E2C06EAB5A3",
+      "guardPassed": 14,
+      "guardTotal": 14
+    },
+    "verify": {
+      "exitCode": 0,
+      "checkEpoch": 5,
+      "sequence": 33,
+      "tier": "full",
+      "reused": false,
+      "passed": 1896,
+      "failed": 0,
+      "notExecuted": 0,
+      "log": "openspec/changes/add-source-plugin-runtime-and-bridge/.comet/checks/1ab26b98-426c-49ad-8e0f-9e0511e575b1.log",
+      "sha256": "1BAB568E54D766AE22CD500204C2B9C281E88BE294B710915E4B7A4C6C14A99C"
+    },
+    "guard": {
+      "exitCode": 0,
+      "passed": 5,
+      "total": 5,
+      "phase": "archive",
+      "verifyResult": "pass",
+      "checkEpoch": 6,
+      "verifiedAt": "2026-10-12",
+      "branchStatus": "pending",
+      "archiveConfirmation": "pending",
+      "archived": false,
+      "log": "openspec/changes/add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/VERIFY-GUARD-FINAL.json",
+      "sha256": "CB9816E588B4A3706EFC851E090368A1A002973E547EB10267228B356E1844D4"
+    },
+    "archiveAuthorized": false,
+    "evidenceBoundary": "原始大证据和发布产物保留本地；本索引记录原始文件的实际计数和 SHA-256，不替代 Runtime 命令执行记录。"
+  }
+}
