@@ -368,7 +368,7 @@ public sealed class AskUserSingleSelectFieldViewModel : AskUserFieldViewModel
 
     public string CustomInputPlaceholder => Field.CustomInputPlaceholder ?? ResourceLookup.Resolve("assistant.decision.custom_input_placeholder");
 
-    public int CustomInputMaxLength => Field.MaxLength ?? 1000;
+    public int CustomInputMaxLength => Field.MaxLength ?? (Field.IsCredentialName ? 200 : 1000);
 
     public string CustomInput
     {
@@ -493,7 +493,7 @@ public sealed class AskUserMultiSelectFieldViewModel : AskUserFieldViewModel
 
     public string CustomInputPlaceholder => Field.CustomInputPlaceholder ?? ResourceLookup.Resolve("assistant.decision.custom_input_placeholder");
 
-    public int CustomInputMaxLength => Field.MaxLength ?? 1000;
+    public int CustomInputMaxLength => Field.MaxLength ?? (Field.IsCredentialName ? 200 : 1000);
 
     public string CustomInput
     {
@@ -612,7 +612,7 @@ public sealed class AskUserTextFieldViewModel : AskUserFieldViewModel
 
     public bool IsMultiline => Field.IsMultiline;
 
-    public int MaxLength => Field.MaxLength ?? 1000;
+    public int MaxLength => Field.MaxLength ?? (Field.IsCredentialName ? 200 : 1000);
 
     protected override object GetValueCore() => TextValue;
 

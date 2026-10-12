@@ -1,38 +1,68 @@
 ﻿# New-API 系中转站接入
 
-## 识别特征
+## 适用范围与入口
 
-New-API / One-API 及其衍生面板（Sub2API 等）的共同特征：
+用户只需提供站点链接和接入目标，例如“把这个站点接入 LoomX”。密钥分支、命名、验证与收尾由本 Skill 编排，不要求用户提供工具步骤或提示词。未知面板先读取真实页面识别；New-API、One-API、Sub2API 等面板通常有令牌或 API 密钥管理和 OpenAI 兼容接口，但常见路径只是线索，实际地址和协议必须以页面文档为准。
 
-- 网页控制台有"令牌 / Token / API Key"管理页，Key 通常 `sk-` 开头。
-- 对外是 OpenAI 兼容接口：`{站点地址}/v1/chat/completions`、`{站点地址}/v1/models`。
-- 渠道（Channel）概念：一个 Key 可限定可用模型分组。
+## 接入前检查
 
-## 标准接入流程
+1. 能力不明确时先用 `loomx.get_capabilities` 查询 provider/model/browser 类别；参数错误时指定 `tool_name` 查看当前完整 schema，不重复猜参数。调用 `loomx.list_providers` 读取现状，避免重复新增或误改已有配置；完整接入资料已给出时直接走配置验证，不启动浏览器。
+2. 调用 `loomx.test_url` 验证用户链接可达性。HTTP 可达与鉴权成功、模型可用是不同结论。
+3. 已加载本 Skill 后仍需由 AI 判断链接与新增 Provider 意图，确实缺少页面资料才走浏览器流程。
 
-1. 用户提供站点地址与 Key；若让用户在浏览器中操作，走"浏览器自动配置流程"。
-2. Base URL = 站点根地址 + `/v1`（例如 `https://relay.example.com/v1`）。
-3. 走 generic-openai-compatible 流程：create_provider → test_provider → create_model → create_combo → update_endpoint。
-4. 中转站模型名与上游一致（如 `gpt-4o`、`claude-sonnet-4-5`），family 按模型实际系列填写。
+## Browser Bridge Session 租约
 
-## 浏览器自动配置流程（Browser Bridge）
+- 是否启动由 AI 根据用户消息与上下文判断：只有用户提供了链接并希望新增 Provider，且确实需要读取页面时才调用 `browser.bridge_start`。新建或恢复会话、普通对话、仅提供链接、查看或修改已有 Provider、加载本 Skill 都不得触发连接。
+- 使用系统提示中的“当前 Assistant Session ID”作为 `assistant_session_id`，不得传入其他 Session ID。
+- 浏览器操作结束时主动调用 `browser.close` 关闭本流程新建的自动化页，再调用 `browser.bridge_stop` 释放同一 Session 租约。
+- 新建、切换、离开或关闭 Session UI 不会自动释放租约。删除 Session 仅清理意外残留；失败或取消的宿主兜底不能替代 AI 主动收尾。多个 Session 可共享 Bridge，不释放其他 Session。
 
-### Browser Bridge Session 租约
+## 从真实页面读取资料
 
-- 系统提示会给出“当前 Assistant Session ID”。需要使用浏览器前，先调用 `browser.bridge_start`，把该 ID 作为 `assistant_session_id`。
-- 只有 AI 确认本 Session 已完成全部浏览器操作后，才主动调用 `browser.bridge_stop` 释放同一 `assistant_session_id`；不得传入或释放其他 Session ID。
-- 新建、切换、离开或关闭 Session UI 都不会自动释放租约。删除 Session 只会在存在意外残留时尝试被动清理，不能替代 AI 的正常主动释放。
-- 多个 Session 可共享单例 Bridge；释放自己的租约后若仍有其他 Session 使用，Bridge 会继续运行。
+1. `browser.open` 打开授权控制台，保存其 `target_id` 和 `session_id`，后续按工具 schema 分别传入，不混用。
+2. `browser.wait` 后调用 `browser.read`。遇到登录、CAPTCHA、2FA、Cloudflare 或 JS challenge，暂停交还用户，不尝试绕过。
+3. 从 `links`/`controls` 的真实 `href`、`selector` 找密钥页和文档；必要时按 selector 读 HTML。禁止猜测 `/api-keys`、CSS 选择器、API Base URL 或协议。每次导航、弹窗或提交之后重新读取控件，旧 selector 不保证仍有效。
+4. 点击找不到控件时重新 `browser.read`，核对当前页面与 selector；不要用截图 base64 猜测页面。截图当前只是编码字符串，并不等于模型已经获得图像视觉输入。不要连续截图或重复失败参数。
+5. `browser.network` 只提供实际请求方法、地址、状态与 Header 线索，不包含响应正文；不得声称从该工具读到了模型列表或新建密钥响应。控制台内部 API 不等于推理 API。
 
-用户说"帮我配置这个中转站"且只给了网址时：
+## 密钥选择与创建
 
-1. `browser.open` 打开站点控制台。只允许自动化标签页，不要碰用户其他标签页。
-2. `browser.read` 判断登录态；未登录 / CAPTCHA / 2FA 时发出 WaitingForUser，等用户完成后再继续，不要反复催促。
-3. 进入"令牌 / Token"页，`browser.read`（必要时 `browser.click` 新建令牌）获取 Key。
-   页面中的 Key 会被自动收割进 Secret Store，你只会看到 `secret_ref`——这是正常且必须的。
-4. `browser.network` 查看控制台实际调用的 API：Base URL、`/v1/models` 响应里的模型清单往往比页面文字更可靠。
-5. `loomx.create_provider` 用 `api_key_secret_ref` 引用收割的 Key（不要试图拼出明文）。
-6. 按标准流程建 Models、Combo 并逐项 test。结束后 `browser.close` 清理现场。
+先在真实密钥页读取全部名称；若有分页，按实际下一页控件逐页读取全部真实名称。不要在选择前创建、重置或删除密钥，也不要只列第一项。
+
+已有密钥时用一个 `purpose="credential_name"` 的 `single_select` 字段列出全部真实名称，选项 ID 为稳定非敏感标识，不得使用密钥值；设置 `allow_custom_input=true`、`custom_input_placeholder="输入新密钥名称"`、`max_length=100`。问题明确：选已有项表示复用；自定义名称非空表示创建新密钥，提交后按该名称创建并继续接入。选择和自由输入分别保留在 `values` 与 `custom_inputs`；自定义名称非空按明确约定创建，否则复用所选项，不替用户清空任何字段。不要新增独立 text 字段，避免分成两个页面。
+
+没有密钥时直接请求名称，设置 `purpose="credential_name"` 和 `default_text="LoomX"`，使用下面的结构，不询问是/否：
+
+```json
+{
+  "title": "创建 API 密钥",
+  "question": "输入密钥名称；提交后创建该名称的密钥并继续接入。",
+  "impact_summary": "将在当前站点创建持久 API 访问凭据。",
+  "fields": [{
+    "id": "key_name",
+    "label": "密钥名称",
+    "type": "text",
+    "purpose": "credential_name",
+    "is_required": true,
+    "default_text": "LoomX",
+    "max_length": 100
+  }],
+  "allow_cancel": true
+}
+```
+
+名称与凭据值是不同数据。名称字段必须声明 `purpose="credential_name"`，用于列出真实名称或取名，不能用于索取密钥值。默认 general 会保守拦截英文 Key/Token 等词，不要因校验失败改成无意义的 Q/a/b 或是/否测试；先核对当前 schema 与字段用途。用户可直接提交默认值 `LoomX` 或自定义。提交即确认创建，不追加二元确认；取消则停止创建。根据真实创建表单填写名称、采用页面可选的最小权限，提交后重新读取成功提示和列表，不把打开弹窗当成创建成功。失败先读取错误摘要，禁止反复提交造成重复密钥。
+
+已有密钥仅使用页面允许查看或复制的值；只显示掩码时不能猜测或重置。凭据由统一 Credential Protection 在 Provider 请求边界转成长期本地引用；`api_key` 传完整引用并保持原样，不使用不存在的 `api_key_secret_ref`，不向用户索要明文，不把凭据写入回复或日志。无法取得凭据时明确缺少的页面能力，不能假装已经接入。
+
+## 配置与完整验证
+
+1. 从真实文档获取 Base URL、模型列表地址与协议。常见 `/v1`、`/models`、`/chat/completions`、`/responses` 只能作为线索，不据此盲目拼接。
+2. 加载 `providers/generic-openai-compatible`；调用 `loomx.create_provider` 使用当前 schema 的 `business_id`、`display_name`、`base_url`、`api_mode`、`endpoint_format` 和 `api_key`，再调用 `loomx.test_provider`。
+3. `test_provider` 的 `models` 是实际模型 ID；`loomx.fetch_provider_models` 可只读获取完整元数据；页面提供自定义模型列表 URL 时用 `loomx.set_provider_model_list_url` 只修改该字段，空值恢复默认。用户希望导入模型时调用 `loomx.sync_provider_models`，等同模型页获取按钮，保留已有模型与配置；少量指定模型也可按真实 ID 创建。不得把来源猜成模型接口、额度或上下文规格。
+4. 调用 `loomx.get_model_api` 确认具体模型实际协议、HTTP 方法、主机、路径与代理状态，再用 `loomx.test_model` 发送最小真实请求。Provider 列表通过不代表具体模型通过；200 但响应结构无效也不是成功。
+5. Combo 或 Endpoint 绑定只有在用户要求时修改，读取并保留已有绑定；仅新增 Provider 时不要自动替换网关配置。
+6. 无论成功或可恢复失败，关闭本流程新建的自动化页并释放自己的 Bridge 租约。回复只列安全配置摘要、可达性/模型测试结果和实际限制，不宣称未完成的步骤成功。
 
 ## 需要代理的中转站
 
@@ -60,9 +90,9 @@ New-API / One-API 及其衍生面板（Sub2API 等）的共同特征：
 
 处理流程：
 1. 用 `browser.network` 抓取站点控制台（或官方客户端）真实的 API 请求，对比其中的 `User-Agent` 与自定义头。
-   （`Authorization` 会被收割成 secret_ref，看不到明文是正常的。）
+   （`Authorization` 由 Credential Protection 统一处理，不要索取明文。）
 2. `loomx.create_provider` / `update_provider` 的 `headers` 参数补齐这些头（例如 `{"User-Agent":"...","X-Client":"..."}`）。
-   头值里若含 Secret，会被自动收割，按 secret_ref 引用即可。
+   头值里若含 Secret，会被自动收割，按完整凭据引用原样传入工具即可。
 3. 重新 `test_provider` / `test_model` 验证。
 4. 提醒用户：绕过客户端校验可能违反中转站条款，由其自行权衡；且站点可能随时升级校验导致失效。
 
@@ -76,3 +106,10 @@ New-API / One-API 及其衍生面板（Sub2API 等）的共同特征：
 
 - Key 只通过工具参数写入 Secret Store，绝不出现在聊天与日志里。
 - 若用户贴了完整 Key 在对话中，提醒该 Key 已暴露，建议在中转站后台重置。
+
+## 可达性与具体模型接口测试
+
+- 仅验证用户提供的网址可达性时调用 `loomx.test_url`，不进入 Browser Bridge 流程。`reachable` 表示收到HTTP响应；401/403也说明网络已到达，不能把它说成模型测试成功。
+- `loomx.test_provider` 的 `models` 返回实际模型ID，按这些ID配置模型，不从模型数量猜测名称。
+- 配置后用 `loomx.get_model_api` 查看具体模型的协议、方法、主机与请求路径，再用 `loomx.test_model` 发起真实请求。根据页面/网络证据设置 Provider 的 `endpoint_format`，不要把 Responses 与 Chat Completions 混用。
+- 工具调用历史可能隐藏参数，每次按当前工具schema重建参数；不要复制 `summary` 或隐藏摘要。参数错误先检查schema与实际工具结果，不要反复重试同样错误。

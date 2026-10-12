@@ -34,6 +34,7 @@ public static class LoomXTools
         ArgumentNullException.ThrowIfNull(tester);
         ArgumentNullException.ThrowIfNull(skillStore);
 
+        RegisterCapabilityTools(registry);
         RegisterStatusTools(registry, configuration, configurationProvider, gatewayStateHub);
         RegisterProviderTools(registry, configuration);
         RegisterModelTools(registry, configuration);
@@ -42,6 +43,47 @@ public static class LoomXTools
         RegisterTestTools(registry, tester);
         RegisterSkillTools(registry, skillStore);
     }
+
+    private static void RegisterCapabilityTools(ToolRegistry registry)
+    {
+        registry.Register(new ToolDefinition
+        {
+            Name = "loomx.get_capabilities",
+            Description = "按需查询当前可用工具能力；category 返回简洁分类索引，tool_name 返回该工具的完整参数 schema。只查询能力，不连接浏览器，不读取配置凭据。",
+            ParametersSchema = Schema("""{"type":"object","properties":{"category":{"type":"string","enum":["all","provider","model","browser","interaction","skill","other"]},"tool_name":{"type":"string"}}}"""),
+            RiskLevel = ToolRiskLevel.Read,
+            Handler = (args, _) => Task.FromResult(Guard(() =>
+            {
+                var category = GetString(args, "category") ?? "all";
+                var name = GetString(args, "tool_name");
+                if (category is not ("all" or "provider" or "model" or "browser" or "interaction" or "skill" or "other"))
+                    throw new ArgumentException("能力分类无效。");
+                var tools = registry.All.Where(tool => name is not null
+                    ? string.Equals(tool.Name, name, StringComparison.OrdinalIgnoreCase)
+                    : category == "all" || CapabilityCategory(tool.Name) == category)
+                    .OrderBy(tool => tool.Name, StringComparer.Ordinal).ToArray();
+                if (name is not null && tools.Length == 0) throw new KeyNotFoundException("能力不存在。");
+                return Ok(new JsonObject
+                {
+                    ["tools"] = new JsonArray(tools.Select(tool => (JsonNode?)new JsonObject
+                    {
+                        ["name"] = tool.Name, ["category"] = CapabilityCategory(tool.Name),
+                        ["description"] = tool.Description, ["risk_level"] = tool.RiskLevel.ToString(),
+                        ["required"] = tool.ParametersSchema["required"]?.DeepClone() ?? new JsonArray(),
+                        ["parameter_names"] = new JsonArray((tool.ParametersSchema["properties"] as JsonObject ?? new JsonObject())
+                            .Select(item => (JsonNode?)JsonValue.Create(item.Key)).ToArray()),
+                        ["parameters_schema"] = name is null ? null : tool.ParametersSchema.DeepClone(),
+                    }).ToArray()),
+                });
+            })),
+        });
+    }
+
+    private static string CapabilityCategory(string name) => name.StartsWith("browser.", StringComparison.Ordinal) ? "browser"
+        : name.StartsWith("assistant.", StringComparison.Ordinal) ? "interaction"
+        : name.StartsWith("skill.", StringComparison.Ordinal) ? "skill"
+        : name.Contains("model", StringComparison.Ordinal) ? "model"
+        : name.Contains("provider", StringComparison.Ordinal) ? "provider" : "other";
 
     /// <summary>
     /// 注册 loomx.diagnose：对 Provider 调起 Diagnostic Subagent 做分层诊断。
@@ -212,6 +254,21 @@ public static class LoomXTools
             {
                 var provider = await configuration.UpdateProviderAsync(RequireGuid(args, "id"), ReadProviderInput(args), cancellationToken);
                 return Ok(ToSafeJson(provider, includeModels: false));
+            }),
+        });
+
+        registry.Register(new ToolDefinition
+        {
+            Name = "loomx.set_provider_model_list_url",
+            Description = "仅修改 Provider 模型页的自定义模型获取 URL；null 或空串恢复默认 base_url/models。保留其余配置、模型和凭据，不发网络请求。",
+            ParametersSchema = Schema("""{"type":"object","properties":{"id":{"type":"string","description":"Provider Guid 或 business_id"},"model_list_url":{"type":["string","null"]}},"required":["id","model_list_url"]}"""),
+            RiskLevel = ToolRiskLevel.Write,
+            Handler = async (args, cancellationToken) => await GuardAsync(async () =>
+            {
+                if (args is not JsonObject obj || !obj.ContainsKey("model_list_url")) throw new ArgumentException("缺少模型列表地址字段。");
+                var provider = await FindProviderAsync(configuration, RequireString(args, "id"), cancellationToken);
+                var changed = await configuration.UpdateProviderModelListUrlAsync(provider.Id, GetString(args, "model_list_url"), cancellationToken);
+                return Ok(ToSafeJson(changed, includeModels: false));
             }),
         });
 
@@ -545,10 +602,48 @@ public static class LoomXTools
 
     private static void RegisterTestTools(ToolRegistry registry, AssistantTester tester)
     {
+        foreach (var synchronize in new[] { false, true })
+        {
+            var sync = synchronize;
+            registry.Register(new ToolDefinition
+            {
+                Name = sync ? "loomx.sync_provider_models" : "loomx.fetch_provider_models",
+                Description = sync ? "等同 Provider 模型页获取模型：按自定义模型URL或默认地址获取并新增/更新模型元数据，保留现有模型、本地覆盖与凭据，不自动修改网关绑定。"
+                    : "只读获取 Provider 真实远端模型列表和元数据，复用模型页获取与解析逻辑；遵循自定义模型URL，不写配置，不返回响应正文或凭据。",
+                ParametersSchema = Schema("""{"type":"object","properties":{"id":{"type":"string","description":"Provider Guid 或 business_id"}},"required":["id"]}"""),
+                RiskLevel = sync ? ToolRiskLevel.Write : ToolRiskLevel.External,
+                Timeout = TimeSpan.FromSeconds(45),
+                Handler = async (args, cancellationToken) => await GuardAsync(async () =>
+                {
+                    var result = await tester.GetProviderModelsAsync(RequireString(args, "id"), sync, cancellationToken);
+                    return sync && result["synced"]?.GetValue<bool>() != true ? ToolResult.SafeFail(result.ToJsonString(OutputJsonOptions)) : Ok(result);
+                }),
+            });
+        }
+
+
+        registry.Register(new ToolDefinition
+        {
+            Name = "loomx.test_url",
+            Description = "验证用户提供的HTTP/HTTPS网址可达性，无需新增Provider或连接Chrome。返回网络可达、HTTP成功、状态码与耗时；不返回正文，不携带Provider凭据。",
+            ParametersSchema = Schema("""{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}"""),
+            Timeout = TimeSpan.FromSeconds(35),
+            RiskLevel = ToolRiskLevel.External,
+            Handler = async (args, cancellationToken) => await GuardAsync(async () => Ok(await tester.TestUrlAsync(RequireString(args, "url"), cancellationToken))),
+        });
+        registry.Register(new ToolDefinition
+        {
+            Name = "loomx.get_model_api",
+            Description = "读取已配置模型实际使用的协议、HTTP方法、主机、端口、请求路径、代理状态及Header名。不会返回凭据或Header值；测试模型前可用来确认具体接口。",
+            ParametersSchema = Schema("""{"type":"object","properties":{"id":{"type":"string","description":"模型Guid"}},"required":["id"]}"""),
+            RiskLevel = ToolRiskLevel.Read,
+            Handler = async (args, cancellationToken) => await GuardAsync(async () => Ok(await tester.GetModelApiAsync(RequireGuid(args, "id"), cancellationToken))),
+        });
+
         registry.Register(new ToolDefinition
         {
             Name = "loomx.test_provider",
-            Description = "测试 Provider 连通性：请求其模型列表接口，返回 reachability/鉴权/模型数/耗时与结构化诊断结论。",
+            Description = "测试 Provider 连通性：请求其模型列表接口，返回 reachability/鉴权/实际模型ID列表/模型数/耗时与结构化诊断结论。",
             ParametersSchema = Schema("""{"type":"object","properties":{"id":{"type":"string","description":"Provider Guid 或 business_id"}},"required":["id"]}"""),
             Timeout = TimeSpan.FromSeconds(30),
             RiskLevel = ToolRiskLevel.External,
@@ -559,7 +654,7 @@ public static class LoomXTools
         registry.Register(new ToolDefinition
         {
             Name = "loomx.test_model",
-            Description = "测试单个模型：按其协议发起一次最小 Chat 请求，返回成功与否、状态码、耗时与诊断结论。",
+            Description = "测试单个模型：按Provider的Responses/Chat或原生协议发起一次最小请求，返回成功与否、状态码、耗时与诊断结论。",
             ParametersSchema = Schema("""{"type":"object","properties":{"id":{"type":"string","description":"模型 Guid"}},"required":["id"]}"""),
             Timeout = TimeSpan.FromSeconds(30),
             RiskLevel = ToolRiskLevel.External,
@@ -603,6 +698,11 @@ public static class LoomXTools
         registry.Register(new ToolDefinition
         {
             Name = "skill.load",
+            SafeArgumentsProjector = args =>
+            {
+                var manifest = skillStore.List().FirstOrDefault(item => item.Category == GetString(args, "category") && item.Name == GetString(args, "name"));
+                return manifest is null ? new JsonObject() : new JsonObject { ["category"] = manifest.Category, ["name"] = manifest.Name };
+            },
             Description = "加载指定 Skill 的知识内容（识别、配置路径、修改/备份/恢复/验证/测试方法）。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{

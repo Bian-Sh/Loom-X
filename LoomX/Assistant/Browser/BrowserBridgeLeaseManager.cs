@@ -14,7 +14,7 @@ public interface IBrowserBridgeLifecycle
 
 /// <summary>
 /// 以 Assistant Session ID 管理进程内单例 Browser Bridge 的租约。
-/// 正常释放只由 AI 主动调用；删除 Session 仅使用同一入口清理意外残留。
+/// 正常释放由 AI 主动调用；删除 Session 或运行失败、取消时使用同一入口清理意外残留。
 /// </summary>
 public sealed class BrowserBridgeLeaseManager
 {

@@ -140,6 +140,20 @@ public sealed class ConfigurationManagementService(
         return ToResponse(provider);
     }
 
+    /// <summary>仅更新模型列表地址，保留其余配置与凭据。</summary>
+    public async Task<ProviderResponse> UpdateProviderModelListUrlAsync(Guid id, string? modelListUrl, CancellationToken cancellationToken = default)
+    {
+        var normalized = NormalizeOptionalModelListUrl(modelListUrl);
+        if (normalized is not null && !string.IsNullOrEmpty(new Uri(normalized).UserInfo)) throw new ArgumentException("模型列表地址不得含内嵌凭据。");
+        await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);
+        var provider = await db.Providers.Include(item => item.Models).SingleOrDefaultAsync(item => item.Id == id, cancellationToken)
+            ?? throw new KeyNotFoundException("Provider 不存在。");
+        provider.ModelListUrl = normalized;
+        await db.SaveChangesAsync(cancellationToken);
+        await ReloadProviderAsync(cancellationToken);
+        return ToResponse(provider);
+    }
+
     public async Task DeleteProviderAsync(Guid id, CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);

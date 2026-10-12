@@ -19,6 +19,26 @@ public sealed class BrowserToolsTests
     }
 
     [Fact]
+    public void 浏览器历史只保留安全会话标识而不保留页面或输入内容()
+    {
+        Assert.True(registry.TryGet("browser.read", out var tool));
+        var call = ToolCallProjection.Project(new ToolCall("call", "browser.read",
+            "{\"session_id\":\"session-7\",\"selector\":\"敏感测试值\"}"), tool);
+        Assert.Equal("session-7", JsonNode.Parse(call.ArgumentsJson)!["session_id"]?.GetValue<string>());
+        Assert.DoesNotContain("敏感测试值", call.ArgumentsJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BridgeStart_说明要求模型确认链接与新增Provider意图()
+    {
+        Assert.True(registry.TryGet("browser.bridge_start", out var tool));
+        Assert.Contains("由 AI 判断", tool!.Description, StringComparison.Ordinal);
+        Assert.Contains("用户提供了链接并希望新增 Provider", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("确实需要读取页面", tool.Description, StringComparison.Ordinal);
+        Assert.Contains("不得在新建会话、普通对话或仅收到链接时调用", tool.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Registers_ElevenBrowserTools()
     {
         var expected = new[]

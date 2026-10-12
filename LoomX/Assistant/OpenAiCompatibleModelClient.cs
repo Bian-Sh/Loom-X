@@ -677,7 +677,8 @@ public sealed class OpenAiCompatibleModelClient : IModelClient
                         ["function"] = new JsonObject
                         {
                             ["name"] = ResolveWireToolName(call.Name, toolNames),
-                            ["arguments"] = call.ArgumentsJson,
+                            ["arguments"] = ToolCallProjection.ToModelArgumentsJson(call,
+                                request.Tools.FirstOrDefault(tool => tool.Name == call.Name)?.ParametersSchema),
                         },
                     });
                 }

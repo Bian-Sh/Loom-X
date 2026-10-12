@@ -40,13 +40,15 @@ Read → Backup → Patch → Validate → Test → Restart if necessary → Ver
 
 ## Secret 边界
 
-- 工具输出中的 api_key 永远是 `{"configured": true, "secret_ref": "secret://..."}`。
+- Provider 工具只返回 `api_key_configured` 状态，不返回已保存凭据；浏览器读取到的凭据由统一 Credential Protection 在 Provider 请求边界替换为完整本地凭据引用。
 - 不要试图向用户或上下文中索取、复述已保存的 Key。
 - 用户给新 Key 时，直接通过 create/update 工具的 api_key 参数写入，它会被 DPAPI 加密保存，不会回显。
 
 ## 常用工具流程
 
 - 查看状态：loomx.get_status → loomx.list_providers / list_combos / list_endpoints
-- 新增 Provider：loomx.create_provider → loomx.create_model → loomx.create_combo（挂 model_ids）→ loomx.update_endpoint（绑定 Combo）→ loomx.test_provider / test_model
+- 新增 Provider：先查询能力并加载领域 Skill。只有站点链接且需要读取控制台资料时加载 `relays/new-api` 的浏览器与密钥编排；完整接入资料已给出时加载 `providers/generic-openai-compatible`。用户只需提供链接与接入目标，无需编写工具步骤。Combo 和 Endpoint 绑定仅在用户明确要求时修改。
+- 查询能力：`loomx.get_capabilities` 按分类提供工具索引；指定 `tool_name` 返回完整 schema，参数报错先读取该契约。
+- 模型页能力：`loomx.fetch_provider_models` 只读获取；`loomx.sync_provider_models` 等同获取模型按钮并新增/更新模型；`loomx.set_provider_model_list_url` 仅修改自定义模型 URL，保留其他 Provider 配置。
 - 连接被拒（Connection refused / 主机积极拒绝）：先看 loomx.get_status 的 `gateway` 字段。`running: false` 说明网关未启动（配置层完全正常也会被拒），提示用户在概览页点"启动网关"；`running: true` 才继续排查端口/防火墙/跨机访问。
 - 上游排障：loomx.test_provider → loomx.test_model → 根据 diagnosis（auth_failed / unreachable / timeout / model_not_found 等）解释原因

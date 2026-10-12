@@ -35,6 +35,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     private DispatcherTimer? elapsedTimer;
     private AssistantSessionItemViewModel? selectedSession;
     private ChatMessageViewModel? streamingMessage;
+    private string pendingWhitespace = string.Empty;
     private ChatMessageViewModel? currentGroup;
     private bool suppressSelectionLoad;
     private bool isModelPickerOpen;
@@ -716,6 +717,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
                 IsRunning = false;
                 if (!hasPersistenceWarning) StatusText = string.Empty;
                 streamingMessage = null;
+                pendingWhitespace = string.Empty;
                 currentGroup = null;
                 RefreshSessions();
                 if (string.Equals(service.CurrentSession.Id, sessionId, StringComparison.Ordinal))
@@ -887,16 +889,29 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             case AgentEventKind.SessionStarted:
                 // 新用户轮次只切断上一轮引用；没有最终内容的旧过程不能冒充“已完成”。
                 streamingMessage = null;
+                pendingWhitespace = string.Empty;
                 currentGroup = null;
                 break;
 
             case AgentEventKind.StepStarted:
                 // step 只切换阶段性正文；整轮的思考与工具调用仍归入同一个父 foldout。
                 streamingMessage = null;
+                pendingWhitespace = string.Empty;
                 break;
 
             case AgentEventKind.TextDelta:
-                streamingMessage ??= AppendStreamingMessage(agentEvent.Timestamp);
+                // 延迟到实际正文到达才创建气泡，保留同一消息的开头缩进。
+                if (streamingMessage is null && string.IsNullOrWhiteSpace(agentEvent.Text))
+                {
+                    pendingWhitespace += agentEvent.Text;
+                    break;
+                }
+                if (streamingMessage is null)
+                {
+                    streamingMessage = AppendStreamingMessage(agentEvent.Timestamp);
+                    streamingMessage.Append(pendingWhitespace);
+                    pendingWhitespace = string.Empty;
+                }
                 streamingMessage.Append(agentEvent.Text ?? string.Empty);
                 break;
 
@@ -910,6 +925,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             case AgentEventKind.MessageCompleted:
                 if (agentEvent.Message is { Role: ChatRole.Assistant } assistantMessage)
                 {
+                    pendingWhitespace = string.Empty;
                     if (streamingMessage is not null) streamingMessage.IsStreaming = false;
                     if (assistantMessage.ToolCalls.Count > 0)
                     {
@@ -921,6 +937,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
                     {
                         FinishCurrentGroup(agentEvent.Timestamp);
                         streamingMessage = null;
+                        pendingWhitespace = string.Empty;
                     }
                 }
                 else if (agentEvent.Message is { Role: ChatRole.Tool } toolMessage)
@@ -931,12 +948,14 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
 
             case AgentEventKind.ToolCallStarted:
                 streamingMessage = null;
+                pendingWhitespace = string.Empty;
                 EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), StepLabel)
                     .RegisterToolCall(agentEvent.ToolCallId, agentEvent.ToolName);
                 break;
 
             case AgentEventKind.ToolApprovalRequested:
                 streamingMessage = null;
+                pendingWhitespace = string.Empty;
                 EnsureGroupItem(EnsureGroup(agentEvent.Timestamp), StepLabel)
                     .Append(string.Format(ResourceLookup.Resolve("assistant.step.approval"), agentEvent.ToolName) + "\n");
                 break;
@@ -963,6 +982,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
                 if (streamingMessage is not null) streamingMessage.IsStreaming = false;
                 if (currentGroup is not null) currentGroup.IsExpanded = false;
                 streamingMessage = null;
+                pendingWhitespace = string.Empty;
                 currentGroup = null;
                 // Detail 为 ModelErrorFormatter 组装的多行详情（本地化描述 + 状态码/错误码/上游描述）
                 Messages.Add(ChatMessageViewModel.Error(agentEvent.Detail ?? ResourceLookup.Resolve("assistant.task.failed"), agentEvent.Timestamp));
@@ -974,11 +994,13 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
 
             case AgentEventKind.TaskCompleted:
                 streamingMessage = null;
+                pendingWhitespace = string.Empty;
                 currentGroup = null;
                 break;
 
             case AgentEventKind.TaskCancelled:
                 streamingMessage = null;
+                pendingWhitespace = string.Empty;
                 currentGroup = null;
                 Messages.Add(ChatMessageViewModel.Status(ResourceLookup.Resolve("assistant.task.cancelled")));
                 break;
@@ -1190,6 +1212,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         StatusText = string.Empty;
         Messages.Clear();
         streamingMessage = null;
+        pendingWhitespace = string.Empty;
         currentGroup = null;
         suppressSelectionLoad = true;
         try
@@ -1273,6 +1296,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
 
         Messages.Clear();
         streamingMessage = null;
+        pendingWhitespace = string.Empty;
         currentGroup = null;
         var session = service.CurrentSession;
         var hasToolActivities = session.Activities.Any(item => item.Kind == AgentEventKind.ToolCallStarted);
@@ -1292,6 +1316,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             if (message.Role == ChatRole.User)
             {
                 streamingMessage = null;
+                pendingWhitespace = string.Empty;
                 currentGroup = null;
                 Messages.Add(new ChatMessageViewModel(message.Role, message.Content ?? string.Empty, message.Timestamp));
                 continue;
@@ -1329,6 +1354,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             Project(new AgentEvent(session.Id, AgentEventKind.MessageCompleted, message.Timestamp) { Message = message }, session.Id);
         }
         streamingMessage = null;
+        pendingWhitespace = string.Empty;
         currentGroup = null;
     }
 

@@ -56,7 +56,7 @@ public sealed record UserDecisionField
         bool isMultiline = false,
         bool allowCustomInput = false,
         string? customInputPlaceholder = null,
-        int? maxLength = null)
+        int? maxLength = null, bool isCredentialName = false)
     {
         Id = id;
         Label = label;
@@ -76,6 +76,7 @@ public sealed record UserDecisionField
         AllowCustomInput = allowCustomInput;
         CustomInputPlaceholder = customInputPlaceholder;
         MaxLength = maxLength;
+        IsCredentialName = isCredentialName;
     }
 
     public string Id { get; }
@@ -83,6 +84,8 @@ public sealed record UserDecisionField
     public string Label { get; }
 
     public UserDecisionFieldType Type { get; }
+
+    public bool IsCredentialName { get; }
 
     public bool IsRequired { get; }
 
@@ -219,16 +222,17 @@ public static class UserDecisionValidator
         ArgumentNullException.ThrowIfNull(request);
         var errors = new List<UserDecisionValidationError>();
 
-        ValidateDisplayText(errors, UserDecisionValidationError.RequestFieldId, "标题", request.Title, true, MaxTitleLength);
-        ValidateDisplayText(errors, UserDecisionValidationError.RequestFieldId, "问题", request.Question, true, MaxQuestionLength);
-        ValidateDisplayText(errors, UserDecisionValidationError.RequestFieldId, "说明", request.Description, false, MaxDescriptionLength);
+        var namesOnly = request.Fields.Count == 1 && request.Fields[0].IsCredentialName;
+        ValidateDisplayText(errors, UserDecisionValidationError.RequestFieldId, "标题", request.Title, true, MaxTitleLength, namesOnly);
+        ValidateDisplayText(errors, UserDecisionValidationError.RequestFieldId, "问题", request.Question, true, MaxQuestionLength, namesOnly);
+        ValidateDisplayText(errors, UserDecisionValidationError.RequestFieldId, "说明", request.Description, false, MaxDescriptionLength, namesOnly);
         ValidateDisplayText(
             errors,
             UserDecisionValidationError.RequestFieldId,
             "影响摘要",
             request.ImpactSummary,
             false,
-            MaxImpactSummaryLength);
+            MaxImpactSummaryLength, namesOnly);
 
         if (request.Fields.Count == 0)
         {
@@ -295,8 +299,11 @@ public static class UserDecisionValidator
         string fieldId)
     {
         ValidateIdentifier(errors, fieldId, "字段 id", field.Id, MaxFieldIdLength);
-        ValidateDisplayText(errors, fieldId, "字段标题", field.Label, true, MaxFieldLabelLength);
+        ValidateDisplayText(errors, fieldId, "字段标题", field.Label, true, MaxFieldLabelLength, field.IsCredentialName);
 
+        if (field.IsCredentialName && (field.Type is not (UserDecisionFieldType.Text or UserDecisionFieldType.SingleSelect)
+            || field.IsMultiline || field.MaxLength is > 200))
+            errors.Add(new UserDecisionValidationError(fieldId, "凭据名称字段仅支持最多200字的单行文本或单选。"));
         switch (field.Type)
         {
             case UserDecisionFieldType.SingleSelect:
@@ -475,9 +482,9 @@ public static class UserDecisionValidator
             "自由输入提示",
             field.CustomInputPlaceholder,
             field.CustomInputPlaceholder is not null,
-            MaxCustomInputPlaceholderLength);
+            MaxCustomInputPlaceholderLength, field.IsCredentialName);
 
-        var maxLength = field.MaxLength ?? DefaultTextMaxLength;
+        var maxLength = field.MaxLength ?? (field.IsCredentialName ? 200 : DefaultTextMaxLength);
         if (maxLength <= 0 || maxLength > MaxTextLength)
         {
             errors.Add(new UserDecisionValidationError(fieldId, "自由输入最大长度必须处于允许范围内。"));
@@ -504,14 +511,14 @@ public static class UserDecisionValidator
         foreach (var option in field.Options)
         {
             ValidateIdentifier(errors, fieldId, "选项 id", option.Id, MaxOptionIdLength);
-            ValidateDisplayText(errors, fieldId, "选项标签", option.Label, true, MaxOptionLabelLength);
+            ValidateDisplayText(errors, fieldId, "选项标签", option.Label, true, MaxOptionLabelLength, field.IsCredentialName);
             ValidateDisplayText(
                 errors,
                 fieldId,
                 "选项说明",
                 option.Description,
                 false,
-                MaxOptionDescriptionLength);
+                MaxOptionDescriptionLength, field.IsCredentialName);
 
             if (!optionIds.Add(option.Id ?? string.Empty))
             {
@@ -554,7 +561,7 @@ public static class UserDecisionValidator
         string fieldId)
     {
         ValidateTextProperties(errors, field, fieldId);
-        var maxLength = field.MaxLength ?? DefaultTextMaxLength;
+        var maxLength = field.MaxLength ?? (field.IsCredentialName ? 200 : DefaultTextMaxLength);
         if (maxLength <= 0 || maxLength > MaxTextLength)
         {
             errors.Add(new UserDecisionValidationError(fieldId, "文本最大长度必须处于允许范围内。"));
@@ -574,7 +581,7 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(fieldId, "文本默认值超过最大长度。"));
         }
-        else if (AssistantContentPolicy.ContainsSensitiveContent(field.DefaultText))
+        else if (ContainsBlockedFieldContent(field, field.DefaultText))
         {
             errors.Add(new UserDecisionValidationError(fieldId, "文本默认值包含敏感字段模式。"));
         }
@@ -642,14 +649,14 @@ public static class UserDecisionValidator
             return;
         }
 
-        var maxLength = field.MaxLength ?? DefaultTextMaxLength;
+        var maxLength = field.MaxLength ?? (field.IsCredentialName ? 200 : DefaultTextMaxLength);
         if (customInput.Length > maxLength)
         {
             errors.Add(new UserDecisionValidationError(field.Id, "自由输入长度超过最大限制。"));
             return;
         }
 
-        if (AssistantContentPolicy.ContainsSensitiveContent(customInput))
+        if (ContainsBlockedFieldContent(field, customInput))
         {
             errors.Add(new UserDecisionValidationError(field.Id, "自由输入包含敏感信息。"));
             return;
@@ -760,12 +767,12 @@ public static class UserDecisionValidator
             return;
         }
 
-        var maxLength = field.MaxLength ?? DefaultTextMaxLength;
+        var maxLength = field.MaxLength ?? (field.IsCredentialName ? 200 : DefaultTextMaxLength);
         if (text.Length > maxLength)
         {
             errors.Add(new UserDecisionValidationError(field.Id, "文本长度超过最大限制。"));
         }
-        else if (AssistantContentPolicy.ContainsSensitiveContent(text))
+        else if (ContainsBlockedFieldContent(field, text))
         {
             errors.Add(new UserDecisionValidationError(field.Id, "文本内容包含敏感信息。"));
         }
@@ -814,7 +821,7 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}长度超过限制。"));
         }
-        else if (AssistantContentPolicy.IsSensitivePath([value]))
+        else if (AssistantContentPolicy.IsSensitivePath([value]) || AssistantContentPolicy.ContainsCredentialValue(value))
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}包含敏感字段模式。"));
         }
@@ -826,7 +833,7 @@ public static class UserDecisionValidator
         string name,
         string? value,
         bool required,
-        int maxLength)
+        int maxLength, bool credentialName = false)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -842,12 +849,15 @@ public static class UserDecisionValidator
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}长度超过限制。"));
         }
-        else if (AssistantContentPolicy.ContainsSensitiveContent(value))
+        else if (credentialName ? AssistantContentPolicy.ContainsCredentialValue(value) : AssistantContentPolicy.ContainsSensitiveContent(value))
         {
             errors.Add(new UserDecisionValidationError(fieldId, $"{name}包含敏感字段模式。"));
         }
     }
 
+    private static bool ContainsBlockedFieldContent(UserDecisionField field, string value) => field.IsCredentialName
+        ? value.Contains('\r') || value.Contains('\n') || AssistantContentPolicy.ContainsCredentialValue(value)
+        : AssistantContentPolicy.ContainsSensitiveContent(value);
     private static bool TryConvertNumber(object value, out decimal number)
     {
         try

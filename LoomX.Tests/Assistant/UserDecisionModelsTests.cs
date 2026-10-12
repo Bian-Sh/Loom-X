@@ -518,4 +518,16 @@ public sealed class UserDecisionModelsTests
             isRequired: isRequired,
             defaultText: defaultText,
             maxLength: maxLength);
+    [Fact]
+    public void 凭据名称字段允许名称术语但仍拒绝真实凭据()
+    {
+        var field = new UserDecisionField("name", "API Key name", UserDecisionFieldType.Text,
+            isRequired: true, defaultText: "LoomX", maxLength: 100, isCredentialName: true);
+        var request = new UserDecisionRequest("Create API Key", "Choose an API Key name", [field]);
+        Assert.Empty(UserDecisionValidator.ValidateRequest(request));
+        Assert.Empty(UserDecisionValidator.ValidateSubmission(request, new Dictionary<string, object?> { ["name"] = "Production API Key" }));
+        Assert.NotEmpty(UserDecisionValidator.ValidateSubmission(request, new Dictionary<string, object?> { ["name"] = "sk-proj-abcdefghijklmnopqrstuvwxyz123456" }));
+        Assert.NotEmpty(UserDecisionValidator.ValidateSubmission(request, new Dictionary<string, object?> { ["name"] = "Authorization: Bearer abcdef" }));
+    }
+
 }

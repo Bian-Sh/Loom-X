@@ -1,118 +1,42 @@
-// LoomX Browser Bridge - content script。
-// 唯一职责：在页面内捕获 XHR/fetch 网络请求摘要，供 browser.network 查询。
-// 不包含任何 Provider/Relay/AI 业务逻辑。
-(function () {
-  if (window.__loomxNetworkHooked) return;
-  window.__loomxNetworkHooked = true;
-  window.__loomxNetwork = [];
+// LoomX Browser Bridge 原生网络事件缓存，加载于扩展 Service Worker。
+// 不改写页面 fetch/XHR；仅保存请求摘要，不保存请求或响应正文。
+const LoomXNetwork = (() => {
+  const recordsByTab = new Map();
+  const maxRecords = 200;
+  const excludedHeaders = new Set(["cookie", "set-cookie", "proxy-authorization"]);
 
-  const MAX_RECORDS = 200;
-
-  function sanitizeHeaders(headers) {
-    const result = {};
-    for (const [key, value] of Object.entries(headers || {})) {
-      result[key] = String(value);
-    }
-    return result;
-  }
-
-  function record(entry) {
-    window.__loomxNetwork.push(entry);
-    if (window.__loomxNetwork.length > MAX_RECORDS) {
-      window.__loomxNetwork.splice(0, window.__loomxNetwork.length - MAX_RECORDS);
-    }
-  }
-
-  function guessModel(body) {
-    if (!body) return null;
-    const match = /"model"\s*:\s*"([^"]+)"/.exec(body);
-    return match ? match[1] : null;
-  }
-
-  // fetch 钩子
-  const originalFetch = window.fetch;
-  window.fetch = async function (input, init) {
-    const url = typeof input === "string" ? input : input && input.url;
-    const method = (init && init.method) || (input && input.method) || "GET";
-    const headers = sanitizeHeaders(
-      Object.assign(
-        {},
-        input && input.headers ? Object.fromEntries(new Headers(input.headers).entries()) : {},
-        init && init.headers ? Object.fromEntries(new Headers(init.headers).entries()) : {}
-      )
-    );
-    const body = init && typeof init.body === "string" ? init.body.slice(0, 2000) : null;
-    const startedAt = Date.now();
-    try {
-      const response = await originalFetch.apply(this, arguments);
-      record({
-        type: "fetch",
-        url,
-        method,
-        status: response.status,
-        request_headers: headers,
-        model: guessModel(body),
-        elapsed_ms: Date.now() - startedAt,
-        timestamp: new Date().toISOString(),
-      });
-      return response;
-    } catch (error) {
-      record({
-        type: "fetch",
-        url,
-        method,
-        status: 0,
-        request_headers: headers,
-        model: guessModel(body),
-        elapsed_ms: Date.now() - startedAt,
-        timestamp: new Date().toISOString(),
-      });
-      throw error;
-    }
-  };
-
-  // XHR 钩子
-  const OriginalXHR = window.XMLHttpRequest;
-  function HookedXHR() {
-    const xhr = new OriginalXHR();
-    const requestHeaders = {};
-    let method = "GET";
-    let url = "";
-    let body = null;
-
-    const originalOpen = xhr.open;
-    xhr.open = function (m, u) {
-      method = m;
-      url = u;
-      return originalOpen.apply(xhr, arguments);
-    };
-
-    const originalSetRequestHeader = xhr.setRequestHeader;
-    xhr.setRequestHeader = function (key, value) {
-      requestHeaders[key] = value;
-      return originalSetRequestHeader.apply(xhr, arguments);
-    };
-
-    const originalSend = xhr.send;
-    xhr.send = function (payload) {
-      body = typeof payload === "string" ? payload.slice(0, 2000) : null;
+  function record(tabId, method, params) {
+    if (method === "Network.requestWillBeSent") {
+      if (!params.request || !["XHR", "Fetch"].includes(params.type)) return;
+      let records = recordsByTab.get(tabId);
+      if (!records) { records = []; recordsByTab.set(tabId, records); }
+      const request = params.request;
+      let model = null;
+      // 模型名只作公开线索；正文不进入缓存。
+      if (typeof request.postData === "string" && request.postData.length <= 8192) {
+        try { const value = JSON.parse(request.postData)?.model; if (typeof value === "string") model = value; } catch (_) {}
+      }
       const startedAt = Date.now();
-      xhr.addEventListener("loadend", function () {
-        record({
-          type: "xhr",
-          url,
-          method,
-          status: xhr.status,
-          request_headers: sanitizeHeaders(requestHeaders),
-          model: guessModel(body),
-          elapsed_ms: Date.now() - startedAt,
-          timestamp: new Date().toISOString(),
-        });
-      });
-      return originalSend.apply(xhr, arguments);
-    };
-
-    return xhr;
+      records.push({ request_id: params.requestId, started_at: startedAt,
+        type: params.type.toLowerCase(), url: request.url, method: request.method, status: 0, model,
+        request_headers: Object.fromEntries(Object.entries(request.headers || {})
+          .filter(([name]) => !excludedHeaders.has(name.toLowerCase())).map(([name, value]) => [name, String(value)])),
+        elapsed_ms: 0, timestamp: new Date(startedAt).toISOString() });
+      if (records.length > maxRecords) records.splice(0, records.length - maxRecords);
+      return;
+    }
+    if (!["Network.responseReceived", "Network.loadingFailed"].includes(method)) return;
+    const records = recordsByTab.get(tabId) || [];
+    const entry = records.findLast(item => item.request_id === params.requestId);
+    if (!entry) return;
+    entry.status = params.response?.status || 0;
+    entry.elapsed_ms = Date.now() - entry.started_at;
   }
-  window.XMLHttpRequest = HookedXHR;
+
+  function recent(tabId, urlContains, limit) {
+    const count = Math.min(maxRecords, Math.max(1, Number(limit) || 50));
+    return { requests: (recordsByTab.get(tabId) || []).filter(item => !urlContains || item.url.includes(urlContains))
+      .slice(-count).map(({ request_id, started_at, ...summary }) => summary) };
+  }
+  return { record, recent, forget: tabId => recordsByTab.delete(tabId) };
 })();

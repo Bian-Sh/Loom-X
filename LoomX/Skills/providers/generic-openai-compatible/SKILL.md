@@ -9,15 +9,15 @@
 
 1. `loomx.create_provider`：`api_mode=openai`，`base_url` 填服务给的地址（保留 `/v1` 后缀）。
 2. `api_key` 通过参数写入（自动 DPAPI 加密，不回显）。
-3. `loomx.test_provider` 验证：`diagnosis=provider_ok` 且 `models_found > 0` 即接入成功。
-4. 按返回的模型列表逐个 `loomx.create_model`（context_length / max_tokens 按模型实际规格填写）。
-5. `loomx.create_combo` 挂接 model_ids，`loomx.update_endpoint` 把 Combo 绑到目标 Endpoint。
-6. `loomx.test_model` 抽查关键模型。
+3. `loomx.test_provider` 验证模型列表可达性与鉴权；通过只说明列表可用，具体模型仍需真实测试。
+4. `loomx.fetch_provider_models` 只读获取真实 ID 与远端元数据；`loomx.sync_provider_models` 等同 UI 获取按钮，新增/更新模型并保留已有配置。可用 `loomx.set_provider_model_list_url` 设置页面文档给出的自定义模型获取地址，空值恢复默认。仅需少量模型时按真实 ID 创建，不猜上下文规格。
+5. Combo/Endpoint 绑定仅在用户要求时修改，先读取并保留已有绑定。
+6. `loomx.get_model_api` 确认真实协议、方法和路径，再用 `loomx.test_model` 测试关键模型。
 
 ## 注意事项
 
 - `endpoint_format`：上游若只支持 chat completions（大多数兼容服务），设为 `chat_completions`；支持 Responses API 的服务（官方 OpenAI 新接口）可用 `responses`。
-- 如果 `test_provider` 返回 `endpoint_not_found`，尝试调整 base_url（多一层或少一层 `/v1`）。
+- 如果模型列表返回 `endpoint_not_found`，根据真实文档确认 Base URL 与自定义模型列表 URL，不盲目增删 `/v1`。
 - `auth_failed` 优先确认 Key 是否复制完整、是否有 IP 白名单。
 - 部分兼容服务的 `/models` 不需要鉴权但 chat 需要，`test_provider` 通过不代表模型可用，务必再跑 `test_model`。
 - 服务需要代理才能连通时设 `use_proxy: true`；按 User-Agent / 自定义头校验客户端时用 `headers` 补齐——

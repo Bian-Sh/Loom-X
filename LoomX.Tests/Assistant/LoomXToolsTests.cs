@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Text;
 using System.Text.Json.Nodes;
 using LoomX.Assistant;
@@ -82,6 +82,16 @@ public sealed class LoomXToolsTests : IAsyncLifetime
     }
 
     [Fact]
+    public void 注册可达性与具体模型接口工具且不依赖浏览器()
+    {
+        Assert.True(registry.TryGet("loomx.test_url", out var urlTool));
+        Assert.Contains("无需新增Provider或连接Chrome", urlTool!.Description, StringComparison.Ordinal);
+        Assert.True(registry.TryGet("loomx.get_model_api", out _));
+        Assert.True(registry.TryGet("loomx.test_model", out var modelTool));
+        Assert.Contains("Responses/Chat", modelTool!.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task CreateProvider_统一使用ApiKey参数并只返回配置状态()
     {
         var tool = Assert.Single(registry.All, item => item.Name == "loomx.create_provider");
@@ -149,7 +159,25 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         Assert.Contains("当前 Assistant Session ID", source, StringComparison.Ordinal);
         Assert.Contains("删除 Session", source, StringComparison.Ordinal);
         Assert.Contains("意外残留", source, StringComparison.Ordinal);
+        Assert.Contains("是否启动由 AI 根据用户消息与上下文判断", source, StringComparison.Ordinal);
+        Assert.Contains("用户提供了链接并希望新增 Provider", source, StringComparison.Ordinal);
+        Assert.Contains("确实需要读取页面", source, StringComparison.Ordinal);
+        Assert.Contains("加载本 Skill 都不得触发连接", source, StringComparison.Ordinal);
     }
+    [Fact]
+    public void 接入Skill编排密钥分支与完整验证无需用户提供流程()
+    {
+        var skill = ReadRepositoryFile("LoomX", "Skills", "relays", "new-api", "SKILL.md");
+        Assert.Contains("用户只需提供站点链接和接入目标", skill, StringComparison.Ordinal);
+        Assert.Contains("全部真实名称", skill, StringComparison.Ordinal);
+        Assert.Contains("allow_custom_input=true", skill, StringComparison.Ordinal);
+        Assert.Contains("default_text=\"LoomX\"", skill, StringComparison.Ordinal);
+        Assert.Contains("提交后创建该名称的密钥并继续接入", skill, StringComparison.Ordinal);
+        Assert.Contains("loomx.get_model_api", skill, StringComparison.Ordinal);
+        Assert.Contains("loomx.test_url", skill, StringComparison.Ordinal);
+        Assert.Contains("不要用截图 base64 猜测页面", skill, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void LoggingBootstrap_文件Sink不组合Shared与Buffered()
     {
@@ -175,6 +203,22 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         {
             Assert.True(registry.TryGet(name, out _), $"缺少工具 {name}");
         }
+    }
+
+    [Fact]
+    public async Task 能力查询按需返回当前注册工具并支持详细Schema()
+    {
+        registry.Register(new ToolDefinition { Name = "browser.test_runtime", Description = "测试动态能力",
+            ParametersSchema = JsonNode.Parse("{\"type\":\"object\",\"properties\":{}}")!,
+            Handler = (_, _) => Task.FromResult(ToolResult.Ok("{}")) });
+        var result = await InvokeAsync("loomx.get_capabilities", "{\"category\":\"browser\"}");
+        Assert.True(result.Success, result.Content);
+        Assert.Contains("browser.test_runtime", result.Content);
+        Assert.DoesNotContain("loomx.delete_provider", result.Content);
+        var details = await InvokeAsync("loomx.get_capabilities", "{\"tool_name\":\"loomx.create_provider\"}");
+        var json = JsonNode.Parse(details.Content)!;
+        Assert.NotNull(json["tools"]![0]!["parameters_schema"]);
+        Assert.DoesNotContain(PlaintextApiKey, details.Content);
     }
 
     [Fact]
@@ -385,6 +429,41 @@ public sealed class LoomXToolsTests : IAsyncLifetime
         Assert.Equal("provider_ok", json["diagnosis"]?.GetValue<string>());
         Assert.Equal(1, json["models_found"]?.GetValue<int>());
         Assert.DoesNotContain(PlaintextApiKey, result.Content);
+    }
+
+    [Fact]
+    public async Task 模型URL局部修改与只读获取同步保留其他配置()
+    {
+        var id = Guid.Parse(await CreateProviderAsync());
+        var provider = (await configuration.ListProvidersAsync()).Single();
+        await configuration.UpdateProviderAsync(id, new ProviderInput("demo", "保留名称", provider.BaseUrl, "openai", false, null, false,
+            new Dictionary<string, string> { ["X-Test"] = "保留Header" }, true, EndpointFormat: "chat_completions"));
+        var model = await configuration.CreateModelAsync(id, new ModelInput("gpt-4o", "本地名称", "本地标识", "local", "https://override.example.com/v1", "openai",
+            32000, 2000, true, 0.2, 0.8, false, PlaintextApiKey, false, new Dictionary<string, string> { ["X-Model"] = "保留模型Header" }, null));
+        var setting = await InvokeAsync("loomx.set_provider_model_list_url", $$"""{"id":"{{id}}","model_list_url":"https://catalog.example.com/custom/models"}""");
+        Assert.True(setting.Success, setting.Content);
+        var changed = (await configuration.ListProvidersAsync()).Single();
+        Assert.Equal("https://catalog.example.com/custom/models", changed.ModelListUrl);
+        Assert.Equal("保留名称", changed.DisplayName);
+        Assert.False(changed.Enabled);
+        Assert.True(changed.UseProxy);
+        Assert.True(changed.HasApiKey);
+        Assert.Equal("保留Header", JsonNode.Parse(changed.HeadersJson)!["X-Test"]!.GetValue<string>());
+        Assert.Equal("chat_completions", changed.EndpointFormat);
+        var fetched = await InvokeAsync("loomx.fetch_provider_models", $$"""{"id":"{{id}}"}""");
+        Assert.True(fetched.Success, fetched.Content);
+        Assert.Contains("gpt-4o", fetched.Content);
+        Assert.DoesNotContain(PlaintextApiKey, fetched.Content);
+        Assert.Equal(model, (await configuration.ListProvidersAsync()).Single().Models.Single());
+        var synced = await InvokeAsync("loomx.sync_provider_models", $$"""{"id":"{{id}}"}""");
+        Assert.True(synced.Success, synced.Content);
+        var current = (await configuration.ListProvidersAsync()).Single().Models.Single();
+        Assert.Equal("本地名称", current.DisplayName);
+        Assert.Equal("本地标识", current.ConfigId);
+        Assert.Equal("https://override.example.com/v1", current.BaseUrl);
+        Assert.False(current.Enabled);
+        Assert.True(current.HasApiKey);
+        Assert.Equal("保留模型Header", JsonNode.Parse(current.HeadersJson)!["X-Model"]!.GetValue<string>());
     }
 
     [Fact]

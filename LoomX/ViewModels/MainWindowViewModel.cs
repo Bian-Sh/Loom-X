@@ -1410,23 +1410,23 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         logger?.LogInformation("模型同步开始 {ProviderId}", provider.BusinessId);
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-            if (!string.IsNullOrWhiteSpace(provider.ApiKey)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", provider.ApiKey);
-            foreach (var header in ProviderEditorViewModel.ParseDictionary(provider.HeadersJson) ?? []) request.Headers.TryAddWithoutValidation(header.Key, header.Value);
-            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
-            if (!response.IsSuccessStatusCode)
+            var catalog = await ProviderModelCatalog.FetchAsync(httpClient, endpoint, provider.ApiKey,
+                ProviderEditorViewModel.ParseDictionary(provider.HeadersJson) ?? new Dictionary<string, string>(), token);
+            if (catalog.StatusCode is < 200 or >= 300)
             {
-                SetStatus("providers.sync.failure.http", (int)response.StatusCode, response.ReasonPhrase ?? "");
-                toastService.Show(LocFormat("providers.sync.failure.toast.http", (int)response.StatusCode), ToastLevel.Error);
-                logger?.LogWarning("模型同步失败 {ProviderId} {StatusCode}", provider.BusinessId, (int)response.StatusCode);
+                SetStatus("providers.sync.failure.http", catalog.StatusCode, "");
+                toastService.Show(LocFormat("providers.sync.failure.toast.http", catalog.StatusCode), ToastLevel.Error);
+                logger?.LogWarning("模型同步失败 {ProviderId} {StatusCode}", provider.BusinessId, catalog.StatusCode);
                 return;
             }
-
-            using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync(token));
-            var descriptors = ExtractModelDescriptors(document.RootElement)
-                .GroupBy(item => item.ModelId, StringComparer.OrdinalIgnoreCase)
-                .Select(group => group.First())
-                .ToArray();
+            if (!catalog.Parsed)
+            {
+                SetStatus("providers.sync.failure.parse");
+                toastService.Show(Status, ToastLevel.Error);
+                logger?.LogWarning("模型同步响应格式无法解析 {ProviderId}", provider.BusinessId);
+                return;
+            }
+            var descriptors = catalog.Models.ToArray();
             if (descriptors.Length == 0)
             {
                 SetStatus("providers.sync.failure.empty");
@@ -1516,32 +1516,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         return $"{baseUrl}/models";
     }
 
-    internal sealed record RemoteModelDescriptor(string ModelId, string? OwnedBy, string? Family, int? ContextLength, int? MaxTokens, bool? Vision);
-
-    internal static IEnumerable<RemoteModelDescriptor> ExtractModelDescriptors(JsonElement root)
-    {
-        var items = root.ValueKind == JsonValueKind.Array
-            ? root
-            : root.ValueKind == JsonValueKind.Object && root.TryGetProperty("data", out var data)
-                ? data
-                : root.ValueKind == JsonValueKind.Object && root.TryGetProperty("models", out var models)
-                    ? models
-                    : default;
-        if (items.ValueKind != JsonValueKind.Array) yield break;
-        foreach (var item in items.EnumerateArray())
-        {
-            if (item.ValueKind != JsonValueKind.Object) continue;
-            var modelId = ReadString(item, "id") ?? ReadString(item, "name") ?? ReadString(item, "model");
-            if (string.IsNullOrWhiteSpace(modelId)) continue;
-            var topProvider = item.TryGetProperty("top_provider", out var top) && top.ValueKind == JsonValueKind.Object ? top : default;
-            var contextLength = ReadPositiveInt(item, "context_length") ?? ReadPositiveInt(topProvider, "context_length") ?? ReadPositiveInt(item, "inputTokenLimit");
-            var maxTokens = ReadPositiveInt(topProvider, "max_completion_tokens") ?? ReadPositiveInt(item, "max_completion_tokens") ?? ReadPositiveInt(item, "max_output_tokens") ?? ReadPositiveInt(item, "outputTokenLimit");
-            var family = ReadString(item, "family");
-            var ownedBy = ReadString(item, "owned_by") ?? ReadString(item, "ownedBy");
-            var vision = ReadNullableBool(item, "vision") ?? ReadCapabilitiesVision(item);
-            yield return new RemoteModelDescriptor(modelId.Trim(), ownedBy, family, contextLength, maxTokens, vision);
-        }
-    }
+    internal static IEnumerable<RemoteProviderModelDescriptor> ExtractModelDescriptors(JsonElement root) => ProviderModelCatalog.Extract(root);
 
     public bool BeginModelDrag(ModelEditorViewModel? model)
     {
@@ -1651,34 +1626,6 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         var index = 0;
         foreach (var model in provider.Models.Where(model => model.IsRealModel)) model.SortOrder = index++;
     }
-
-    private static string? ReadString(JsonElement element, string propertyName) => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(value.GetString()) ? value.GetString()!.Trim() : null;
-    private static int? ReadPositiveInt(JsonElement element, string propertyName)
-    {
-        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(propertyName, out var value)) return null;
-        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number) && number > 0) return number;
-        if (value.ValueKind == JsonValueKind.String && int.TryParse(value.GetString(), out number) && number > 0) return number;
-        return null;
-    }
-    private static bool? ReadNullableBool(JsonElement element, string propertyName) => element.ValueKind == JsonValueKind.Object && element.TryGetProperty(propertyName, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False ? value.GetBoolean() : null;
-    private static bool? ReadCapabilitiesVision(JsonElement element)
-    {
-        if (element.ValueKind != JsonValueKind.Object) return null;
-        if (element.TryGetProperty("vision", out _)) return ReadNullableBool(element, "vision");
-        if (element.TryGetProperty("capabilities", out var capabilities))
-        {
-            if (capabilities.ValueKind == JsonValueKind.Array) return capabilities.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && IsVisionCapability(item.GetString()));
-            if (capabilities.ValueKind == JsonValueKind.Object) return ReadNullableBool(capabilities, "vision");
-        }
-
-        if (element.TryGetProperty("input_modalities", out var inputModalities) && inputModalities.ValueKind == JsonValueKind.Array)
-            return inputModalities.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && string.Equals(item.GetString(), "image", StringComparison.OrdinalIgnoreCase));
-        if (element.TryGetProperty("architecture", out var architecture) && architecture.ValueKind == JsonValueKind.Object && architecture.TryGetProperty("input_modalities", out var architectureModalities) && architectureModalities.ValueKind == JsonValueKind.Array)
-            return architectureModalities.EnumerateArray().Any(item => item.ValueKind == JsonValueKind.String && string.Equals(item.GetString(), "image", StringComparison.OrdinalIgnoreCase));
-        return null;
-    }
-
-    private static bool IsVisionCapability(string? value) => value is not null && (string.Equals(value, "vision", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "image", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "multimodal", StringComparison.OrdinalIgnoreCase));
 
     private void AttachProvider(ProviderEditorViewModel? provider)
     {
@@ -2436,8 +2383,8 @@ public sealed class ModelEditorViewModel : NotifyViewModel
         if (wasDirty != HasUnsavedChanges) OnPropertyChanged(nameof(HasUnsavedChanges));
     }
     public ModelInput ToInput() => new(ModelId, DisplayName, string.IsNullOrWhiteSpace(ConfigId) ? null : ConfigId, Family, string.IsNullOrWhiteSpace(BaseUrl) ? null : BaseUrl, string.IsNullOrWhiteSpace(ApiMode) ? null : ApiMode, ContextLength, MaxTokens, Vision, Temperature, TopP, Enabled, string.IsNullOrWhiteSpace(ApiKey) ? null : ApiKey, ClearApiKey, ProviderEditorViewModel.ParseDictionary(HeadersJson), JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ExtraJson), OwnedBy, RemoteFamily, RemoteContextLength, RemoteMaxTokens, RemoteVision, SortOrder);
-    internal static ModelInput CreateRemoteInput(string apiMode, ProvidersViewModel.RemoteModelDescriptor descriptor) => new(descriptor.ModelId, descriptor.ModelId, null, descriptor.Family ?? "unknown", null, apiMode, descriptor.ContextLength ?? 128000, descriptor.MaxTokens ?? 4096, descriptor.Vision ?? false, null, null, true, null, false, null, null, descriptor.OwnedBy, descriptor.Family, descriptor.ContextLength, descriptor.MaxTokens, descriptor.Vision);
-    internal ModelInput ToRemoteInput(ProvidersViewModel.RemoteModelDescriptor descriptor) => new(ModelId, ModelId, null, descriptor.Family ?? Family, null, ApiMode, descriptor.ContextLength ?? ContextLength, descriptor.MaxTokens ?? MaxTokens, descriptor.Vision ?? Vision, Temperature, TopP, Enabled, null, false, ProviderEditorViewModel.ParseDictionary(HeadersJson), JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(ExtraJson), descriptor.OwnedBy, descriptor.Family, descriptor.ContextLength, descriptor.MaxTokens, descriptor.Vision, SortOrder);
+    internal static ModelInput CreateRemoteInput(string apiMode, RemoteProviderModelDescriptor descriptor) => ProviderModelCatalog.CreateInput(apiMode, descriptor);
+    internal ModelInput ToRemoteInput(RemoteProviderModelDescriptor descriptor) => ProviderModelCatalog.ApplyMetadata(ToInput() with { ApiKey = null, ClearApiKey = false }, descriptor);
 }
 
 public sealed class PlaceholderViewModel

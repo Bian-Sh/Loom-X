@@ -31,6 +31,65 @@ public sealed class AssistantServiceTests : IDisposable
         try { if (Directory.Exists(rootDirectory)) Directory.Delete(rootDirectory, recursive: true); } catch (IOException) { }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task 失败或取消仅清理运行所属会话的Bridge租约(bool cancelled)
+    {
+        var lifecycle = new FakeBrowserBridgeLifecycle();
+        var leases = new BrowserBridgeLeaseManager(lifecycle, NullLogger<BrowserBridgeLeaseManager>.Instance);
+        var service = CreateService(new StubModelClientFactory(new ScriptedModelClient([])), browserBridgeLeaseManager: leases);
+        await leases.AcquireAsync(service.CurrentSession.Id);
+        await leases.AcquireAsync("other-session");
+        using var cancellation = new CancellationTokenSource();
+        if (cancelled) cancellation.Cancel();
+        await foreach (var unused in service.SendAsync("测试", cancellation.Token)) { }
+        Assert.Equal(cancelled ? AgentSessionState.Cancelled : AgentSessionState.Failed, service.CurrentSession.State);
+        Assert.Equal("other-session", Assert.Single(leases.ActiveSessionIds));
+        Assert.True(lifecycle.IsListening);
+        Assert.Equal(0, lifecycle.StopCount);
+    }
+
+    [Fact]
+    public void NewSession_SystemPrompt_由模型判断新增Provider后按需连接Chrome()
+    {
+        var service = CreateService(new StubModelClientFactory(null));
+
+        Assert.Equal(100, service.CurrentSession.Options.MaxSteps);
+        AssertBrowserStartupPolicy(service.CurrentSession.Options.SystemPrompt!);
+    }
+
+    [Fact]
+    public async Task 新建恢复与普通对话不会启动BrowserBridge()
+    {
+        var lifecycle = new FakeBrowserBridgeLifecycle();
+        var leases = new BrowserBridgeLeaseManager(lifecycle, NullLogger<BrowserBridgeLeaseManager>.Instance);
+        var model = new ScriptedModelClient(
+            [new TextDeltaEvent("你好"), new ModelCompletedEvent("stop")]);
+        var service = CreateService(new StubModelClientFactory(model), browserBridgeLeaseManager: leases);
+        Assert.Equal(0, lifecycle.StartCount);
+
+        await foreach (var unused in service.SendAsync("你好")) { }
+        var sessionId = service.CurrentSession.Id;
+        service.NewSession();
+        Assert.True(await service.LoadSessionAsync(sessionId));
+
+        Assert.Equal(0, lifecycle.StartCount);
+        Assert.Empty(leases.ActiveSessionIds);
+        Assert.False(lifecycle.IsListening);
+        AssertBrowserStartupPolicy(service.CurrentSession.Options.SystemPrompt!);
+    }
+
+    private static void AssertBrowserStartupPolicy(string prompt)
+    {
+        Assert.Contains("由你根据用户消息和上下文判断", prompt, StringComparison.Ordinal);
+        Assert.Contains("用户提供了链接并希望新增 Provider", prompt, StringComparison.Ordinal);
+        Assert.Contains("确实需要读取该链接的页面", prompt, StringComparison.Ordinal);
+        Assert.Contains("新建或恢复会话、普通对话、仅提供链接、查看或修改已有 Provider", prompt, StringComparison.Ordinal);
+        Assert.Contains("不得调用 browser.bridge_start", prompt, StringComparison.Ordinal);
+        Assert.Contains("意图不明确时先澄清", prompt, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void NewSession_SystemPrompt_DeclaresResearchChannelsAndChallengeHandoff()
     {
@@ -233,6 +292,8 @@ public sealed class AssistantServiceTests : IDisposable
         Assert.Contains("browser.bridge_start", prompt, StringComparison.Ordinal);
         Assert.Contains("browser.bridge_stop", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain(oldPrompt, prompt, StringComparison.Ordinal);
+        Assert.Equal(100, service.CurrentSession.Options.MaxSteps);
+        AssertBrowserStartupPolicy(prompt);
         Assert.DoesNotContain(request.Messages, message =>
             message.Role == ChatRole.System && message.Content == oldPrompt);
     }
@@ -740,9 +801,11 @@ public sealed class AssistantServiceTests : IDisposable
     {
         public bool IsListening { get; private set; }
         public int StopCount { get; private set; }
+        public int StartCount { get; private set; }
 
         public Task StartAsync(CancellationToken cancellationToken = default)
         {
+            StartCount++;
             IsListening = true;
             return Task.CompletedTask;
         }

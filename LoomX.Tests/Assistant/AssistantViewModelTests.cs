@@ -14,6 +14,37 @@ namespace LoomX.Tests.Assistant;
 /// </summary>
 public sealed class AssistantViewModelTests
 {
+    [Theory]
+    [InlineData("")]
+    [InlineData("\n\n")]
+    [InlineData("  ")]
+    public void Project_工具轮纯空白正文不创建空气泡(string whitespace)
+    {
+        var viewModel = CreateViewModel();
+        var baseline = viewModel.Messages.Count;
+        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = whitespace });
+        Assert.Equal(baseline, viewModel.Messages.Count);
+        viewModel.Project(Event(AgentEventKind.MessageCompleted) with
+        {
+            Message = ChatMessage.AssistantToolCalls([new ToolCall("tool-1", "browser.read", "{}")], whitespace),
+        });
+        Assert.DoesNotContain(viewModel.Messages.Skip(baseline), item => item.IsAssistantMessage);
+        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "正文" });
+        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = " \n" });
+        Assert.Equal("正文 \n", viewModel.Messages[^1].Text);
+    }
+
+    [Fact]
+    public void Project_延迟创建正文气泡仍保留开头缩进()
+    {
+        var viewModel = CreateViewModel();
+        var baseline = viewModel.Messages.Count;
+        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "    " });
+        Assert.Equal(baseline, viewModel.Messages.Count);
+        viewModel.Project(Event(AgentEventKind.TextDelta) with { Text = "代码" });
+        Assert.Equal("    代码", viewModel.Messages[^1].Text);
+    }
+
     [Fact]
     public void 历史文本块合并连续文本避免Emoji代理项被分割()
     {

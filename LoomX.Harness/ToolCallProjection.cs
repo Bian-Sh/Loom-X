@@ -44,6 +44,26 @@ public static class ToolCallProjection
         }
     }
 
+    /// <summary>模型历史保留安全参数；UI 的隐藏摘要不能伪装成 schema 参数。</summary>
+    public static string ToModelArgumentsJson(ToolCall call, JsonNode? parametersSchema = null)
+    {
+        var safe = EnsureSafe(call);
+        if (safe.ArgumentsJson == HiddenArgumentsJson) return "{}";
+        if (parametersSchema is null) return safe.ArgumentsJson;
+        try
+        {
+            if (JsonNode.Parse(safe.ArgumentsJson) is not JsonObject arguments
+                || parametersSchema is not JsonObject schema || schema["properties"] is not JsonObject properties) return "{}";
+            // 交互摘要等公开投影不包含真实必需参数，不能当作历史调用输入。
+            if (schema["required"] is JsonArray required
+                && required.Any(item => item is not JsonValue value || !value.TryGetValue<string>(out var name) || !arguments.ContainsKey(name)))
+                return "{}";
+            return new JsonObject(arguments.Where(item => properties.ContainsKey(item.Key))
+                .Select(item => KeyValuePair.Create(item.Key, item.Value?.DeepClone()))).ToJsonString();
+        }
+        catch (JsonException) { return "{}"; }
+    }
+
     public static ToolCall EnsureSafe(ToolCall call) => call.ArgumentsAreSafe ? call : Hide(call);
 
     public static ChatMessage EnsureSafe(ChatMessage message)

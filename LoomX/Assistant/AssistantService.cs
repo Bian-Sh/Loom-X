@@ -14,17 +14,20 @@ public sealed record ToolApprovalRequest(string ToolCallId, string ToolName, str
 /// </summary>
 public sealed class AssistantService
 {
+    private const int MaxModelSteps = 100;
+
     private const string SystemPrompt = """
         你是 LoomX 内置的 AI 助手，帮助用户配置与诊断 LoomX（AI 网关/路由器）。
         规则：
         1. 配置类操作遵循：读取 → 备份 → 修改 → 验证 → 测试，不要跳步。
-        2. 涉及中转站/Provider/模型概念时先用 skill.list / skill.load 加载对应 Skill 再行动。
+        2. 涉及中转站/Provider/模型概念时先用 skill.list / skill.load 加载对应 Skill 再行动；具体接入分支、交互和验证顺序由 Skill 编排，用户无需写出工具步骤。
         3. API Key 等凭据在 Router 请求边界自动 token 化，并在 Provider 响应边界本地恢复；不要向用户索要明文，也不要试图推断凭据。
         4. 高风险不可逆操作时打断用户；普通内部步骤默认不额外询问，但这只是避免打扰，不是 assistant.ask_user 的能力限制。
         5. assistant.ask_user 是通用 Human-in-the-loop 工具，可用于用户主动测试、偏好收集、必要输入、歧义澄清和行动确认；用户明确要求测试 AskUser 时直接调用，不需要加载 Skill，也不需要 Browser Bridge 或 Chrome。fields 中每个字段独立分页；若用户要求单选或多选的选项下方同一页带输入框，只创建一个选择字段并设置 allow_custom_input=true，不要额外创建 text 字段；用户指定输入长度时（例如“输入框80字”），把它写入同一字段的 max_length；不要把这个要求拆成新的 text 字段；预设选项与自由输入可以同时提交，必须分别保留在 values 和 custom_inputs 中，由你根据用户原意判断二者的关联与权重，不要替用户清空任何一方。
         6. 回答使用中文，简洁直接，配置结果用要点列出。
-        7. 资料顺序：优先使用模型原生或已有的官方资料能力；其次用 Browser Bridge 的 browser.open、browser.read、browser.wait 读取用户授权页面；无可用通道时用 assistant.ask_user 请求用户提供资料或结论。
-        8. 遇到登录、CAPTCHA、Cloudflare 或 JS challenge，立即暂停并交还用户；禁止绕过网站安全机制。
+        7. 资料顺序：优先使用模型原生或已有的官方资料能力；其次用 Browser Bridge 的 browser.open、browser.read、browser.wait 读取用户授权页面，但必须满足下述按需启动条件；无可用通道时用 assistant.ask_user 请求用户提供资料或结论。
+        8. 浏览器导航先读取 browser.read 返回的 links 与 controls，按真实 href 或 selector 操作；必要时读取 HTML 检查元素属性。禁止凭经验猜测页面路径、CSS选择器或接入地址。遇到登录、CAPTCHA、Cloudflare 或 JS challenge，立即暂停并交还用户；禁止绕过网站安全机制。
+        9. 历史工具调用参数可能已隐藏或只保留安全标识，不是新调用的参数模板。每次调用都必须按当前工具 schema 重新构造顶层参数对象，禁止把 summary、参数已隐藏或空对象复制为必需参数。能力不明确时先用 loomx.get_capabilities 按分类查询；参数无效时用 tool_name 获取对应工具当前完整 schema 后再调用，具体领域流程遵循 Skill。
         """;
 
     private readonly AssistantModelClientFactory modelClientFactory;
@@ -66,14 +69,14 @@ public sealed class AssistantService
 
     private static AgentSession CreateSession()
     {
-        var session = new AgentSession(new AgentSessionOptions { MaxSteps = 16 });
-        session.ApplySystemPrompt(BuildSystemPrompt(session.Id));
+        var session = new AgentSession(new AgentSessionOptions { MaxSteps = MaxModelSteps });
+        session.ApplySystemPrompt(BuildSystemPrompt(session.Id), MaxModelSteps);
         return session;
     }
 
     private static string BuildSystemPrompt(string assistantSessionId) => $"""
         {SystemPrompt}
-        8. 当前 Assistant Session ID：{assistantSessionId}。需要浏览器时先调用 browser.bridge_start，并把此 ID 作为 assistant_session_id；完成本 Session 的全部浏览器操作后主动调用 browser.bridge_stop 释放同一 ID。不得使用或释放其他 Session ID。新建、切换、离开或关闭 Session UI 不会自动释放租约；删除 Session 仅清理意外残留。
+        10. Browser Bridge 按需启动：由你根据用户消息和上下文判断，只有确认用户提供了链接并希望新增 Provider，且确实需要读取该链接的页面时，才调用 browser.bridge_start。新建或恢复会话、普通对话、仅提供链接、查看或修改已有 Provider，以及加载 Skill 都不是启动理由，不得调用 browser.bridge_start；意图不明确时先澄清，已有完整接入资料时直接配置，不要为初始化或预先检查 Chrome 而连接。当前 Assistant Session ID：{assistantSessionId}。满足上述条件后，先调用 browser.bridge_start，并把此 ID 作为 assistant_session_id；完成本 Session 的全部浏览器操作后主动调用 browser.bridge_stop 释放同一 ID。不得使用或释放其他 Session ID。新建、切换、离开或关闭 Session UI 不会自动释放租约；删除 Session 仅清理意外残留；运行失败或取消时，宿主清理该运行所属 Session 的租约作为异常兜底。
         """;
     /// <summary>助手模型是否可用（安全摘要，不含 Key）。</summary>
     public async Task<AssistantModelInfo?> DescribeModelAsync(CancellationToken cancellationToken = default) =>
@@ -130,7 +133,7 @@ public sealed class AssistantService
     {
         var session = await sessionStore.LoadAsync(sessionId, cancellationToken);
         if (session is null) return false;
-        session.ApplySystemPrompt(BuildSystemPrompt(session.Id));
+        session.ApplySystemPrompt(BuildSystemPrompt(session.Id), MaxModelSteps);
         CurrentSession = session;
         return true;
     }
@@ -321,6 +324,18 @@ public sealed class AssistantService
             }
             finally
             {
+                if (browserBridgeLeaseManager is not null && runSession.State is AgentSessionState.Failed or AgentSessionState.Cancelled)
+                {
+                    try
+                    {
+                        await browserBridgeLeaseManager.ReleaseAsync(runSession.Id, CancellationToken.None);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogWarning(exception, "AI 助手异常结束时清理 Browser Bridge 租约失败 {SessionId}", runSession.Id);
+                    }
+                }
+
                 userDecisionBroker.CancelOwner(ownerId, "assistant_run_cancelled");
                 currentRun = null;
                 currentRunOwnerId = null;

@@ -29,7 +29,8 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.bridge_start",
-            Description = "为当前 Assistant Session 申请 Browser Bridge 租约。使用系统提示中的当前 Assistant Session ID；重复调用幂等。",
+            SafeArgumentsProjector = ProjectSessionArguments,
+            Description = "仅在由 AI 判断用户提供了链接并希望新增 Provider，且确实需要读取页面时，为当前 Assistant Session 申请 Browser Bridge 租约。不得在新建会话、普通对话或仅收到链接时调用；查看或修改已有 Provider、加载 Skill、预先检查 Chrome 也不能作为启动理由，意图不明确先澄清，已有完整资料直接配置。使用系统提示中的当前 Assistant Session ID；重复调用幂等。",
             ParametersSchema = Schema("""{"type":"object","properties":{"assistant_session_id":{"type":"string","description":"系统提示中的当前 Assistant Session ID"}},"required":["assistant_session_id"]}"""),
             RiskLevel = ToolRiskLevel.External,
             Timeout = TimeSpan.FromSeconds(40),
@@ -44,6 +45,7 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.bridge_stop",
+            SafeArgumentsProjector = ProjectSessionArguments,
             Description = "主动释放当前 Assistant Session 的 Browser Bridge 租约。只有最后一个租约释放后才停止 Bridge；不得传入其他 Session ID。",
             ParametersSchema = Schema("""{"type":"object","properties":{"assistant_session_id":{"type":"string","description":"系统提示中的当前 Assistant Session ID"}},"required":["assistant_session_id"]}"""),
             RiskLevel = ToolRiskLevel.External,
@@ -56,6 +58,7 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.tabs",
+            SafeArgumentsProjector = ProjectSessionArguments,
             Description = "列出 LoomX 自动化标签页（仅限 Extension 登记的目标，不含用户其他标签页）。",
             ParametersSchema = Schema("""{"type":"object","properties":{}}"""),
             RiskLevel = ToolRiskLevel.Read,
@@ -76,6 +79,7 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.open",
+            SafeArgumentsProjector = ProjectSessionArguments,
             Description = "在用户 Chrome 中打开新的自动化标签页，返回 target_id 与 session_id。",
             ParametersSchema = Schema("""{"type":"object","properties":{"url":{"type":"string","description":"HTTP/HTTPS 绝对地址"}},"required":["url"]}"""),
             RiskLevel = ToolRiskLevel.External,
@@ -95,12 +99,13 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.read",
-            Description = "读取页面内容。mode: text(可见文本，默认) / html / markdown。结果中的 API Key 会被收割为 secret_ref。",
+            SafeArgumentsProjector = ProjectSessionArguments,
+            Description = "读取页面内容与真实导航/控件：links提供label、href和selector，controls提供label、selector、type及禁用状态。先按这些真实元素导航和交互，不猜URL或CSS选择器；必要时用html读取元素属性。mode: text(可见文本，默认) / html / markdown。凭据由统一 Credential Protection 在 Provider 边界处理，引用必须保持完整。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{
                   "session_id":{"type":"string"},"mode":{"type":"string","enum":["text","html","markdown"]},
                   "selector":{"type":"string","description":"可选 CSS 选择器，只读取匹配元素"},
-                  "max_length":{"type":"integer","description":"最长字符数，默认 20000"}
+                  "max_length":{"type":"integer","minimum":1,"maximum":20000,"description":"最长字符数，默认 20000"}
                 },"required":["session_id"]}
                 """),
             RiskLevel = ToolRiskLevel.Read,
@@ -124,6 +129,7 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.click",
+            SafeArgumentsProjector = ProjectSessionArguments,
             Description = "点击页面元素（CSS 选择器）。",
             ParametersSchema = Schema("""{"type":"object","properties":{"session_id":{"type":"string"},"selector":{"type":"string"}},"required":["session_id","selector"]}"""),
             RiskLevel = ToolRiskLevel.External,
@@ -138,6 +144,7 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.type",
+            SafeArgumentsProjector = ProjectSessionArguments,
             Description = "在输入框中填入文本（CSS 选择器）。不要用于输入 API Key——Key 应由网页复制后经收割入库。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{
@@ -162,6 +169,7 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.wait",
+            SafeArgumentsProjector = ProjectSessionArguments,
             Description = "等待页面条件：selector 出现 / 固定毫秒 / 页面加载完成。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{
@@ -189,6 +197,7 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.screenshot",
+            SafeArgumentsProjector = ProjectSessionArguments,
             Description = "截取页面截图，返回 PNG 的 base64（不含任何 Secret 区域以外的内容）。",
             ParametersSchema = Schema("""{"type":"object","properties":{"session_id":{"type":"string"},"full_page":{"type":"boolean"}},"required":["session_id"]}"""),
             RiskLevel = ToolRiskLevel.Read,
@@ -204,7 +213,8 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.network",
-            Description = "读取该自动化标签页最近捕获的网络请求（XHR/fetch）：URL、方法、状态码、Model 线索。Authorization 等 Secret 一律替换为 secret_ref。",
+            SafeArgumentsProjector = ProjectSessionArguments,
+            Description = "读取该自动化标签页最近捕获的网络请求（XHR/fetch）：URL、方法、状态码、Model 线索。凭据由统一 Credential Protection 在 Provider 边界处理。",
             ParametersSchema = Schema("""
                 {"type":"object","properties":{
                   "session_id":{"type":"string"},
@@ -231,6 +241,7 @@ public static class BrowserTools
         registry.Register(new ToolDefinition
         {
             Name = "browser.close",
+            SafeArgumentsProjector = ProjectSessionArguments,
             Description = "关闭自动化标签页。",
             ParametersSchema = Schema("""{"type":"object","properties":{"target_id":{"type":"string"}},"required":["target_id"]}"""),
             RiskLevel = ToolRiskLevel.External,
@@ -291,6 +302,21 @@ public static class BrowserTools
         {
             return Fail("invalid_arguments", exception.Message);
         }
+    }
+
+    private static JsonObject ProjectSessionArguments(JsonNode? args)
+    {
+        var result = new JsonObject();
+        foreach (var name in new[] { "assistant_session_id", "session_id", "target_id" })
+        {
+            var value = GetString(args, name);
+            if (value is null) continue;
+            var knownId = Guid.TryParse(value, out _)
+                || new[] { "session-", "target-" }.Any(prefix => value.StartsWith(prefix, StringComparison.Ordinal)
+                    && int.TryParse(value.AsSpan(prefix.Length), out var tabId) && tabId > 0);
+            if (knownId) result[name] = value;
+        }
+        return result;
     }
 
     private static string RequireString(JsonNode? args, string name)

@@ -64,11 +64,18 @@ public static class LoomXHost
         // 小助手（Phase 2）：诊断测试器、Skill 仓库与 loomx.* 工具注册表
         builder.Services.AddHttpClient("loomx-assistant");
         builder.Services.AddSingleton<GatewayStateHub>();
+        builder.Services.AddSingleton<ConfigSnapshotService>();
+        builder.Services.AddSingleton<IProviderTestService>(services => new ProviderTestService(
+            services.GetRequiredService<IHttpClientFactory>().CreateClient("loomx-assistant"),
+            services.GetRequiredService<ILogger<ProviderTestService>>(),
+            services.GetRequiredService<IProviderExecutionPipeline>(),
+            services.GetRequiredService<ConfigSnapshotService>().GetUpdateProxySettingsAsync));
         builder.Services.AddSingleton<Assistant.AssistantTester>(services => new Assistant.AssistantTester(
             services.GetRequiredService<IHttpClientFactory>().CreateClient("loomx-assistant"),
             services.GetRequiredService<ConfigurationManagementService>(),
             services.GetRequiredService<IDbContextFactory<ConfigurationDbContext>>(),
-            services.GetRequiredService<ILogger<Assistant.AssistantTester>>()));
+            services.GetRequiredService<ILogger<Assistant.AssistantTester>>(),
+            services.GetRequiredService<IProviderTestService>()));
         builder.Services.AddSingleton(_ => Assistant.SkillStore.ForInstallDirectory());
 
         // 小助手（Phase 3）：Browser Bridge、网络探针与诊断工人

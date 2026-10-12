@@ -99,6 +99,11 @@ public static class AssistantContentPolicy
         return false;
     }
 
+    /// <summary>名称用途允许术语，但仍拒绝可识别凭据、认证赋值及本地凭据引用。</summary>
+    public static bool ContainsCredentialValue(string? content) => !string.IsNullOrWhiteSpace(content)
+        && (SecretValuePattern.IsMatch(content)
+            || content.Contains("LOOMX_CREDENTIAL_", StringComparison.OrdinalIgnoreCase)
+            || Regex.IsMatch(content, @"(?i)\b(?:api[_\s-]*key|token|password|secret|authorization|credentials?)\s*[:=]\s*\S+|\bbearer\s+\S+", RegexOptions.CultureInvariant));
     public static TomlValue Redact(TomlValue value, IReadOnlyList<string> path)
     {
         ArgumentNullException.ThrowIfNull(value);

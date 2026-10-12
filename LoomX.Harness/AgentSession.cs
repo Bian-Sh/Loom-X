@@ -103,9 +103,10 @@ public sealed class AgentSession
     }
 
     /// <summary>应用宿主当前系统策略；替换历史策略并保留原消息标识，避免追加重复策略消息。</summary>
-    internal void ApplySystemPrompt(string systemPrompt)
+    internal void ApplySystemPrompt(string systemPrompt, int? maxSteps = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(systemPrompt);
+        if (maxSteps is <= 0) throw new ArgumentOutOfRangeException(nameof(maxSteps));
         var persistedSystem = messages.FirstOrDefault(message => message.Role == ChatRole.System);
         messages.RemoveAll(message => message.Role == ChatRole.System);
         var currentSystem = persistedSystem is null
@@ -116,7 +117,7 @@ public sealed class AgentSession
                 Timestamp = persistedSystem.Timestamp,
             };
         messages.Insert(0, currentSystem);
-        Options = Options with { SystemPrompt = systemPrompt };
+        Options = Options with { SystemPrompt = systemPrompt, MaxSteps = maxSteps ?? Options.MaxSteps };
     }
 
     /// <summary>从持久化恢复消息（不清空系统提示之外的校验，内容由存储层保证安全）。</summary>

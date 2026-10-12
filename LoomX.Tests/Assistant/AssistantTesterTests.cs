@@ -5,6 +5,7 @@ using LoomX.Assistant;
 using LoomX.Configuration;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Microsoft.Extensions.Logging;
 
 namespace LoomX.Tests.Assistant;
 
@@ -47,9 +48,93 @@ public sealed class AssistantTesterTests : IAsyncLifetime
     private async Task<string> CreateProviderAsync()
     {
         var provider = await configuration.CreateProviderAsync(
-            new ProviderInput("demo", "演示", "https://api.example.com/v1", "openai", true, LoomXToolsTests.PlaintextApiKey, false, null),
+            new ProviderInput("demo", "演示", "https://api.example.com/v1", "openai", true, LoomXToolsTests.PlaintextApiKey, false, null, EndpointFormat: "chat_completions"),
             CancellationToken.None);
         return provider.Id.ToString();
+    }
+
+    [Fact]
+    public async Task TestUrl_日志不包含查询凭据或响应正文()
+    {
+        var logger = new ProbeLogger();
+        responder = _ => new HttpResponseMessage(HttpStatusCode.Forbidden) { Content = new StringContent("敏感响应测试值") };
+        var tester = new AssistantTester(new HttpClient(new DelegateHttpHandler(request => responder(request))), configuration, factory, logger);
+        var result = await tester.TestUrlAsync("https://example.com/test?api_key=敏感查询测试值", CancellationToken.None);
+        Assert.DoesNotContain("敏感查询测试值", string.Join("\n", logger.Messages), StringComparison.Ordinal);
+        Assert.DoesNotContain("敏感响应测试值", string.Join("\n", logger.Messages), StringComparison.Ordinal);
+        Assert.DoesNotContain("敏感查询测试值", result.ToJsonString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("敏感响应测试值", result.ToJsonString(), StringComparison.Ordinal);
+        Assert.Contains(logger.Messages, item => item.Contains("网址测试未通过", StringComparison.Ordinal));
+    }
+
+    private sealed class ProbeLogger : ILogger<AssistantTester>
+    {
+        public List<string> Messages { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) => Messages.Add(formatter(state, exception) + " " + exception?.ToString());
+    }
+
+    [Theory]
+    [InlineData("file:///C:/test")]
+    [InlineData("https://user:secret@example.com")]
+    public async Task TestUrl_拒绝非Http和携带凭据的地址(string url)
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => CreateTester().TestUrlAsync(url, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TestUrl_可达与Http成功分开判断且不返回响应正文()
+    {
+        responder = request =>
+        {
+            Assert.Equal(HttpMethod.Head, request.Method);
+            Assert.Null(request.Headers.Authorization);
+            return new HttpResponseMessage(HttpStatusCode.Unauthorized) { Content = new StringContent("敏感测试值") };
+        };
+        var result = await CreateTester().TestUrlAsync("https://example.com", CancellationToken.None);
+        Assert.True(result["reachable"]!.GetValue<bool>());
+        Assert.False(result["http_success"]!.GetValue<bool>());
+        Assert.Equal(401, result["status_code"]!.GetValue<int>());
+        Assert.DoesNotContain("敏感测试值", result.ToJsonString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TestUrl_不支持Head时退回Get但不读取正文()
+    {
+        var methods = new List<HttpMethod>();
+        responder = request =>
+        {
+            methods.Add(request.Method);
+            return new HttpResponseMessage(request.Method == HttpMethod.Head ? HttpStatusCode.MethodNotAllowed : HttpStatusCode.OK);
+        };
+        var result = await CreateTester().TestUrlAsync("https://example.com", CancellationToken.None);
+        Assert.Equal(new[] { HttpMethod.Head, HttpMethod.Get }, methods);
+        Assert.True(result["http_success"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task TestModel_使用Responses接口与模型覆盖Header并返回真实接口摘要()
+    {
+        var providerId = await CreateProviderAsync();
+        var provider = (await configuration.ListProvidersAsync()).Single();
+        await configuration.UpdateProviderAsync(provider.Id, new ProviderInput(provider.BusinessId, provider.DisplayName,
+            provider.BaseUrl, "openai", true, null, false, new() { ["X-Test"] = "Provider" }, EndpointFormat: "responses"));
+        var model = await configuration.CreateModelAsync(Guid.Parse(providerId), new ModelInput("测试模型", "测试模型", null,
+            "openai", null, null, 4096, 128, false, null, null, true, null, false, new() { ["X-Test"] = "Model" }, null));
+        responder = request =>
+        {
+            Assert.Equal("/v1/responses", request.RequestUri!.AbsolutePath);
+            Assert.Equal("Model", request.Headers.GetValues("X-Test").Single());
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"output_text\":\"pong\"}") };
+        };
+        var result = await CreateTester().TestModelAsync(model.Id, CancellationToken.None);
+        Assert.True(result["chat_test"]!.GetValue<bool>());
+        Assert.Equal("/v1/responses", result["request_path"]!.GetValue<string>());
+        var api = await CreateTester().GetModelApiAsync(model.Id, CancellationToken.None);
+        Assert.Equal("responses", api["endpoint_format"]!.GetValue<string>());
+        Assert.Equal("/v1/responses", api["request_path"]!.GetValue<string>());
+        Assert.DoesNotContain(LoomXToolsTests.PlaintextApiKey, api.ToJsonString(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -65,6 +150,7 @@ public sealed class AssistantTesterTests : IAsyncLifetime
 
         Assert.Equal("provider_ok", result["diagnosis"]?.GetValue<string>());
         Assert.Equal(3, result["models_found"]?.GetValue<int>());
+        Assert.Equal(new[] { "a", "b", "c" }, result["models"]!.AsArray().Select(item => item!.GetValue<string>()));
         Assert.True(result["reachable"]!.GetValue<bool>());
         Assert.True(result["authenticated"]!.GetValue<bool>());
     }
@@ -198,4 +284,47 @@ public sealed class AssistantTesterTests : IAsyncLifetime
         Assert.Null(result["api_key"]);
         Assert.DoesNotContain("secret://", result.ToJsonString(), StringComparison.Ordinal);
     }
+    [Fact]
+    public async Task 模型目录使用自定义URL且元数据与日志不含额外响应内容()
+    {
+        var id = Guid.Parse(await CreateProviderAsync());
+        await configuration.UpdateProviderModelListUrlAsync(id, "https://catalog.example.com/custom?trace=敏感查询");
+        responder = request =>
+        {
+            Assert.Equal("catalog.example.com", request.RequestUri!.Host);
+            Assert.Equal("/custom", request.RequestUri.AbsolutePath);
+            Assert.Equal("Bearer " + LoomXToolsTests.PlaintextApiKey, request.Headers.Authorization!.ToString());
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("""{"data":[{"id":"real-model","owned_by":"relay","context_length":64000,"max_output_tokens":8000,"capabilities":["vision"]}],"private":"敏感响应"}""") };
+        };
+        var logger = new ProbeLogger();
+        var tester = new AssistantTester(new HttpClient(new DelegateHttpHandler(request => responder(request))), configuration, factory, logger);
+        var result = await tester.GetProviderModelsAsync("demo", false, CancellationToken.None);
+        Assert.Equal("real-model", result["models"]![0]!["id"]!.GetValue<string>());
+        Assert.Equal(64000, result["models"]![0]!["context_length"]!.GetValue<int>());
+        Assert.Equal(8000, result["models"]![0]!["max_tokens"]!.GetValue<int>());
+        Assert.True(result["models"]![0]!["vision"]!.GetValue<bool>());
+        Assert.Empty((await configuration.ListProvidersAsync()).Single().Models);
+        Assert.DoesNotContain("敏感响应", result.ToJsonString());
+        Assert.DoesNotContain("敏感查询", string.Join("\n", logger.Messages));
+        Assert.DoesNotContain(LoomXToolsTests.PlaintextApiKey, string.Join("\n", logger.Messages));
+        responder = _ => throw new HttpRequestException("包含敏感查询及敏感响应的错误");
+        var failed = await tester.GetProviderModelsAsync("demo", true, CancellationToken.None);
+        Assert.Equal("unreachable", failed["diagnosis"]!.GetValue<string>());
+        Assert.False(failed["synced"]!.GetValue<bool>());
+        Assert.DoesNotContain("敏感查询", string.Join("\n", logger.Messages));
+        Assert.DoesNotContain("敏感响应", string.Join("\n", logger.Messages));
+    }
+
+    [Theory]
+    [InlineData(200)]
+    [InlineData(401)]
+    public async Task 模型列表异常不会同步任何模型(int statusCode)
+    {
+        await CreateProviderAsync();
+        responder = _ => new HttpResponseMessage((HttpStatusCode)statusCode) { Content = new StringContent("不是模型列表") };
+        var result = await CreateTester().GetProviderModelsAsync("demo", true, CancellationToken.None);
+        Assert.False(result["synced"]!.GetValue<bool>());
+        Assert.Empty((await configuration.ListProvidersAsync()).Single().Models);
+    }
+
 }

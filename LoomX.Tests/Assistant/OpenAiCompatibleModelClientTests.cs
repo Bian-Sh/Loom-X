@@ -76,6 +76,33 @@ public sealed class OpenAiCompatibleModelClientTests
     }
 
     [Fact]
+    public void 模型历史保留声明标识但不复制缺少必需字段的交互摘要()
+    {
+        var summary = new ToolCall("call", "assistant.ask_user", "{\"field_count\":1,\"fields\":[{\"type\":\"text\"}],\"allow_cancel\":true}") { ArgumentsAreSafe = true };
+        var schema = JsonNode.Parse("{\"type\":\"object\",\"required\":[\"title\",\"question\",\"fields\"],\"properties\":{\"title\":{\"type\":\"string\"},\"question\":{\"type\":\"string\"},\"fields\":{\"type\":\"array\"}}}")!;
+        Assert.Equal("{}", ToolCallProjection.ToModelArgumentsJson(summary, schema));
+        var safeId = new ToolCall("call", "browser.read", "{\"session_id\":\"session-7\",\"field_count\":1}") { ArgumentsAreSafe = true };
+        var readSchema = JsonNode.Parse("{\"type\":\"object\",\"required\":[\"session_id\"],\"properties\":{\"session_id\":{\"type\":\"string\"}}}")!;
+        Assert.Equal("{\"session_id\":\"session-7\"}", ToolCallProjection.ToModelArgumentsJson(safeId, readSchema));
+    }
+
+    [Fact]
+    public async Task 隐藏的历史摘要不能作为工具参数发送给模型()
+    {
+        var handler = new FakeHttpHandler(HttpStatusCode.OK,
+            "data: {\"choices\":[{\"delta\":{\"content\":\"完成\"},\"finish_reason\":\"stop\"}]}\n\ndata: [DONE]\n");
+        var client = new OpenAiCompatibleModelClient(new HttpClient(handler), "https://example.invalid/v1", "测试模型");
+        var hiddenCall = ToolCallProjection.EnsureSafe(new ToolCall("call-hidden", "mock.list_providers", "{\"api_key\":\"敏感测试值\"}"));
+        await CollectAsync(client.StreamAsync(new ModelRequest([
+            ChatMessage.User("测试"), ChatMessage.AssistantToolCalls([hiddenCall]),
+            ChatMessage.ToolResult(hiddenCall, "完成")], [CreateTool()]), CancellationToken.None));
+        var body = JsonNode.Parse(handler.LastRequestBody!)!;
+        Assert.Equal("{}", body["messages"]![1]!["tool_calls"]![0]!["function"]!["arguments"]!.GetValue<string>());
+        Assert.DoesNotContain("敏感测试值", handler.LastRequestBody!, StringComparison.Ordinal);
+        Assert.Contains("参数已隐藏", hiddenCall.ArgumentsJson, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StreamAsync_ParsesTextDeltasAndCompletion()
     {
         var sse = string.Join('\n',

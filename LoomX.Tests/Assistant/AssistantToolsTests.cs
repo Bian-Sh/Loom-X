@@ -627,6 +627,27 @@ public sealed class AssistantToolsTests
         return tool!;
     }
 
+    [Fact]
+    public async Task AskUser_凭据名称用途通过真实Broker并返回用户选择()
+    {
+        using var broker = CreateBroker();
+        var pending = CaptureNext(broker);
+        var tool = GetTool(broker);
+        using var scope = AssistantTools.BeginRun("name-test");
+        var arguments = JsonNode.Parse("""
+            {"title":"Create API Key","question":"Choose the API Key name","fields":[{"id":"name","label":"API Key name","type":"single_select","purpose":"credential_name","is_required":true,"options":[{"id":"existing_1","label":"Primary API Key"},{"id":"existing_2","label":"Backup Token"}],"allow_custom_input":true,"max_length":100}]}
+            """)!;
+        var execution = tool.Handler(arguments, CancellationToken.None);
+        var request = await pending.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.True(Assert.Single(request.Request.Fields).IsCredentialName);
+        Assert.True(broker.Submit(request.RequestId, UserDecisionBrokerTestExtensions.ClaimantId,
+            new Dictionary<string, object?> { ["name"] = "existing_1" }, new Dictionary<string, string> { ["name"] = "LoomX-new" }));
+        var result = await execution;
+        Assert.True(result.Success);
+        var json = JsonNode.Parse(result.Content)!;
+        Assert.Equal("existing_1", json["values"]!["name"]!.GetValue<string>());
+        Assert.Equal("LoomX-new", json["custom_inputs"]!["name"]!.GetValue<string>());
+    }
     private static TaskCompletionSource<PendingUserDecision> CaptureNext(UserDecisionBroker broker)
     {
         var completion = new TaskCompletionSource<PendingUserDecision>(

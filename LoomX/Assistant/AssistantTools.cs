@@ -22,7 +22,7 @@ public static class AssistantTools
     {
         "id", "label", "type", "is_required", "options", "default_option_id", "default_option_ids",
         "min_selections", "max_selections", "default_number", "min_number", "max_number", "step",
-        "default_text", "is_multiline", "allow_custom_input", "custom_input_placeholder", "max_length",
+        "default_text", "is_multiline", "allow_custom_input", "custom_input_placeholder", "max_length", "purpose",
     };
     private static readonly HashSet<string> OptionProperties = new(StringComparer.Ordinal)
     {
@@ -37,7 +37,7 @@ public static class AssistantTools
         registry.Register(new ToolDefinition
         {
             Name = "assistant.ask_user",
-            Description = "通用 Human-in-the-loop 结构化交互，可直接用于测试、偏好收集、必要输入、歧义澄清和行动确认；fields 中每个字段独立分页。若用户要求在 single_select 或 multi_select 的选项下方同一页输入其他内容，只创建一个选择字段并设置 allow_custom_input=true，可同时设置 custom_input_placeholder 和 max_length；不要创建独立 text 字段。无需加载 Skill，无需 Browser Bridge 或 Chrome；不得用于索取密钥或认证信息。",
+            Description = "通用 Human-in-the-loop 结构化交互，可直接用于测试、偏好收集、必要输入、歧义澄清和行动确认；fields 中每个字段独立分页。若用户要求在 single_select 或 multi_select 的选项下方同一页输入其他内容，只创建一个选择字段并设置 allow_custom_input=true，可同时设置 custom_input_placeholder 和 max_length；不要创建独立 text 字段。命名或选择已有凭据名称时，在一个 text 或 single_select 字段声明 purpose=credential_name；该用途只收集名称，仍拒绝凭据值。无需加载 Skill，无需 Browser Bridge 或 Chrome；不得用于索取密钥或认证信息。",
             ParametersSchema = CreateAskUserSchema(),
             RiskLevel = ToolRiskLevel.Read,
             SafeArgumentsProjector = CreateSafeArgumentsProjection,
@@ -147,6 +147,8 @@ public static class AssistantTools
         ValidateProperties(field, FieldProperties);
         var type = ParseFieldType(RequireString(field, "type"));
         var options = ReadOptions(field, "options");
+        var purpose = OptionalString(field, "purpose") ?? "general";
+        if (purpose is not ("general" or "credential_name")) throw InvalidRequest("用户决策字段用途无效。");
 
         return new UserDecisionField(
             RequireString(field, "id"),
@@ -166,7 +168,7 @@ public static class AssistantTools
             OptionalValue(field, "is_multiline", false),
             OptionalValue(field, "allow_custom_input", false),
             OptionalString(field, "custom_input_placeholder"),
-            OptionalNullableValue<int>(field, "max_length"));
+            OptionalNullableValue<int>(field, "max_length"), purpose == "credential_name");
     }
 
     private static UserDecisionOption ParseOption(JsonNode? node)
@@ -376,6 +378,7 @@ public static class AssistantTools
         "用户决策请求包含未知属性。" => "unknown_property",
         "用户决策可选属性类型无效。" => "invalid_property_type",
         "用户决策请求包含禁止的正文或配置内容。" => "prohibited_content",
+        _ when message.Contains("敏感", StringComparison.Ordinal) => "sensitive_content",
         _ => "invalid_field",
     };
 
@@ -542,6 +545,7 @@ public static class AssistantTools
                   "id": { "type": "string", "maxLength": 64 },
                   "label": { "type": "string", "maxLength": 200 },
                   "type": { "type": "string", "enum": ["single_select", "multi_select", "number", "text"], "description": "single_select 和 multi_select 必须提供至少一个 options。" },
+                  "purpose": { "type": "string", "enum": ["general", "credential_name"], "default": "general", "description": "只有收集、选择或自定义凭据名称时设为 credential_name；仅限单行 text 或 single_select 字段，最长200字。允许名称术语，仍禁止真实密钥、认证赋值及凭据引用。" },
                   "is_required": { "type": "boolean", "default": false },
                   "options": {
                     "type": "array",
