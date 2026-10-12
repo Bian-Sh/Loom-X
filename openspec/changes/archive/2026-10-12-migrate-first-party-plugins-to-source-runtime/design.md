@@ -2,6 +2,8 @@
 comet_change: migrate-first-party-plugins-to-source-runtime
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-10-12-migrate-first-party-plugins-to-source-runtime
+status: final
 ---
 
 # 技术设计

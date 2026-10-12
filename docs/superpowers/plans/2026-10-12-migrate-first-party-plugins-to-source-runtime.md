@@ -2,6 +2,7 @@
 change: migrate-first-party-plugins-to-source-runtime
 design-doc: openspec/changes/migrate-first-party-plugins-to-source-runtime/design.md
 base-ref: 355f31d3cbd6e57b53cf35be18521a2fa19a4e3a
+archived-with: 2026-10-12-migrate-first-party-plugins-to-source-runtime
 ---
 
 # 第一方插件源码迁移实施计划
