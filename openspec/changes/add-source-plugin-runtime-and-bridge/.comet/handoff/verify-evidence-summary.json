@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-12",
+  "productBaseline": "f066e16aeb5a2927337178902d13ba64e371deec",
+  "reviewer": "01a12ddc-9325-7752-a523-57198892c091",
+  "initialResult": "IMPORTANT I-1",
+  "followupResult": "PASS",
+  "critical": 0,
+  "important": 0,
+  "tasksPass": 44,
+  "requirementsPass": 33,
+  "scenariosPass": 82,
+  "originalRuntimeReviewRounds": 2,
+  "originalFeedbackReviewRounds": 2,
+  "finalIntegrationInitialReviews": 1,
+  "finalIntegrationTargetedFollowups": 1,
+  "published": "outputs/20261012-104237",
+  "nativeUi": "outputs/ui-reload-candidate-2026-10-12_10-48-00",
+  "trx": [
+    {
+      "path": "integration/VERIFY-FINAL.trx",
+      "sha256": "CD3B5AF2A2B2E16290B19DFE55CF81AF7C0CE65A5D3F8EA169BC7FDBD68CD14B",
+      "total": 1884,
+      "passed": 1884,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
+    },
+    {
+      "path": "integration-ui-fix/UI-RED.trx",
+      "sha256": "1F0AEDC6FE67FA9F387EA01589130E60912C1B3DCD99ED54B02553805C23666D",
+      "total": 12,
+      "passed": 2,
+      "failed": 10,
+      "notExecuted": 0,
+      "outcome": "Failed"
+    },
+    {
+      "path": "integration-ui-fix/UI-GREEN.trx",
+      "sha256": "148363F030529223BD58F42F3357D4963389EF35D4334DE4E2A2F5BF0FCBA763",
+      "total": 63,
+      "passed": 61,
+      "failed": 2,
+      "notExecuted": 0,
+      "outcome": "Failed"
+    },
+    {
+      "path": "integration-ui-fix/UI-GREEN-VERIFIED.trx",
+      "sha256": "25EF286B428B9BA745886037653AB24BA0C4655BA94A7274D6D698B46A2DE3A5",
+      "total": 63,
+      "passed": 63,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
+    },
+    {
+      "path": "integration-ui-fix/UI-ADJACENT-FINAL.trx",
+      "sha256": "BE1A75B10FDE2126B45389BC955DC7E2E8B920037B3BA366980B7860DA21939A",
+      "total": 71,
+      "passed": 71,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
+    },
+    {
+      "path": "integration-ui-fix/BUILD-UI-FIX-FULL.trx",
+      "sha256": "8DD242DB0479658237817BF539E0FEFA1BF1627BF89A03CF15919D940813A88D",
+      "total": 1896,
+      "passed": 1895,
+      "failed": 1,
+      "notExecuted": 0,
+      "outcome": "Failed"
+    },
+    {
+      "path": "integration-ui-fix/BUILD-UI-FIX-VERIFIED.trx",
+      "sha256": "3D41B20AB4CC92C9BE50A4E25E0328A698DE89667857BADCEDA1B66691B2AFDB",
+      "total": 1896,
+      "passed": 1896,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
+    }
+  ]
+}

@@ -242,7 +242,7 @@ public sealed class PluginRuntimeReviewRegressionTests(ITestOutputHelper output)
         var data=Path.Combine(fixture.Root,"data","b");
         for(var index=0;index<200&&!File.Exists(Path.Combine(data,"ui-started"));index++)await Task.Delay(10);
         Assert.True(File.Exists(Path.Combine(data,"ui-started")));
-        try { fixture.Stage("b",typeof(SlowUiPlugin),"2"); Assert.True(await runtime.ReloadAsync("b")); Assert.Equal(0,providers[0].Disposals); }
+        try { fixture.Stage("b",typeof(ReadyUiPlugin),"2"); Assert.True(await runtime.ReloadAsync("b")); Assert.Equal(0,providers[0].Disposals); }
         finally { File.WriteAllText(Path.Combine(data,"ui-continue"),"继续"); }
         await operation.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.Equal(1,providers[0].Disposals);
@@ -329,7 +329,7 @@ public sealed class PluginRuntimeReviewRegressionTests(ITestOutputHelper output)
                 foreach(var culture in new[]{"zh-CN","zh-TW","ja-JP","en-US"}) File.WriteAllText(Path.Combine(directory,"i18n",culture+".json"),"{}");
             }
             var document=new Dictionary<string,object?> { ["id"]=id,["version"]=version,["capabilities"]=new[]{"probe"},["extensions"]=new object[]{new{id="request",kind="request",pipeline="request",failure_policy=policy},new{id="response",kind="response",pipeline="response",failure_policy="continue-on-error"}} };
-            if(type==typeof(SlowUiPlugin)) document["ui"]=new {contributions=new[]{new{id="panel",slot="card-body",interactive=false}}};
+            if(typeof(SlowUiPlugin).IsAssignableFrom(type)) document["ui"]=new {contributions=new[]{new{id="panel",slot="card-body",interactive=false}}};
             if(source) document["runtime"]=new{kind="csharp-source",entry_type="Demo.Plugin",sources=new[]{"src/Plugin.cs"}};
             else {document["assembly"]="Probe.dll"; document["plugin_type"]=entry??type.FullName;}
             File.WriteAllText(Path.Combine(directory,"plugin.manifest.json"),JsonSerializer.Serialize(document));
@@ -413,14 +413,20 @@ public sealed class DuplicateExtensionPlugin:ILoomXPlugin
 public sealed class TriggerPlugin:ReviewPlugin {public override string Id=>"a";}
 public sealed class ConstructorThrowsPlugin:ReviewPlugin { public ConstructorThrowsPlugin()=>throw new InvalidOperationException("sk-review-private-constructor"); }
 
-public sealed class SlowUiPlugin:ILoomXPlugin,IPluginUiContributionProvider
+public class SlowUiPlugin:ILoomXPlugin,IPluginUiContributionProvider
 {
     private string directory=null!;
     public string Id=>"b";
     public event EventHandler? UiInvalidated {add{} remove{}}
     public void Initialize(PluginInitializationContext context)=>directory=context.DataDirectory;
     public IEnumerable<IPipelineExtension> CreateExtensions()=>[new ReviewPlugin.Request(),new ReviewPlugin.Response()];
-    private void Wait(){File.WriteAllText(Path.Combine(directory,"ui-started"),"开始");if(!SpinWait.SpinUntil(()=>File.Exists(Path.Combine(directory,"ui-continue")),TimeSpan.FromSeconds(10)))throw new TimeoutException("测试UI等待超时");}
+    protected virtual void Wait(){File.WriteAllText(Path.Combine(directory,"ui-started"),"开始");if(!SpinWait.SpinUntil(()=>File.Exists(Path.Combine(directory,"ui-continue")),TimeSpan.FromSeconds(10)))throw new TimeoutException("测试UI等待超时");}
     public PluginDisplayInfo? GetDisplayInfo(PluginUiContext context){Wait();return new("演示","说明","测试","生命周期");}
     public IReadOnlyList<PluginUiContribution> GetUiContributions(PluginUiContext context){Wait();return [new(PluginUiContribution.CurrentSchemaVersion,"panel",PluginUiSlot.CardBody,new PluginUiTextNode("演示"))];}
+}
+
+/// <summary>候选UI验证立即完成；仅旧实例在途快照等待，避免夹具把两代调用绑在同一闸门。</summary>
+public sealed class ReadyUiPlugin : SlowUiPlugin
+{
+    protected override void Wait() { }
 }

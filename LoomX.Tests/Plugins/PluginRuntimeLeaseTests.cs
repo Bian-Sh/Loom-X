@@ -212,13 +212,17 @@ public sealed class PluginRuntimeLeaseTests
         public ValueTask DisposeAsync() { Disposals++; return ValueTask.CompletedTask; }
     }
 }
-public sealed class LeaseUiProbePlugin : ILoomXPlugin, IPluginUiCommandHandler, IDisposable
+public sealed class LeaseUiProbePlugin : ILoomXPlugin, IPluginUiCommandHandler, IPluginUiContributionProvider, IDisposable
 {
     private readonly RegistrationProbePlugin inner = new();
     private string directory = null!;
     public string Id => inner.Id;
     public void Initialize(PluginInitializationContext context) { directory = context.DataDirectory; inner.Initialize(context); }
     public IEnumerable<IPipelineExtension> CreateExtensions() => inner.CreateExtensions();
+    // 命令租约夹具也必须提供与Manifest一致的有效声明式UI候选。
+    public event EventHandler? UiInvalidated { add { } remove { } }
+    public IReadOnlyList<PluginUiContribution> GetUiContributions(PluginUiContext context) =>
+        [new(PluginUiContribution.CurrentSchemaVersion, "panel", PluginUiSlot.DetailBody, new PluginUiButtonNode("等待", "wait"))];
     public async ValueTask<PluginUiCommandResult> ExecuteUiCommandAsync(PluginUiCommand command, CancellationToken cancellationToken = default)
     {
         File.WriteAllText(Path.Combine(directory, "command-started"), "开始");

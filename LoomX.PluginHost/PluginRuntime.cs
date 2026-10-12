@@ -496,6 +496,12 @@ public sealed partial class PluginRuntime
             if (candidateOnly && invalidExtensions) return null;
 
             uiProvider = instance as IPluginUiContributionProvider;
+            // 重载只发布完整候选；启动阶段仍保留既有 UI 降级行为。
+            if (candidateOnly && !ValidateCandidateUi(manifest, uiProvider))
+            {
+                AddLoadDiagnostic(manifest.Id, "LX_UI_INVALID", "候选声明式 UI 未通过生产结构验证。");
+                return null;
+            }
             if (manifest.Ui is { Contributions.Count: > 0 } && uiProvider is null)
                 AddUiDiagnostic(manifest.Id, "provider", "PROVIDER_MISSING");
             if (uiProvider is not null)
@@ -564,6 +570,29 @@ public sealed partial class PluginRuntime
             }
         }
     }
+    private static bool ValidateCandidateUi(PluginManifest manifest, IPluginUiContributionProvider? provider)
+    {
+        if (manifest.Ui is not { Contributions.Count: > 0 }) return true;
+        if (provider is null) return false;
+        var declarations = manifest.Ui.Contributions.ToDictionary(item => item.Id, StringComparer.Ordinal);
+        // 与产品四语言负载一致，避免只在非默认文化出现的无效快照被发布。
+        foreach (var culture in new[] { "zh-CN", "zh-TW", "ja-JP", "en-US" })
+        {
+            var contributions = provider.GetUiContributions(new PluginUiContext(culture)) ?? [];
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var contribution in contributions)
+            {
+                if (contribution is null || !seen.Add(contribution.Id)
+                    || !declarations.TryGetValue(contribution.Id, out var declared)
+                    || declared.Slot != contribution.Slot
+                    || !PluginUiValidator.Validate(contribution).IsValid)
+                    return false;
+            }
+            if (declarations.Keys.Any(id => !seen.Contains(id))) return false;
+        }
+        return true;
+    }
+
     private void LogCandidateCleanupFailure(string pluginId, Exception exception)
     {
         logger.LogWarning(new InvalidOperationException("候选插件资源清理失败，异常内容已隐藏。"),
