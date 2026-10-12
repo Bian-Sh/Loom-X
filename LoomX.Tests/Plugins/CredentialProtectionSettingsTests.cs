@@ -9,11 +9,13 @@ namespace LoomX.Tests.Plugins;
 /// </summary>
 public sealed class CredentialProtectionSettingsTests : IDisposable
 {
+    private readonly CredentialTestFactory factory = new();
     private readonly string dataDirectory =
         Path.Combine(Path.GetTempPath(), "loomx-credential-settings-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
+        factory.Dispose();
         try
         {
             if (Directory.Exists(dataDirectory)) Directory.Delete(dataDirectory, recursive: true);
@@ -28,7 +30,7 @@ public sealed class CredentialProtectionSettingsTests : IDisposable
     {
         Directory.CreateDirectory(dataDirectory);
         var plugin = new CredentialProtectionPlugin();
-        plugin.Initialize(new PluginInitializationContext("loomx.credential-protection", dataDirectory));
+        plugin.Initialize(factory.CreateContext(dataDirectory));
         plugin.CreateExtensions().ToArray();
         return plugin;
     }

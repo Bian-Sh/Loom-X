@@ -173,7 +173,7 @@ public interface IPluginSqliteDatabase : IAsyncDisposable
 
 ### 9. Logging 与 Notifications 使用最小值 DTO
 
-`logging/v1` 接收级别、消息模板和 `PluginLogField` 列表；字段值限制为 Null、Boolean、Integer、Real、Text。宿主自动增加 PluginId 和能力作用域，再映射到 `ILogger`/Serilog。宿主限制字段数量、键长度和值长度，并对敏感键名和已知凭据形态拒绝或脱敏。插件仍负有不提交敏感数据的契约责任，过滤器不能被描述为绝对防泄漏安全边界。
+`logging/v1` 接收级别、消息模板和 `PluginLogField` 列表；字段值限制为 Null、Boolean、Integer、Real、Text。宿主自动增加 PluginId 和能力作用域，再映射到 `ILogger`/Serilog。v1 消息模板只接受 `{Name}` 占位与 `{{`/`}}` 字面花括号，拒绝 format/alignment（如 `{Count:N2}` 或 `{Count,8}`）。宿主加可见 `[pluginId] ` 来源前缀；512 字符是交给 Serilog 前按字段值预展开的总预算，包含来源前缀，不保证 Serilog quoting/escaping 后的最终输出仍不超过 512 字符。保留来源字段不可由插件覆盖。宿主限制字段数量、键长度和值长度，并对敏感键名和已知凭据形态拒绝或脱敏。插件仍负有不提交敏感数据的契约责任，过滤器不能被描述为绝对防泄漏安全边界。
 
 `notifications/v1` 接收级别与短安全摘要，由宿主映射到 `ToastService` 的 Success/Info/Warning/Error。宿主执行长度、频率和敏感内容检查；插件不能控制窗口、持续时间、位置、导航或渲染类型。
 

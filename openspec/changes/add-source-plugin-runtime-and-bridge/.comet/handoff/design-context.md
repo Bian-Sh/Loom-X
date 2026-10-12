@@ -2,8 +2,8 @@
 
 - Change: add-source-plugin-runtime-and-bridge
 - Phase: design
-- Mode: compact
-- Context hash: 412767ccbb3a627d6bb5c040d0a2212b5a8299293bab68d6a632cf838676e689
+- Mode: full
+- Context hash: d8db719913a358d7ee7b8f590deb939b2c764e0cb19004db35c4d570585c60c9
 
 Generated-by: comet-handoff.sh
 Task hash policy: task-content-v1. Read tasks.md for live completion; excerpts are design-time context.
@@ -60,9 +60,7 @@ LoomX 当前插件以预编译程序集为交付单位，插件开发者既要�
 
 - Source: openspec/changes/add-source-plugin-runtime-and-bridge/design.md
 - Lines: 1-273
-- SHA256: 6e8c86a3eb72dc94d71a0924410098e738e7d427be96c33ae780be07c77f03c5
-
-[TRUNCATED]
+- SHA256: bd3aa437acd0225cfccf5a694bfed0c58cc34deaccc537b69cb4b9382532dbdd
 
 ```md
 ---
@@ -146,9 +144,200 @@ canonical_spec: openspec
 
 程序集职责如下：
 
+- `LoomX.Plugin.Abstractions.dll`：插件 SDK；包含 Manifest 模型、Plugin API、Bridge 接口、值 DTO、稳定错误与诊断。插件开发和编译只引用此契约，不引用 SQLite 实现。
+- `LoomX.PluginHost.dll`：发现、验证、能力协商、源码编译、缓存、加载、重新加载与 Bridge 生命周期编排。
+- `LoomX.Plugin.Storage.Sqlite.dll`：宿主侧 `storage.sqlite/v1` 实现；它统一承载插件 Bridge 的 SQLite 提供程序依赖；宿主既有配置数据库依赖不在本次去重范围内。
+- `LoomX`：组合根；把统一 `ILogger` 管线和现有 `ToastService` 适配到 Logging/Notifications Bridge。
+
+SQLite 实现单独 DLL 的目的不是让插件引用它，而是把提供程序与原生依赖固定在宿主发布边界，使插件目录保持纯净，也便于用测试实现替换。插件调试依赖 Abstractions 和宿主提供的测试 Bridge，不需要复制生产 SQLite DLL。
+
+Logging 和 Notifications 适配器暂不拆独立项目：它们体量小且依赖宿主组合根，提前拆分只会增加程序集数量。
+
+### 3. 初始化上下文增加 Bridge，同时保持已有插件二进制入口
+
+`PluginInitializationContext` 增加 `Bridge` 属性，并保留现有 `PluginInitializationContext(string, string)` 二参数构造与 `PluginId`、`DataDirectory` 属性，避免改变旧 DLL 调用的构造签名。宿主为每个插件创建与不可变 plugin id 绑定的 Bridge；所有能力授权、数据库根目录、日志作用域和通知来源均来自该绑定身份，而不是插件调用参数。
+
+新插件文档优先使用 Bridge。`DataDirectory` 本 change 不删除，因为现有插件仍用它保存 JSON 配置和统计文件；删除会把 SQLite 边界调整扩大成全插件文件系统迁移。它不提供安全沙箱保证，后续若要治理任意文件访问，应新增 `storage.files/v1` 并配合进程隔离，而不是在本 change 中伪装成已隔离。
+
+### 4. Bridge 以精确能力名协商，未声明能力使用拒绝代理
+
+Manifest 使用 `<capability>/v<major>` 字符串，例如 `storage.sqlite/v1`。宿主在执行插件入口前完成精确主版本匹配：
+
+1. 解析并去重 `host_capabilities`。
+2. 验证宿主是否支持全部必需能力。
+3. 为已声明能力创建实现，为未声明能力创建返回 `CapabilityNotDeclared` 的拒绝代理。
+4. 任一必需能力不兼容时，不编译或不实例化插件。
+
+v1 内只允许向后兼容的新增枚举值保护、可选字段或新方法版本接口；破坏性变更发布新的 major 能力名。拒绝代理让根 Bridge 形状稳定，同时避免“属性存在即默认授权”。
+
+### 5. Bridge DTO 使用封闭值类型并兼容未来 IPC
+
+根接口方向：
+
+```csharp
+public interface IPluginBridge
+{
+    IPluginStorageBridge Storage { get; }
+    IPluginLogBridge Log { get; }
+    IPluginNotificationBridge Notifications { get; }
+}
 ```
 
-Full source: openspec/changes/add-source-plugin-runtime-and-bridge/design.md
+公开 API 只使用 string、enum、`byte[]`、只读 record DTO、`CancellationToken`、`ValueTask` 与受控 Bridge 接口。禁止 `object`、`Stream`、delegate、`DbConnection`、`DbTransaction` 和宿主私有类型。Bridge 接口在进程内是普通对象，未来 IPC 实现可把同一调用映射为请求、响应和远端句柄。
+
+SQL 与日志值分别使用封闭 union DTO，防止类型系统退化为 `Dictionary<string, object?>`。Blob 和结果集由宿主设置大小、行数与总字节限制；超过限制映射为稳定的 `ResourceLimit` 错误，避免进程内与 IPC 行为分叉。
+
+### 6. SQLite Bridge 保留 SQL 语义，但控制连接和文件边界
+
+核心契约：
+
+```csharp
+public interface IPluginStorageBridge
+{
+    ValueTask<IPluginSqliteDatabase> OpenSqliteAsync(
+        string relativePath,
+        CancellationToken cancellationToken = default);
+}
+
+public interface IPluginSqliteDatabase : IAsyncDisposable
+{
+    ValueTask<int> ExecuteAsync(PluginSqlCommand command, CancellationToken cancellationToken = default);
+    ValueTask<PluginSqlRow?> QuerySingleAsync(PluginSqlCommand command, CancellationToken cancellationToken = default);
+    ValueTask<IReadOnlyList<PluginSqlRow>> QueryAsync(PluginSqlCommand command, CancellationToken cancellationToken = default);
+    ValueTask<IPluginSqliteTransaction> BeginTransactionAsync(CancellationToken cancellationToken = default);
+}
+```
+
+`IPluginSqliteTransaction` 提供同形的 Execute/Query 与 Commit/Rollback；事务对象完成或释放后不可复用，v1 不支持嵌套事务。事务与数据库共享串行操作门，活动事务期间非事务命令不能混入该事务；裸 BEGIN/COMMIT/ROLLBACK/SAVEPOINT 由语句策略拒绝，事务控制只能通过句柄完成。`PluginSqlCommand` 包含一条 SQL 语句和命名参数；多语句批处理拆成多次调用，事务保证原子性。
+
+`PluginSqlValue` 的种类固定为 Null、Integer、Real、Text、Blob。`PluginSqlRow` 保留列顺序，同时允许按列名读取；重复列名必须通过索引区分。`QuerySingleAsync` 返回第一行或 null，`QueryAsync` 返回受宿主限制的缓冲结果集，不暴露 Reader 或 Stream。
+
+选择 SQL Bridge 而不是 KV，是因为插件需要自行掌握表结构、索引、事务和迁移，且 Credential Protection 已有必须原样复用的关系模型。选择 Bridge 而不是暴露 `SqliteConnection`，是为了避免插件绑定提供程序版本、原生加载和进程内实现。
+
+### 7. 数据库路径解析和 SQLite 文件操作均由宿主约束
+
+`OpenSqliteAsync(relativePath)` 将目标解析到：
+
+```text
+%LOCALAPPDATA%\LoomX\plugins\<plugin-id>\<relativePath>
+```
+
+解析顺序：拒绝空值、根路径、UNC、设备路径与盘符相对路径；规范化分隔符；计算绝对路径；验证目标位于插件根目录；逐段检查插件数据根、已存在父目录及数据库文件本身的 reparse point/符号链接；创建缺失父目录；创建后再次验证最终路径。所有文件系统操作使用宿主绑定的 plugin id，插件不能提交其他 id。
+
+仅约束打开入口还不够，因为 SQLite 的 `ATTACH`、`VACUUM INTO`、扩展加载等语句可能再次触达文件系统。宿主实现必须关闭扩展加载，并通过 SQLite authorizer 与受限语句策略拒绝可打开外部文件或改变提供程序边界的操作；v1 不支持 ATTACH。普通 DDL、DML、查询、索引、事务和数据库内 PRAGMA 保持可用，Credential Protection 所需的 WAL、synchronous 与 busy_timeout 由独立命令设置。
+
+该约束是 Bridge 服务保证，不是完整进程沙箱。可信插件若直接调用 `System.IO` 仍拥有当前进程权限；真正阻止绕过需要未来 Worker/OS sandbox。
+
+### 8. SQLite 生命周期和错误由宿主规范化
+
+数据库句柄拥有宿主连接资源，并默认使用 read-write-create、禁用池化或采用宿主可控池策略。插件显式释放句柄；Runtime 卸载插件时兜底关闭该插件全部数据库和未完成事务。事务释放但未提交时回滚。
+
+提供程序异常映射为 `PluginSqlException` 与 `PluginSqlError`：ConstraintViolation、Busy、Locked、Corrupt、ReadOnly、PermissionDenied、InvalidPath、InvalidSql、Cancelled、ResourceLimit、Unknown。错误携带稳定代码、安全消息和可选的 SQLite 主错误码，但不携带 SQL 参数值、数据库绝对路径或提供程序异常对象。
+
+取消令牌传入所有异步操作；取消映射为 Cancelled。对无法立即中断的本地调用，宿主在返回前保证连接仍处于可判定状态，必要时废弃该连接而不是把未知事务状态交还插件。
+
+### 9. Logging 与 Notifications 使用最小值 DTO
+
+`logging/v1` 接收级别、消息模板和 `PluginLogField` 列表；字段值限制为 Null、Boolean、Integer、Real、Text。宿主自动增加 PluginId 和能力作用域，再映射到 `ILogger`/Serilog。v1 消息模板只接受 `{Name}` 占位与 `{{`/`}}` 字面花括号，拒绝 format/alignment（如 `{Count:N2}` 或 `{Count,8}`）。宿主加可见 `[pluginId] ` 来源前缀；512 字符是交给 Serilog 前按字段值预展开的总预算，包含来源前缀，不保证 Serilog quoting/escaping 后的最终输出仍不超过 512 字符。保留来源字段不可由插件覆盖。宿主限制字段数量、键长度和值长度，并对敏感键名和已知凭据形态拒绝或脱敏。插件仍负有不提交敏感数据的契约责任，过滤器不能被描述为绝对防泄漏安全边界。
+
+`notifications/v1` 接收级别与短安全摘要，由宿主映射到 `ToastService` 的 Success/Info/Warning/Error。宿主执行长度、频率和敏感内容检查；插件不能控制窗口、持续时间、位置、导航或渲染类型。
+
+### 10. 源码编译使用 Roslyn 内嵌服务和原子内容寻址缓存
+
+源码编译器位于 PluginHost 内部，随宿主发布 Roslyn C# 编译组件。流程：
+
+1. 解析 Manifest 并校验 runtime、sources、host capabilities 与路径。
+2. 按 sources 声明顺序读取 UTF-8 源码，诊断使用 Manifest 相对路径。
+3. 生成缓存键：规范化完整 Manifest、每个源码相对路径及字节、Plugin API 版本、编译器版本、语言版本、全部生效编译选项、实际引用程序集摘要，以及进入产物的本地化负载内容。
+4. 检查 `%LOCALAPPDATA%\LoomX\plugin-cache\source\<plugin-id>\<hash>\` 的完整性元数据。
+5. 未命中时，以固定语言版本、nullable、deterministic 和 portable PDB 选项编译到同根临时候选目录。
+6. 编译成功后写入元数据并以原子目录切换发布；失败时删除本次候选，不触碰已发布缓存。
+7. 缓存内部镜像 `plugins/<id>/plugin.manifest.json` 与 `i18n/<culture>.json`，程序集位于对应插件目录，并嵌入默认 en-US；保持 PluginTextCatalog 原查找顺序，不添加特判。生成程序集身份包含内容摘要，防止 reload 后文案缓存串代际。`i18n` 更新参与缓存失效。通过现有 Plugin API、入口类型和 Manifest 一致性验证后，在新的 collectible ALC 中加载。
+
+引用集合来自发布包随附的固定 net10.0 编译引用集合、`LoomX.Plugin.Abstractions` 及明确允许的共享契约。构建时收集并发布，运行时校验清单与摘要，不搜索本机 SDK，不把宿主已加载程序集或 TPA 全集当作插件白名单，不解析插件目录任意 DLL，不发起 NuGet 恢复。引用集缺失或摘要不符时返回安全诊断，不在线补齐。缓存元数据记录输入摘要和产物摘要，避免只凭目录名信任残缺或篡改产物。
+
+首次编译失败时插件不加载；更新或 reload 失败时保留当前实例。成功 reload 先构造并验证新实例，再原子替换 Runtime 注册，最后释放旧实例；旧 ALC 无法及时回收只记诊断，不回滚已经成功的切换。
+
+### 11. 诊断模型统一服务 UI、工具和 AI
+
+新增公共 `PluginDiagnostic` 值模型，包含 PluginId、Stage、Severity、Code、Message、RelativePath、Line、Column。Stage 至少覆盖 Manifest、SourceRead、Compile、Cache、Capability、Load、Initialize、Bridge、Test、Reload。
+
+所有外部诊断必须使用相对路径和安全消息。编译诊断保留稳定 ID、相对路径与行列，消息由受控模板生成，不直接回显可能含源码字面量的 Roslyn 原始消息或任意异常消息。详细异常只通过宿主 `ILogger<T>` 记录安全摘要，不把源码正文、SQL 参数、Vault 数据、Prompt 或请求/响应正文放入诊断。
+
+### 12. Credential Protection 只替换数据库访问层
+
+Credential Protection 仍是预编译第一方插件，本 change 不把它转换为源码插件。迁移步骤：
+
+- Manifest 增加 `storage.sqlite/v1`，需要用户反馈时增加 `logging/v1`、`notifications/v1`。
+- 初始化时保存 Bridge；`SensitiveRuleStore` 等现有 JSON 数据保持原路径和行为。
+- `CredentialTokenStore` 改为通过 `OpenSqliteAsync("credential-tokens.db")` 初始化同一张 `CredentialTokens` 表。
+- 保留同步 CredentialEngine/JSON/SSE 业务链，以插件内部单一适配点消费异步 Bridge，不为数据库依赖去重重写全链路 async。第一版宿主实现不捕获 UI SynchronizationContext；统一验证同步适配的取消、异常、资源释放与无死锁行为。唯一约束冲突捕获 `ConstraintViolation`；失败事务释放后在新操作中按 OriginalHash 精确查回既有 token。
+- DPAPI 前缀、哈希算法、字段内容、表名、列名、索引和 fail closed 分支不变。
+- 从插件 csproj 移除 `Microsoft.Data.Sqlite`；发布测试断言插件目录不存在 `Microsoft.Data.Sqlite.dll`、`SQLitePCLRaw.*` 和 `e_sqlite3`，同时宿主发布目录具备唯一实现。
+
+不执行数据库迁移意味着回滚到旧版本仍能读取同一 Vault。若新 Bridge 版本出现故障，回滚宿主与插件程序集即可；不得删除或恢复数据库快照覆盖用户新产生的 token。
+
+### 13. 插件开发 Skill 通过宿主工具操作形成闭环
+
+提供稳定工具名：
+
+- `loomx.plugin.create`
+- `loomx.plugin.validate`
+- `loomx.plugin.compile`
+- `loomx.plugin.test`
+- `loomx.plugin.reload`
+- `loomx.plugin.diagnostics`
+
+这些工具共享同一应用服务并注册到既有 ToolRegistry，不重新实现 Manifest 或编译规则。create 不覆盖既有插件目录；compile 写缓存、test 执行可信代码和 reload 改变 Runtime 的风险等级如实标记，沿用工具授权与可信代码披露。集成 AI 在进程内调用；未来 CLI 适配器可以映射为 `loomx plugin <verb>`，但本 change 不要求为同一逻辑维护第二套实现。
+
+Skill 随 Plugin API 版本发布，包含 Manifest Schema、目录模板、Pipeline、声明式 UI、Bridge、权限、示例和安全规则。AI 只需读取 Skill 和插件目录：validate/compile/test 返回 `PluginDiagnostic`，reload 使用 Runtime 的原子替换路径。测试使用隔离临时数据根、测试 Bridge 与假 Provider，默认不连接真实 Provider、不读取生产 Vault、不修改宿主配置。该隔离是受控测试流程的数据隔离，可信任意 C# 仍能直接访问进程资源，不得称为 OS 沙箱。validate/diagnostics 不执行插件代码；compile 只编译；test/reload 会执行可信代码。
+
+### 14. reload 按请求代际切换，不立即释放在途实例
+
+当前 ProviderExecutionPipeline 在启动时固定持有 request/response Pipeline，Runtime 的 Pipeline Entry 又存于可变 List。仅换 Runtime 注册会让旧引用继续工作，执行中直接改 List 会产生并发风险。采用候选实例、不可变注册快照与请求级代际租约：
+
+- 候选编译、入口、初始化、Extension/UI 校验全部成功后才发布；同插件 reload 串行，与启停操作协调。
+- ProviderExecutionPipeline 每次完整 Provider 调用取得成对 request/response 快照，不永久绑定启动时的旧 Pipeline；保留原构造用法供测试与兼容。
+- 租约贯穿请求、响应和流式正文释放。新请求使用新代际，旧请求/SSE 继续旧快照，直到结束。
+- 旧租约排空后解除 UI 订阅、回滚未完成事务、释放实例和 Bridge，并申请 ALC 卸载；未排空时不强制关闭数据库。
+- 候选失败只释放本次候选资源。普通禁用不释放 Credential Protection 历史解析所需的 Bridge。
+- 原子性只覆盖 Runtime 注册和句柄归属，不保证任意插件初始化副作用回滚。初始化持久化操作由可信插件自行保证幂等/事务性；失败 reload 不得恢复 Vault 快照覆盖新增 token。
+
+选择请求级租约而不是暂停全局请求或直接替换 List，是为了同时保持新请求可用与 SSE 连续性；代价是长流会延长旧代际存活。
+
+### 15. SQLite 策略与同步适配的验证边界
+
+一命令一语句通过实际 prepare 语义确认，不按分号切割或正则关键字承担安全边界。authorizer 在 prepare 层拒绝文件逃逸，并用受限策略处理可能改变文件落点的 PRAGMA。活动事务由宿主管理，命令取消后连接状态必须可判定，否则关闭。
+
+保持同步凭据业务链可最小化解析回归风险，但本地 SQLite 操作仍可能占用调用线程；Async 契约用于稳定调用和未来传输，不承诺底层已经是非阻塞 I/O。源码插件可直接 await Bridge；未来 Worker 的阻塞成本另行评估，不把本轮描述为已完成进程外隔离。
+
+测试必须覆盖旧二参数构造、固定引用集、i18n 缓存失效、真实旧格式 Vault、跨事务混入拒绝、并发 reload 和完整 SSE 生命周期。敏感哨兵需覆盖 SQL 参数、源码字面量、异常、日志与 Toast。无 SDK 验证采用发布包与不调用外部 SDK 的子进程，仅改 PATH 不足以证明无 SDK 依赖。
+
+## Risks / Trade-offs
+
+- **[源码插件可执行任意受信任进程权限代码]** → 安装和启用时明确披露；不宣称 ALC 或 Bridge 是沙箱；未来以相同 DTO 契约迁移到 Worker。
+- **[Bridge 路径限制可被进程内插件直接 System.IO 绕过]** → 把限制准确描述为 Bridge 服务边界；不以不完整的 API 黑名单冒充安全隔离。
+- **[公共契约增长后难以二进制兼容]** → 按能力 major 版本演进，使用封闭 DTO、契约兼容测试和旧插件加载测试。
+- **[SQL Bridge 过于通用，错误使用会造成锁竞争或大结果集]** → 一语句一命令、显式事务、取消、资源限制、busy/locked 分类和测试工具诊断。
+- **[SQL 文件逃逸不只发生在连接路径]** → 禁用扩展加载，使用 SQLite authorizer 和语句策略阻止 ATTACH、VACUUM INTO 等文件型操作。
+- **[宿主统一 SQLite 后升级影响所有插件]** → 实现独立程序集、固定版本、集中兼容测试；错误契约与提供程序异常解耦。
+- **[编译缓存残缺或被篡改]** → 候选目录、完整性元数据、产物摘要和原子发布；无效缓存重新编译。
+- **[Roslyn 增加宿主体积]** → 只在宿主携带一次，换取所有插件无需 SDK 和重复编译器依赖；发布体积纳入验收。
+- **[日志和通知过滤无法识别所有秘密]** → 插件契约禁止提交敏感内容，宿主过滤仅作为纵深防御，并对字段和长度做最小化。
+- **[Credential Store 从同步改异步引入竞态]** → 保留单插件异步互斥和“冲突事务结束后重新精确查询”的既有算法，增加并发回归测试。
+
+## Migration Plan
+
+1. 在 Abstractions 增加兼容的 Manifest Runtime、host capabilities、Bridge、SQL/日志/通知 DTO、错误和诊断模型，并以契约测试锁定 IPC 友好形状。
+2. 在 PluginHost 增加能力协商、每插件 Bridge 绑定、源码路径校验、Roslyn 编译、缓存与 reload；现有 assembly Manifest 继续通过原路径加载。
+3. 增加宿主 SQLite 实现程序集及组合根适配器，完成路径、authorizer、事务、取消、资源限制和错误映射测试。
+4. 迁移 Credential Protection 的 token store，使用既有数据库运行兼容性测试；发布布局确认 SQLite 依赖只存在宿主侧。
+5. 增加源码插件示例、开发 Skill 与 `loomx.plugin.*` 工具，并覆盖无 SDK 编译、诊断修复、隔离测试和失败 reload。
+6. 完成端到端发布验证后默认启用新 Runtime 类型；旧预编译插件无需迁移。
+
+回滚时恢复旧宿主和 Credential Protection 程序集，保留 `%LOCALAPPDATA%\LoomX\plugins\<plugin-id>\` 数据与源码编译缓存。缓存可被旧版本忽略，但不得在回滚流程中自动删除；Credential Vault 无格式变化。
+
+```
 
 ## openspec/changes/add-source-plugin-runtime-and-bridge/tasks.md
 
@@ -161,69 +350,69 @@ Full source: openspec/changes/add-source-plugin-runtime-and-bridge/design.md
 
 ## 1. 公共契约与 Manifest
 
-- [ ] 1.1 在 `LoomX.Plugin.Abstractions` 增加 Runtime 联合模型、`host_capabilities`、`PluginDiagnostic` 及稳定错误码，并通过契约序列化测试验证字段可确定性往返且不含宿主私有类型。 <!-- comet-task:72235196-cb85-4513-8f30-f0e12ce1e207 -->
-- [ ] 1.2 定义 `IPluginBridge`、Storage/Logging/Notifications 接口及封闭值 DTO，增加反射契约测试，验证公共签名不出现 `object`、`Stream`、delegate、`DbConnection`、`DbTransaction`、`IServiceProvider` 或宿主程序集类型。 <!-- comet-task:a3f4b72b-c955-45b4-9d4a-7b7fc318dfd5 -->
-- [ ] 1.3 扩展 Manifest 解析与验证以支持 `assembly`、`csharp-source` 和旧顶层程序集字段，测试有效声明、双重 Runtime、缺失入口、空/重复 sources、非法能力版本及旧插件兼容。 <!-- comet-task:728d1069-edb4-40b7-a62a-7ba66415a0aa -->
-- [ ] 1.4 扩展 `PluginInitializationContext` 以提供 Bridge 且保留现有属性和兼容构造方式，使用既有第一方插件和测试插件验证二进制入口及初始化行为未回归。 <!-- comet-task:d8c17566-c4d5-4982-9b28-5b80b738a707 -->
-- [ ] 1.5 实现 host capability 精确协商与未声明能力拒绝代理，测试不兼容能力在执行插件代码前被拒绝、未声明调用返回 `CapabilityNotDeclared`、不同插件授权互不影响。 <!-- comet-task:3c8df5e2-e9ab-4207-9668-c442a28d7f6b -->
+- [x] 1.1 在 `LoomX.Plugin.Abstractions` 增加 Runtime 联合模型、`host_capabilities`、`PluginDiagnostic` 及稳定错误码，并通过契约序列化测试验证字段可确定性往返且不含宿主私有类型。 <!-- comet-task:72235196-cb85-4513-8f30-f0e12ce1e207 -->
+- [x] 1.2 定义 `IPluginBridge`、Storage/Logging/Notifications 接口及封闭值 DTO，增加反射契约测试，验证公共签名不出现 `object`、`Stream`、delegate、`DbConnection`、`DbTransaction`、`IServiceProvider` 或宿主程序集类型。 <!-- comet-task:a3f4b72b-c955-45b4-9d4a-7b7fc318dfd5 -->
+- [x] 1.3 扩展 Manifest 解析与验证以支持 `assembly`、`csharp-source` 和旧顶层程序集字段，测试有效声明、双重 Runtime、缺失入口、空/重复 sources、非法能力版本及旧插件兼容。 <!-- comet-task:728d1069-edb4-40b7-a62a-7ba66415a0aa -->
+- [x] 1.4 扩展 `PluginInitializationContext` 以提供 Bridge 且保留现有属性和兼容构造方式，使用既有第一方插件和测试插件验证二进制入口及初始化行为未回归。 <!-- comet-task:d8c17566-c4d5-4982-9b28-5b80b738a707 -->
+- [x] 1.5 实现 host capability 精确协商与未声明能力拒绝代理，测试不兼容能力在执行插件代码前被拒绝、未声明调用返回 `CapabilityNotDeclared`、不同插件授权互不影响。 <!-- comet-task:3c8df5e2-e9ab-4207-9668-c442a28d7f6b -->
 
 ## 2. 宿主 SQLite Bridge
 
-- [ ] 2.1 新建宿主侧 `LoomX.Plugin.Storage.Sqlite` 项目并把 `Microsoft.Data.Sqlite`/`SQLitePCLRaw` 依赖集中于该项目，构建测试验证 Plugin Abstractions 和普通插件项目不传递这些依赖。 <!-- comet-task:b28eb15e-361c-45ea-80bc-8745f78f06e7 -->
-- [ ] 2.2 实现与 plugin id 绑定的数据库路径解析和目录创建，覆盖相对嵌套路径、绝对路径、UNC、设备路径、盘符相对路径、`..`、空路径及大小写边界测试。 <!-- comet-task:172a5347-d48a-44a6-a8c4-acd4cb6407cd -->
-- [ ] 2.3 增加 Windows reparse point/符号链接逃逸检查并在测试临时目录验证现有父目录链接、创建前后竞态校验和跨插件路径均返回 `InvalidPath`。 <!-- comet-task:40bda651-a7a0-4193-9a6b-707d23986624 -->
-- [ ] 2.4 实现 SQLite 打开、单语句参数化 Execute、QuerySingle、Query 和 Null/Integer/Real/Text/Blob 映射，使用 CRUD、DDL、索引、Blob、空结果、重复列名和资源上限测试验证行为。 <!-- comet-task:e2aca947-f284-42f6-b367-7a145da607fb -->
-- [ ] 2.5 实现显式事务、提交、回滚、释放回滚、完成后拒绝复用和取消传播，使用原子写入、失败回滚、并发 busy/locked 与取消测试验证生命周期。 <!-- comet-task:3423f7ba-5076-4d87-87e3-3e2214f81f73 -->
-- [ ] 2.6 实现 `PluginSqlException` 错误映射，逐项测试 ConstraintViolation、Busy、Locked、Corrupt、ReadOnly、PermissionDenied、InvalidPath、InvalidSql、Cancelled、ResourceLimit 和 Unknown，确认消息不含参数值或数据库绝对路径。 <!-- comet-task:fb8c5646-1a63-41fd-ad62-55d3f2bba90a -->
-- [ ] 2.7 关闭 SQLite 扩展加载并增加 authorizer/语句限制，测试 ATTACH、外部路径型 VACUUM 和提供程序替换被拒绝，而普通 PRAGMA、DDL、DML 与查询保持可用。 <!-- comet-task:cd65eb11-68d9-4122-bfac-a7ffb98f1341 -->
-- [ ] 2.8 把数据库句柄和事务登记到插件 Bridge 生命周期，在插件卸载时关闭资源并回滚未完成事务；通过文件可重新打开、句柄不可复用和其他插件不受影响的测试验证。 <!-- comet-task:fe042dc6-143e-4987-a09c-5227006fe633 -->
+- [x] 2.1 新建宿主侧 `LoomX.Plugin.Storage.Sqlite` 项目并把 `Microsoft.Data.Sqlite`/`SQLitePCLRaw` 依赖集中于该项目，构建测试验证 Plugin Abstractions 和普通插件项目不传递这些依赖。 <!-- comet-task:b28eb15e-361c-45ea-80bc-8745f78f06e7 -->
+- [x] 2.2 实现与 plugin id 绑定的数据库路径解析和目录创建，覆盖相对嵌套路径、绝对路径、UNC、设备路径、盘符相对路径、`..`、空路径及大小写边界测试。 <!-- comet-task:172a5347-d48a-44a6-a8c4-acd4cb6407cd -->
+- [x] 2.3 增加 Windows reparse point/符号链接逃逸检查并在测试临时目录验证现有父目录链接、创建前后竞态校验和跨插件路径均返回 `InvalidPath`。 <!-- comet-task:40bda651-a7a0-4193-9a6b-707d23986624 -->
+- [x] 2.4 实现 SQLite 打开、单语句参数化 Execute、QuerySingle、Query 和 Null/Integer/Real/Text/Blob 映射，使用 CRUD、DDL、索引、Blob、空结果、重复列名和资源上限测试验证行为。 <!-- comet-task:e2aca947-f284-42f6-b367-7a145da607fb -->
+- [x] 2.5 实现显式事务、提交、回滚、释放回滚、完成后拒绝复用和取消传播，使用原子写入、失败回滚、并发 busy/locked 与取消测试验证生命周期。 <!-- comet-task:3423f7ba-5076-4d87-87e3-3e2214f81f73 -->
+- [x] 2.6 实现 `PluginSqlException` 错误映射，逐项测试 ConstraintViolation、Busy、Locked、Corrupt、ReadOnly、PermissionDenied、InvalidPath、InvalidSql、Cancelled、ResourceLimit 和 Unknown，确认消息不含参数值或数据库绝对路径。 <!-- comet-task:fb8c5646-1a63-41fd-ad62-55d3f2bba90a -->
+- [x] 2.7 关闭 SQLite 扩展加载并增加 authorizer/语句限制，测试 ATTACH、外部路径型 VACUUM 和提供程序替换被拒绝，而普通 PRAGMA、DDL、DML 与查询保持可用。 <!-- comet-task:cd65eb11-68d9-4122-bfac-a7ffb98f1341 -->
+- [x] 2.8 把数据库句柄和事务登记到插件 Bridge 生命周期，在插件卸载时关闭资源并回滚未完成事务；通过文件可重新打开、句柄不可复用和其他插件不受影响的测试验证。 <!-- comet-task:fe042dc6-143e-4987-a09c-5227006fe633 -->
 
 ## 3. Logging 与 Notifications Bridge
 
-- [ ] 3.1 实现 Logging Bridge 到 `ILogger`/Serilog 的级别、模板、字段和 PluginId 作用域映射，测试结构化字段输出以及敏感键名、凭据形态、超长字段和高频调用的拒绝或净化。 <!-- comet-task:2d120113-1d43-464b-8fff-24f9f8b880cc -->
-- [ ] 3.2 实现 Notifications Bridge 到现有 `ToastService` 的 Success/Info/Warning/Error 映射，测试自动归属、长度/频率限制、敏感内容拦截以及插件无法控制窗口或导航。 <!-- comet-task:0f824d00-7a70-4edd-a25b-5e7c1b524e0b -->
-- [ ] 3.3 在宿主组合根为每个插件创建授权后的 Bridge，并用多插件集成测试验证数据库根、日志作用域、通知来源和故障均按插件隔离。 <!-- comet-task:254f980b-7683-4dc5-b0d2-039d3ce6d497 -->
+- [x] 3.1 实现 Logging Bridge 到 `ILogger`/Serilog 的级别、模板、字段和 PluginId 作用域映射，测试结构化字段输出以及敏感键名、凭据形态、超长字段和高频调用的拒绝或净化。 <!-- comet-task:2d120113-1d43-464b-8fff-24f9f8b880cc -->
+- [x] 3.2 实现 Notifications Bridge 到现有 `ToastService` 的 Success/Info/Warning/Error 映射，测试自动归属、长度/频率限制、敏感内容拦截以及插件无法控制窗口或导航。 <!-- comet-task:0f824d00-7a70-4edd-a25b-5e7c1b524e0b -->
+- [x] 3.3 在宿主组合根为每个插件创建授权后的 Bridge，并用多插件集成测试验证数据库根、日志作用域、通知来源和故障均按插件隔离。 <!-- comet-task:254f980b-7683-4dc5-b0d2-039d3ce6d497 -->
 
 ## 4. C# 源码插件运行时
 
-- [ ] 4.1 在 PluginHost 引入随应用发布的 Roslyn 编译能力和固定编译选项，使用没有外部 `dotnet` SDK 参与的测试进程验证最小源码插件可生成 DLL 与 portable PDB。 <!-- comet-task:b8fb2332-bcc6-4f6c-bb6c-1b7ece04c426 -->
-- [ ] 4.2 实现 Manifest 显式 sources 收集和插件包路径验证，测试未声明 `.cs` 不参与、缺失文件被诊断、目录穿越和 reparse point 逃逸在读取前被拒绝。 <!-- comet-task:55e9dd95-5f68-494b-8ddb-7455b9e96b91 -->
-- [ ] 4.3 实现受控引用集合与禁止任意 NuGet/插件目录 DLL 解析的规则，测试框架 API 与 Abstractions 可用、未允许第三方引用产生结构化编译错误且无网络恢复行为。 <!-- comet-task:f95170f5-995f-48bb-a3d1-701c1e993205 -->
-- [ ] 4.4 实现包含规范化 Manifest、源码路径及内容、Plugin API、编译器和选项的缓存键，使用单项输入变化测试验证缓存命中、失效和不同插件隔离。 <!-- comet-task:bb87d631-934a-4a8d-af9a-e32a390d30fd -->
-- [ ] 4.5 实现候选目录、产物摘要、完整性元数据和原子缓存发布，测试残缺/篡改缓存触发重编译、失败编译不覆盖最近可用缓存且临时候选可清理。 <!-- comet-task:5bd5d58d-a15d-49c3-bbb1-2bf4de8727a6 -->
-- [ ] 4.6 把 Roslyn、缓存、能力、加载与初始化错误统一映射为 `PluginDiagnostic`，测试文件、行、列、错误码与阶段完整，并验证诊断不含源码正文、外部绝对路径或敏感运行数据。 <!-- comet-task:0ba5923d-d44d-4722-b34a-70b3097a9f1a -->
-- [ ] 4.7 将成功编译产物接入现有 collectible ALC、Manifest 一致性、Extension/Pipeline 和 UI Contribution 流程，使用同功能的源码/预编译插件对照测试验证行为一致。 <!-- comet-task:80c29900-6775-41c0-971e-aaa986b0effe -->
-- [ ] 4.8 实现“先验证新实例、再原子替换”的 reload，测试成功切换、首次失败拒绝、更新失败保留当前实例和旧 ALC 回收失败仅产生安全诊断。 <!-- comet-task:1f5a8d6d-aa48-4d4f-bf1c-ef9bcb3a1948 -->
-- [ ] 4.9 在安装/启用源码插件入口增加可信代码边界披露及本地化文案，UI 测试验证不会把 ALC 或 Bridge 表述为安全沙箱。 <!-- comet-task:f7d28e73-a9a8-4bd8-97f4-db9621bb7705 -->
+- [x] 4.1 在 PluginHost 引入随应用发布的 Roslyn 编译能力和固定编译选项，使用没有外部 `dotnet` SDK 参与的测试进程验证最小源码插件可生成 DLL 与 portable PDB。 <!-- comet-task:b8fb2332-bcc6-4f6c-bb6c-1b7ece04c426 -->
+- [x] 4.2 实现 Manifest 显式 sources 收集和插件包路径验证，测试未声明 `.cs` 不参与、缺失文件被诊断、目录穿越和 reparse point 逃逸在读取前被拒绝。 <!-- comet-task:55e9dd95-5f68-494b-8ddb-7455b9e96b91 -->
+- [x] 4.3 实现受控引用集合与禁止任意 NuGet/插件目录 DLL 解析的规则，测试框架 API 与 Abstractions 可用、未允许第三方引用产生结构化编译错误且无网络恢复行为。 <!-- comet-task:f95170f5-995f-48bb-a3d1-701c1e993205 -->
+- [x] 4.4 实现包含规范化 Manifest、源码路径及内容、Plugin API、编译器和选项的缓存键，使用单项输入变化测试验证缓存命中、失效和不同插件隔离。 <!-- comet-task:bb87d631-934a-4a8d-af9a-e32a390d30fd -->
+- [x] 4.5 实现候选目录、产物摘要、完整性元数据和原子缓存发布，测试残缺/篡改缓存触发重编译、失败编译不覆盖最近可用缓存且临时候选可清理。 <!-- comet-task:5bd5d58d-a15d-49c3-bbb1-2bf4de8727a6 -->
+- [x] 4.6 把 Roslyn、缓存、能力、加载与初始化错误统一映射为 `PluginDiagnostic`，测试文件、行、列、错误码与阶段完整，并验证诊断不含源码正文、外部绝对路径或敏感运行数据。 <!-- comet-task:0ba5923d-d44d-4722-b34a-70b3097a9f1a -->
+- [x] 4.7 将成功编译产物接入现有 collectible ALC、Manifest 一致性、Extension/Pipeline 和 UI Contribution 流程，使用同功能的源码/预编译插件对照测试验证行为一致。 <!-- comet-task:80c29900-6775-41c0-971e-aaa986b0effe -->
+- [x] 4.8 实现“先验证新实例、再原子替换”的 reload，测试成功切换、首次失败拒绝、更新失败保留当前实例和旧 ALC 回收失败仅产生安全诊断。 <!-- comet-task:1f5a8d6d-aa48-4d4f-bf1c-ef9bcb3a1948 -->
+- [x] 4.9 在安装/启用源码插件入口增加可信代码边界披露及本地化文案，UI 测试验证不会把 ALC 或 Bridge 表述为安全沙箱。 <!-- comet-task:f7d28e73-a9a8-4bd8-97f4-db9621bb7705 -->
 
-- [ ] 4.10 随发布包提供固定编译引用集，并将引用和本地化负载纳入缓存输入，验证无 SDK 编译、引用缺失诊断、四语言缓存布局及文案更新生效。 <!-- comet-task:8fa61a79-c51c-4b2a-904e-a417c7a5a922 -->
-- [ ] 4.11 为 Provider 调用绑定 request/response 代际租约，覆盖新请求切换、旧请求/SSE 完成前资源不释放、启停竞争及组合根旧引用回归。 <!-- comet-task:d8c634f9-404e-406f-bd8c-6a4f79d97345 -->
+- [x] 4.10 随发布包提供固定编译引用集，并将引用和本地化负载纳入缓存输入，验证无 SDK 编译、引用缺失诊断、四语言缓存布局及文案更新生效。 <!-- comet-task:8fa61a79-c51c-4b2a-904e-a417c7a5a922 -->
+- [x] 4.11 为 Provider 调用绑定 request/response 代际租约，覆盖新请求切换、旧请求/SSE 完成前资源不释放、启停竞争及组合根旧引用回归。 <!-- comet-task:d8c634f9-404e-406f-bd8c-6a4f79d97345 -->
 
 ## 5. Credential Protection 迁移
 
-- [ ] 5.1 为 Credential Protection Manifest 声明所需 Bridge 能力，并把 `CredentialTokenStore` 改为通过 `storage.sqlite/v1` 打开 `credential-tokens.db`；使用新建 Vault 测试验证表名、列名、索引和初始化 SQL 不变。 <!-- comet-task:220c7e73-88a7-4abf-a655-44c164eb1484 -->
-- [ ] 5.2 将 token 创建、精确查询和批量恢复接入异步 Bridge，并保留同步解析链与单一同步适配点；测试同一明文稳定复用 token、跨请求恢复、重复 token 去重、取消、释放以及 UI SynchronizationContext 下无死锁。 <!-- comet-task:fb7a6c1c-25d2-4edd-9b80-ba6ff74c9ac2 -->
-- [ ] 5.3 保留“唯一约束冲突后释放失败事务并重新精确查询”的算法，使用并发冲突测试验证不会签出第二个 token 或产生嵌套 placeholder。 <!-- comet-task:7a9cc787-0334-4a30-ad7f-55b0db5a029a -->
-- [ ] 5.4 使用由旧实现创建的真实 `credential-tokens.db` 作为兼容夹具，验证升级后无需迁移即可恢复历史 placeholder，DPAPI 前缀、密文和 OriginalHash 保持原样且不创建第二个 Vault。 <!-- comet-task:60e5ec3a-0df3-4b54-b76b-15ba477d2ce2 -->
-- [ ] 5.5 覆盖 Bridge Busy/Locked/Corrupt、DPAPI 解密失败与未知 token 场景，验证 Credential Protection 保持原有确定性解析和 fail closed，不把明文发送给 Provider。 <!-- comet-task:5107c058-d1e3-4d5b-9163-2a356ad46433 -->
-- [ ] 5.6 从 Credential Protection csproj 移除 `Microsoft.Data.Sqlite`，更新宿主/测试负载复制并扩展发布契约测试，验证插件目录不存在 `Microsoft.Data.Sqlite.dll`、`SQLitePCLRaw.*`、`e_sqlite3`，宿主侧实现仍可运行。 <!-- comet-task:554527df-f334-4923-ad69-45133e24c64d -->
+- [x] 5.1 为 Credential Protection Manifest 声明所需 Bridge 能力，并把 `CredentialTokenStore` 改为通过 `storage.sqlite/v1` 打开 `credential-tokens.db`；使用新建 Vault 测试验证表名、列名、索引和初始化 SQL 不变。 <!-- comet-task:220c7e73-88a7-4abf-a655-44c164eb1484 -->
+- [x] 5.2 将 token 创建、精确查询和批量恢复接入异步 Bridge，并保留同步解析链与单一同步适配点；测试同一明文稳定复用 token、跨请求恢复、重复 token 去重、取消、释放以及 UI SynchronizationContext 下无死锁。 <!-- comet-task:fb7a6c1c-25d2-4edd-9b80-ba6ff74c9ac2 -->
+- [x] 5.3 保留“唯一约束冲突后释放失败事务并重新精确查询”的算法，使用并发冲突测试验证不会签出第二个 token 或产生嵌套 placeholder。 <!-- comet-task:7a9cc787-0334-4a30-ad7f-55b0db5a029a -->
+- [x] 5.4 使用由旧实现创建的真实 `credential-tokens.db` 作为兼容夹具，验证升级后无需迁移即可恢复历史 placeholder，DPAPI 前缀、密文和 OriginalHash 保持原样且不创建第二个 Vault。 <!-- comet-task:60e5ec3a-0df3-4b54-b76b-15ba477d2ce2 -->
+- [x] 5.5 覆盖 Bridge Busy/Locked/Corrupt、DPAPI 解密失败与未知 token 场景，验证 Credential Protection 保持原有确定性解析和 fail closed，不把明文发送给 Provider。 <!-- comet-task:5107c058-d1e3-4d5b-9163-2a356ad46433 -->
+- [x] 5.6 从 Credential Protection csproj 移除 `Microsoft.Data.Sqlite`，更新宿主/测试负载复制并扩展发布契约测试，验证插件目录不存在 `Microsoft.Data.Sqlite.dll`、`SQLitePCLRaw.*`、`e_sqlite3`，宿主侧实现仍可运行。 <!-- comet-task:554527df-f334-4923-ad69-45133e24c64d -->
 
 ## 6. 插件开发 Skill 与工具闭环
 
-- [ ] 6.1 实现共享插件开发应用服务和 `loomx.plugin.create/validate/compile/test/reload/diagnostics` 工具注册，使用工具契约测试验证稳定名称、机器可读结果和统一 `PluginDiagnostic`。 <!-- comet-task:9efd77a2-d371-419d-94b2-d92ac7aee6d9 -->
-- [ ] 6.2 实现 create 模板生成器，验证生成目录包含合法 Manifest、显式 sources、入口源码、测试占位和 i18n 负载，且不强制生成 `.csproj`。 <!-- comet-task:cbe387c5-15a1-472c-8835-1a9d43f1acd2 -->
-- [ ] 6.3 让 validate、compile 和 diagnostics 复用生产 Manifest、能力协商、路径和 Roslyn 服务，使用多错误输入测试验证一次返回可安全收集的问题且无规则分叉。 <!-- comet-task:f1c02aae-561b-434f-ae2c-4093feef867e -->
-- [ ] 6.4 实现隔离 test 工具和临时 Bridge，测试默认不连接真实 Provider、不读取生产 Vault、不修改 LoomX 配置，并能验证 Pipeline、声明式 UI 和 SQLite 插件测试。 <!-- comet-task:70fd1107-f8c9-48d6-bca4-aaa931855cac -->
-- [ ] 6.5 让 reload 工具调用生产 Runtime 的原子替换路径，使用正在运行的测试宿主验证成功生效和失败保留旧实例。 <!-- comet-task:2d75515d-0de5-475e-a04c-485bf438e7bf -->
-- [ ] 6.6 编写版本化插件开发 Skill，覆盖 Manifest Schema、源码模板、Pipeline、声明式 UI、SQLite/Logging/Notifications Bridge、权限边界、安全规则和 AI 修复循环；按 Skill 中步骤生成并加载示例插件验证文档可执行。 <!-- comet-task:70f4eb88-0074-4135-8522-eb08501e8967 -->
+- [x] 6.1 实现共享插件开发应用服务和 `loomx.plugin.create/validate/compile/test/reload/diagnostics` 工具注册，使用工具契约测试验证稳定名称、机器可读结果和统一 `PluginDiagnostic`。 <!-- comet-task:9efd77a2-d371-419d-94b2-d92ac7aee6d9 -->
+- [x] 6.2 实现 create 模板生成器，验证生成目录包含合法 Manifest、显式 sources、入口源码、测试占位和 i18n 负载，且不强制生成 `.csproj`。 <!-- comet-task:cbe387c5-15a1-472c-8835-1a9d43f1acd2 -->
+- [x] 6.3 让 validate、compile 和 diagnostics 复用生产 Manifest、能力协商、路径和 Roslyn 服务，使用多错误输入测试验证一次返回可安全收集的问题且无规则分叉。 <!-- comet-task:f1c02aae-561b-434f-ae2c-4093feef867e -->
+- [x] 6.4 实现隔离 test 工具和临时 Bridge，测试默认不连接真实 Provider、不读取生产 Vault、不修改 LoomX 配置，并能验证 Pipeline、声明式 UI 和 SQLite 插件测试。 <!-- comet-task:70fd1107-f8c9-48d6-bca4-aaa931855cac -->
+- [x] 6.5 让 reload 工具调用生产 Runtime 的原子替换路径，使用正在运行的测试宿主验证成功生效和失败保留旧实例。 <!-- comet-task:2d75515d-0de5-475e-a04c-485bf438e7bf -->
+- [x] 6.6 编写版本化插件开发 Skill，覆盖 Manifest Schema、源码模板、Pipeline、声明式 UI、SQLite/Logging/Notifications Bridge、权限边界、安全规则和 AI 修复循环；按 Skill 中步骤生成并加载示例插件验证文档可执行。 <!-- comet-task:70f4eb88-0074-4135-8522-eb08501e8967 -->
 
 ## 7. 集成、发布与回归
 
-- [ ] 7.1 扩展 `LoomX.PluginPlayground` 端到端覆盖源码编译、Bridge SQLite CRUD、日志、通知、Pipeline、reload 和 Credential Protection 历史 Vault，并验证全部检查通过。 <!-- comet-task:44d21847-c7bb-4800-aeef-0c9bd92e1ce3 -->
-- [ ] 7.2 运行完整 `dotnet test`，修复所有 Plugin Runtime、Credential Protection、UI、本地化和发布布局回归，并保存通过结果作为 Verify 输入。 <!-- comet-task:277f9bc1-0799-4bea-b20a-174aefa98e65 -->
-- [ ] 7.3 执行 Windows 发布与打包，检查宿主只携带一套 SQLite 实现、各插件负载目录无 SQLite 动态链、源码插件示例布局正确，并将可读时间命名的成品放入 `outputs/`。 <!-- comet-task:0019cb6e-914f-465e-8cf6-5b0152ca5bf0 -->
-- [ ] 7.4 在真实发布包中执行无 SDK 源码插件创建→编译→诊断修复→测试→加载→reload 流程，并验证重启后缓存命中、插件数据仍位于 `%LOCALAPPDATA%\LoomX\plugins\<plugin-id>\`。 <!-- comet-task:8ba86c5c-6fb5-48ae-afec-ed3561f0506c -->
-- [ ] 7.5 使用现有 Credential Protection 端到端请求/响应用例复验 placeholder 完整性指令、跨 chunk/SSE 恢复、未知或损坏 token fail closed、禁用与卸载生命周期均未改变。 <!-- comet-task:4a03cea1-9a66-4c87-808e-befb55568744 -->
+- [x] 7.1 扩展 `LoomX.PluginPlayground` 端到端覆盖源码编译、Bridge SQLite CRUD、日志、通知、Pipeline、reload 和 Credential Protection 历史 Vault，并验证全部检查通过。 <!-- comet-task:44d21847-c7bb-4800-aeef-0c9bd92e1ce3 -->
+- [x] 7.2 运行完整 `dotnet test`，修复所有 Plugin Runtime、Credential Protection、UI、本地化和发布布局回归，并保存通过结果作为 Verify 输入。 <!-- comet-task:277f9bc1-0799-4bea-b20a-174aefa98e65 -->
+- [x] 7.3 执行 Windows 发布与打包，检查宿主只携带一套 SQLite 实现、各插件负载目录无 SQLite 动态链、源码插件示例布局正确，并将可读时间命名的成品放入 `outputs/`。 <!-- comet-task:0019cb6e-914f-465e-8cf6-5b0152ca5bf0 -->
+- [x] 7.4 在真实发布包中执行无 SDK 源码插件创建→编译→诊断修复→测试→加载→reload 流程，并验证重启后缓存命中、插件数据仍位于 `%LOCALAPPDATA%\LoomX\plugins\<plugin-id>\`。 <!-- comet-task:8ba86c5c-6fb5-48ae-afec-ed3561f0506c -->
+- [x] 7.5 使用现有 Credential Protection 端到端请求/响应用例复验 placeholder 完整性指令、跨 chunk/SSE 恢复、未知或损坏 token fail closed、禁用与卸载生命周期均未改变。 <!-- comet-task:4a03cea1-9a66-4c87-808e-befb55568744 -->
 
 ## Workflow follow-up
 
@@ -249,8 +438,6 @@ created: 2026-10-12
 - Source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-development-skill/spec.md
 - Lines: 1-109
 - SHA256: b8377c76c2475d7c74638120bd4158f9f478a95319023fa9f081830bbe28b48f
-
-[TRUNCATED]
 
 ```md
 # Spec Delta
@@ -334,17 +521,42 @@ Skill SHALL 说明 Manifest Schema、源码插件目录与模板、Pipeline API�
 ### Requirement: 提供安全重新加载操作
 开发工具 SHALL 提供 reload 操作，用于对已安装插件执行验证、编译和原子替换。重新加载失败 MUST 保持当前可用实例运行，并返回失败诊断。
 
-```
+#### Scenario: 重新加载成功
+- **WHEN** 修改后的插件验证与编译均成功
+- **THEN** reload 在运行时边界替换插件实例并报告新版本已生效
 
-Full source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-development-skill/spec.md
+#### Scenario: 重新加载失败
+- **WHEN** 修改后的插件编译或初始化失败
+- **THEN** reload 不替换当前实例且返回结构化诊断
+
+### Requirement: 支持 AI 闭环开发流程
+插件开发接口 SHALL 允许 AI 按“读取 Manifest 与 sources、修改源码、验证、编译、读取诊断、修复、测试、安装或重新加载”的顺序反复执行，所有操作结果 MUST 可机器读取且具有稳定错误码。
+
+#### Scenario: 从自然语言需求迭代到可加载插件
+- **WHEN** AI 根据用户需求生成插件并在首次编译遇到错误
+- **THEN** AI 可仅依据 Skill、插件文件和结构化工具结果完成修复与复验，无需读取宿主内部源码
+
+#### Scenario: 工具输出包含敏感运行数据
+- **WHEN** 编译、测试或重新加载过程中遇到包含凭据或请求正文的异常
+- **THEN** 工具结果仅返回安全摘要和稳定错误码，不回显敏感原值
+### Requirement: 开发诊断与测试隔离准确披露
+开发工具 SHALL 对可能带源码字面量或敏感运行数据的编译与测试诊断使用稳定代码和受控安全消息。受控测试的数据隔离 MUST NOT 被描述为对可信任意 C# 的操作系统安全沙箱。
+
+#### Scenario: 编译错误含敏感字面量
+- **WHEN** 编译器原始错误消息可能包含源码中的敏感字面量
+- **THEN** 工具只返回错误码、相对路径、行列和受控消息，不回显该原值
+
+#### Scenario: 执行可信插件测试
+- **WHEN** test 使用临时数据根、测试 Bridge 与假 Provider 执行插件
+- **THEN** Skill 和工具准确说明此隔离不阻止任意可信 C# 直接访问当前进程权限内的资源
+
+```
 
 ## openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-host-bridge/spec.md
 
 - Source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-host-bridge/spec.md
 - Lines: 1-196
 - SHA256: 4bf68ae56351cd3a057cb3c3df146203ff6be3249b34eb6b7e0e56d3054acde3
-
-[TRUNCATED]
 
 ```md
 # Spec Delta
@@ -427,18 +639,130 @@ Storage Bridge MUST 拒绝绝对路径、UNC 路径、设备路径、盘符相�
 
 #### Scenario: 执行参数化写入
 - **WHEN** 插件提交包含命名参数的 INSERT、UPDATE 或 DELETE 命令
+- **THEN** 宿主绑定显式类型参数并返回受影响行数
+
+#### Scenario: 查询多行结果
+- **WHEN** 插件执行 SELECT 并请求多行结果
+- **THEN** 宿主以有序行和显式列值类型返回结果，不泄露具体 SQLite Reader
+
+#### Scenario: 查询单行无结果
+- **WHEN** 插件执行单行查询且结果集为空
+- **THEN** Bridge 返回明确的无结果状态而非伪造空行
+
+### Requirement: SQLite Bridge 管理事务生命周期
+Storage Bridge SHALL 提供与数据库句柄绑定的显式事务。提交、回滚、释放和取消 MUST 具有确定性结果；事务完成后再次执行命令 MUST 被拒绝。
+
+#### Scenario: 事务提交
+- **WHEN** 插件在事务内成功执行多条命令并提交
+- **THEN** 所有修改以同一事务提交且事务进入已完成状态
+
+#### Scenario: 事务中途失败并回滚
+- **WHEN** 插件在事务内遇到失败后请求回滚或释放未提交事务
+- **THEN** 宿主回滚未提交修改且后续不得复用该事务
+
+#### Scenario: 操作被取消
+- **WHEN** 调用方取消正在等待的数据库操作
+- **THEN** Bridge 尽快终止等待并返回 `Cancelled`，不得把取消误报为未知数据库故障
+
+### Requirement: SQLite 错误映射为稳定契约错误
+宿主 MUST 将具体 SQLite 异常映射为 Bridge 稳定错误分类，至少覆盖 `ConstraintViolation`、`Busy`、`Locked`、`Corrupt`、`ReadOnly`、`PermissionDenied`、`InvalidPath`、`InvalidSql`、`Cancelled` 和 `Unknown`，不得向插件暴露具体提供程序异常类型。
+
+#### Scenario: 唯一约束冲突
+- **WHEN** 插件写入违反唯一约束的数据
+- **THEN** Bridge 返回 `ConstraintViolation`，插件可按自身业务规则重新查询或重试
+
+#### Scenario: 数据库锁定
+- **WHEN** SQLite 报告 busy 或 locked
+- **THEN** Bridge 分别返回 `Busy` 或 `Locked` 并保留可诊断的安全摘要
+
+#### Scenario: 未知提供程序错误
+- **WHEN** 具体错误无法映射到已知分类
+- **THEN** Bridge 返回 `Unknown`，诊断不得包含 SQL 参数中的敏感值
+
+### Requirement: SQLite 实现由宿主提供
+插件使用 `storage.sqlite/v1` 时 MUST NOT 需要携带 SQLite 托管程序集或原生动态库。宿主 SHALL 提供唯一受控的 SQLite 实现并阻止插件通过 Bridge 注入或替换提供程序。
+
+#### Scenario: 插件包仅包含业务程序集和负载
+- **WHEN** 使用 SQLite Bridge 的插件被构建和发布
+- **THEN** 插件目录不包含 `Microsoft.Data.Sqlite.dll`、`SQLitePCLRaw.*` 或平台 `e_sqlite3` 文件仍可正常访问数据库
+
+#### Scenario: 插件携带自有 SQLite 实现
+- **WHEN** 插件包尝试以 Bridge 依赖方式覆盖宿主 SQLite 提供程序
+- **THEN** Runtime 不使用该实现且返回安全诊断
+
+### Requirement: Logging Bridge 提供结构化安全日志
+`logging/v1` SHALL 接受日志级别、消息模板和受限结构化字段，由宿主映射到统一日志管线。插件 MUST NOT 记录 API Key、Authorization、自定义 Header 值、请求或响应正文、用户 Prompt、图片及工具调用参数，也不得逐 token 或逐流式 chunk 高频记录。
+
+#### Scenario: 记录结构化业务事件
+- **WHEN** 插件记录包含插件 id、事件名、状态码和耗时的完成事件
+- **THEN** 宿主为该插件加上安全作用域并写入统一日志管线
+
+#### Scenario: 日志字段包含敏感值
+- **WHEN** 日志调用包含被策略识别为凭据或正文的字段
+- **THEN** 宿主拒绝或净化该字段并记录不含原值的安全诊断
+
+### Requirement: Notifications Bridge 提供宿主管控的即时反馈
+`notifications/v1` SHALL 允许插件提交安全摘要和 `Success`、`Info`、`Warning`、`Error` 级别，由宿主映射到统一 Toast 体验。插件不得接触窗口、ViewModel 或导航状态。
+
+#### Scenario: 插件显示成功通知
+- **WHEN** 插件提交不含敏感数据的 Success 摘要
+- **THEN** 宿主通过现有 Toast 机制显示并按统一生命周期自动隐藏
+
+#### Scenario: 通知包含敏感内容
+- **WHEN** 插件提交 API Key、Authorization、请求正文或工具参数
+- **THEN** 宿主拒绝显示原文并返回安全错误或净化后的反馈
+
+### Requirement: Bridge 调用按插件隔离
+宿主 SHALL 将每个 Bridge 绑定到不可变插件 id，并以该身份执行能力授权、数据路径、日志作用域和通知来源归属。插件不得通过调用参数冒充另一插件。
+
+#### Scenario: 插件尝试指定其他插件 id
+- **WHEN** 插件在数据库路径、日志字段或通知来源中尝试覆盖绑定身份
+- **THEN** 宿主仍使用初始化时绑定的插件 id，并拒绝越权目标
+
+#### Scenario: 单插件 Bridge 故障
+- **WHEN** 一个插件的 Bridge 调用失败
+- **THEN** 故障按该调用和既有 Extension 失败策略处理，不破坏其他插件的 Bridge 实例
+
+### Requirement: Credential Protection 原 Vault 保持兼容
+Credential Protection 迁移到 SQLite Bridge 后 MUST 继续使用既有 `credential-tokens.db`、`CredentialTokens` 表和 DPAPI 密文，不得创建第二个 Vault、重建数据或使既有 placeholder 失效。
+
+#### Scenario: 升级后解析历史 placeholder
+- **WHEN** 用户升级前已存在 token 映射且升级后请求恢复历史 placeholder
+- **THEN** Credential Protection 通过 Bridge 精确读取原记录并恢复相同 DPAPI 保护值
+
+#### Scenario: 初始化已有 Vault
+- **WHEN** `credential-tokens.db` 已存在并包含既有表结构
+- **THEN** 插件直接复用该数据库，不执行数据迁移或创建另一个数据库文件
+
+#### Scenario: 唯一约束冲突保持原语义
+- **WHEN** 并发创建映射触发 Token 或 OriginalHash 唯一约束冲突
+- **THEN** 插件通过 `ConstraintViolation` 识别冲突、结束失败事务并重新精确查询既有映射
+
+#### Scenario: Vault 访问失败时安全失败
+- **WHEN** 数据库损坏、无法解密或 Bridge 返回不可恢复错误
+- **THEN** Credential Protection 保持既有 fail closed 行为，不放行可能含明文凭据的数据
+### Requirement: 事务归属与实例生命周期明确
+数据库句柄 SHALL 区分非事务命令与活动事务命令，不得将非事务调用隐式加入其他调用的活动事务。句柄在其所属实例实际退休并释放后 MUST 拒绝复用；普通禁用 MUST NOT 提前销毁 Credential Protection 的历史解析资源。
+
+#### Scenario: 非事务命令遇到活动事务
+- **WHEN** 同一数据库句柄上存在未结束事务且其他调用提交非事务命令
+- **THEN** Bridge 不让该命令混入活动事务，按受控串行或稳定错误处理
+
+#### Scenario: 已退休句柄被复用
+- **WHEN** 插件旧实例已排空在途调用并释放而代码继续使用其数据库或事务句柄
+- **THEN** Bridge 拒绝调用且不访问或重建数据库
+
+#### Scenario: 暂停主动保护后解析历史引用
+- **WHEN** 用户普通禁用 Credential Protection 而历史 placeholder 仍需解析
+- **THEN** 历史解析所需的 Bridge 保持可用，且不与实际实例退休混淆
 
 ```
-
-Full source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/plugin-host-bridge/spec.md
 
 ## openspec/changes/add-source-plugin-runtime-and-bridge/specs/source-plugin-runtime/spec.md
 
 - Source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/source-plugin-runtime/spec.md
 - Lines: 1-140
 - SHA256: 165efc33000034a7fd660244bdfef50b30a9afd6968cd1b195c2f0bd7aaa3930
-
-[TRUNCATED]
 
 ```md
 # Spec Delta
@@ -521,7 +845,65 @@ Runtime SHALL 以 Manifest、源码相对路径及内容、Plugin API 版本、�
 - **THEN** Runtime 保持当前实例运行并保留最近一次可用缓存，同时报告本次更新失败
 
 #### Scenario: 更新源码编译成功
+- **WHEN** 新源码版本编译成功并通过加载前验证
+- **THEN** Runtime 发布新缓存并在重新加载边界用新实例替换旧实例
+
+### Requirement: 提供结构化安全编译诊断
+编译与加载诊断 SHALL 至少包含插件 id、阶段、严重级别、错误码、安全消息，以及适用时的源码相对路径、行和列。诊断 MUST NOT 包含插件数据、凭据、请求正文或规范化后的外部绝对路径。
+
+#### Scenario: 语法错误可定位
+- **WHEN** 声明源码存在语法错误
+- **THEN** Runtime 返回含相对文件路径、行、列和编译器错误码的诊断
+
+#### Scenario: 非源码错误仍可分类
+- **WHEN** 失败发生在 Manifest 验证、缓存校验或入口类型加载阶段
+- **THEN** Runtime 返回对应阶段和稳定错误码，不伪造源码位置
+
+### Requirement: 源码插件遵守既有插件契约
+编译后的源码插件 MUST 通过与预编译插件相同的共享契约、Manifest 一致性检查、Extension 注册、Pipeline 顺序、失败策略、启停和 UI Contribution 验证流程，不得获得额外宿主实现访问权。
+
+#### Scenario: 入口类型不实现插件契约
+- **WHEN** 编译成功但入口类型未实现当前 Plugin API 要求的插件接口
+- **THEN** Runtime 拒绝实例化该插件并返回契约不匹配诊断
+
+#### Scenario: 源码插件注册 Extension
+- **WHEN** 有效源码插件创建 Request 和 Response Extension
+- **THEN** 两个 Extension 按现有 Manifest 声明和 Pipeline 配置进入对应 Pipeline
+
+### Requirement: 源码插件被视为可信代码而非安全沙箱
+产品和开发工具 MUST 明确披露源码插件会在 LoomX 本地进程权限边界内执行，`AssemblyLoadContext` 仅用于加载与卸载，不构成恶意代码隔离。
+
+#### Scenario: 安装或启用源码插件
+- **WHEN** 用户首次安装或启用一个源码插件
+- **THEN** 产品向用户展示可信代码边界说明，不宣称该插件已被沙箱隔离
+### Requirement: 编译引用与本地化负载参与缓存完整性
+源码插件发布与缓存 SHALL 包含宿主固定提供的编译引用集合及实际进入产物的本地化负载身份。缺少必要引用时 MUST 返回安全诊断，不得搜索本机 SDK 或在线恢复。缓存负载 MUST 遵守既有插件目录布局与文案查找协议。
+
+#### Scenario: 引用或文案更新使缓存失效
+- **WHEN** 实际编译引用摘要或插件 i18n 内容发生变化
+- **THEN** Runtime 不复用旧缓存，并使新实例使用更新后的引用与文案
+
+#### Scenario: 发布包缺少编译引用
+- **WHEN** 随附引用集合缺失或完整性校验失败
+- **THEN** Runtime 返回安全的缓存或编译诊断，不搜索外部 SDK 或发起依赖恢复
+
+#### Scenario: 从缓存加载插件本地化
+- **WHEN** 源码程序集从内容寻址缓存加载
+- **THEN** 缓存仍提供 plugins/<id>/plugin.manifest.json 与 i18n/<culture>.json 的一致负载布局，且无需增加 PluginTextCatalog 查找特判
+
+### Requirement: 重新加载保持在途请求代际连续性
+Runtime SHALL 在候选实例验证成功后切换不可变注册快照。完整 Provider 调用的 request/response 及流式处理 MUST 使用同一已取得代际，旧代际的 Bridge 资源 MUST 在在途调用结束后才释放。
+
+#### Scenario: 新请求使用新代际
+- **WHEN** 候选插件已成功切换且新的 Provider 调用开始
+- **THEN** 新调用使用新代际的成对 request/response Pipeline，不继续使用组合根启动时固定持有的旧引用
+
+#### Scenario: 旧 SSE 调用仍在途
+- **WHEN** reload 成功而旧调用的 SSE 正文尚未结束或释放
+- **THEN** 旧调用继续使用原代际，所需 Bridge 不被提前释放
+
+#### Scenario: 候选初始化失败
+- **WHEN** 新候选编译成功但初始化或注册验证失败
+- **THEN** Runtime 不切换当前实例，只释放本次候选资源并返回安全诊断
 
 ```
-
-Full source: openspec/changes/add-source-plugin-runtime-and-bridge/specs/source-plugin-runtime/spec.md

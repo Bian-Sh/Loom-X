@@ -64,6 +64,8 @@ public sealed class PluginRuntimeTests : IDisposable
                 PluginDirectory = PluginDirectory,
                 DataRootDirectory = DataDirectory,
                 PipelineOrder = pipelineOrder ?? new Dictionary<string, IReadOnlyList<string>>(),
+                BridgeFactory = (manifest, _) => new(manifest.Id, manifest.HostCapabilities,
+                    storage: new LoomX.Plugin.Storage.Sqlite.PluginSqliteStorageBridge(manifest.Id, DataDirectory)),
             },
             NullLoggerFactory.Instance);
 

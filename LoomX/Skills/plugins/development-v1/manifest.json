@@ -1,0 +1,8 @@
+{
+  "name": "development-v1",
+  "description": "开发 LoomX 可信源码插件：公共 SDK、Manifest、Pipeline、声明式 UI、Bridge 与安全修复闭环。",
+  "when_to_use": "创建、校验、编译、测试或重新加载 LoomX 插件时；不用于修改宿主内部实现或操作真实凭据。",
+  "version": "1.0.0",
+  "plugin_api_major": 1,
+  "manifest_schema": "runtime-v1"
+}

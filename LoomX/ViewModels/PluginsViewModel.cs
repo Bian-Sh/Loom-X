@@ -256,7 +256,10 @@ public sealed class PluginsViewModel : NotifyViewModel, IDisposable
             CultureInfo.CurrentCulture,
             Loc(enabled ? "plugins.toast.enabled" : "plugins.toast.disabled"),
             item.DisplayName);
-        toastService.Show(message, enabled ? ToastLevel.Success : ToastLevel.Warning);
+        if (enabled && item.IsSourcePlugin)
+            toastService.Show(Loc("plugins.source.trust.enabled"), ToastLevel.Warning);
+        else
+            toastService.Show(message, enabled ? ToastLevel.Success : ToastLevel.Warning);
         logger.LogInformation("插件页面已{State}插件 {PluginId}", enabled ? "启用" : "禁用", item.Id);
     }
 
@@ -317,8 +320,11 @@ public sealed class PluginItemViewModel : NotifyViewModel
     public IReadOnlyList<PluginUiContribution> CardContributions { get; private set; }
     public IReadOnlyList<PluginUiContribution> DetailContributions { get; private set; }
     public bool HasCardUi => CardContributions.Count > 0;
+    public bool IsSourcePlugin { get; }
+    public string SourceTrustTitle => Loc("plugins.source.trust.title");
+    public string SourceTrustDescription => Loc("plugins.source.trust.description");
     public bool HasDetailUi { get; }
-    public bool CanOpenDetail => HasDetailUi && DetailContributions.Count > 0;
+    public bool CanOpenDetail => IsSourcePlugin || HasDetailUi && DetailContributions.Count > 0;
     public IReadOnlyList<string> InteractiveContributions { get; }
     public bool IsCardInteractive => IsInteractive(CardContributions);
     public bool IsDetailInteractive => IsInteractive(DetailContributions);
@@ -375,7 +381,8 @@ public sealed class PluginItemViewModel : NotifyViewModel
         enabled = info.Enabled;
         CardContributions = cardContributions;
         DetailContributions = detailContributions;
-        HasDetailUi = info.HasDetailUi;
+        IsSourcePlugin = string.Equals(info.RuntimeKind, "csharp-source", StringComparison.Ordinal);
+        HasDetailUi = info.HasDetailUi || IsSourcePlugin;
         InteractiveContributions = interactiveContributions ?? [];
         this.setEnabled = setEnabled;
         this.openDetail = openDetail;
@@ -421,6 +428,8 @@ public sealed class PluginItemViewModel : NotifyViewModel
         OnPropertyChanged(nameof(StatusLabel));
         OnPropertyChanged(nameof(ExtensionCountLabel));
         OnPropertyChanged(nameof(CapabilitySummary));
+        OnPropertyChanged(nameof(SourceTrustTitle));
+        OnPropertyChanged(nameof(SourceTrustDescription));
     }
 
     private string Loc(string key) => loc(key);

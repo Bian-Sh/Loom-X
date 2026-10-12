@@ -62,3 +62,10 @@ Mendel独立首审请求修改：I1 assembly验证/执行Manifest快照不一致
 - 新产物 outputs/ui-source-trust-2026-10-12_07-04-00/README.md 说明证据、源码、PNG、UIA、检查JSON和夹具错误。原生验收壳不是完整MainWindow，底部Toast显示是验收壳、不模拟自动隐藏；不声称完整安装入口/CUA主程序已通过，不用截图判断透明主题真实配色。原英文字符串核对假定与资源实际OS sandbox不符，修的是验收断言，不是产品文案。
 - 两项真实IMPORTANT阻塞未改变：Runtime原I3与Feedback原I2，各reviewRounds=1已用完，原审查者均terminal/closed，无任务正在等待，不能再轮询会话或擅自修复。不勾整个Runtime及7.4，不放行正式发布；完成仍15/44、Goal仍active。
 - 当前同一“两个审查包追加授权缺失”条件自用户触发/上一完整进展turn起连续出现第2个Goal turn。本轮仍有安全验证进展；若下一自动Goal turn复核仍无用户授权、无可推进的独立必要工作，在第3个Goal turn按blocked audit把Goal设blocked，而非无止境重复汇报或伪造进展。用户明确授权后才恢复受影响修复，保留原review次数不重置。
+
+## 2026-10-12 10:00 用户授权后完成Build验收
+- 用户明确追加授权Runtime/Feedback各一轮；Mendel/Maxwell原审查者第2轮均通过，历史轮次不重置，所有原IMPORTANT关闭。
+- 正式44/44逐ID验收，全量1884/1884、Playground85/85、最新发布094447布局32/32，无SDK实际发布二进制闭环33+8两进程，四语言原生隔离UI复验。
+- 暂存83路径独立source快照全量1884/1884，证明依赖闭包不依赖未提交文件；详见extra-build-acceptance.md和published-extra-acceptance.md。
+- Goal既有blocked是历史授权缺失状态，用户继续后实际已推进，工具不支持active恢复，未创建新Goal或重置历史。待Verify完成再按实际开发目标处理状态。
+- 未Verify/Archive，归档仍须最终用户交付确认；当前只准备实现提交推送和guard。保留所有旧outputs/.comet/evidence/其它会话文件。

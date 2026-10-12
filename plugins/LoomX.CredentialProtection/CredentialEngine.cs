@@ -30,6 +30,7 @@ public class CredentialEngine
 
     private readonly SensitiveRuleStore store;
     private readonly CredentialTokenStore tokenStore;
+    private readonly AsyncLocal<CancellationToken> operationCancellation = new();
 
     /// <summary>
     /// 已编译规则的不可变快照。
@@ -54,11 +55,27 @@ public class CredentialEngine
     private CompiledRules compiled = CompiledRules.Initial;
     private readonly object compilationGate = new();
 
-    public CredentialEngine(SensitiveRuleStore store, CredentialTokenStore? tokenStore = null)
+    public CredentialEngine(SensitiveRuleStore store, CredentialTokenStore tokenStore)
     {
         ArgumentNullException.ThrowIfNull(store);
         this.store = store;
-        this.tokenStore = tokenStore ?? new CredentialTokenStore(store.DataDirectory);
+        ArgumentNullException.ThrowIfNull(tokenStore);
+        this.tokenStore = tokenStore;
+    }
+
+    // 同一引擎可并发服务请求；取消令牌只在本次同步解析作用域内流动。
+    internal T WithCancellation<T>(CancellationToken cancellationToken, Func<T> operation)
+    {
+        var previous = operationCancellation.Value;
+        operationCancellation.Value = cancellationToken;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = operation();
+            cancellationToken.ThrowIfCancellationRequested();
+            return result;
+        }
+        finally { operationCancellation.Value = previous; }
     }
 
     /// <summary>
@@ -150,7 +167,7 @@ public class CredentialEngine
         var candidates = PlaceholderPattern.Matches(payload)
             .Select(match => new PlaceholderCandidate(match.Value, NormalizePlaceholder(match)))
             .ToArray();
-        var snapshot = tokenStore.ResolveTokens(candidates.Select(candidate => candidate.Normalized));
+        var snapshot = CredentialSynchronous.Run(() => tokenStore.ResolveTokensAsync(candidates.Select(candidate => candidate.Normalized), operationCancellation.Value));
         if (snapshot.Count == 0) return payload;
 
         var didChange = false;
@@ -600,9 +617,9 @@ public class CredentialEngine
     }
 
     private string GetOrCreatePlaceholder(string original) =>
-        tokenStore.GetOrCreateToken(
+        CredentialSynchronous.Run(() => tokenStore.GetOrCreateTokenAsync(
             original,
-            () => PlaceholderPrefix + CreateRandomSuffix() + "}}");
+            () => PlaceholderPrefix + CreateRandomSuffix() + "}}", operationCancellation.Value));
 
     private static string CreateRandomSuffix()
     {

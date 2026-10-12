@@ -88,10 +88,9 @@ public sealed class CredentialProtectionLocalizationTests
     [Fact]
     public void CardOverview_RendersPluginOwnTextPerCulture()
     {
+        using var factory = new CredentialTestFactory();
         var plugin = new CredentialProtectionPlugin();
-        plugin.Initialize(new PluginInitializationContext(
-            CredentialProtectionPlugin.PluginId,
-            Path.Combine(Path.GetTempPath(), "loomx-cp-i18n")));
+        plugin.Initialize(factory.CreateContext(Path.Combine(Path.GetTempPath(), "loomx-cp-i18n")));
 
         var zh = string.Join('\n', plugin.GetUiContributions(new PluginUiContext("zh-CN"))
             .Where(item => item.Slot == PluginUiSlot.CardBody)

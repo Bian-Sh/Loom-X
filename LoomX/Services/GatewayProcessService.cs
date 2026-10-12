@@ -1,4 +1,4 @@
-﻿using System.Net.Http;
+using System.Net.Http;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +22,8 @@ public enum GatewayState
 
 public sealed class GatewayProcessService : IDisposable
 {
+    private readonly ToastService toastService;
+    public GatewayProcessService(ToastService? toastService = null) => this.toastService = toastService ?? new ToastService();
     private readonly HttpClient httpClient = new() { Timeout = TimeSpan.FromSeconds(1) };
     private readonly SemaphoreSlim lifecycleLock = new(1, 1);
     private WebApplication? app;
@@ -49,7 +51,7 @@ public sealed class GatewayProcessService : IDisposable
 
             SetState(GatewayState.Starting, null);
             EnsureBrowserRuntime();
-            app ??= await LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager, cancellationToken);
+            app ??= await LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager, cancellationToken, toastService);
             activityStore ??= app.Services.GetRequiredService<ActivityStore>();
             telemetryHub ??= app.Services.GetRequiredService<RequestTelemetryHub>();
             activityStore.ActivityEnqueued -= OnActivityEnqueued;
@@ -95,7 +97,7 @@ public sealed class GatewayProcessService : IDisposable
         {
             if (app is not null) return;
             EnsureBrowserRuntime();
-            app = await LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager, cancellationToken);
+            app = await LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager, cancellationToken, toastService);
             try
             {
                 app.Services.GetRequiredService<LoomX.Assistant.AssistantPreferencesStore>().MigrateLegacyIfNeeded();

@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-12T09:55:41.6631414+08:00",
+  "sidePackageStatus": "DONE",
+  "releaseStatus": "候选未放行",
+  "runtimeFeedbackReviewStatus": "原第二轮仍执行中，侧包不改审查状态",
+  "attempt": "D:\\AppData\\Github\\Loom-X\\.worktrees\\add-source-plugin-runtime-and-bridge\\openspec\\changes\\add-source-plugin-runtime-and-bridge\\.comet\\evidence\\integration\\sdkless-published-extra-20261012-094710-521-4c7d7c08\\attempts\\20261012-095051-201-5edbd57a",
+  "pids": [
+    30456,
+    33608
+  ],
+  "exitCodes": [
+    0,
+    0
+  ],
+  "assertions": [
+    33,
+    8
+  ],
+  "totalAssertions": 41,
+  "layoutPassed": 32,
+  "layoutFailed": 0,
+  "publishedFilesRehashedAfterStatusDocuments": 464,
+  "hashMismatches": 0,
+  "loadedProvenanceRecords": 24,
+  "expectedSyntaxFailure": "CS0116 src/Plugin.cs:10:1",
+  "cacheHit": true,
+  "databaseCounts": [
+    2,
+    3
+  ],
+  "evidenceAttempts": [
+    "20261012-094853-451-ecd6d2ce",
+    "20261012-095014-715-b749cfc7",
+    "20261012-095051-201-5edbd57a"
+  ],
+  "fixtureFailuresRetained": true,
+  "productChanges": false,
+  "gitCommitOrTaskCheckbox": false,
+  "physicalSdklessDevice": false,
+  "fullDesktopStartup": false,
+  "providerConnection": false,
+  "productionVaultRead": false
+}

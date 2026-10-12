@@ -24,7 +24,7 @@ archived: false
 bound_branch: comet/add-source-plugin-runtime-and-bridge
 direct_override: null
 handoff_context: openspec/changes/add-source-plugin-runtime-and-bridge/.comet/handoff/design-context.json
-handoff_hash: 412767ccbb3a627d6bb5c040d0a2212b5a8299293bab68d6a632cf838676e689
+handoff_hash: d8db719913a358d7ee7b8f590deb939b2c764e0cb19004db35c4d570585c60c9
 classic_profile: full
 classic_migration: 1
 run_id: 7b1a060e-77c3-41c0-a194-c779b3b739ee

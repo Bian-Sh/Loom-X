@@ -10,18 +10,20 @@ namespace LoomX.Tests.Plugins;
 /// </summary>
 public sealed class CredentialProtectionTests : IDisposable
 {
+    private readonly CredentialTestFactory factory = new();
     private readonly string dataDirectory =
         Path.Combine(Path.GetTempPath(), "loomx-credential-" + Guid.NewGuid().ToString("N"));
 
     public void Dispose()
     {
+        factory.Dispose();
         if (Directory.Exists(dataDirectory)) Directory.Delete(dataDirectory, recursive: true);
     }
 
     private CredentialEngine CreateEngine()
     {
         Directory.CreateDirectory(dataDirectory);
-        return new CredentialEngine(new SensitiveRuleStore(dataDirectory));
+        return factory.CreateEngine(dataDirectory);
     }
 
     // ── 敏感数据检测 ────────────────────────────────────────────────────
@@ -292,15 +294,17 @@ public sealed class CredentialProtectionTests : IDisposable
     {
         Directory.CreateDirectory(dataDirectory);
         const string secret = "sk-persistent-abcdefghij0123456789";
-        var firstEngine = new CredentialEngine(new SensitiveRuleStore(dataDirectory));
+        var firstEngine = factory.CreateEngine(dataDirectory);
         var token = firstEngine.Sanitize(secret, out var changed);
 
-        var restartedEngine = new CredentialEngine(new SensitiveRuleStore(dataDirectory));
+        var restartedEngine = factory.CreateEngine(dataDirectory);
         var restored = restartedEngine.Restore(token, out var restoredChanged);
 
         Assert.True(changed);
         Assert.True(restoredChanged);
         Assert.Equal(secret, restored);
+        // Bridge 持有连接；先释放并完成 WAL 检查点，再验证磁盘没有明文。
+        factory.Dispose();
         var databaseBytes = File.ReadAllBytes(Path.Combine(dataDirectory, "credential-tokens.db"));
         Assert.DoesNotContain(secret, System.Text.Encoding.UTF8.GetString(databaseBytes), StringComparison.Ordinal);
     }
@@ -310,8 +314,8 @@ public sealed class CredentialProtectionTests : IDisposable
     {
         Directory.CreateDirectory(dataDirectory);
         const string secret = "sk-stable-abcdefghij0123456789";
-        var first = new CredentialEngine(new SensitiveRuleStore(dataDirectory)).Sanitize(secret, out _);
-        var second = new CredentialEngine(new SensitiveRuleStore(dataDirectory)).Sanitize(secret, out _);
+        var first = factory.CreateEngine(dataDirectory).Sanitize(secret, out _);
+        var second = factory.CreateEngine(dataDirectory).Sanitize(secret, out _);
 
         Assert.Equal(first, second);
     }
@@ -379,7 +383,7 @@ public sealed class CredentialProtectionTests : IDisposable
     {
         Directory.CreateDirectory(dataDirectory);
         var store = new SensitiveRuleStore(dataDirectory);
-        var engine = new CredentialEngine(store);
+        var engine = factory.CreateEngine(store);
         const string payload = """{"vault_path":"/data/alpha"}""";
 
         Assert.Empty(engine.Detect(payload)); // 新增前不命中
@@ -399,7 +403,7 @@ public sealed class CredentialProtectionTests : IDisposable
     {
         Directory.CreateDirectory(dataDirectory);
         var store = new SensitiveRuleStore(dataDirectory);
-        var engine = new CredentialEngine(store);
+        var engine = factory.CreateEngine(store);
         const string payload = "sk-abcdefghij0123456789abcd";
 
         Assert.True(store.SetRuleEnabled("pattern.openai-sk", false));
@@ -429,7 +433,7 @@ public sealed class CredentialProtectionTests : IDisposable
     {
         Directory.CreateDirectory(dataDirectory);
         var store = new SensitiveRuleStore(dataDirectory);
-        var engine = new CredentialEngine(store);
+        var engine = factory.CreateEngine(store);
         const string payload = "sk-abcdefghij0123456789abcd";
 
         Assert.True(store.RemoveRule("pattern.openai-sk"));
@@ -500,7 +504,7 @@ public sealed class CredentialProtectionTests : IDisposable
     public async Task ProcessingFailure_BlocksRawData()
     {
         var observability = new CredentialProtectionObservability();
-        var extension = new CredentialRequestExtension(new ThrowingEngine(dataDirectory), observability);
+        var extension = new CredentialRequestExtension(new ThrowingEngine(dataDirectory, factory.CreateStore(dataDirectory)), observability);
         const string payload = "raw sk-abcdefghij0123456789abcd";
 
         var result = await extension.ProcessRequestAsync(
@@ -515,8 +519,8 @@ public sealed class CredentialProtectionTests : IDisposable
     /// <summary>处理过程必抛异常的引擎，验证插件侧 fail closed。</summary>
     private sealed class ThrowingEngine : CredentialEngine
     {
-        public ThrowingEngine(string dataDirectory)
-            : base(new SensitiveRuleStore(dataDirectory))
+        public ThrowingEngine(string dataDirectory, CredentialTokenStore tokenStore)
+            : base(new SensitiveRuleStore(dataDirectory), tokenStore)
         {
         }
 

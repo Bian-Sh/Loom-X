@@ -10,6 +10,7 @@
       { "id": "settings", "slot": "detail-body", "interactive": true }
     ]
   },
+  "host_capabilities": ["storage.sqlite/v1"],
   "extensions": [
     {
       "id": "credential.request",

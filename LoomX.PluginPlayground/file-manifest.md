@@ -1,0 +1,32 @@
+# task7.1 本次文件清单
+
+仅包含本次 LoomX.PluginPlayground 文件；所有已有产物保留，不包含其他 session 的改动。standard-review*.md 仅作非正式参考，正式独立审查由主会话协调。构建和运行临时数据路径见真实日志。
+
+- [design.md](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/design.md)
+- [evidence/coordinator-green-20261012-0615.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/coordinator-green-20261012-0615.log)
+- [evidence/diff-check.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/diff-check.log)
+- [evidence/green-attempt-1.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/green-attempt-1.log)
+- [evidence/green-final-release.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/green-final-release.log)
+- [evidence/green-final-repeat.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/green-final-repeat.log)
+- [evidence/green-repeat-release.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/green-repeat-release.log)
+- [evidence/green-review-final-repeat.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/green-review-final-repeat.log)
+- [evidence/green-review-final.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/green-review-final.log)
+- [evidence/green-review-followup.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/green-review-followup.log)
+- [evidence/red-adapter-inactive-value.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/red-adapter-inactive-value.log)
+- [evidence/red-baseline.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/red-baseline.log)
+- [evidence/red-extended.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/red-extended.log)
+- [evidence/red-review-gap-mutation.log](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/red-review-gap-mutation.log)
+- [evidence/session-temp-root.txt](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/session-temp-root.txt)
+- [evidence/standard-review-final.md](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/standard-review-final.md)
+- [evidence/standard-review-initial.md](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/standard-review-initial.md)
+- [evidence/standard-review-inline-before-followup.md](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/standard-review-inline-before-followup.md)
+- [evidence/standard-review.md](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/standard-review.md)
+- [evidence/verification-summary.json](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/evidence/verification-summary.json)
+- [handoff.md](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/handoff.md)
+- [LegacyVaultFixture.cs](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/LegacyVaultFixture.cs)
+- [LoomX.PluginPlayground.csproj](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/LoomX.PluginPlayground.csproj)
+- [PlaygroundBridgeFactory.cs](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/PlaygroundBridgeFactory.cs)
+- [Program.cs](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/Program.cs)
+- [SourcePluginFixture.cs](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/SourcePluginFixture.cs)
+- [Verify-Playground.ps1](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/Verify-Playground.ps1)
+- [file-manifest.md](file:///D:/AppData/Github/Loom-X/.worktrees/add-source-plugin-runtime-and-bridge/LoomX.PluginPlayground/file-manifest.md)（本清单）

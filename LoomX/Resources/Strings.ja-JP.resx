@@ -1608,4 +1608,7 @@
   <data name="update.install.confirm.cancel"><value>後で</value></data>
   <data name="plugins.detail.open"><value>プラグインの詳細を開く</value></data>
   <data name="plugins.detail.back"><value>プラグイン一覧に戻る</value></data>
+  <data name="plugins.source.trust.title"><value>ソースプラグイン：信頼するコードの実行範囲</value></data>
+  <data name="plugins.source.trust.description"><value>信頼できる提供元のソースプラグインのみをインストールまたは有効化してください。ソースプラグインは LoomX と同一プロセスで現在のユーザーの権限で実行され、そのユーザーがアクセスできるファイルやネットワークにアクセスできます。AssemblyLoadContext は読み込みとアンロードのみ、Bridge はホストサービスの境界のみを提供します。どちらも OS サンドボックスではなく、悪意のあるコードを隔離できません。</value></data>
+  <data name="plugins.source.trust.enabled"><value>ソースプラグインを有効にしました。信頼できる提供元のソースプラグインのみをインストールまたは有効化してください。ソースプラグインは LoomX と同一プロセスで現在のユーザーの権限で実行され、そのユーザーがアクセスできるファイルやネットワークにアクセスできます。AssemblyLoadContext は読み込みとアンロードのみ、Bridge はホストサービスの境界のみを提供します。どちらも OS サンドボックスではなく、悪意のあるコードを隔離できません。</value></data>
 </root>

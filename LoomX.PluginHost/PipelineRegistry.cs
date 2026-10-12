@@ -14,6 +14,19 @@ public sealed class PipelineRegistry
 
     public IReadOnlyList<string> Diagnostics => diagnostics;
 
+    /// <summary>候选注册失败时撤销其全部归属，不能留下引用已释放资源的 Entry。</summary>
+    internal void RemovePluginEntries(string pluginId)
+    {
+        foreach (var pipeline in pipelines.Values)
+        {
+            foreach (var entry in pipeline.Entries.Where(entry => entry.PluginId == pluginId).ToArray())
+                ownership.Remove(entry.Extension);
+            pipeline.RemovePluginEntries(pluginId);
+        }
+        foreach (var empty in pipelines.Where(pair => pair.Value.Entries.Count == 0).Select(pair => pair.Key).ToArray())
+            pipelines.Remove(empty);
+    }
+
     public Pipeline GetOrCreatePipeline(string pipelineId, ExtensionKind kind, Microsoft.Extensions.Logging.ILogger logger)
     {
         if (pipelines.TryGetValue(pipelineId, out var existing))
