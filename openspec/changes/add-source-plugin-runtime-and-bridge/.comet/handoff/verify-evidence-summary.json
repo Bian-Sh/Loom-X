@@ -78,6 +78,60 @@
       "failed": 0,
       "notExecuted": 0,
       "outcome": "Completed"
+    },
+    {
+      "path": "integration-ui-fix/VERIFY-UI-FIX-FINAL.trx",
+      "sha256": "F7D577B65BAD2A96D67B2264613BA0BFAD522A1148848FE2E6B146A0DDF16CA5",
+      "total": 1896,
+      "passed": 1896,
+      "failed": 0,
+      "notExecuted": 0,
+      "outcome": "Completed"
     }
-  ]
+  ],
+  "finalVerification": {
+    "productCommit": "d93074573d22be7d87503f55b3c7151dae54608f",
+    "inputBefore": "9d342ffb36a6fcc60568a824625d03c968603226226a80bc0e78cf79d7be0cd5",
+    "inputAfter": "9d342ffb36a6fcc60568a824625d03c968603226226a80bc0e78cf79d7be0cd5",
+    "changedDuringExecution": [],
+    "build": {
+      "exitCode": 0,
+      "warnings": 14,
+      "errors": 0,
+      "checkEpoch": 4,
+      "sequence": 30,
+      "log": "openspec/changes/add-source-plugin-runtime-and-bridge/.comet/checks/5b7a8b2c-bae2-4265-b624-f79f09ae840b.log",
+      "sha256": "9D33E6017F0C908B43293031E09E6B59B55E51968C9E7B5AA9B22E2C06EAB5A3",
+      "guardPassed": 14,
+      "guardTotal": 14
+    },
+    "verify": {
+      "exitCode": 0,
+      "checkEpoch": 5,
+      "sequence": 33,
+      "tier": "full",
+      "reused": false,
+      "passed": 1896,
+      "failed": 0,
+      "notExecuted": 0,
+      "log": "openspec/changes/add-source-plugin-runtime-and-bridge/.comet/checks/1ab26b98-426c-49ad-8e0f-9e0511e575b1.log",
+      "sha256": "1BAB568E54D766AE22CD500204C2B9C281E88BE294B710915E4B7A4C6C14A99C"
+    },
+    "guard": {
+      "exitCode": 0,
+      "passed": 5,
+      "total": 5,
+      "phase": "archive",
+      "verifyResult": "pass",
+      "checkEpoch": 6,
+      "verifiedAt": "2026-10-12",
+      "branchStatus": "pending",
+      "archiveConfirmation": "pending",
+      "archived": false,
+      "log": "openspec/changes/add-source-plugin-runtime-and-bridge/.comet/evidence/integration-ui-fix/VERIFY-GUARD-FINAL.json",
+      "sha256": "CB9816E588B4A3706EFC851E090368A1A002973E547EB10267228B356E1844D4"
+    },
+    "archiveAuthorized": false,
+    "evidenceBoundary": "原始大证据和发布产物保留本地；本索引记录原始文件的实际计数和 SHA-256，不替代 Runtime 命令执行记录。"
+  }
 }
