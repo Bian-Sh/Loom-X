@@ -12,6 +12,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
+    <!-- 只保留产品支持语种的 NuGet satellite 资源，避免内置 Roslyn 编译器带入其他本地化资产。 -->
+    <SatelliteResourceLanguages>zh-CN;zh-TW;ja-JP;en-US</SatelliteResourceLanguages>
     <!-- i18n: default resource language -->
     <DefaultLanguage>zh-CN</DefaultLanguage>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>

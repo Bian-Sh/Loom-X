@@ -29,6 +29,16 @@ public sealed class PluginPublishContractTests
     }
 
     [Fact]
+    public void DesktopProject_LimitsSatelliteResourcesToSupportedCultures()
+    {
+        var project = XDocument.Load(GetRepositoryFile("LoomX", "LoomX.csproj"));
+        var languages = project.Descendants("SatelliteResourceLanguages").SingleOrDefault();
+
+        Assert.NotNull(languages);
+        Assert.Equal("zh-CN;zh-TW;ja-JP;en-US", languages!.Value);
+    }
+
+    [Fact]
     public void CompressionPluginPayloadIncludesManifestAndInteractiveSettings()
     {
         var project = File.ReadAllText(GetRepositoryFile(
