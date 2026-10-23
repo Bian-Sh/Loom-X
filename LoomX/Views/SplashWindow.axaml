@@ -1,0 +1,52 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LoomX.Views.SplashWindow"
+        Width="640"
+        Height="430"
+        MinWidth="640"
+        MinHeight="430"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen"
+        SystemDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="AcrylicBlur,Transparent"
+        TransparencyBackgroundFallback="{DynamicResource WindowBackgroundBrush}">
+  <Border Background="{DynamicResource WindowBackgroundBrush}"
+          BorderBrush="{DynamicResource BorderBrush}"
+          BorderThickness="1"
+          CornerRadius="14"
+          Padding="34">
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" RowSpacing="16">
+      <StackPanel Orientation="Horizontal" Spacing="14">
+        <Border Width="48" Height="48" CornerRadius="12" Background="{DynamicResource AccentSoftBrush}" Padding="8">
+          <Image Source="/Assets/icon-transparent.png" Stretch="Uniform" />
+        </Border>
+        <StackPanel VerticalAlignment="Center" Spacing="2">
+          <TextBlock Text="Loom-X" FontSize="25" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding VersionLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+        </StackPanel>
+      </StackPanel>
+
+      <StackPanel Grid.Row="1" Spacing="8">
+        <TextBlock Text="{Binding CurrentStageText}" FontSize="16" FontWeight="SemiBold" />
+        <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressValue}" Height="8" />
+        <TextBlock Text="{Binding ProgressValue, StringFormat={}{0}%}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" />
+      </StackPanel>
+
+      <ItemsControl Grid.Row="2" ItemsSource="{Binding StageItems}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Grid ColumnDefinitions="28,*" Margin="0,5">
+              <TextBlock Text="{Binding Marker}" FontSize="16" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="{Binding Title}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Grid.Row="3" Text="{Binding ErrorMessage}" Foreground="{DynamicResource DangerBrush}" TextWrapping="Wrap" IsVisible="{Binding IsFailed}" />
+      <Button Grid.Row="4" Content="{Binding CloseText}" HorizontalAlignment="Right" IsVisible="{Binding IsFailed}" Click="OnCloseClick" />
+    </Grid>
+  </Border>
+</Window>

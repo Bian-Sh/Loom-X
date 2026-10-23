@@ -17,6 +17,15 @@
   <data name="app.loading.failed.description">
     <value>データセンターの読み込みに失敗しました：{0}。ページを更新して再試行してください。</value>
   </data>
+  <data name="app.splash.starting"><value>デスクトップ環境を準備しています</value></data>
+  <data name="app.splash.completed"><value>起動完了</value></data>
+  <data name="app.splash.failed"><value>起動に失敗しました</value></data>
+  <data name="app.splash.close"><value>閉じる</value></data>
+  <data name="app.splash.stage.database"><value>設定データベースを読み込んでいます</value></data>
+  <data name="app.splash.stage.plugin.compile"><value>プラグインをコンパイルしています</value></data>
+  <data name="app.splash.stage.plugin.load"><value>プラグインを読み込んでいます</value></data>
+  <data name="app.splash.stage.gateway"><value>ゲートウェイサービスを起動しています</value></data>
+  <data name="app.splash.stage.shell"><value>メインウィンドウを準備しています</value></data>
   <data name="nav.overview">
     <value>概要</value>
   </data>
@@ -1388,7 +1397,7 @@
     <value>接続未テスト</value>
   </data>
   <data name="placeholder.empty.body">
-    <value>このページはナビゲーションに接続済みです。業務機能は今後のイテレーションで段階的に実装されます。</value>
+    <value>表示できる詳細情報はありません。</value>
   </data>
   <data name="assistant.history.placeholder">
     <value>履歴…</value>

@@ -101,9 +101,11 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         Sessions.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasNoSessions));
 
         RefreshSessions();
-        RefreshModelSummary();
         StartElapsedTimer();
     }
+
+    /// <summary>启动编排完成后加载助手服务和模型摘要，避免主窗口构造阶段触发插件运行时。</summary>
+    public void InitializeAfterStartup() => RefreshModelSummary();
 
     /// <summary>每秒刷新运行中的过程块耗时；没有 UI 线程（单元测试）时静默降级。</summary>
     private void StartElapsedTimer()

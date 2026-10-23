@@ -2,6 +2,13 @@ using Microsoft.Extensions.Logging;
 
 namespace LoomX.Plugins.Host;
 
+public enum PluginRuntimeStartupPhase
+{
+    Compiling,
+    Loading,
+    Completed
+}
+
 /// <summary>Runtime 配置：插件目录、插件数据根目录、Pipeline 顺序与启停。</summary>
 public sealed class PluginRuntimeOptions
 {
@@ -15,6 +22,9 @@ public sealed class PluginRuntimeOptions
     public Func<PluginManifest, string, PluginBridgeScope>? BridgeFactory { get; init; }
     /// <summary>宿主随附离线编译器；不搜索用户本机 SDK。</summary>
     public SourcePluginCompiler? SourceCompiler { get; init; }
+
+    /// <summary>报告首次启动时的编译、加载和完成阶段。</summary>
+    public Action<PluginRuntimeStartupPhase>? StartupProgress { get; init; }
 
     /// <summary>Pipeline 执行顺序：pipelineId → 按序的 "pluginId/extensionId"。未列出的 Entry 追加在发现顺序之后。</summary>
     public IDictionary<string, IReadOnlyList<string>> PipelineOrder { get; init; } =
@@ -307,7 +317,9 @@ public sealed partial class PluginRuntime
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
         var runtime = new PluginRuntime(loggerFactory) { options = options };
+        options.StartupProgress?.Invoke(PluginRuntimeStartupPhase.Compiling);
         runtime.DiscoverAndLoad(options);
+        options.StartupProgress?.Invoke(PluginRuntimeStartupPhase.Completed);
         runtime.ApplyOrdering(options);
         runtime.ApplyDisabled(options);
         runtime.diagnostics.AddRange(runtime.registry.Diagnostics);
@@ -367,6 +379,8 @@ public sealed partial class PluginRuntime
     private void DiscoverAndLoad(PluginRuntimeOptions options)
     {
         var discovered = PluginCatalog.Discover(options.PluginDirectory, diagnostics);
+        if (discovered.Count > 0)
+            options.StartupProgress?.Invoke(PluginRuntimeStartupPhase.Loading);
         foreach (var package in discovered)
         {
             try

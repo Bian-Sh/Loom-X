@@ -30,7 +30,6 @@ internal static class AppearanceSettingsLimits
 
     public static int NormalizeBlurAmount(int value) => Math.Clamp(value, MinimumBlurAmount, MaximumBlurAmount);
 }
-
 public sealed class ConfigurationManagementService(
     IDbContextFactory<ConfigurationDbContext> dbContextFactory,
     IDatabaseConfigurationProvider configurationProvider,
@@ -68,6 +67,49 @@ public sealed class ConfigurationManagementService(
         return routes.Select(ToGatewayRouteResponse).ToArray();
     }
 
+    internal static async Task<StartupConfigSnapshot> LoadStartupSnapshotAsync(
+        ConfigurationDbContext db,
+        IDatabaseConfigurationProvider configurationProvider,
+        CancellationToken cancellationToken = default)
+    {
+        await configurationProvider.ReloadAsync(cancellationToken);
+
+        var providers = await db.Providers.AsNoTracking()
+            .Include(provider => provider.Models)
+            .OrderBy(provider => provider.SortOrder)
+            .ThenBy(provider => provider.BusinessId)
+            .ToListAsync(cancellationToken);
+
+        var settings = await db.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
+
+        var endpoints = await db.GatewayEndpoints.AsNoTracking()
+            .Include(item => item.ComboBindings)
+            .ThenInclude(item => item.Combo)
+            .OrderBy(item => item.Key)
+            .ToListAsync(cancellationToken);
+
+        var combos = await db.GatewayCombos.AsNoTracking().AsSplitQuery()
+            .Include(item => item.Routes).ThenInclude(item => item.Model).ThenInclude(item => item.Provider)
+            .Include(item => item.EndpointBindings).ThenInclude(item => item.Endpoint)
+            .OrderBy(item => item.SortOrder).ThenBy(item => item.Name)
+            .ToListAsync(cancellationToken);
+
+        var enabledModels = await db.Models.AsNoTracking()
+            .Where(model => model.Enabled && model.Provider.Enabled)
+            .OrderBy(model => model.Provider.SortOrder)
+            .ThenBy(model => model.SortOrder)
+            .ThenBy(model => model.ModelId)
+            .Select(model => new GatewayModelSourceResponse(model.Id, model.DisplayName, model.Provider.DisplayName))
+            .ToArrayAsync(cancellationToken);
+
+        return new StartupConfigSnapshot(
+            configurationProvider.Current,
+            providers.Select(ToResponse).ToArray(),
+            ToResponse(settings),
+            endpoints.Select(ToGatewayResponse).ToArray(),
+            combos.Select(ToGatewayComboResponse).ToArray(),
+            enabledModels);
+    }
     public async Task<AppSettingsResponse> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await dbContextFactory.CreateDbContextAsync(cancellationToken);

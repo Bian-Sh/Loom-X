@@ -15,6 +15,7 @@ using LoomX.Localization;
 using LoomX.Logging;
 using LoomX.Services;
 using LoomX.ViewModels;
+using LoomX.Views;
 using Serilog;
 
 namespace LoomX;
@@ -141,25 +142,11 @@ public partial class App : Application
             gatewayService = new GatewayProcessService(toastService);
             var windowsStartupService = new WindowsStartupService(loggerFactory.CreateLogger<WindowsStartupService>());
             dataStore = new AppDataStore(configService, gatewayService, loggerFactory.CreateLogger<AppDataStore>());
-            mainWindow = new MainWindow(
-                toastService,
-                loggerFactory.CreateLogger<MainWindow>(),
-                loggerFactory.CreateLogger<AppModalService>());
-            mainWindow.DataContext = new MainWindowViewModel(
-                gatewayService,
-                toastService,
-                loggerFactory,
-                configService,
-                mainWindow.ApplyAppearance,
-                dataStore,
-                LocalizerFactory.Create<MainWindowViewModel>(),
-                requestApplicationExit: () => desktop.Shutdown(),
-                confirmUpdateInstall: mainWindow.ConfirmUpdateInstallAsync,
-                applyTheme: mainWindow.ApplyTheme,
-                windowsStartupService: windowsStartupService);
-            desktop.MainWindow = mainWindow;
-            if (activationPending)
-                mainWindow.ActivateFromSecondaryLaunch();
+            var startupProgress = new StartupProgress();
+            var splashViewModel = new SplashViewModel(startupProgress);
+            var splashWindow = new SplashWindow { DataContext = splashViewModel };
+            desktop.MainWindow = splashWindow;
+            splashWindow.Show();
             desktop.Exit += async (_, _) =>
             {
                 if (instanceActivationServer is not null)
@@ -170,7 +157,8 @@ public partial class App : Application
                 await gatewayService.StopAsync();
                 gatewayService.Dispose();
                 gatewayService = null;
-                if (mainWindow.DataContext is MainWindowViewModel viewModel) viewModel.Dispose();
+                if (mainWindow?.DataContext is MainWindowViewModel viewModel) viewModel.Dispose();
+                splashViewModel.Dispose();
                 dataStore?.Dispose();
                 dataStore = null;
                 configService.Dispose();
@@ -184,6 +172,56 @@ public partial class App : Application
                 ownsShellBootstrapMutex = false;
                 Log.CloseAndFlush();
             };
+
+            _ = CompleteStartupAsync();
+
+            async Task CompleteStartupAsync()
+            {
+                try
+                {
+                    var orchestrator = new StartupOrchestrator(
+                        dataStore,
+                        gatewayService,
+                        startupProgress,
+                        windowsStartupService,
+                        loggerFactory.CreateLogger<StartupOrchestrator>());
+                    await orchestrator.RunAsync();
+                    startupProgress.AdvanceTo(StartupPhase.Shell);
+
+                    mainWindow = new MainWindow(
+                        toastService,
+                        loggerFactory.CreateLogger<MainWindow>(),
+                        loggerFactory.CreateLogger<AppModalService>());
+                    mainWindow.DataContext = new MainWindowViewModel(
+                        gatewayService,
+                        toastService,
+                        loggerFactory,
+                        configService,
+                        mainWindow.ApplyAppearance,
+                        dataStore,
+                        LocalizerFactory.Create<MainWindowViewModel>(),
+                        requestApplicationExit: () => desktop.Shutdown(),
+                        confirmUpdateInstall: mainWindow.ConfirmUpdateInstallAsync,
+                        applyTheme: mainWindow.ApplyTheme,
+                        windowsStartupService: windowsStartupService,
+                        autoInitializeDataStore: false,
+                        restoreStartupIntent: false);
+                    if (mainWindow.DataContext is MainWindowViewModel viewModel)
+                        await viewModel.InitializeAfterStartupAsync();
+
+                    startupProgress.Complete();
+                    desktop.MainWindow = mainWindow;
+                    mainWindow.Show();
+                    splashWindow.Close();
+                    if (activationPending)
+                        mainWindow.ActivateFromSecondaryLaunch();
+                }
+                catch (Exception exception)
+                {
+                    startupLogger.LogError(exception, "桌面应用启动失败");
+                    startupProgress.Fail(exception.Message);
+                }
+            }
         }
         base.OnFrameworkInitializationCompleted();
     }

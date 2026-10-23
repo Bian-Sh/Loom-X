@@ -52,6 +52,30 @@ public sealed class ConfigSnapshotService : IDisposable
             return Load();
         }, cancellationToken);
 
+    public async Task<StartupConfigSnapshot> LoadStartupSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            logger?.LogInformation("启动快照读取开始 {DatabasePath}", databasePath);
+            await EnsureDatabaseReadyForReadAsync(cancellationToken);
+            await using var db = CreateContext(CreateReadOnlyOptions());
+            LogDatabaseState(db, "启动快照数据库初始化完成");
+            var provider = new DatabaseConfigurationProvider(db, CreateProviderLogger());
+            var snapshot = await ConfigurationManagementService.LoadStartupSnapshotAsync(db, provider, cancellationToken);
+            logger?.LogInformation(
+                "启动快照读取完成 {ProviderCount} {ModelCount} {EndpointCount} {ComboCount}",
+                snapshot.Providers.Count,
+                snapshot.Config.Models.Count,
+                snapshot.GatewayEndpoints.Count,
+                snapshot.GatewayCombos.Count);
+            return snapshot;
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "启动快照读取失败 {DatabasePath}", databasePath);
+            throw;
+        }
+    }
     public async Task<IReadOnlyList<ProviderResponse>> ListProvidersAsync(CancellationToken cancellationToken = default)
     {
         try

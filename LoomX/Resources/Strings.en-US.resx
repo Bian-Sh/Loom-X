@@ -8,6 +8,15 @@
   <data name="app.loading.description"><value>Loading Loom-X.</value></data>
   <data name="app.loading.failed"><value>Loading failed</value></data>
   <data name="app.loading.failed.description"><value>Unable to load Loom-X: {0}</value></data>
+  <data name="app.splash.starting"><value>Preparing the desktop environment</value></data>
+  <data name="app.splash.completed"><value>Startup complete</value></data>
+  <data name="app.splash.failed"><value>Startup failed</value></data>
+  <data name="app.splash.close"><value>Close</value></data>
+  <data name="app.splash.stage.database"><value>Loading configuration database</value></data>
+  <data name="app.splash.stage.plugin.compile"><value>Compiling plugins</value></data>
+  <data name="app.splash.stage.plugin.load"><value>Loading plugins</value></data>
+  <data name="app.splash.stage.gateway"><value>Starting gateway service</value></data>
+  <data name="app.splash.stage.shell"><value>Preparing the main window</value></data>
   <data name="nav.overview"><value>Overview</value></data>
   <data name="nav.overview.description"><value>Review local service health and gateway configuration.</value></data>
   <data name="nav.plugins"><value>Plugins</value></data>
@@ -513,7 +522,7 @@
   <data name="gateway.request.success"><value>Success</value></data>
   <data name="gateway.request.failure"><value>Failed</value></data>
   <data name="providers.connection.status.pending"><value>Connection not tested</value></data>
-  <data name="placeholder.empty.body"><value>No additional details.</value></data>
+  <data name="placeholder.empty.body"><value>No additional details are available.</value></data>
   <data name="assistant.history.placeholder"><value>History…</value></data>
   <data name="assistant.session.new"><value>New chat</value></data>
   <data name="assistant.history.list.tooltip"><value>History</value></data>

@@ -15,7 +15,7 @@ public sealed class UpdateExperienceContractTests
         var previewService = NormalizeLineEndings(ReadDesktopFile("Services", "DebugUpdatePreviewService.cs"));
 
         Assert.Contains("#if DEBUG\n        updateService = DebugUpdatePreviewService.CreateFromEnvironment(updateService);\n        updatePreviewEnabled = updateService is DebugUpdatePreviewService;\n#endif", mainViewModel, StringComparison.Ordinal);
-        Assert.Contains("#if DEBUG\n            if (updatePreviewEnabled) _ = updateCoordinator.CheckNowAsync();\n#endif", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("#if DEBUG\n        if (updatePreviewEnabled) _ = updateCoordinator.CheckNowAsync();\n#endif", mainViewModel, StringComparison.Ordinal);
         Assert.StartsWith("#if DEBUG\n", previewService, StringComparison.Ordinal);
         Assert.EndsWith("#endif\n", previewService, StringComparison.Ordinal);
         Assert.Contains("LOOMX_UPDATE_PREVIEW", previewService, StringComparison.Ordinal);
@@ -35,7 +35,7 @@ public sealed class UpdateExperienceContractTests
 
         Assert.Contains("requestApplicationExit: () => desktop.Shutdown()", app, StringComparison.Ordinal);
         Assert.Contains("confirmUpdateInstall: mainWindow.ConfirmUpdateInstallAsync", app, StringComparison.Ordinal);
-        Assert.Contains("AssistantViewModel? assistantViewModel = null,\n        Action? requestApplicationExit = null,\n        Func<Task<bool>>? confirmUpdateInstall = null,\n        Action<string>? applyTheme = null,\n        IWindowsStartupService? windowsStartupService = null)", mainViewModel, StringComparison.Ordinal);
+        Assert.Contains("AssistantViewModel? assistantViewModel = null,\n        Action? requestApplicationExit = null,\n        Func<Task<bool>>? confirmUpdateInstall = null,\n        Action<string>? applyTheme = null,\n        IWindowsStartupService? windowsStartupService = null,\n        bool autoInitializeDataStore = true,\n        bool restoreStartupIntent = true)", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("private readonly ReleaseHistoryViewModel releaseHistoryViewModel;", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("IUpdateService updateService = new UpdateService(", mainViewModel, StringComparison.Ordinal);
         Assert.Contains("new UpdateCoordinator(\n            this.dataStore,\n            updateService,", mainViewModel, StringComparison.Ordinal);

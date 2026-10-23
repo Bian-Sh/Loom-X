@@ -90,14 +90,17 @@ public sealed class GatewayProcessService : IDisposable
     /// 仅初始化网关容器中的共享服务，不监听网关端口。
     /// 小助手直连 Provider 时调用此方法，因此不受概览页网关启停状态影响。
     /// </summary>
-    public async Task EnsureHostedServicesAsync(CancellationToken cancellationToken = default)
+    public async Task EnsureHostedServicesAsync(
+        CancellationToken cancellationToken = default,
+        Action<LoomX.Plugins.Host.PluginRuntimeStartupPhase>? pluginStartupProgress = null)
     {
         await lifecycleLock.WaitAsync(cancellationToken);
         try
         {
             if (app is not null) return;
             EnsureBrowserRuntime();
-            app = await LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager, cancellationToken, toastService);
+            app = await LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager, cancellationToken, toastService, pluginStartupProgress);
+            _ = app.Services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>();
             try
             {
                 app.Services.GetRequiredService<LoomX.Assistant.AssistantPreferencesStore>().MigrateLegacyIfNeeded();
