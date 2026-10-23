@@ -20,6 +20,15 @@
 
 约束：显式刷新语义必须保留——用户编辑 Provider、配置事件到达时的重新读库是正确行为，本 change 只针对启动流程内的无驱动读取。
 
+### 根因修正（2026-10-24 实施期）
+
+实施期逐行核实调用链后，修正上文对两次重复读库的归因：
+
+1. **重复读库的真实共同来源是 `OverviewViewModel` 构造函数**（MainWindowViewModel.cs 内，构造顺序先于 ProvidersViewModel）：其构造时的 `_ = RefreshAsync()` 调用 `dataStore.RefreshAsync()`，以 `isInitialLoad: false` 走 `ConfigSnapshotService.Load()` 同步快照 + `ListProvidersAsync` + `GetSettingsAsync` 等共 6 个读入口，同时产出实测日志中的「配置快照同步读取开始」「配置数据库初始化完成」「Provider 列表数据库初始化完成」三条记录。上文把 #1 归因到 `ProvidersViewModel.RefreshCoreAsync` 的 `dataStore.InitializeAsync()` 与代码不符：`AppDataStore.InitializeAsync` 经 `initializationTask` memoize，编排器 Database 阶段完成后再次调用直接返回已完成任务，**不会重读**；因此该处只是语义不清，并非实际读库点（本次仍按 Decision 1 将其改为 `EnsureInitializedAsync` 以固定语义）。
+2. **实测日志顺序错位的原因**是 `ConfigSnapshotService.LoadAsync` 内部用 `Task.Run` 把同步 `Load()` 丢进线程池：UI 线程继续构造 `ProvidersViewModel` 并打印「Provider 页面刷新开始」，线程池稍后才打印「配置快照同步读取开始」，造成「Providers 页面触发同步读取」的假象。归因时应以日志文本的产生位置（`ConfigSnapshotService` 各方法）而非相邻时间戳为准。
+3. **预置测试缺陷备注**：并行会话预置的 `LoomX.Tests/Views/StartupShellDatabaseAccessTests.cs` 第 101 行断言 `dataStore.CreateProviderAsync`（产生 LocalSave 事件）后 Providers 页面自动出现新 Provider；而 `ProvidersViewModel.OnConfigurationChanged` 按既有约定过滤 LocalSave 事件（本机编辑保存不重建列表），语义保持的实现无法满足该断言。建议把建 Provider 移到显式刷新之前——显式刷新的 Snapshot 事件会让页面合并出一致数据，可保留「显式刷新按需读库且页面数据一致」的用例意图。
+
+
 ## Goals / Non-Goals
 
 **Goals:**
