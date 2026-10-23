@@ -60,6 +60,7 @@ public sealed class SourcePluginCompiler
         var inputsReadElapsed = Stopwatch.GetElapsedTime(inputsReadStartedAt);
         logger.LogInformation("源码插件编译开始 {PluginId} {SourceCount} {InputReadMs}", manifest.Id, inputs.Sources.Length,
             (long)inputsReadElapsed.TotalMilliseconds);
+        var referencesStartedAt = Stopwatch.GetTimestamp();
         SourcePluginReferences referenceSet;
         try { referenceSet = references(); }
         catch (Exception exception) when (exception is InvalidDataException or IOException or ArgumentException or BadImageFormatException)
@@ -67,6 +68,8 @@ public sealed class SourcePluginCompiler
             logger.LogWarning(exception, "源码插件固定引用不可用 {PluginId}", manifest.Id);
             return Failure(manifest.Id, PluginDiagnosticStage.Compile, "LX_REFERENCES_INVALID", "宿主固定编译引用缺失或摘要不匹配。");
         }
+        // 引用集惰性初始化只在每进程首次支付，用于归属编译窗口内的固定开销（tasks 1.2/2.2）。
+        var referencesMs = (long)Stopwatch.GetElapsedTime(referencesStartedAt).TotalMilliseconds;
         var key = inputs.CacheKey(referenceSet.Digest, CompilerIdentity, settings.Identity);
         var identity = SourceCacheIdentity.Create(referenceSet.Digest, CompilerIdentity, settings.Identity, inputs.InputIdentity());
         var cache = new SourcePluginCache(cacheRoot, manifest.Id, key);
@@ -79,8 +82,8 @@ public sealed class SourcePluginCompiler
             var cached = await cache.ReadAsync(authenticationKey, inputs, cancellationToken).ConfigureAwait(false);
             if (cached is { } cacheDiagnostics)
             {
-                logger.LogInformation("源码插件编译缓存命中 {PluginId} {References} {Compiler} {Options} {Inputs} {CacheKey}",
-                    manifest.Id, identity.References, identity.Compiler, identity.Options, identity.Inputs, key);
+                logger.LogInformation("源码插件编译缓存命中 {PluginId} {References} {Compiler} {Options} {Inputs} {CacheKey} {ReferencesMs}",
+                    manifest.Id, identity.References, identity.Compiler, identity.Options, identity.Inputs, key, referencesMs);
                 return new(true, cache.AssemblyPath, cache.PdbPath, key, true, cacheDiagnostics);
             }
             var cacheWarning = Directory.Exists(cache.DirectoryPath)
@@ -99,8 +102,8 @@ public sealed class SourcePluginCompiler
             cancellationToken.ThrowIfCancellationRequested();
             cache.Publish(candidate);
             candidate = null;
-            logger.LogInformation("源码插件编译完成 {PluginId} {References} {Compiler} {Options} {Inputs} {CacheKey} {DiagnosticCount}",
-                manifest.Id, identity.References, identity.Compiler, identity.Options, identity.Inputs, key, diagnostics.Length);
+            logger.LogInformation("源码插件编译完成 {PluginId} {References} {Compiler} {Options} {Inputs} {CacheKey} {DiagnosticCount} {ReferencesMs}",
+                manifest.Id, identity.References, identity.Compiler, identity.Options, identity.Inputs, key, diagnostics.Length, referencesMs);
             return new(true, cache.AssemblyPath, cache.PdbPath, key, false, cacheWarning.AddRange(diagnostics));
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException or BadImageFormatException)

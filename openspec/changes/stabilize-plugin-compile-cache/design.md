@@ -42,6 +42,39 @@
 - 并行编译会使日志交错，需要保证每个插件的诊断组仍按插件聚合输出（保持 `PluginDiagnostics` 按插件归组）。
 - CompilerIdentity 稳定化若仅用包版本号，理论上存在同版本号不同构建的极小风险；保持「包版本 + 程序集版本」双写并在诊断日志中同时输出 MVID 以便排查。
 
-## Open Questions
+## Open Questions（已于 tasks 1.3 实测关闭）
 
-- 发布期预编译种子在 `publish-desktop.ps1` 单产物校验（发布目录必须只有 LoomX.exe？不——脚本只校验 exe 数量）与现有 `FirstPartySourcePayload.targets` 布局中的落点，由实现会话结合打包脚本确认。
+### 结论：宿主重建后翻转的身份组成部分是「引用集摘要」（tasks 1.3 实测，2026-10-24）
+
+连续构建 + 运行验证（Release、同一缓存根、插件源码不变）：
+
+| 运行 | 条件 | 结果 |
+|---|---|---|
+| A | 宿主构建 #1 首次启动 | 两插件编译并封存身份（references=571CB298BD6E9AFA，compiler=8CA98715BC80AC35） |
+| B | 同一二进制再次启动 | 两插件缓存命中，身份逐项一致 |
+| C | 契约程序集加入探针成员后重建、启动 | 两插件未命中，身份对比 Flipped=**references**（571CB298BD6E9AFA→61DD458A1C9AB897），compiler/options/inputs 全部不变 |
+| D | 还原契约源码重建、启动 | 两插件直接命中原代际（references 回到 571CB298BD6E9AFA），无编译耗时 |
+
+- **翻转项 = 引用集摘要**，驱动字节是发布期内嵌的 `LoomX.Plugin.Abstractions.dll`：契约程序集源码迭代 → 引用字节变化 → 全部源码插件缓存失效。纯宿主应用代码迭代不改契约字节时，缓存身份稳定（运行 B/D 证实）。
+- **编译器身份在同一 SDK（net10.0/10.0.9）+ Microsoft.CodeAnalysis.CSharp 5.3.0 下跨构建稳定**：NuGet 预编译程序集的 MVID 不随宿主重建变化，只有升级 Roslyn 包版本才翻转。CompilerIdentity 稳定化（tasks 3.3）仅用于消除「同包版本不同构建」的理论风险，可按 Decision 2 的并行小改落地。
+- 编译选项与插件输入不随宿主构建变化。
+- **预编译种子（Decision 2）落点确认**：种子必须在发布期用与宿主随附完全相同的引用集与 Roslyn 程序集（同一次构建/restore 产物）离线编译；运行期身份与发布期不一致时，缓存键不同 → 种子目录名不匹配 → 按现有键语义自然回落运行时编译，无需独立开关。
+
+### 结论：前置 3.1s 的归属（tasks 1.2 插桩后 warm 实测）
+
+| 环节 | warm 实测（四次启动） |
+|---|---|
+| EnsureBrowserRuntime | 18–25ms |
+| LoomXHost.CreateAsync | 143–252ms（DB init 68–76ms + reload 19–20ms + 容器构建 10–24ms） |
+| PluginCatalog.Discover | 15–17ms |
+| 每插件包验证（含首次输入读取） | 155–258ms（12 源文件插件）/ 14–18ms（22 源文件插件） |
+| SourcePluginInputs.ReadAsync（编译内重读） | 6–11ms |
+| 合计「Database 完成 → 首个编译开始」 | **约 0.4–0.6s** |
+
+20261024 发布日志中 Database 完成 → 首个编译开始的 3.1s 是**冷启动成本（JIT/磁盘/杀软扫描）叠加在同一结构链路上**，warm 重启不支付，不属于固定结构开销。
+
+### 结论：2.2 可压缩项取舍
+
+- **保留**：包验证（含源码输入首读，约 0.2s）与清单漂移检查必须紧邻各自加载回合执行——`PluginRuntimeReviewRegressionTests` 的快照语义测试证明把验证提前到并行阶段会破坏「能力协商、入口与注册使用同一份已验证清单」的既有防御，不压缩。
+- **计量而非前移**：引用集惰性初始化（169 个内嵌 DLL 哈希 + MetadataReference 构建）无法移出首个编译的关键路径（编译必须使用同一引用集，提前物化与其他工作重叠收益 ≤20ms）；已在编译事件中输出 `ReferencesMs` 供发布版实测归属。
+- **结论**：warm 前置链路（浏览器运行时 18–25ms、容器构建 143–252ms、发现 15–17ms）均为必要且量级小；冷启动 3.1s 不可由本 change 结构性消除，由日志留证。

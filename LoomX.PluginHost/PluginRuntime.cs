@@ -35,6 +35,12 @@ public sealed class PluginRuntimeOptions
 
     /// <summary>初始禁用的 Entry（"pluginId/extensionId"）。</summary>
     public ISet<string> DisabledEntries { get; init; } = new HashSet<string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// 启动期插件准备（验证 + 源码编译）的并行度；0（默认）= min(处理器核数, 4)，1 = 串行。
+    /// 只影响执行调度，不改变诊断与加载的确定性顺序。
+    /// </summary>
+    internal int CompileParallelism { get; init; }
 }
 
 /// <summary>已加载插件的安全摘要（用于日志与诊断，不含任何敏感值）。</summary>
@@ -384,11 +390,15 @@ public sealed partial class PluginRuntime
             (long)System.Diagnostics.Stopwatch.GetElapsedTime(discoverStartedAt).TotalMilliseconds);
         if (discovered.Count > 0)
             options.StartupProgress?.Invoke(PluginRuntimeStartupPhase.Loading);
+        // 仅并行化源码编译（相互独立且无副作用）；验证与清单漂移检查必须紧邻各自加载回合执行，
+        // 保证「能力协商、入口与注册使用同一份已验证清单」的既有防御语义不变。
+        var (compilations, compilationErrors) = CompileSourcePlugins(discovered, options);
         foreach (var package in discovered)
         {
             try
             {
-                LoadPlugin(package, options);
+                compilationErrors.TryGetValue(package.Manifest.Id, out var compilationError);
+                LoadPlugin(package, options, compilation: compilations.GetValueOrDefault(package.Manifest.Id), compilationError: compilationError);
             }
             catch (Exception exception)
             {
@@ -399,7 +409,38 @@ public sealed partial class PluginRuntime
         }
     }
 
-    private LoadedPlugin? LoadPlugin(DiscoveredPlugin package, PluginRuntimeOptions options, bool candidateOnly = false)
+    /// <summary>
+    /// 并行编译上限：源码插件相互独立（编译只读包内输入、只写自身缓存代际），
+    /// 并行度随处理器核数但封顶 <see cref="MaxCompileParallelism"/>；诊断仍由各插件加载回合按发现顺序插入，
+    /// 加载与 Pipeline 顺序保持既有确定性。
+    /// </summary>
+    internal const int MaxCompileParallelism = 4;
+
+    private (IReadOnlyDictionary<string, SourcePluginCompilationResult> Results, IReadOnlyDictionary<string, Exception> Errors)
+        CompileSourcePlugins(IReadOnlyList<DiscoveredPlugin> discovered, PluginRuntimeOptions options)
+    {
+        var sourcePackages = discovered.Where(item => item.Manifest.Runtime?.Kind == "csharp-source").ToArray();
+        if (sourcePackages.Length == 0) return (new Dictionary<string, SourcePluginCompilationResult>(), new Dictionary<string, Exception>());
+        var maxParallelism = options.CompileParallelism > 0
+            ? options.CompileParallelism
+            : Math.Clamp(Environment.ProcessorCount, 1, MaxCompileParallelism);
+        var compiler = options.SourceCompiler ?? new SourcePluginCompiler();
+        var results = new System.Collections.Concurrent.ConcurrentDictionary<string, SourcePluginCompilationResult>();
+        var errors = new System.Collections.Concurrent.ConcurrentDictionary<string, Exception>();
+        var compileStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
+        Parallel.ForEachAsync(sourcePackages, new ParallelOptions { MaxDegreeOfParallelism = maxParallelism },
+            async (package, token) =>
+            {
+                try { results[package.Manifest.Id] = await compiler.CompileAsync(package.Directory, package.Manifest, token).ConfigureAwait(false); }
+                catch (Exception exception) { errors[package.Manifest.Id] = exception; }
+            }).ConfigureAwait(false).GetAwaiter().GetResult();
+        logger.LogInformation("源码插件并行编译完成 {PluginCount} {MaxParallelism} {ElapsedMs}", sourcePackages.Length, maxParallelism,
+            (long)System.Diagnostics.Stopwatch.GetElapsedTime(compileStartedAt).TotalMilliseconds);
+        return (results, errors);
+    }
+
+    private LoadedPlugin? LoadPlugin(DiscoveredPlugin package, PluginRuntimeOptions options, bool candidateOnly = false,
+        SourcePluginCompilationResult? compilation = null, Exception? compilationError = null)
     {
         var loadStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         var targetRegistry = candidateOnly ? new PipelineRegistry() : registry;
@@ -434,7 +475,10 @@ public sealed partial class PluginRuntime
         string assemblyPath;
         if (manifest.Runtime?.Kind == "csharp-source")
         {
-            var result = (options.SourceCompiler ?? new SourcePluginCompiler())
+            // 启动期使用并行预编译结果；失败异常在加载回合重抛，与串行路径的降级行为一致。
+            // 候选重载等未预热路径仍在加载回合内串行编译。
+            if (compilationError is { } failure) throw failure;
+            var result = compilation ?? (options.SourceCompiler ?? new SourcePluginCompiler())
                 .CompileAsync(package.Directory, manifest).ConfigureAwait(false).GetAwaiter().GetResult();
             lock (diagnosticsGate) structuredDiagnostics.AddRange(result.Diagnostics);
             if (!result.Success || result.AssemblyPath is null) return null;
