@@ -110,7 +110,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
             providerTestLogger: this.loggerFactory.CreateLogger<ProviderTestService>());
         gatewayViewModel = new GatewayViewModel(this.dataStore, this.toastService);
         activityViewModel = new ActivityViewModel(this.dataStore, this.loggerFactory.CreateLogger<ActivityViewModel>());
-        this.assistantViewModel = assistantViewModel ?? new AssistantViewModel(gatewayService, this.loggerFactory, this.toastService);
+        this.assistantViewModel = assistantViewModel ?? new AssistantViewModel(gatewayService, this.loggerFactory, this.toastService, dataStore: this.dataStore);
         IUpdateService updateService = new UpdateService(
             logger: this.loggerFactory.CreateLogger<UpdateService>(),
             currentVersion: AppVersion.Current);
@@ -390,6 +390,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     private OverviewEndpointViewModel? selectedEndpoint;
     private bool gatewayToggleInProgress;
     private bool refreshInProgress;
+    private Task? startupSnapshotTask;
     private readonly Dictionary<string, RequestTelemetryEvent> activeRequests = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> activeEdgeCounts = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HashSet<string>> requestEdges = new(StringComparer.Ordinal);
@@ -434,8 +435,11 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;
         // 启动首刷只确保数据中心完成一次初始化并应用内存快照，不触发配置库全量重读（desktop-startup-splash「主界面初始化不读库」）。
-        _ = ApplyStartupSnapshotAsync();
+        startupSnapshotTask = ApplyStartupSnapshotAsync();
     }
+
+    /// <summary>启动构造期触发的概览首刷任务，供启动链路测试等待快照应用完成。</summary>
+    internal Task? StartupSnapshotTask => startupSnapshotTask;
 
     public OverviewViewModel(GatewayProcessService gatewayService, ConfigSnapshotService configService, ILogger<MainWindowViewModel>? logger = null)
         : this(gatewayService, new AppDataStore(configService, gatewayService), logger) { }
@@ -568,6 +572,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
     /// <summary>
     /// 启动首刷：仅确保数据中心完成一次初始化，然后直接应用内存快照（统计与拓扑），
     /// 不走 <see cref="RefreshAsync"/> 的配置库全量重读。显式刷新与配置变更事件仍按需读库。
+    /// 最近请求回填独立触发不纳入启动快照应用：它只消费活动库且无需阻塞快照应用完成。
     /// </summary>
     private async Task ApplyStartupSnapshotAsync()
     {
@@ -577,7 +582,7 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         {
             await dataStore.EnsureInitializedAsync();
             ApplyConfigSnapshot();
-            await RefreshRecentRequestsAsync();
+            _ = RefreshRecentRequestsAsync();
             logger?.LogInformation("概览启动快照应用完成 {ProviderCount} 个 Provider、{ModelCount} 个模型、{EndpointCount} 个 Endpoint，网关状态 {GatewayState}", ProviderCount, ModelCount, Endpoints.Count, gatewayService.State);
         }
         catch (Exception exception)
@@ -948,6 +953,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
     private readonly object refreshSync = new();
     private bool refreshRequested;
     private Task? refreshTask;
+    private Task? startupRefreshTask;
     private int lastIncompleteHeaderWarningCount;
     public ObservableCollection<ProviderEditorViewModel> Providers { get; } = [];
     public ProviderTestPanelViewModel TestPanel => testPanel;
@@ -1123,7 +1129,7 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         Providers.CollectionChanged += ProvidersChanged;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;
-        RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(parameter => DeleteModelAsync(parameter as ModelEditorViewModel)); ToggleAllModelsCommand = new AsyncCommand(ToggleAllModelsAsync); VerifyAllProvidersCommand = new AsyncCommand(VerifyAllProvidersAsync, () => IsProviderHealthIdle); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); _ = RefreshAsync();
+        RefreshCommand = new AsyncCommand(RefreshAsync); NewProviderCommand = new DelegateCommand(NewProvider); SaveProviderCommand = new AsyncCommand(SaveProviderAsync); DeleteProviderCommand = new AsyncCommand(parameter => DeleteProviderAsync(parameter as ProviderEditorViewModel)); NewModelCommand = new DelegateCommand(NewModel); SaveModelCommand = new AsyncCommand(SaveModelAsync); DeleteModelCommand = new AsyncCommand(parameter => DeleteModelAsync(parameter as ModelEditorViewModel)); ToggleAllModelsCommand = new AsyncCommand(ToggleAllModelsAsync); VerifyAllProvidersCommand = new AsyncCommand(VerifyAllProvidersAsync, () => IsProviderHealthIdle); SyncModelsCommand = new AsyncCommand(SyncModelsAsync); startupRefreshTask = RefreshAsync();
     }
 
     public ProvidersViewModel(ConfigSnapshotService configService, ToastService? toastService = null, ILogger<ProvidersViewModel>? logger = null, IStringLocalizer<ProvidersViewModel>? localizer = null)
@@ -1152,6 +1158,9 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
             foreach (var model in provider.Models) model.RefreshLocalization();
         }
     }
+
+    /// <summary>启动构造期触发的首次刷新任务，供启动链路测试等待合并完成。</summary>
+    internal Task? StartupRefreshTask => startupRefreshTask;
 
     private Task RefreshAsync()
     {

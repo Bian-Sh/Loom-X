@@ -29,6 +29,12 @@
 3. **预置测试缺陷备注**：并行会话预置的 `LoomX.Tests/Views/StartupShellDatabaseAccessTests.cs` 第 101 行断言 `dataStore.CreateProviderAsync`（产生 LocalSave 事件）后 Providers 页面自动出现新 Provider；而 `ProvidersViewModel.OnConfigurationChanged` 按既有约定过滤 LocalSave 事件（本机编辑保存不重建列表），语义保持的实现无法满足该断言。建议把建 Provider 移到显式刷新之前——显式刷新的 Snapshot 事件会让页面合并出一致数据，可保留「显式刷新按需读库且页面数据一致」的用例意图。
 
 
+### 测试基建备注（2026-10-24 实施期续）
+
+4. **无头测试与 Avalonia Dispatcher**：桌面 VM 构造链中存在多处 `Dispatcher.UIThread.InvokeAsync(...).GetAwaiter().GetResult()` 阻塞调度（如 `ReleaseNotesContentViewModel.RunOnUiThread`、`UpdateCoordinator.DispatchToUiThread`）。在已初始化 Avalonia 但无消息泵的测试环境里，这些调用必然死锁；未初始化 Avalonia 时 `NullDispatcherImpl.CurrentThreadIsLoopThread` 恒为 true，全部调度内联执行，反而安全。因此启动链路测试不在测试线程初始化 Avalonia、在无同步上下文的工作线程（`Task.Run` + 阻塞汇合）上执行，且不构造 `MainWindowViewModel` 外壳（导航图标 `Geometry.Parse` 依赖平台渲染接口）；改为按 MainWindowViewModel 构造顺序构造全部 Shell 阶段页面 VM。若未来需要构造主窗口外壳，应引入 Avalonia.Headless 测试基建。
+5. **启动首刷任务可等待**：`OverviewViewModel.ApplyStartupSnapshotAsync` 把最近请求回填（只消费活动库）改为独立触发、不纳入快照应用任务，配合 `StartupSnapshotTask`/`StartupRefreshTask` 内部观测点，使「页面数据与启动快照一致」的断言可以确定性等待；显式刷新 `RefreshAsync` 仍等待回填完成，行为不变。
+
+
 ## Goals / Non-Goals
 
 **Goals:**
