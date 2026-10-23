@@ -98,9 +98,20 @@ public sealed class GatewayProcessService : IDisposable
         try
         {
             if (app is not null) return;
+            var startupStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
             EnsureBrowserRuntime();
+            var browserRuntimeMs = (long)System.Diagnostics.Stopwatch.GetElapsedTime(startupStartedAt).TotalMilliseconds;
+            var hostCreateStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
             app = await LoomXHost.CreateAsync(browserBridge, browserBridgeLeaseManager, cancellationToken, toastService, pluginStartupProgress);
+            var hostCreateMs = (long)System.Diagnostics.Stopwatch.GetElapsedTime(hostCreateStartedAt).TotalMilliseconds;
+            var pluginRuntimeStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
             _ = app.Services.GetRequiredService<LoomX.Plugins.Host.PluginRuntime>();
+            var pluginRuntimeMs = (long)System.Diagnostics.Stopwatch.GetElapsedTime(pluginRuntimeStartedAt).TotalMilliseconds;
+            // 归属「Database 阶段完成 → 首个编译」之间的前置开销（tasks 1.2）；容器未建时无法提前取日志器，这里统一汇总。
+            app.Services.GetRequiredService<ILogger<GatewayProcessService>>().LogInformation(
+                "宿主服务初始化完成 {BrowserRuntimeMs} {HostCreateMs} {PluginRuntimeMs} {TotalMs}",
+                browserRuntimeMs, hostCreateMs, pluginRuntimeMs,
+                (long)System.Diagnostics.Stopwatch.GetElapsedTime(startupStartedAt).TotalMilliseconds);
             try
             {
                 app.Services.GetRequiredService<LoomX.Assistant.AssistantPreferencesStore>().MigrateLegacyIfNeeded();

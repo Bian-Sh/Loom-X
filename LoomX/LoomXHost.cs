@@ -33,6 +33,7 @@ public static class LoomXHost
         AppDataPaths.EnsureCreated();
 
         LoggingBootstrap.Configure();
+        var createStartedAt = Stopwatch.GetTimestamp();
         var databasePath = AppDataPaths.DatabasePath;
         var builder = WebApplication.CreateBuilder(Array.Empty<string>());
         builder.Host.UseSerilog();
@@ -42,9 +43,14 @@ public static class LoomXHost
 
         var dbOptions = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite(CreateConnectionString(databasePath)).Options;
         var startupDb = new ConfigurationDbContext(dbOptions);
+        var databaseInitializeStartedAt = Stopwatch.GetTimestamp();
         await ConfigurationDatabase.InitializeAsync(startupDb, cancellationToken);
+        var databaseInitializeMs = ElapsedMilliseconds(Stopwatch.GetElapsedTime(databaseInitializeStartedAt));
+        var configurationReloadStartedAt = Stopwatch.GetTimestamp();
         var startupConfiguration = new DatabaseConfigurationProvider(startupDb);
         await startupConfiguration.ReloadAsync(cancellationToken);
+        var configurationReloadMs = ElapsedMilliseconds(Stopwatch.GetElapsedTime(configurationReloadStartedAt));
+        var containerBuildStartedAt = Stopwatch.GetTimestamp();
         LoggingBootstrap.SetIncludeStackTrace(startupConfiguration.Current.Settings.LogStackTrace);
         builder.WebHost.UseUrls(startupConfiguration.Current.Server.Urls.ToArray());
 
@@ -176,11 +182,19 @@ public static class LoomXHost
             services.GetRequiredService<Assistant.Browser.BrowserBridgeLeaseManager>()));
 
         var app = builder.Build();
+        var containerBuildMs = ElapsedMilliseconds(Stopwatch.GetElapsedTime(containerBuildStartedAt));
         app.Lifetime.ApplicationStopped.Register(startupDb.Dispose);
         app.UseMiddleware<ActivityMiddleware>();
         MapEndpoints(app);
+        // 归属「Database 阶段完成 → 插件编译」之间宿主容器构建的前置开销（tasks 1.2）。
+        app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup").LogInformation(
+            "宿主容器构建完成 {DatabaseInitializeMs} {ConfigurationReloadMs} {ContainerBuildMs} {TotalMs}",
+            databaseInitializeMs, configurationReloadMs, containerBuildMs,
+            ElapsedMilliseconds(Stopwatch.GetElapsedTime(createStartedAt)));
         return app;
     }
+
+    private static long ElapsedMilliseconds(TimeSpan elapsed) => (long)elapsed.TotalMilliseconds;
 
     private static string CreateConnectionString(string databasePath) => new SqliteConnectionStringBuilder
     {

@@ -378,7 +378,10 @@ public sealed partial class PluginRuntime
     }
     private void DiscoverAndLoad(PluginRuntimeOptions options)
     {
+        var discoverStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         var discovered = PluginCatalog.Discover(options.PluginDirectory, diagnostics);
+        logger.LogInformation("插件发现完成 {PluginCount} {ElapsedMs}", discovered.Count,
+            (long)System.Diagnostics.Stopwatch.GetElapsedTime(discoverStartedAt).TotalMilliseconds);
         if (discovered.Count > 0)
             options.StartupProgress?.Invoke(PluginRuntimeStartupPhase.Loading);
         foreach (var package in discovered)
@@ -398,6 +401,7 @@ public sealed partial class PluginRuntime
 
     private LoadedPlugin? LoadPlugin(DiscoveredPlugin package, PluginRuntimeOptions options, bool candidateOnly = false)
     {
+        var loadStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         var targetRegistry = candidateOnly ? new PipelineRegistry() : registry;
         var manifest = package.Manifest;
         var capabilityErrors = PluginCapabilityCatalog.Validate(manifest.Id, manifest.HostCapabilities);
@@ -412,7 +416,9 @@ public sealed partial class PluginRuntime
             return null;
         }
 
+        var validationStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
         var validation = PluginPackageValidation.ValidateAsync(package.Directory).ConfigureAwait(false).GetAwaiter().GetResult();
+        var validationMs = (long)System.Diagnostics.Stopwatch.GetElapsedTime(validationStartedAt).TotalMilliseconds;
         if (!validation.Success)
         {
             lock (diagnosticsGate) structuredDiagnostics.AddRange(validation.Diagnostics);
@@ -542,6 +548,9 @@ public sealed partial class PluginRuntime
             }
             if (!candidateOnly) plugins.Add(plugin);
             accepted = true;
+            if (!candidateOnly)
+                logger.LogInformation("插件加载完成 {PluginId} {ValidationMs} {ElapsedMs}", manifest.Id, validationMs,
+                    (long)System.Diagnostics.Stopwatch.GetElapsedTime(loadStartedAt).TotalMilliseconds);
             return plugin;
         }
         catch (Exception exception)
