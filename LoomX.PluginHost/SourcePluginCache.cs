@@ -184,6 +184,34 @@ internal sealed class SourcePluginCache(string root, string pluginId, string key
         Directory.Move(candidate, DirectoryPath);
     }
 
+    /// <summary>
+    /// 把已通过 <see cref="ReadAsync"/> 完整验证的种子代际复制进候选，并以用户认证密钥重签发布（tasks 3.1）。
+    /// 只复制程序集与 PDB（清单与本地化由 <see cref="SealAsync"/> 用验证过的输入重写）；
+    /// 任何失败清理候选并返回 false，由调用方回退运行时编译。
+    /// </summary>
+    internal async Task<bool> TryAdoptAsync(SourcePluginCache seed, SourcePluginInputs inputs, ImmutableArray<PluginDiagnostic> diagnostics,
+        byte[] authenticationKey, IReadOnlyDictionary<string, string> identityComponents, CancellationToken token)
+    {
+        var candidate = CreateCandidate();
+        try
+        {
+            foreach (var relative in new[] { AssemblyRelative, PdbRelative })
+            {
+                var bytes = await SourcePluginPaths.ReadAsync(seed.DirectoryPath, relative, token).ConfigureAwait(false);
+                await File.WriteAllBytesAsync(SourcePluginPaths.Resolve(candidate, relative), bytes, token).ConfigureAwait(false);
+            }
+            await SealAsync(candidate, inputs, diagnostics, authenticationKey, identityComponents, token).ConfigureAwait(false);
+            Publish(candidate);
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            try { CleanupCandidate(candidate); }
+            catch (Exception cleanup) when (cleanup is InvalidDataException or IOException or UnauthorizedAccessException) { }
+            return false;
+        }
+    }
+
     internal void CleanupCandidate(string candidate)
     {
         var absolute = Path.GetFullPath(candidate);

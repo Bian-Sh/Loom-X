@@ -88,4 +88,14 @@
           DestinationFiles="@(_CompressionPluginPayload->'$(PublishDir)plugins\loomx.tool-result-compression\%(PackageRelativePath)')"
           SkipUnchangedFiles="true" />
   </Target>
+  <!-- 预编译种子（openspec: stabilize-plugin-compile-cache tasks 3.1）：发布期用与运行期相同的编译输入
+       离线编译第一方源码插件，产物写入发布目录 plugin-cache-seed\；运行期按缓存键寻址并复用既有认证验证，
+       身份不一致或产物损坏时回退运行时编译。种子工具以 MSBuild Task 显式构建并在本机运行，
+       不作为 ProjectReference 传递，避免其输出被发布进宿主目录（发布目录必须只含 LoomX.exe）。 -->
+  <Target Name="SeedFirstPartySourcePlugins" AfterTargets="CopyFirstPartyPluginsToPublish">
+    <MSBuild Projects="..\LoomX.PluginSeedTool\LoomX.PluginSeedTool.csproj"
+             Targets="Build"
+             Properties="Configuration=$(Configuration);RuntimeIdentifier=;SelfContained=false" />
+    <Exec Command="dotnet &quot;$(MSBuildThisFileDirectory)..\LoomX.PluginSeedTool\bin\$(Configuration)\net10.0\LoomX.PluginSeedTool.dll&quot; &quot;$(PublishDir)&quot;" LogStandardErrorAsError="true" />
+  </Target>
 </Project>

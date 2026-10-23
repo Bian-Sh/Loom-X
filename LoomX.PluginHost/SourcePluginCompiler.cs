@@ -22,7 +22,10 @@ public sealed record SourcePluginCompilationResult(
 public sealed class SourcePluginCompiler
 {
     internal const string SafeCompileMessage = "源码编译诊断，请检查标记位置。";
+    /// <summary>宿主安装镜像内的预编译种子根（tasks 3.1）；密钥文件与代际布局由发布期工具写入。</summary>
+    internal const string SeedKeyRelative = ".cache..seed-key";
     private readonly string cacheRoot;
+    private readonly string? seedRoot;
     private readonly ILogger<SourcePluginCompiler> logger;
     private readonly Func<SourcePluginReferences> references;
     private readonly SourcePluginCompilerSettings settings;
@@ -30,14 +33,15 @@ public sealed class SourcePluginCompiler
     public SourcePluginCompiler(string? cacheRoot = null)
         : this(cacheRoot, NullLogger<SourcePluginCompiler>.Instance) { }
 
-    public SourcePluginCompiler(string? cacheRoot, ILogger<SourcePluginCompiler> logger)
-        : this(cacheRoot, logger, () => SourcePluginReferences.Bundled.Value, new()) { }
+    public SourcePluginCompiler(string? cacheRoot, ILogger<SourcePluginCompiler> logger, string? seedRoot = null)
+        : this(cacheRoot, logger, () => SourcePluginReferences.Bundled.Value, new(), seedRoot) { }
 
     internal SourcePluginCompiler(string? cacheRoot, ILogger<SourcePluginCompiler> logger,
-        Func<SourcePluginReferences> references, SourcePluginCompilerSettings settings)
+        Func<SourcePluginReferences> references, SourcePluginCompilerSettings settings, string? seedRoot = null)
     {
         this.cacheRoot = cacheRoot ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "LoomX", "plugin-cache", "source");
+        this.seedRoot = seedRoot;
         this.logger = logger;
         this.references = references;
         this.settings = settings;
@@ -91,6 +95,10 @@ public sealed class SourcePluginCompiler
                     "LX_CACHE_INVALID", "编译缓存不完整或认证失败，已重新编译。")) : [];
             if (cacheWarning.Length > 0) logger.LogWarning("源码插件缓存认证失败，重新编译 {PluginId} {CacheKey}", manifest.Id, key);
             await LogMissIdentityAsync(cache, authenticationKey, identity, manifest.Id, key, cancellationToken).ConfigureAwait(false);
+            // 预编译种子（tasks 3.1/3.2）：宿主随附、按缓存键寻址并经种子密钥认证的代际，验证后复制进用户缓存重签发布；
+            // 身份不一致（键不同→种子目录不存在）、产物损坏或种子缺失时保持返回 null，行为与无种子一致。
+            var seeded = await AdoptSeedAsync(cache, inputs, authenticationKey, identity, manifest.Id, key, cancellationToken).ConfigureAwait(false);
+            if (seeded is { } adopted) return adopted;
             candidate = cache.CreateCandidate();
             var (success, diagnostics) = await EmitAsync(candidate, cache, inputs, manifest.Id, referenceSet, cancellationToken).ConfigureAwait(false);
             if (!success)
@@ -124,9 +132,19 @@ public sealed class SourcePluginCompiler
         }
     }
 
+    /// <summary>
+    /// 缓存键内的编译器身份：程序集全名 + 程序集版本（tasks 3.3 稳定化）。
+    /// NuGet 预编译程序集的版本不随宿主重建变化，消除「同包版本不同构建 MVID」的理论翻转；
+    /// MVID 只进入 <see cref="CompilerIdentityDetail"/> 诊断输出，用于排查该极小概率场景。
+    /// </summary>
     internal static string CompilerIdentity => typeof(CSharpCompilation).Assembly.FullName + "|"
+        + typeof(CSharpCompilation).Assembly.GetName().Version + "|"
+        + typeof(Compilation).Assembly.FullName + "|" + typeof(Compilation).Assembly.GetName().Version;
+
+    /// <summary>诊断用完整编译器身份，含两个 Roslyn 组件的 MVID；不参与缓存键。</summary>
+    internal static string CompilerIdentityDetail => CompilerIdentity + "|mvid="
         + typeof(CSharpCompilation).Assembly.ManifestModule.ModuleVersionId + "|"
-        + typeof(Compilation).Assembly.FullName + "|" + typeof(Compilation).Assembly.ManifestModule.ModuleVersionId;
+        + typeof(Compilation).Assembly.ManifestModule.ModuleVersionId;
 
     /// <summary>未命中时与最近已认证代际的身份组成对比，指出翻转项；对比失败或无记录时输出当前身份供排查。</summary>
     private async Task LogMissIdentityAsync(SourcePluginCache cache, byte[] authenticationKey, SourceCacheIdentity identity,
@@ -135,22 +153,98 @@ public sealed class SourcePluginCompiler
         var stored = await cache.TryReadLastSealedIdentityAsync(cacheKey, authenticationKey, token).ConfigureAwait(false);
         if (stored is null)
         {
-            logger.LogInformation("源码插件缓存未命中，无既有身份记录 {PluginId} {References} {Compiler} {Options} {Inputs} {CacheKey}",
-                pluginId, identity.References, identity.Compiler, identity.Options, identity.Inputs, cacheKey);
+            logger.LogInformation("源码插件缓存未命中，无既有身份记录 {PluginId} {References} {Compiler} {Options} {Inputs} {CompilerDetail} {CacheKey}",
+                pluginId, identity.References, identity.Compiler, identity.Options, identity.Inputs, CompilerIdentityDetail, cacheKey);
             return;
         }
         var flipped = SourceCacheIdentity.Components
             .Where(component => !stored.TryGetValue(component, out var value) || !string.Equals(value, identity.Component(component), StringComparison.Ordinal))
             .ToArray();
         logger.LogInformation(
-            "源码插件缓存未命中，身份对比 {PluginId} {Flipped} {References} {Compiler} {Options} {Inputs} {StoredReferences} {StoredCompiler} {StoredOptions} {StoredInputs} {CacheKey}",
+            "源码插件缓存未命中，身份对比 {PluginId} {Flipped} {References} {Compiler} {Options} {Inputs} {StoredReferences} {StoredCompiler} {StoredOptions} {StoredInputs} {CompilerDetail} {CacheKey}",
             pluginId, flipped.Length == 0 ? "无" : string.Join(",", flipped),
             identity.References, identity.Compiler, identity.Options, identity.Inputs,
             stored.TryGetValue("references", out var storedReferences) ? storedReferences : "未知",
             stored.TryGetValue("compiler", out var storedCompiler) ? storedCompiler : "未知",
             stored.TryGetValue("options", out var storedOptions) ? storedOptions : "未知",
             stored.TryGetValue("inputs", out var storedInputs) ? storedInputs : "未知",
-            cacheKey);
+            CompilerIdentityDetail, cacheKey);
+    }
+
+    /// <summary>
+    /// 尝试采用宿主随附的预编译种子（tasks 3.1/3.2）。种子按缓存键寻址：运行期计算的键与发布期一致才会命中，
+    /// 身份不一致自然回落运行时编译；种子验证复用 <see cref="SourcePluginCache.ReadAsync"/> 的完整完整性与认证检查；
+    /// 采用是把已验证产物复制进用户缓存并以用户认证密钥重签发布，运行时加载路径保持只有用户缓存一条。
+    /// 任何失败都返回 null，行为与未提供种子一致。
+    /// </summary>
+    private async Task<SourcePluginCompilationResult?> AdoptSeedAsync(SourcePluginCache cache, SourcePluginInputs inputs,
+        byte[] authenticationKey, SourceCacheIdentity identity, string pluginId, string cacheKey, CancellationToken token)
+    {
+        if (seedRoot is null) return null;
+        try
+        {
+            var seedCache = new SourcePluginCache(seedRoot, pluginId, cacheKey);
+            var seedKey = await SourcePluginPaths.ReadAsync(seedRoot, SeedKeyRelative, token).ConfigureAwait(false);
+            var seedDiagnostics = await seedCache.ReadAsync(seedKey, inputs, token).ConfigureAwait(false);
+            if (seedDiagnostics is not { } diagnostics)
+            {
+                logger.LogInformation("源码插件预编译种子未命中或验证失败，回退运行时编译 {PluginId} {CacheKey}", pluginId, cacheKey);
+                return null;
+            }
+            if (!await cache.TryAdoptAsync(seedCache, inputs, diagnostics, authenticationKey, identity.ToComponents(), token).ConfigureAwait(false))
+            {
+                logger.LogWarning("源码插件预编译种子采用失败，回退运行时编译 {PluginId} {CacheKey}", pluginId, cacheKey);
+                return null;
+            }
+            logger.LogInformation("源码插件编译缓存种子命中 {PluginId} {References} {Compiler} {Options} {Inputs} {CacheKey}",
+                pluginId, identity.References, identity.Compiler, identity.Options, identity.Inputs, cacheKey);
+            return new(true, cache.AssemblyPath, cache.PdbPath, cacheKey, true, diagnostics);
+        }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            logger.LogWarning("源码插件预编译种子读取失败，回退运行时编译 {PluginId} {ErrorType}", pluginId, exception.GetType().Name);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 发布期离线编译（tasks 3.1）：与运行期完全相同的输入与编译流程，产物与完整性元数据写入种子根，
+    /// 用发布期种子密钥签名；运行期命中要求键一致并复用同一套认证验证，不引入任何绕过身份校验的加载路径。
+    /// </summary>
+    internal async Task<bool> TrySeedAsync(string packageDirectory, PluginManifest manifest, byte[] seedKey, CancellationToken token)
+    {
+        try
+        {
+            var inputs = await SourcePluginInputs.ReadAsync(packageDirectory, manifest, token).ConfigureAwait(false);
+            var referenceSet = references();
+            var key = inputs.CacheKey(referenceSet.Digest, CompilerIdentity, settings.Identity);
+            var identity = SourceCacheIdentity.Create(referenceSet.Digest, CompilerIdentity, settings.Identity, inputs.InputIdentity());
+            var cache = new SourcePluginCache(cacheRoot, manifest.Id, key);
+            var candidate = cache.CreateCandidate();
+            try
+            {
+                var (success, diagnostics) = await EmitAsync(candidate, cache, inputs, manifest.Id, referenceSet, token).ConfigureAwait(false);
+                if (!success)
+                {
+                    logger.LogWarning("源码插件预编译种子生成失败：编译诊断 {PluginId} {DiagnosticCount}", manifest.Id, diagnostics.Length);
+                    return false;
+                }
+                await cache.SealAsync(candidate, inputs, diagnostics, seedKey, identity.ToComponents(), token).ConfigureAwait(false);
+                cache.Publish(candidate);
+                return true;
+            }
+            catch
+            {
+                cache.CleanupCandidate(candidate);
+                throw;
+            }
+        }
+        catch (Exception exception) when (exception is SourcePluginInputException or InvalidDataException or IOException
+            or UnauthorizedAccessException or ArgumentException or BadImageFormatException)
+        {
+            logger.LogWarning(exception, "源码插件预编译种子生成失败 {PluginId} {ErrorType}", manifest.Id, exception.GetType().Name);
+            return false;
+        }
     }
 
     private async Task<(bool Success, ImmutableArray<PluginDiagnostic> Diagnostics)> EmitAsync(

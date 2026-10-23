@@ -165,7 +165,7 @@ public sealed class SourceCacheIdentityDiagnosticsTests
     private static string MetadataPath(SourcePluginTestPackage package, string cacheKey) =>
         Path.Combine(package.CacheRoot, "demo", cacheKey, "cache.json");
 
-    private static Dictionary<string, byte[]> TamperedContractResources()
+    internal static Dictionary<string, byte[]> TamperedContractResources()
     {
         var resources = SourcePluginCompilerTests.ReferenceResources();
         var contractName = SourcePluginReferences.Prefix + "LoomX.Plugin.Abstractions.dll";
@@ -184,6 +184,8 @@ public sealed class SourceCacheIdentityDiagnosticsTests
 internal sealed class IdentityCaptureLogger : ILogger<SourcePluginCompiler>
 {
     private readonly List<(string Message, Dictionary<string, object?> State)> entries = [];
+
+    internal IEnumerable<string> Messages => entries.Select(item => item.Message);
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
     public bool IsEnabled(LogLevel level) => true;

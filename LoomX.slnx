@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="LoomX.Tests/LoomX.Tests.csproj" />
   <Project Path="LoomX.Harness/LoomX.Harness.csproj" />
+  <Project Path="LoomX.PluginSeedTool/LoomX.PluginSeedTool.csproj" />
   <Project Path="LoomX.Plugin.Abstractions/LoomX.Plugin.Abstractions.csproj" />
   <Project Path="LoomX.PluginHost/LoomX.PluginHost.csproj" />
   <Project Path="LoomX.Plugin.Storage.Sqlite/LoomX.Plugin.Storage.Sqlite.csproj" />

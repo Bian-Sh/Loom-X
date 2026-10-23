@@ -115,7 +115,9 @@ public static class LoomXHost
         }
         PluginDevelopmentComposition.RegisterServices(builder.Services,
             Path.Combine(AppDataPaths.RootDirectory, "plugin-development"),
-            Path.Combine(AppDataPaths.RootDirectory, "plugin-cache", "source"));
+            Path.Combine(AppDataPaths.RootDirectory, "plugin-cache", "source"),
+            // 第一方源码插件的预编译种子随宿主安装镜像提供（tasks 3.1）；目录不存在时回退运行时编译。
+            Path.Combine(AppContext.BaseDirectory, "plugin-cache-seed"));
         builder.Services.AddSingleton(services =>
         {
             var registry = new Assistant.ToolRegistry();

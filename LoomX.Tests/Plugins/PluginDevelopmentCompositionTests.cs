@@ -21,7 +21,7 @@ public sealed class PluginDevelopmentCompositionTests
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         services.AddSingleton(fixture.Runtime);
         type.GetMethod("RegisterServices", BindingFlags.Static | BindingFlags.Public)!.Invoke(null,
-            [services, fixture.DevelopmentRoot, Path.Combine(fixture.Root, "composition-cache")]);
+            [services, fixture.DevelopmentRoot, Path.Combine(fixture.Root, "composition-cache"), null]);
         await using var provider = services.BuildServiceProvider();
         var service = provider.GetRequiredService<PluginDevelopmentService>();
         Assert.Same(provider.GetRequiredService<SourcePluginCompiler>(), provider.GetRequiredService<SourcePluginCompiler>());
