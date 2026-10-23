@@ -216,8 +216,7 @@ public sealed class MainWindowViewModel : NotifyViewModel, IDisposable
 
     public async Task InitializeAfterStartupAsync(CancellationToken cancellationToken = default)
     {
-        if (!dataStore.IsInitialized)
-            await dataStore.InitializeAsync(cancellationToken);
+        await dataStore.EnsureInitializedAsync(cancellationToken);
 
         ApplyLoadedConfiguration();
         assistantViewModel.InitializeAfterStartup();
@@ -434,7 +433,8 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         gatewayService.TelemetryPublished += OnTelemetryPublished;
         dataStore.ConfigurationChanged += OnConfigurationChanged;
         LocaleService.CultureChanged += OnCultureChanged;
-        _ = RefreshAsync();
+        // 启动首刷只确保数据中心完成一次初始化并应用内存快照，不触发配置库全量重读（desktop-startup-splash「主界面初始化不读库」）。
+        _ = ApplyStartupSnapshotAsync();
     }
 
     public OverviewViewModel(GatewayProcessService gatewayService, ConfigSnapshotService configService, ILogger<MainWindowViewModel>? logger = null)
@@ -556,6 +556,33 @@ public sealed class OverviewViewModel : NotifyViewModel, IDisposable
         catch (Exception exception)
         {
             logger?.LogError(exception, "概览刷新失败");
+            graphLoadFailed = true;
+            GraphStatus = Loc("overview.graph.failed");
+        }
+        finally
+        {
+            refreshInProgress = false;
+        }
+    }
+
+    /// <summary>
+    /// 启动首刷：仅确保数据中心完成一次初始化，然后直接应用内存快照（统计与拓扑），
+    /// 不走 <see cref="RefreshAsync"/> 的配置库全量重读。显式刷新与配置变更事件仍按需读库。
+    /// </summary>
+    private async Task ApplyStartupSnapshotAsync()
+    {
+        if (refreshInProgress) return;
+        refreshInProgress = true;
+        try
+        {
+            await dataStore.EnsureInitializedAsync();
+            ApplyConfigSnapshot();
+            await RefreshRecentRequestsAsync();
+            logger?.LogInformation("概览启动快照应用完成 {ProviderCount} 个 Provider、{ModelCount} 个模型、{EndpointCount} 个 Endpoint，网关状态 {GatewayState}", ProviderCount, ModelCount, Endpoints.Count, gatewayService.State);
+        }
+        catch (Exception exception)
+        {
+            logger?.LogError(exception, "概览启动快照应用失败");
             graphLoadFailed = true;
             GraphStatus = Loc("overview.graph.failed");
         }
@@ -1161,7 +1188,8 @@ public sealed class ProvidersViewModel : NotifyViewModel, IDisposable
         try
         {
             logger?.LogInformation("Provider 页面刷新开始，进程 {ProcessId}", Environment.ProcessId);
-            await dataStore.InitializeAsync();
+            // 启动首刷只在数据中心未初始化时读库；显式刷新走 RefreshAsync 的重新读库路径。
+            await dataStore.EnsureInitializedAsync();
             suppressSelectionInvariant = true;
             MergeProviders(dataStore.Providers);
             suppressSelectionInvariant = false;
