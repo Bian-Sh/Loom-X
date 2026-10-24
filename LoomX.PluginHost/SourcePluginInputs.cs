@@ -102,14 +102,34 @@ internal sealed record SourcePluginInputs(byte[] Manifest, ImmutableArray<Source
             writer.Write(referencesDigest);
             writer.Write(compilerIdentity);
             writer.Write(optionsIdentity);
-            writer.Write(Manifest.Length); writer.Write(Manifest);
-            foreach (var input in Sources.Concat(Localization))
-            {
-                writer.Write(input.RelativePath);
-                writer.Write(input.Bytes.Length); writer.Write(input.Bytes);
-            }
+            WriteInputBody(writer);
         }
         return Convert.ToHexString(SHA256.HashData(stream.ToArray())).ToLowerInvariant();
+    }
+
+    /// <summary>
+    /// 插件自身输入（Manifest + 源码 + 本地化）的独立身份摘要，仅供缓存身份诊断对比；
+    /// 域分隔前缀保证它与缓存键、其他摘要不可互换，正确性仍完全由 <see cref="CacheKey"/> 决定。
+    /// </summary>
+    internal string InputIdentity()
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write("LoomX.SourceInputs/v1");
+            WriteInputBody(writer);
+        }
+        return Convert.ToHexString(SHA256.HashData(stream.ToArray())).ToLowerInvariant();
+    }
+
+    private void WriteInputBody(BinaryWriter writer)
+    {
+        writer.Write(Manifest.Length); writer.Write(Manifest);
+        foreach (var input in Sources.Concat(Localization))
+        {
+            writer.Write(input.RelativePath);
+            writer.Write(input.Bytes.Length); writer.Write(input.Bytes);
+        }
     }
 
     private static void Canonicalize(JsonElement element, Utf8JsonWriter writer)

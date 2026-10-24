@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>发布期预编译种子工具：用与运行时相同的编译输入离线编译第一方源码插件（tasks 3.1）。只在发布流水线中运行，不随宿主发布。</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LoomX.PluginHost\LoomX.PluginHost.csproj" />
+  </ItemGroup>
+</Project>

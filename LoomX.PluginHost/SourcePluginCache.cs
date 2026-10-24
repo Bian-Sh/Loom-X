@@ -17,7 +17,8 @@ internal sealed class SourcePluginCache(string root, string pluginId, string key
     internal string PdbRelative => $"{PluginRelative}/{AssemblyName}.pdb";
     internal string AssemblyPath => Path.Combine(DirectoryPath, AssemblyRelative);
     internal string PdbPath => Path.Combine(DirectoryPath, PdbRelative);
-    private sealed record Metadata(string InputHash, Dictionary<string, string> Files, ImmutableArray<PluginDiagnostic> Diagnostics);
+    // Components 只承载诊断摘要；旧代际没有该字段时反序列化为 null，不参与任何正确性判定。
+    private sealed record Metadata(string InputHash, Dictionary<string, string> Files, ImmutableArray<PluginDiagnostic> Diagnostics, Dictionary<string, string>? Components = null);
 
     internal async Task<FileStream> LockAsync(CancellationToken token)
     {
@@ -119,7 +120,8 @@ internal sealed class SourcePluginCache(string root, string pluginId, string key
         return candidate;
     }
 
-    internal async Task SealAsync(string candidate, SourcePluginInputs inputs, ImmutableArray<PluginDiagnostic> diagnostics, byte[] authenticationKey, CancellationToken token)
+    internal async Task SealAsync(string candidate, SourcePluginInputs inputs, ImmutableArray<PluginDiagnostic> diagnostics, byte[] authenticationKey,
+        IReadOnlyDictionary<string, string> identityComponents, CancellationToken token)
     {
         await File.WriteAllBytesAsync(SourcePluginPaths.Resolve(candidate, PluginRelative + "/plugin.manifest.json"), inputs.Manifest, token).ConfigureAwait(false);
         foreach (var input in inputs.Localization)
@@ -127,9 +129,49 @@ internal sealed class SourcePluginCache(string root, string pluginId, string key
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var relative in ArtifactPaths(inputs))
             files.Add(relative, Convert.ToHexString(SHA256.HashData(await SourcePluginPaths.ReadAsync(candidate, relative, token).ConfigureAwait(false))));
-        var metadata = JsonSerializer.SerializeToUtf8Bytes(new Metadata(key, files, diagnostics));
+        var metadata = JsonSerializer.SerializeToUtf8Bytes(new Metadata(key, files, diagnostics, new Dictionary<string, string>(identityComponents, StringComparer.Ordinal)));
         await File.WriteAllBytesAsync(SourcePluginPaths.Resolve(candidate, "cache.json"), metadata, token).ConfigureAwait(false);
         await File.WriteAllBytesAsync(SourcePluginPaths.Resolve(candidate, "cache.sig"), HMACSHA256.HashData(authenticationKey, metadata), token).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// 读取最近一个已认证代际缓存的身份组成摘要（目录名即缓存键），用于未命中时对比翻转项；
+    /// 任何失败都安静返回 null——诊断对比绝不影响编译与加载的正确性。
+    /// </summary>
+    internal async Task<Dictionary<string, string>?> TryReadLastSealedIdentityAsync(string currentKey, byte[] authenticationKey, CancellationToken token)
+    {
+        try
+        {
+            SourcePluginPaths.NoLinks(Parent);
+            if (!Directory.Exists(Parent)) return null;
+            var generations = Directory.EnumerateDirectories(Parent)
+                .Where(directory =>
+                {
+                    var name = Path.GetFileName(directory);
+                    return name.Length == 64 && name != currentKey && name.All(Uri.IsHexDigit);
+                })
+                .OrderByDescending(Directory.GetLastWriteTimeUtc);
+            foreach (var generation in generations)
+            {
+                try
+                {
+                    var raw = await SourcePluginPaths.ReadAsync(generation, "cache.json", token).ConfigureAwait(false);
+                    if (raw.Length > 1024 * 1024) continue;
+                    var signature = await SourcePluginPaths.ReadAsync(generation, "cache.sig", token).ConfigureAwait(false);
+                    if (!CryptographicOperations.FixedTimeEquals(signature, HMACSHA256.HashData(authenticationKey, raw))) continue;
+                    var metadata = JsonSerializer.Deserialize<Metadata>(raw);
+                    if (metadata?.Components is { Count: > 0 } components) return components;
+                }
+                catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+                {
+                    // 单个旧代际不可读时继续尝试更早的代际。
+                }
+            }
+        }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)
+        {
+        }
+        return null;
     }
 
     internal void Publish(string candidate)
@@ -140,6 +182,34 @@ internal sealed class SourcePluginCache(string root, string pluginId, string key
         if (Directory.Exists(DirectoryPath))
             Directory.Move(DirectoryPath, Path.Combine(Parent, ".invalid-" + key + "-" + Guid.NewGuid().ToString("N")));
         Directory.Move(candidate, DirectoryPath);
+    }
+
+    /// <summary>
+    /// 把已通过 <see cref="ReadAsync"/> 完整验证的种子代际复制进候选，并以用户认证密钥重签发布（tasks 3.1）。
+    /// 只复制程序集与 PDB（清单与本地化由 <see cref="SealAsync"/> 用验证过的输入重写）；
+    /// 任何失败清理候选并返回 false，由调用方回退运行时编译。
+    /// </summary>
+    internal async Task<bool> TryAdoptAsync(SourcePluginCache seed, SourcePluginInputs inputs, ImmutableArray<PluginDiagnostic> diagnostics,
+        byte[] authenticationKey, IReadOnlyDictionary<string, string> identityComponents, CancellationToken token)
+    {
+        var candidate = CreateCandidate();
+        try
+        {
+            foreach (var relative in new[] { AssemblyRelative, PdbRelative })
+            {
+                var bytes = await SourcePluginPaths.ReadAsync(seed.DirectoryPath, relative, token).ConfigureAwait(false);
+                await File.WriteAllBytesAsync(SourcePluginPaths.Resolve(candidate, relative), bytes, token).ConfigureAwait(false);
+            }
+            await SealAsync(candidate, inputs, diagnostics, authenticationKey, identityComponents, token).ConfigureAwait(false);
+            Publish(candidate);
+            return true;
+        }
+        catch (Exception exception) when (exception is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            try { CleanupCandidate(candidate); }
+            catch (Exception cleanup) when (cleanup is InvalidDataException or IOException or UnauthorizedAccessException) { }
+            return false;
+        }
     }
 
     internal void CleanupCandidate(string candidate)

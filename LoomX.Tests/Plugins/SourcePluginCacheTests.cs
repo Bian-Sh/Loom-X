@@ -324,6 +324,9 @@ public sealed class SourcePluginCacheTests
         foreach (var assembly in new[] { typeof(Microsoft.CodeAnalysis.Compilation).Assembly, typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly })
         {
             Assert.Contains(assembly.FullName!, SourcePluginCompiler.CompilerIdentity);
-            Assert.Contains(assembly.ManifestModule.ModuleVersionId.ToString(), SourcePluginCompiler.CompilerIdentity);
+            Assert.Contains(assembly.GetName().Version!.ToString(), SourcePluginCompiler.CompilerIdentity);
+            // tasks 3.3：MVID 不再参与缓存键，只在诊断明细中输出。
+            Assert.DoesNotContain(assembly.ManifestModule.ModuleVersionId.ToString(), SourcePluginCompiler.CompilerIdentity);
+            Assert.Contains(assembly.ManifestModule.ModuleVersionId.ToString(), SourcePluginCompiler.CompilerIdentityDetail);
         }
     }}

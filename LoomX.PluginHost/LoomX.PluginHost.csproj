@@ -10,6 +10,7 @@
     <ProjectReference Include="..\LoomX.Plugin.Abstractions\LoomX.Plugin.Abstractions.csproj" />
     <InternalsVisibleTo Include="LoomX.Tests" />
     <InternalsVisibleTo Include="LoomX.PluginPlayground" />
+    <InternalsVisibleTo Include="LoomX.PluginSeedTool" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
