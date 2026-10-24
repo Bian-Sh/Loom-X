@@ -1,6 +1,15 @@
-# HANDOFF — stabilize-plugin-compile-cache
+﻿# HANDOFF — stabilize-plugin-compile-cache
 
-> 给接手本 worktree 的新会话：这是一个已立项、待实施的 openspec change。先读完本文件与 `openspec/changes/stabilize-plugin-compile-cache/` 下四份 artifact 再动手。
+> 给接手本 worktree 的新会话：本 change 已有实现提交，任务清单 12/12 完成，尚未归档。先读完本文件与 `openspec/changes/stabilize-plugin-compile-cache/` 下四份 artifact，再核对当前分支状态；不要根据本文件的历史背景判定尚未实施。
+
+## 2026-10-24 接手复核
+
+- 已有实现：`4730cc9`（身份诊断与计时）、`9e8ca1d`（并行编译）、`395936c`（发布种子）。这些提交早于本次接手会话，不是接手后新增的改动。
+- 本次发现并修复种子编译失败返回时遗漏候选清理的问题：以 `finally` 覆盖编译失败、异常和取消；成功发布后不清理已发布代际，保留此前有效种子。
+- 新增 `Seed_CompileFailure_RemovesCandidateAndPreservesPublishedGeneration`，修改实现前真实失败，修改后随全量测试通过；本次全量 `LoomX.Tests` 为 1985 通过、0 失败、0 跳过。
+- 正式 `scripts/publish-desktop.ps1` 发布到 `outputs/20261024-113223`，两个第一方种子生成成功，脚本的单一 `LoomX.exe` 布局检查通过。
+- 以该发布目录实际的 `LoomX.PluginHost.dll`、Roslyn 和契约程序集在隔离加载上下文执行，首次使用新临时缓存时两个插件均 `Success=True / CacheHit=True`；第二轮均继续命中。不启动桌面、不访问生产配置或 Vault。
+- 上述发布产物生成于本次候选清理修复之前，证明原有发布集成与命中链路；失败分支修复由其后完整测试覆盖。此记录不冒充新的桌面启动耗时测量，历史耗时结论仍见 design.md。
 
 ## 背景一句话
 

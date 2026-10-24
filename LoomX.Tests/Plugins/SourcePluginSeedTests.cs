@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using LoomX.Plugins.Host;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -124,6 +124,24 @@ public sealed class SourcePluginSeedTests
         Assert.False(result.CacheHit);
         Assert.NotEqual(SeedAssemblyPath(seedRoot), result.AssemblyPath);
         Assert.True(File.Exists(result.AssemblyPath));
+    }
+
+    [Fact]
+    public async Task Seed_CompileFailure_RemovesCandidateAndPreservesPublishedGeneration()
+    {
+        using var package = new SourcePluginTestPackage();
+        var seedRoot = Path.Combine(package.Root, "seed");
+        var seedKey = NewSeedKey();
+        await SeedAsync(package, seedRoot, seedKey);
+        var assembly = SeedAssemblyPath(seedRoot);
+        var publishedBytes = File.ReadAllBytes(assembly);
+        package.Write("src/Plugin.cs", "this is not valid C#;");
+
+        var seeder = new SourcePluginCompiler(seedRoot);
+        Assert.False(await seeder.TrySeedAsync(package.Directory, package.Manifest, seedKey, default));
+
+        Assert.Empty(Directory.EnumerateDirectories(Path.Combine(seedRoot, "demo"), ".candidate-*"));
+        Assert.Equal(publishedBytes, File.ReadAllBytes(assembly));
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -220,29 +220,29 @@ public sealed class SourcePluginCompiler
             var key = inputs.CacheKey(referenceSet.Digest, CompilerIdentity, settings.Identity);
             var identity = SourceCacheIdentity.Create(referenceSet.Digest, CompilerIdentity, settings.Identity, inputs.InputIdentity());
             var cache = new SourcePluginCache(cacheRoot, manifest.Id, key);
-            var candidate = cache.CreateCandidate();
+            string? candidate = cache.CreateCandidate();
             try
             {
                 var (success, diagnostics) = await EmitAsync(candidate, cache, inputs, manifest.Id, referenceSet, token).ConfigureAwait(false);
                 if (!success)
                 {
-                    logger.LogWarning("源码插件预编译种子生成失败：编译诊断 {PluginId} {DiagnosticCount}", manifest.Id, diagnostics.Length);
+                    logger.LogError("源码插件预编译种子生成失败：编译诊断 {PluginId} {DiagnosticCount}", manifest.Id, diagnostics.Length);
                     return false;
                 }
                 await cache.SealAsync(candidate, inputs, diagnostics, seedKey, identity.ToComponents(), token).ConfigureAwait(false);
                 cache.Publish(candidate);
+                candidate = null;
                 return true;
             }
-            catch
+            finally
             {
-                cache.CleanupCandidate(candidate);
-                throw;
+                if (candidate is not null) cache.CleanupCandidate(candidate);
             }
         }
         catch (Exception exception) when (exception is SourcePluginInputException or InvalidDataException or IOException
             or UnauthorizedAccessException or ArgumentException or BadImageFormatException)
         {
-            logger.LogWarning(exception, "源码插件预编译种子生成失败 {PluginId} {ErrorType}", manifest.Id, exception.GetType().Name);
+            logger.LogError(exception, "源码插件预编译种子生成失败 {PluginId} {ErrorType}", manifest.Id, exception.GetType().Name);
             return false;
         }
     }
