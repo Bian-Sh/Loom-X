@@ -448,6 +448,56 @@ public sealed class AppDataStoreTests
         finally { DeleteDirectory(directory); }
     }
 
+    [Fact]
+    public async Task 设置保存成功后原子更新外观缓存()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        var appearanceCachePath = Path.Combine(directory, "appearance.json");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(
+                configService,
+                gatewayService,
+                NullLogger<AppDataStore>.Instance,
+                new ActivityQueryService(activityPath),
+                appearanceCachePath: appearanceCachePath);
+            await store.InitializeAsync();
+
+            await store.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "Dark", "direct", "http://127.0.0.1", 7890, null, null, false, true, "stable", false, 30, false, false, 70, 18, "acrylic", true));
+
+            var cached = AppearanceCache.TryRead(appearanceCachePath);
+            Assert.Equal(new AppearanceCacheSnapshot(false, 70, 18, "dark"), cached);
+            Assert.False(File.Exists(appearanceCachePath + ".tmp"), "原子写入不得残留临时文件。");
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
+    [Fact]
+    public async Task 未注入外观缓存路径时不写缓存()
+    {
+        var directory = CreateDirectory();
+        var configPath = Path.Combine(directory, "LoomX.db");
+        var activityPath = Path.Combine(directory, "LoomX.Activity.db");
+        try
+        {
+            await InitializeConfigurationAsync(configPath);
+            using var configService = new ConfigSnapshotService(configPath);
+            using var gatewayService = new GatewayProcessService();
+            using var store = new AppDataStore(configService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+            await store.InitializeAsync();
+
+            await store.UpdateSettingsAsync(new AppSettingsInput("zh-CN", "dark", "direct", "http://127.0.0.1", 7890, null, null, false, true, "stable", false, 30, false, true, 86, 24, "acrylic", true));
+
+            Assert.False(File.Exists(Path.Combine(directory, "appearance.json")));
+        }
+        finally { DeleteDirectory(directory); }
+    }
+
     private static async Task InitializeConfigurationAsync(string path)
     {
         var options = new DbContextOptionsBuilder<ConfigurationDbContext>().UseSqlite($"Data Source={path}").Options;

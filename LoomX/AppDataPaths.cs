@@ -11,6 +11,8 @@ public static class AppDataPaths
 
     public static string ActivityDatabasePath { get; } = Path.Combine(RootDirectory, "LoomX.Activity.db");
 
+    public static string AppearanceCachePath { get; } = Path.Combine(RootDirectory, "appearance.json");
+
     public static string LogDirectory { get; } = Path.Combine(RootDirectory, "logs");
 
     public static string ConfigurationInitializationLockPath { get; } = Path.Combine(RootDirectory, "LoomX.db.init.lock");

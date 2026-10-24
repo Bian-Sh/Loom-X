@@ -30,15 +30,17 @@ public sealed class SettingsViewContractTests
     {
         var appSource = ReadDesktopFile("App.axaml.cs");
         var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
+        var coordinatorSource = ReadDesktopFile("Services", "WindowAppearanceCoordinator.cs");
         var mainViewModelSource = ReadDesktopFile("ViewModels", "MainWindowViewModel.cs");
         var settingsViewModelSource = ReadDesktopFile("ViewModels", "SettingsViewModel.cs");
         var tokenSource = ReadDesktopFile("Styles", "VisualTokens.axaml");
 
         Assert.Contains("applyTheme: mainWindow.ApplyTheme", appSource, StringComparison.Ordinal);
         Assert.Contains("public void ApplyTheme(string theme)", windowSource, StringComparison.Ordinal);
-        Assert.Contains("ThemeVariant.Dark", windowSource, StringComparison.Ordinal);
-        Assert.Contains("ThemeVariant.Light", windowSource, StringComparison.Ordinal);
-        Assert.Contains("ThemeVariant.Default", windowSource, StringComparison.Ordinal);
+        // 主题变体解析随材质管线收拢到应用级协调点。
+        Assert.Contains("ThemeVariant.Dark", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("ThemeVariant.Light", coordinatorSource, StringComparison.Ordinal);
+        Assert.Contains("ThemeVariant.Default", coordinatorSource, StringComparison.Ordinal);
         Assert.Contains("applyTheme?.Invoke(settings.Theme);", mainViewModelSource, StringComparison.Ordinal);
         Assert.Contains("if (!suppressAutoSave) ApplyThemePreview();", settingsViewModelSource, StringComparison.Ordinal);
         Assert.Contains("<ResourceDictionary x:Key=\"Light\">", tokenSource, StringComparison.Ordinal);
@@ -111,13 +113,16 @@ public sealed class SettingsViewContractTests
     public void AppearancePipelineKeepsOneMaterialPriorityAcrossTheBlurRange()
     {
         var windowSource = ReadDesktopFile("MainWindow.axaml.cs");
+        var coordinatorSource = ReadDesktopFile("Services", "WindowAppearanceCoordinator.cs");
 
         Assert.Contains("WindowTransparencyLevel.Transparent", windowSource, StringComparison.Ordinal);
-        Assert.Contains("TransparencyLevelHint = BuildTransparencyLevels(algorithm);", windowSource, StringComparison.Ordinal);
+        // 材质赋值已上移到应用级协调点，主窗口 ApplyAppearance 只负责委托。
+        Assert.Contains("appearanceCoordinator.Apply(", windowSource, StringComparison.Ordinal);
+        Assert.Contains("window.TransparencyLevelHint = Current.Enabled", coordinatorSource, StringComparison.Ordinal);
         Assert.Contains("[WindowTransparencyLevel.AcrylicBlur, WindowTransparencyLevel.Transparent]", windowSource, StringComparison.Ordinal);
         Assert.Contains("0.35 + (Math.Clamp(blurAmount, 0, 64) / 64d * 0.65)", windowSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("TransparencyLevelHint = !enabled", windowSource, StringComparison.Ordinal);
-        Assert.DoesNotContain("[WindowTransparencyLevel.None]", windowSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("TransparencyLevelHint = !enabled", windowSource + coordinatorSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("[WindowTransparencyLevel.None]", windowSource + coordinatorSource, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -253,6 +258,7 @@ public sealed class SettingsViewContractTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        window.ApplyAppearance(false, 1, 1, "acrylic");
         window.ApplyTheme("light");
         var dictionary = Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
             new Uri("avares://LoomX/Styles/VisualTokens.axaml")));
@@ -288,9 +294,10 @@ public sealed class SettingsViewContractTests
         app.RequestedThemeVariant = ThemeVariant.Light;
         Assert.True(app.TryGetResource("WindowBackgroundBrush", ThemeVariant.Light, out var resource));
         var brush = Assert.IsType<SolidColorBrush>(resource);
-        var originalAlpha = brush.Color.A;
 
         var window = new MainWindow();
+        window.ApplyAppearance(false, 1, 1, "acrylic");
+        var originalAlpha = brush.Color.A;
         window.ApplyAppearance(true, 20, 0, "acrylic");
 
         Assert.NotEqual(originalAlpha, brush.Color.A);

@@ -18,6 +18,7 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        ResetToKnownAppearance(window);
         window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
@@ -50,6 +51,7 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        ResetToKnownAppearance(window);
         window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
@@ -72,6 +74,7 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        ResetToKnownAppearance(window);
         window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
@@ -106,6 +109,7 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        ResetToKnownAppearance(window);
         window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
@@ -119,7 +123,8 @@ public sealed class WindowAppearanceCoordinatorTests
         window.ApplyAppearance(false, 86, 24, "acrylic");
 
         Assert.Equal(255, Assert.IsType<SolidColorBrush>(dialog.Background).Color.A);
-        Assert.Equal(WindowTransparencyLevel.AcrylicBlur, dialog.TransparencyLevelHint[0]);
+        // 透明关闭后不得残留窗口级透明提示。
+        Assert.Empty(dialog.TransparencyLevelHint);
     }
 
     [Fact]
@@ -127,6 +132,7 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        ResetToKnownAppearance(window);
         window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
@@ -145,6 +151,7 @@ public sealed class WindowAppearanceCoordinatorTests
     {
         EnsureAvaloniaSetup();
         var window = new MainWindow();
+        ResetToKnownAppearance(window);
         window.ApplyTheme("light");
         var dictionary = LoadVisualTokens();
         window.Resources.MergedDictionaries.Add(dictionary);
@@ -154,6 +161,85 @@ public sealed class WindowAppearanceCoordinatorTests
         window.ApplyAppearance(false, 0, 0, "acrylic");
         Assert.Equal(255, brush.Color.A);
     }
+
+    [Fact]
+    public void 相同外观与主题请求被幂等跳过不重复应用()
+    {
+        EnsureAvaloniaSetup();
+        var window = new MainWindow();
+        var dictionary = LoadVisualTokens();
+        window.Resources.MergedDictionaries.Add(dictionary);
+        var applications = 0;
+        window.AppearanceCoordinator.AppearanceChanged += (_, _) => applications++;
+
+        window.ApplyTheme("dark");
+        window.ApplyTheme("light");
+        var baseline = applications;
+        window.ApplyAppearance(true, 40, 12, "acrylic");
+        var appearanceBaseline = applications;
+
+        // 重复的相同请求：主题不刷新资源、外观不重换画刷，事件不再触发。
+        window.ApplyTheme("light");
+        window.ApplyAppearance(true, 40, 12, "acrylic");
+
+        Assert.Equal(baseline, applications - 1);
+        Assert.Equal(appearanceBaseline, applications);
+    }
+
+    [Fact]
+    public void 透明开关时全部注册窗口同帧一致切换()
+    {
+        EnsureAvaloniaSetup();
+        var window = new MainWindow();
+        ResetToKnownAppearance(window, enabled: false, opacity: 1, blur: 1);
+        window.ApplyTheme("light");
+        var dictionary = LoadVisualTokens();
+        window.Resources.MergedDictionaries.Add(dictionary);
+        var existingDialog = new GlassDialogWindow();
+        var lateDialog = new GlassDialogWindow();
+        Window[] windows = [window, existingDialog, lateDialog];
+
+        // 注册即应用：禁用态下先存窗口与后建窗口都自第一帧起不透明且无透明提示。
+        Assert.All(windows, item => Assert.Equal(255, Assert.IsType<SolidColorBrush>(item.Background).Color.A));
+        Assert.All(windows, item => Assert.Empty(item.TransparencyLevelHint));
+
+        window.ApplyAppearance(true, 60, 20, "acrylic");
+
+        Assert.All(windows, item => Assert.Same(Brushes.Transparent, item.Background));
+        Assert.All(windows, item => Assert.Equal(WindowTransparencyLevel.AcrylicBlur, item.TransparencyLevelHint[0]));
+
+        window.ApplyAppearance(false, 60, 20, "acrylic");
+
+        Assert.All(windows, item => Assert.Equal(255, Assert.IsType<SolidColorBrush>(item.Background).Color.A));
+        Assert.All(windows, item => Assert.Empty(item.TransparencyLevelHint));
+    }
+
+    [Fact]
+    public void 主题切换刷新全部注册窗口的画刷引用()
+    {
+        EnsureAvaloniaSetup();
+        var window = new MainWindow();
+        ResetToKnownAppearance(window, enabled: false, opacity: 50, blur: 10);
+        var dictionary = LoadVisualTokens();
+        window.Resources.MergedDictionaries.Add(dictionary);
+        var dialog = new GlassDialogWindow();
+        window.ApplyTheme("light");
+
+        // 主题字典切换会替换画刷实例：禁用态下窗口背景必须改用新变体的不透明底色。
+        window.ApplyTheme("dark");
+        Assert.True(dictionary.TryGetResource("WindowBackgroundBrush", ThemeVariant.Dark, out var darkResource));
+        var expectedDark = Assert.IsType<SolidColorBrush>(darkResource).Color;
+        foreach (Window item in new Window[] { window, dialog })
+        {
+            var background = Assert.IsType<SolidColorBrush>(item.Background).Color;
+            Assert.Equal(255, background.A);
+            Assert.Equal((expectedDark.R, expectedDark.G, expectedDark.B), (background.R, background.G, background.B));
+        }
+    }
+
+    /// <summary>把共享协调器收敛到已知状态，规避前序测试残留状态触发幂等跳过。</summary>
+    private static void ResetToKnownAppearance(MainWindow window, bool enabled = false, int opacity = 1, int blur = 1) =>
+        window.ApplyAppearance(enabled, opacity, blur, "acrylic");
 
     private static ResourceDictionary LoadVisualTokens() => Assert.IsType<ResourceDictionary>(AvaloniaXamlLoader.Load(
         new Uri("avares://LoomX/Styles/VisualTokens.axaml")));

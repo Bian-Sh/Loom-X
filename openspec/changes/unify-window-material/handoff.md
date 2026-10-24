@@ -39,3 +39,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish-desktop.ps1
 ## 分支
 
 `feature/20261024/unify-window-material`（基于 master ab8ca28，含本 change 的完整 planning artifacts）
+
+## 实施状态（2026-10-24 更新）
+
+任务 1.1–3.3 已完成并推送，全量 `dotnet test` 1992/1992 通过。实现要点与 design 的差异：
+
+- 协调器实例由 `App.AppearanceCoordinator` 持有；`MainWindow` 构造时从 `Application.Current as App` 取共享实例并 `ApplyTo(this)` 注册（无 App 宿主时回退独立实例）。资源解析顺序：主窗口资源 → 应用资源，兼容测试的窗口级字典注入。
+- `SplashWindow` / `GlassDialogWindow` 均在自身构造函数末尾 `ApplyTo(this)` 注册（构造即注册，结构性保证「注册先于 Show」）；`ProvidersView` 的显式 `ApplyTo(dialog)` 保留（幂等去重）。
+- 幂等收敛：`Apply` 与 `ApplyTheme` 对相同状态跳过（不换画刷、不触发 `AppearanceChanged`、记 Debug）；主题变体切换会重录基础颜色并对全部注册窗口同帧重放。
+- 新增行为（spec 要求）：透明关闭时清空窗口级 `TransparencyLevelHint`（原实现禁用后仍残留 Acrylic 提示），既有断言已同步更新。
+- 外观缓存写入挂在 `AppDataStore.UpdateSettingsAsync` / `SetGatewayRunningAsync` 成功路径，路径由 App 注入 `AppDataPaths.AppearanceCachePath`；测试与 CLI 默认不注入、不写缓存。
+- 对账在 `viewModel.InitializeAfterStartupAsync()` 之后执行：一致记 Debug 零切换；漂移记 Warning 并自愈回写缓存。
+- 归档注意：先归档 `improve-startup-splash-screen`，再归档本 change（`desktop-startup-splash` 的 MODIFIED delta 依赖）。
+
+剩余：任务 3.4 发布版实测 + 截屏验收（需用户环境执行）。
