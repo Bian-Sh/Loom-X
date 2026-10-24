@@ -53,3 +53,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish-desktop.ps1
 - 归档注意：先归档 `improve-startup-splash-screen`，再归档本 change（`desktop-startup-splash` 的 MODIFIED delta 依赖）。
 
 剩余：任务 3.4 发布版实测 + 截屏验收（需用户环境执行）。
+
+## 实测状态（2026-10-24 12:50 更新）
+
+- 修复：协调器实例最初未接 logger（材质链路日志不落盘），现于 App 注入 `ILogger<WindowAppearanceCoordinator>`；「启动外观对账一致，零切换」由 Debug 提升为 Information（Serilog 文件级别为 Information，Debug 不落盘）。
+- **漂移路径已实证**（发布版 20261024-122823，12:28 运行，日志 loomx-20261024.log 12:29:03 WRN）：
+  - `外观缓存与配置库不一致，已按配置库一次性切换 False/86/24/"system" -> True/66/35/"light"`
+  - `appearance.json` 自愈写入 `{"enabled":true,"opacity":66,"blur":35,"theme":"light"}`，与配置库逐字段一致。
+- **对齐路径待安静机器验证**：12:31 起另一 session（stabilize-plugin-compile-cache）的发布版实例在同一桌面/同一日志目录并发实测，单实例互斥与 Serilog buffered 双写者把当日日志文件滚动截断（loomx-20261024*.log 出现 KiB 边界截断、后缀递增），后续两次启动未能取得有效证据，已按协作约定停止并发桌面实测。
+- 安静机器上的验证步骤（约 1 分钟）：确认无 LoomX 进程后启动本 worktree 最新发布版两次；第 2 次启动日志应出现且仅出现一次 `窗口材质应用完成 True 66 35 acrylic 1 initial`（窗口数 1=闪屏，先于 Show）+ `窗口主题应用完成 light`，随后 `启动外观对账一致，零切换 True 66 35 light`，且启动链路内不再有第二次材质/主题应用记录——即第 29→31 帧突变消除的日志证据。截屏仅留档（透明下颜色失真），判定以日志为准。
+- `outputs/screenshots-untrusted/` 中的截图因并发实例无法归属，不作验收依据。

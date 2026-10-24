@@ -36,7 +36,7 @@ public partial class App : Application
     private bool allowMultipleInstances;
     public ILoggerFactory? LoggerFactory => loggerFactory;
     /// <summary>应用级窗口材质协调点：闪屏、主窗口与对话框共享唯一外观状态。</summary>
-    public WindowAppearanceCoordinator AppearanceCoordinator { get; } = new();
+    public WindowAppearanceCoordinator AppearanceCoordinator { get; private set; } = new();
     public override void Initialize()
     {
         AssistantMarkdownTypography.Configure();
@@ -149,6 +149,7 @@ public partial class App : Application
                 loggerFactory.CreateLogger<AppDataStore>(),
                 appearanceCachePath: AppDataPaths.AppearanceCachePath);
             // 外观初值只读缓存文件、不开配置库；闪屏构造注册时即拿到最终材质，第一帧零切换。
+            AppearanceCoordinator = new WindowAppearanceCoordinator(loggerFactory.CreateLogger<WindowAppearanceCoordinator>());
             var cachedAppearance = ApplyStartupAppearance(startupLogger);
             var startupProgress = new StartupProgress();
             var splashViewModel = new SplashViewModel(startupProgress);
@@ -259,7 +260,7 @@ public partial class App : Application
             && string.Equals(effective.Theme, AppearanceCache.NormalizeTheme(settings.Theme) ?? "system", StringComparison.Ordinal);
         if (aligned)
         {
-            startupLogger.LogDebug(
+            startupLogger.LogInformation(
                 "启动外观对账一致，零切换 {Enabled} {Opacity} {Blur} {Theme}",
                 effective.Enabled, effective.Opacity, effective.Blur, effective.Theme);
             return;
