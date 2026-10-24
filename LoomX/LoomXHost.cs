@@ -84,6 +84,7 @@ public static class LoomXHost
             services.GetRequiredService<ILogger<Assistant.AssistantTester>>(),
             services.GetRequiredService<IProviderTestService>()));
         builder.Services.AddSingleton(_ => Assistant.SkillStore.ForInstallDirectory());
+        builder.Services.AddSingleton<Assistant.ClientConfig.ClientConfigService>();
 
         // 小助手（Phase 3）：Browser Bridge、网络探针与诊断工人
         builder.Services.AddSingleton<Assistant.NetworkProbe>();
@@ -135,6 +136,11 @@ public static class LoomXHost
             Assistant.TomlTools.RegisterAll(
                 registry,
                 services.GetRequiredService<Assistant.Configuration.ITomlDocumentService>());
+            Assistant.ClientConfig.ClientConfigTools.RegisterAll(
+                registry,
+                services.GetRequiredService<Assistant.ClientConfig.ClientConfigService>(),
+                services.GetRequiredService<ConfigurationManagementService>(),
+                services.GetRequiredService<IDatabaseConfigurationProvider>());
             Assistant.AssistantTools.RegisterAll(
                 registry,
                 services.GetRequiredService<Assistant.UserDecisions.IUserDecisionBroker>());

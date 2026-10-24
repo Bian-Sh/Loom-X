@@ -1,0 +1,5 @@
+{
+  "name": "openclaw",
+  "description": "OpenClaw 一键接入 LoomX：写 ~/.openclaw/openclaw.json",
+  "when_to_use": "用户要求把 OpenClaw 配置为使用 LoomX"
+}

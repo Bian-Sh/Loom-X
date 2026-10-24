@@ -1,0 +1,5 @@
+{
+  "name": "zcode",
+  "description": "ZCode 一键接入 LoomX：写 ~/.zcode/v2/provider_config.json（codex/claude 双模式）",
+  "when_to_use": "用户要求把 ZCode 配置为使用 LoomX"
+}

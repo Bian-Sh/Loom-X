@@ -1,0 +1,5 @@
+{
+  "name": "opencode",
+  "description": "OpenCode 一键接入 LoomX：写 ~/.config/opencode/opencode.json",
+  "when_to_use": "用户要求把 OpenCode 配置为使用 LoomX"
+}

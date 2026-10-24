@@ -768,7 +768,8 @@ public sealed class TomlDocumentService : ITomlDocumentService
 
     private static KeyValueSyntax CreateKeyValue(IReadOnlyList<string> path, TomlValue value)
     {
-        var snippet = $"{FormatKey(path)} = {FormatValue(value)}\n";
+        // 前置换行：目标文件可能不以换行结尾，直接追加键值会粘到上一行产生非法 TOML。
+        var snippet = $"\n{FormatKey(path)} = {FormatValue(value)}\n";
         var document = SyntaxParser.Parse(snippet, "patch-value.toml", validate: true);
         if (document.HasErrors || document.KeyValues.ChildrenCount != 1)
         {
@@ -785,7 +786,8 @@ public sealed class TomlDocumentService : ITomlDocumentService
         string key,
         TomlValue value)
     {
-        var snippet = $"[{FormatKey(tablePath)}]\n{FormatKey([key])} = {FormatValue(value)}\n";
+        // 前置换行：目标文件可能不以换行结尾，直接追加表头会粘到上一行产生非法 TOML。
+        var snippet = $"\n[{FormatKey(tablePath)}]\n{FormatKey([key])} = {FormatValue(value)}\n";
         var document = SyntaxParser.Parse(snippet, "patch-table.toml", validate: true);
         if (document.HasErrors || document.Tables.ChildrenCount != 1)
         {

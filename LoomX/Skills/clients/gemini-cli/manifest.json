@@ -1,0 +1,5 @@
+{
+  "name": "gemini-cli",
+  "description": "Gemini CLI 接入 LoomX：写 ~/.gemini/settings.json（base-url 覆盖）",
+  "when_to_use": "用户要求把 Gemini CLI 配置为使用 LoomX"
+}

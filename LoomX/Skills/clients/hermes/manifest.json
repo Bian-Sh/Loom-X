@@ -1,0 +1,5 @@
+{
+  "name": "hermes",
+  "description": "Hermes Agent 一键接入 LoomX：写 ~/.hermes/config.yaml",
+  "when_to_use": "用户要求把 Hermes Agent 配置为使用 LoomX"
+}
