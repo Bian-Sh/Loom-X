@@ -63,3 +63,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publish-desktop.ps1
 - **对齐路径待安静机器验证**：12:31 起另一 session（stabilize-plugin-compile-cache）的发布版实例在同一桌面/同一日志目录并发实测，单实例互斥与 Serilog buffered 双写者把当日日志文件滚动截断（loomx-20261024*.log 出现 KiB 边界截断、后缀递增），后续两次启动未能取得有效证据，已按协作约定停止并发桌面实测。
 - 安静机器上的验证步骤（约 1 分钟）：确认无 LoomX 进程后启动本 worktree 最新发布版两次；第 2 次启动日志应出现且仅出现一次 `窗口材质应用完成 True 66 35 acrylic 1 initial`（窗口数 1=闪屏，先于 Show）+ `窗口主题应用完成 light`，随后 `启动外观对账一致，零切换 True 66 35 light`，且启动链路内不再有第二次材质/主题应用记录——即第 29→31 帧突变消除的日志证据。截屏仅留档（透明下颜色失真），判定以日志为准。
 - `outputs/screenshots-untrusted/` 中的截图因并发实例无法归属，不作验收依据。
+
+## 实测状态（2026-10-24 13:06 安静机器验收，任务 3.4 完成）
+
+- 安静机器（tasklist 确认无 LoomX 实例）发布 `outputs/unify-acceptance-3-4`（259d4ad）并连续启动两次，日志落 `loomx-20261024_003.log`。
+- 第 1 次（appearance.json 缺失，冷缓存）：首帧默认 `system`/`False 86 24`，Shell 阶段一次性切换 `True 66 35 light` + WRN 自愈写缓存——design Decision 2 的降级语义实证。
+- 第 2 次（缓存一致，对齐路径）：首帧即 `窗口材质应用完成 True 66 35 acrylic` 与 `窗口主题应用完成 light`（先于 Database 阶段完成），至 `启动外观对账一致，零切换 True 66 35 "light"`（13:07:49.206）全程无第二次材质/主题应用——第 29→31 帧中途突变消除的日志证据成立，任务 3.4 勾选。
+- 与上文预期线的差异：首帧应用的窗口数记 0（App 级初值应用先于闪屏构造注册，画刷为应用级资源故仍生效）、变化项记 `"opacity,blur"` 而非 `initial`——均为 259d4ad 日志细节，不影响判定。
+- 透明关闭路径不改动用户真实设置，以契约测试（关闭清空 TransparencyLevelHint）为证；截屏按约定未采集。
