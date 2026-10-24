@@ -11,6 +11,7 @@ public sealed class ConfigSnapshotService : IDisposable
 {
     private readonly string databasePath;
     private readonly ILogger<ConfigSnapshotService>? logger;
+    private int databaseReadCount;
 
     public ConfigSnapshotService(ILogger<ConfigSnapshotService>? logger = null)
         : this(AppDataPaths.DatabasePath, logger) { }
@@ -28,6 +29,7 @@ public sealed class ConfigSnapshotService : IDisposable
     {
         try
         {
+            IncrementDatabaseRead();
             LogRuntimeContext("配置快照同步读取开始");
             using var db = new ConfigurationDbContext(CreateReadOnlyOptions());
             EnsureDatabaseReadyForReadAsync().GetAwaiter().GetResult();
@@ -56,6 +58,7 @@ public sealed class ConfigSnapshotService : IDisposable
     {
         try
         {
+            IncrementDatabaseRead();
             logger?.LogInformation("启动快照读取开始 {DatabasePath}", databasePath);
             await EnsureDatabaseReadyForReadAsync(cancellationToken);
             await using var db = CreateContext(CreateReadOnlyOptions());
@@ -80,6 +83,7 @@ public sealed class ConfigSnapshotService : IDisposable
     {
         try
         {
+            IncrementDatabaseRead();
             LogRuntimeContext("Provider 列表读取开始");
             await using var db = CreateContext(CreateReadOnlyOptions());
             await EnsureDatabaseReadyForReadAsync(cancellationToken);
@@ -108,6 +112,7 @@ public sealed class ConfigSnapshotService : IDisposable
 
     public async Task<AppSettingsResponse> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
+        IncrementDatabaseRead();
         await using var db = CreateContext(CreateReadOnlyOptions());
         await EnsureDatabaseReadyForReadAsync(cancellationToken);
         var provider = new DatabaseConfigurationProvider(db, CreateProviderLogger());
@@ -120,6 +125,7 @@ public sealed class ConfigSnapshotService : IDisposable
     /// </summary>
     public async Task<UpdateProxySettings> GetUpdateProxySettingsAsync(CancellationToken cancellationToken = default)
     {
+        IncrementDatabaseRead();
         await using var db = CreateContext(CreateReadOnlyOptions());
         await EnsureDatabaseReadyForReadAsync(cancellationToken);
         var settings = await db.AppSettings.AsNoTracking().SingleAsync(cancellationToken);
@@ -162,6 +168,7 @@ public sealed class ConfigSnapshotService : IDisposable
     public Task DeleteModelAsync(Guid id, CancellationToken cancellationToken = default) => ExecuteManagementAsync(async (service, token) => { await service.DeleteModelAsync(id, token); return true; }, cancellationToken);
     public async Task<IReadOnlyList<GatewayModelSourceResponse>> ListEnabledGatewayModelsAsync(CancellationToken cancellationToken = default)
     {
+        IncrementDatabaseRead();
         await using var db = CreateContext();
         await ConfigurationDatabase.InitializeAsync(db, cancellationToken);
         return await db.Models.AsNoTracking()
@@ -205,6 +212,14 @@ public sealed class ConfigSnapshotService : IDisposable
             initializationLock.Dispose();
         }
     }
+
+    /// <summary>
+    /// 本次进程内「打开配置库执行读取/初始化」的次数观测点（按服务实例累计）。
+    /// 启动链路回归测试据此断言整个启动流程内配置库只被读取一次。
+    /// </summary>
+    internal int DatabaseReadCount => Volatile.Read(ref databaseReadCount);
+
+    private void IncrementDatabaseRead() => Interlocked.Increment(ref databaseReadCount);
 
     private ConfigurationDbContext CreateContext(DbContextOptions<ConfigurationDbContext>? options = null) => new(options ?? CreateOptions());
     private DbContextOptions<ConfigurationDbContext> CreateOptions()

@@ -44,6 +44,27 @@ public sealed class SplashStartupContractTests
         Assert.DoesNotContain("RefreshModelSummary();", constructor, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void 助手模型摘要优先复用数据中心内存快照()
+    {
+        // desktop-startup-splash「主界面初始化不读库」：启动首刷的模型分组必须先取内存快照，
+        // 数据库读取（ListAvailableModelsAsync）只能是数据中心不可用时的回落。
+        var source = ReadDesktopFile("ViewModels", "AssistantViewModel.cs");
+        var methodStart = source.IndexOf("    private async void RefreshModelSummary()", StringComparison.Ordinal);
+        Assert.True(methodStart >= 0, "未找到 RefreshModelSummary。");
+        var nextMethod = source.IndexOf("    private void UpdateModelSummary()", methodStart, StringComparison.Ordinal);
+        Assert.True(nextMethod > methodStart, "未找到 RefreshModelSummary 的结束边界。");
+        var method = source[methodStart..nextMethod];
+
+        Assert.Contains("dataStore is { IsInitialized: true }", method, StringComparison.Ordinal);
+        Assert.Contains("GroupAvailableModels", method, StringComparison.Ordinal);
+        Assert.Contains("ListAvailableModelsAsync", method, StringComparison.Ordinal);
+        Assert.True(
+            method.IndexOf("dataStore is { IsInitialized: true }", StringComparison.Ordinal)
+            < method.IndexOf("ListAvailableModelsAsync", StringComparison.Ordinal),
+            "内存快照必须是首选数据源，数据库读取只能是回落。");
+    }
+
     private static string ReadDesktopFile(params string[] segments) =>
         File.ReadAllText(Path.Combine([AppContext.BaseDirectory, "..", "..", "..", "..", "LoomX", .. segments]));
 }

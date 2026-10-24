@@ -73,6 +73,14 @@ public sealed class AppDataStore : IDisposable
     public async Task RefreshAsync(CancellationToken cancellationToken = default) =>
         await ReloadCoreAsync(cancellationToken, isInitialLoad: false, new ConfigurationChangedEventArgs(ConfigurationChangeSource.Snapshot, ConfigurationChangeKind.Snapshot));
 
+    /// <summary>
+    /// 仅在数据中心尚未初始化时读库初始化；已初始化时直接复用内存快照返回。
+    /// 启动期首刷（Shell 阶段页面构造、助手首次模型摘要）必须使用本入口，
+    /// 保证整个启动流程内配置库只被读取一次；显式刷新继续使用会重新读库的 <see cref="RefreshAsync"/>。
+    /// </summary>
+    public Task EnsureInitializedAsync(CancellationToken cancellationToken = default) =>
+        IsInitialized ? Task.CompletedTask : InitializeAsync(cancellationToken);
+
     public async Task<IReadOnlyList<ProviderResponse>> ListProvidersAsync(CancellationToken cancellationToken = default)
     {
         await InitializeAsync(cancellationToken);

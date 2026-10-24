@@ -1,6 +1,7 @@
 using Xunit;
 using LoomX.Assistant;
 using LoomX.Configuration;
+using LoomX.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -193,6 +194,33 @@ public sealed class AssistantModelClientFactoryTests : IAsyncLifetime
         Assert.Equal("main-openai", group.ProviderBusinessId);
         Assert.Equal(2, group.Models.Count);
         Assert.DoesNotContain(group.Models, model => model.ModelId == "hidden-model");
+    }
+
+    [Fact]
+    public async Task GroupAvailableModels_FromStartupSnapshot_MatchesDatabaseListing()
+    {
+        // desktop-startup-splash「主界面初始化不读库」：助手首刷改为复用数据中心内存快照，
+        // 折叠规则必须与数据库读取路径 ListAvailableAsync 完全一致（含 Provider.SortOrder → Model.SortOrder → ModelId 排序）。
+        var openai = await CreateProviderAsync("main-openai", "openai");
+        await CreateModelAsync(openai.Id, "model-b");
+        await CreateModelAsync(openai.Id, "model-a");
+
+        using var snapshotService = new ConfigSnapshotService(databasePath);
+        using var gatewayService = new GatewayProcessService();
+        var activityPath = Path.Combine(Path.GetTempPath(), $"loomx-modelfactory-{Guid.NewGuid():N}.activity.db");
+        using var store = new AppDataStore(snapshotService, gatewayService, NullLogger<AppDataStore>.Instance, new ActivityQueryService(activityPath));
+        await store.InitializeAsync();
+
+        var fromMemory = AssistantModelClientFactory.GroupAvailableModels(store.Providers);
+        var fromDatabase = await factory.ListAvailableAsync(CancellationToken.None);
+
+        Assert.Equal(
+            fromDatabase.Select(item => (item.ProviderBusinessId, item.ProviderDisplayName, string.Join("|", item.Models.Select(model => model.ModelId)))).ToArray(),
+            fromMemory.Select(item => (item.ProviderBusinessId, item.ProviderDisplayName, string.Join("|", item.Models.Select(model => model.ModelId)))).ToArray());
+        var group = Assert.Single(fromMemory);
+        Assert.Equal(["model-b", "model-a"], group.Models.Select(item => item.ModelId).ToArray());
+
+        try { File.Delete(activityPath); } catch (IOException) { }
     }
 
     private async Task<ProviderResponse> CreateProviderAsync(string businessId, string apiMode, bool enabled = true) =>

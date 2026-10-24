@@ -22,6 +22,7 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
     private readonly ILoggerFactory loggerFactory;
     private readonly ILogger<AssistantViewModel> logger;
     private readonly ToastService? toastService;
+    private readonly AppDataStore? dataStore;
     private readonly IUserDecisionBroker? configuredUserDecisionBroker;
     private readonly Action<Action> uiDispatcher;
     private readonly Func<AskUserDialogViewModel, Task<bool?>> showAskUserDialog;
@@ -63,12 +64,14 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
         ToastService? toastService = null,
         IUserDecisionBroker? userDecisionBroker = null,
         Action<Action>? uiDispatcher = null,
-        Func<AskUserDialogViewModel, Task<bool?>>? showAskUserDialog = null)
+        Func<AskUserDialogViewModel, Task<bool?>>? showAskUserDialog = null,
+        AppDataStore? dataStore = null)
     {
         this.gatewayService = gatewayService;
         this.loggerFactory = loggerFactory ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
         logger = this.loggerFactory.CreateLogger<AssistantViewModel>();
         this.toastService = toastService;
+        this.dataStore = dataStore;
         configuredUserDecisionBroker = userDecisionBroker;
         this.uiDispatcher = uiDispatcher ?? (action => Dispatcher.UIThread.Post(action));
         this.showAskUserDialog = showAskUserDialog ?? ShowAskUserCardAsync;
@@ -1103,7 +1106,11 @@ public sealed class AssistantViewModel : NotifyViewModel, IDisposable
             }
 
             var (preferredProvider, preferredModel) = service.GetModelSelection();
-            var groups = await service.ListAvailableModelsAsync();
+            // 启动链路优先复用数据中心的内存快照构造分组，避免再次打开配置库（desktop-startup-splash「主界面初始化不读库」）；
+            // 仅数据中心不可用时回落到数据库读取。
+            var groups = dataStore is { IsInitialized: true } store
+                ? AssistantModelClientFactory.GroupAvailableModels(store.Providers)
+                : await service.ListAvailableModelsAsync();
             if (preferredProvider is null || preferredModel is null)
             {
                 var firstGroup = groups.FirstOrDefault();

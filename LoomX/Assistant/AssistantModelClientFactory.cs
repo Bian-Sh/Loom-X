@@ -81,11 +81,22 @@ public class AssistantModelClientFactory
     public virtual async Task<IReadOnlyList<AssistantProviderModelGroup>> ListAvailableAsync(CancellationToken cancellationToken)
     {
         var providers = await configuration.ListProvidersAsync(cancellationToken);
+        return GroupAvailableModels(providers);
+    }
+
+    /// <summary>
+    /// 把数据中心内存中的 Provider 快照折叠为可选模型分组，规则与 <see cref="ListAvailableAsync"/> 完全一致。
+    /// 启动链路用它复用内存快照、避免重复打开配置库；模型按 SortOrder → ModelId 排序，保证选择器顺序稳定。
+    /// </summary>
+    public static IReadOnlyList<AssistantProviderModelGroup> GroupAvailableModels(IEnumerable<ProviderResponse> providers)
+    {
         var groups = new List<AssistantProviderModelGroup>();
         foreach (var provider in providers.Where(item => item.Enabled))
         {
             var models = provider.Models
                 .Where(item => item.Enabled && SupportsOpenAi(item.ApiMode ?? provider.ApiMode))
+                .OrderBy(item => item.SortOrder)
+                .ThenBy(item => item.ModelId, StringComparer.Ordinal)
                 .Select(item => new AssistantModelOption(provider.BusinessId, item.ModelId, item.DisplayName))
                 .ToArray();
             if (models.Length > 0)
