@@ -15,6 +15,7 @@ public sealed class AppDataStore : IDisposable
     private readonly ActivityQueryService activityQueryService;
     private readonly GatewayProcessService gatewayService;
     private readonly ILogger<AppDataStore> logger;
+    private readonly string? appearanceCachePath;
     private readonly SemaphoreSlim stateLock = new(1, 1);
     private readonly object initializationGate = new();
     private readonly List<ActivityEventRecord> activityWindow = [];
@@ -50,12 +51,15 @@ public sealed class AppDataStore : IDisposable
         ConfigSnapshotService configService,
         GatewayProcessService gatewayService,
         ILogger<AppDataStore>? logger = null,
-        ActivityQueryService? activityQueryService = null)
+        ActivityQueryService? activityQueryService = null,
+        string? appearanceCachePath = null)
     {
         this.configService = configService;
         this.gatewayService = gatewayService;
         this.logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger<AppDataStore>.Instance;
         this.activityQueryService = activityQueryService ?? new ActivityQueryService();
+        // 桌面端注入 %LOCALAPPDATA%\LoomX\appearance.json；测试与 CLI 默认不写缓存。
+        this.appearanceCachePath = appearanceCachePath;
         gatewayService.ActivityEnqueued += OnActivityEnqueued;
     }
 
@@ -127,6 +131,7 @@ public sealed class AppDataStore : IDisposable
     {
         var previous = Settings;
         var result = await configService.UpdateSettingsAsync(input, cancellationToken);
+        WriteAppearanceCache(result);
         var fields = GetSettingsFields(previous, result);
         await ApplyLocalChangeAsync(
             new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Settings, EntityKey: "settings", Fields: fields),
@@ -139,6 +144,7 @@ public sealed class AppDataStore : IDisposable
     {
         var previous = Settings;
         var result = await configService.SetGatewayRunningAsync(gatewayRunning, cancellationToken);
+        WriteAppearanceCache(result);
         var fields = GetSettingsFields(previous, result);
         await ApplyLocalChangeAsync(
             new ConfigurationChangedEventArgs(ConfigurationChangeSource.LocalSave, ConfigurationChangeKind.Settings, EntityKey: "settings", Fields: fields),
@@ -469,10 +475,24 @@ public sealed class AppDataStore : IDisposable
         ConfigurationChanged?.Invoke(this, change);
     }
 
+    private void WriteAppearanceCache(AppSettingsResponse settings)
+    {
+        if (appearanceCachePath is null) return;
+        AppearanceCache.TryWrite(
+            appearanceCachePath,
+            new AppearanceCacheSnapshot(
+                settings.TransparencyEnabled,
+                settings.TransparencyOpacity,
+                settings.BlurAmount,
+                AppearanceCache.NormalizeTheme(settings.Theme) ?? "system"),
+            logger);
+    }
+
     private void ApplySettingsSnapshot(AppSettingsResponse result)
     {
         Settings = result;
         CurrentConfig = WithConfig(CurrentConfig, settings: new ResolvedAppSettings
+
         {
             Language = result.Language,
             Theme = result.Theme,

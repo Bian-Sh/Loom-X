@@ -77,8 +77,9 @@ public partial class MainWindow : Window
         updateReleasePreviewHideTimer.Tick += (_, _) => CloseUpdateReleasePreview();
         UpdateSidebarCollapseToolTip();
         LocaleService.CultureChanged += MainWindow_OnCultureChanged;
-        appearanceCoordinator = new WindowAppearanceCoordinator(this);
-        TransparencyLevelHint = BuildTransparencyLevels("acrylic");
+        // 材质由应用级协调点统一管理：主窗口注册后立即取得当前快照，第一帧即目标材质。
+        appearanceCoordinator = (Application.Current as App)?.AppearanceCoordinator ?? new WindowAppearanceCoordinator();
+        appearanceCoordinator.ApplyTo(this);
         AddHandler(InputElement.PointerPressedEvent, Window_OnPointerPressed, RoutingStrategies.Tunnel);
         AddHandler(InputElement.PointerMovedEvent, Window_OnPointerMoved, RoutingStrategies.Tunnel);
         DataContextChanged += MainWindow_OnDataContextChanged;
@@ -464,28 +465,14 @@ public partial class MainWindow : Window
         logger.LogInformation("重复启动请求已激活主窗口 {NativeActivated} {ProcessId}", nativeActivated, Environment.ProcessId);
     }
 
-    public void ApplyTheme(string theme)
-    {
-        if (Application.Current is not { } application) return;
-        application.RequestedThemeVariant = theme.Trim().ToLowerInvariant() switch
-        {
-            "dark" => ThemeVariant.Dark,
-            "light" => ThemeVariant.Light,
-            _ => ThemeVariant.Default
-        };
-        appearanceCoordinator.RefreshThemeResources();
-    }
+    public void ApplyTheme(string theme) => appearanceCoordinator.ApplyTheme(theme);
 
     public void ApplyAppearance(bool enabled, int opacity, int blurAmount, string algorithm)
     {
         // 算法选择已固定为 Acrylic；保留参数仅兼容旧版调用方和配置数据。
         algorithm = "acrylic";
         logger.LogDebug("透明外观应用开始 {Enabled} {Opacity} {BlurAmount} {Algorithm}", enabled, opacity, blurAmount, algorithm);
-        opacity = Math.Clamp(opacity, 0, 100);
-        blurAmount = Math.Clamp(blurAmount, 0, 64);
         appearanceCoordinator.Apply(enabled, opacity, blurAmount, algorithm);
-        // 保留主窗口入口的显式材质赋值，兼容现有外观契约和运行时诊断。
-        TransparencyLevelHint = BuildTransparencyLevels(algorithm);
         logger.LogDebug(
             "透明外观应用完成 {Enabled} {Opacity} {BlurAmount} {Algorithm} {WindowBackgroundType} {GlassType} {ActualTransparencyLevel}",
             enabled,

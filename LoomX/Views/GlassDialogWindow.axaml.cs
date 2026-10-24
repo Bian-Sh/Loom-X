@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 
@@ -5,7 +6,12 @@ namespace LoomX.Views;
 
 public partial class GlassDialogWindow : Window
 {
-    public GlassDialogWindow() => InitializeComponent();
+    public GlassDialogWindow()
+    {
+        InitializeComponent();
+        // 构造即接入应用级材质协调点，所有玻璃对话框共享当前外观快照。
+        (Application.Current as App)?.AppearanceCoordinator.ApplyTo(this);
+    }
 
     public object? DialogContent
     {

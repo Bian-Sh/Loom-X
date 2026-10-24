@@ -35,6 +35,8 @@ public partial class App : Application
     private bool ownsShellBootstrapMutex;
     private bool allowMultipleInstances;
     public ILoggerFactory? LoggerFactory => loggerFactory;
+    /// <summary>应用级窗口材质协调点：闪屏、主窗口与对话框共享唯一外观状态。</summary>
+    public WindowAppearanceCoordinator AppearanceCoordinator { get; private set; } = new();
     public override void Initialize()
     {
         AssistantMarkdownTypography.Configure();
@@ -141,7 +143,14 @@ public partial class App : Application
             var toastService = new ToastService();
             gatewayService = new GatewayProcessService(toastService);
             var windowsStartupService = new WindowsStartupService(loggerFactory.CreateLogger<WindowsStartupService>());
-            dataStore = new AppDataStore(configService, gatewayService, loggerFactory.CreateLogger<AppDataStore>());
+            dataStore = new AppDataStore(
+                configService,
+                gatewayService,
+                loggerFactory.CreateLogger<AppDataStore>(),
+                appearanceCachePath: AppDataPaths.AppearanceCachePath);
+            // 外观初值只读缓存文件、不开配置库；闪屏构造注册时即拿到最终材质，第一帧零切换。
+            AppearanceCoordinator = new WindowAppearanceCoordinator(loggerFactory.CreateLogger<WindowAppearanceCoordinator>());
+            var cachedAppearance = ApplyStartupAppearance(startupLogger);
             var startupProgress = new StartupProgress();
             var splashViewModel = new SplashViewModel(startupProgress);
             var splashWindow = new SplashWindow { DataContext = splashViewModel };
@@ -208,6 +217,7 @@ public partial class App : Application
                         restoreStartupIntent: false);
                     if (mainWindow.DataContext is MainWindowViewModel viewModel)
                         await viewModel.InitializeAfterStartupAsync();
+                    ReconcileStartupAppearance(cachedAppearance, startupLogger);
 
                     startupProgress.Complete();
                     desktop.MainWindow = mainWindow;
@@ -224,6 +234,50 @@ public partial class App : Application
             }
         }
         base.OnFrameworkInitializationCompleted();
+    }
+
+    /// <summary>显示闪屏前把缓存外观注入协调器；缓存缺失或损坏时以不透明默认值兜底。</summary>
+    private AppearanceCacheSnapshot? ApplyStartupAppearance(ILogger<App> startupLogger)
+    {
+        var cached = AppearanceCache.TryRead(AppDataPaths.AppearanceCachePath, startupLogger);
+        var initial = cached ?? AppearanceCacheSnapshot.OpaqueDefault;
+        AppearanceCoordinator.ApplyTheme(initial.Theme);
+        AppearanceCoordinator.Apply(initial.Enabled, initial.Opacity, initial.Blur, "acrylic");
+        return cached;
+    }
+
+    /// <summary>
+    /// 配置库加载完成后对账：缓存与设置一致时零切换；不一致说明缓存写入曾失败，
+    /// 已由 Shell 阶段按设置一次性切换，这里补记 Warning 并自愈缓存。
+    /// </summary>
+    private void ReconcileStartupAppearance(AppearanceCacheSnapshot? cached, ILogger<App> startupLogger)
+    {
+        if (dataStore?.Settings is not { } settings) return;
+        var effective = cached ?? AppearanceCacheSnapshot.OpaqueDefault;
+        var aligned = effective.Enabled == settings.TransparencyEnabled
+            && effective.Opacity == settings.TransparencyOpacity
+            && effective.Blur == settings.BlurAmount
+            && string.Equals(effective.Theme, AppearanceCache.NormalizeTheme(settings.Theme) ?? "system", StringComparison.Ordinal);
+        if (aligned)
+        {
+            startupLogger.LogInformation(
+                "启动外观对账一致，零切换 {Enabled} {Opacity} {Blur} {Theme}",
+                effective.Enabled, effective.Opacity, effective.Blur, effective.Theme);
+            return;
+        }
+
+        startupLogger.LogWarning(
+            "外观缓存与配置库不一致，已按配置库一次性切换 {CacheEnabled}/{CacheOpacity}/{CacheBlur}/{CacheTheme} -> {SettingsEnabled}/{SettingsOpacity}/{SettingsBlur}/{SettingsTheme}",
+            effective.Enabled, effective.Opacity, effective.Blur, effective.Theme,
+            settings.TransparencyEnabled, settings.TransparencyOpacity, settings.BlurAmount, AppearanceCache.NormalizeTheme(settings.Theme) ?? "system");
+        AppearanceCache.TryWrite(
+            AppDataPaths.AppearanceCachePath,
+            new AppearanceCacheSnapshot(
+                settings.TransparencyEnabled,
+                settings.TransparencyOpacity,
+                settings.BlurAmount,
+                AppearanceCache.NormalizeTheme(settings.Theme) ?? "system"),
+            startupLogger);
     }
 
     [SupportedOSPlatform("windows")]
